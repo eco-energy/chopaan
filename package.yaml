@@ -26,6 +26,7 @@ dependencies:
 - amazonka-iot
 - net-mqtt
 - aeson
+- proto-lens
 
 ghc-options:
 - -Wall
