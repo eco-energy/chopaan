@@ -8,7 +8,7 @@ def replace_params():
         params = json.load(f)
 
     with open(os.path.join(fp, 'cert.id'), 'r') as f:
-        cert_id = f.read().strip()
+        cert_id = f.read().strip().strip("\"")
 
     params["CertificateId"] = cert_id
 
@@ -18,3 +18,4 @@ def replace_params():
 
 if __name__ == "__main__":
     replace_params()
+    os.remove(os.path.join(fp, 'cert.id'))

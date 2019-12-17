@@ -20,7 +20,7 @@
             "Properties" : {
                 "ThingName" : {"Ref" : "ThingName"},
                 "AttributePayload" : { "version" : "v1", "kibbutz": {"Ref" : "Kibbutz"}, "commonName" :  {"Ref" : "CommonName"}},
-                "ThingTypeName" :  "kibbutz-pilot-node",
+                "ThingTypeName" :  "kibbutz-pilot-chopaan",
                 "ThingGroups" : ["kibbutz-pilot-v1"]
             }
         },
