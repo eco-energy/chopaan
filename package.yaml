@@ -6,9 +6,19 @@ author:              Faez Shakil
 maintainer:          faez.shakil@gmail.com
 copyright:           2019 Faez Shakil
 
+custom-setup:
+  dependencies:
+    - base
+    - Cabal
+    - proto-lens-setup
+
+build-tools:
+  proto-lens-protoc:proto-lens-protoc
+
 extra-source-files:
 - README.md
 - ChangeLog.md
+- node_message_schema/NodeMessages.proto
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -19,6 +29,9 @@ extra-source-files:
 # common to point users to the README.md file.
 description:         Please see the README on Github at <https://github.com/faezs/chopaan#readme>
 
+
+
+
 dependencies:
 - base >= 4.11 && < 10
 - rio >= 0.1.8.0
@@ -27,6 +40,8 @@ dependencies:
 - net-mqtt
 - aeson
 - proto-lens
+- text
+- bytestring
 
 ghc-options:
 - -Wall
@@ -38,6 +53,12 @@ ghc-options:
 - -Wredundant-constraints
 
 library:
+  dependencies:
+    - base
+    - proto-lens-runtime
+  exposed-modules:
+    - Proto.NodeMessages
+    - Proto.NodeMessages_Fields
   source-dirs: src
 
 executables:
@@ -47,7 +68,9 @@ executables:
     dependencies:
     - chopaan
     - optparse-simple
-
+    - base
+    - microlens
+    - proto-lens
     ghc-options:
     - -threaded
     - -rtsopts
