@@ -9,3 +9,16 @@ mqtt_cert:
 	| jq .certificateId | tee -a certs/cert.id && \
 	python certs/update_params.py && \
   aws iot register-thing --template-body file://certs/chopaan_template.json --parameters file://certs/params.json
+
+
+dev:
+	stack test --fast --haddock-deps --file-watch
+
+setup_hoogle:
+	stack hoogle -- generate --local
+
+hoogle:
+	stack hoogle -- server --local --port=8080
+
+build:
+	stack build
