@@ -1,3 +1,6 @@
+gen_schema:
+	git submodule update --remote --merge 
+
 mqtt_cert:
 	aws iot create-keys-and-certificate --set-as-active \
 	--certificate-pem-outfile certs/chopaan.cert.pem \
