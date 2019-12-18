@@ -22,28 +22,17 @@ import Control.Monad.Trans.AWS
 import Data.Maybe
 import System.IO
 
-{--
-type KibbutzName = Text
-type StateTopic = Text
-type ControlTopic = Text
 
-kbtz :: KibbutzName
-kbtz = "PILOT"
---}
+-- MQTT Imports
+import qualified Network.MQTT.Client as MQ
+import qualified Network.MQTT.Topic as MQ
+import Network.Connection
+import Network.TLS
+import Data.X509.CertificateStore
+import Data.Default.Class 
+import Network.TLS.Extra.Cipher
+import Network.URI
 {--
-getNodes :: KibbutzName -> IO [(StateTopic, ControlTopic)]
-getNodes kbtz = do
-  let
-    query = Iot.listThings & Iot.ltAttributeValue kbtz
-    thingName ta = ta ^. Iot.taThingName
-    toTopics :: Text -> (StateTopic, ControlTopic)
-    toTopics tn = (pfx++tn++"/state", pfx++tn++"/control")
-    pfx = "kibbutz/node/"
-  lgr <- newLogger Trace stdout
-  env <- newEnv Discover <&> set envLogger lgr . set envRegion ("ap-southeast-1" :: Region)
-  runResourceT . runAWST env $ do
-    things <- send query
-    
 
 eTR :: NM.EnergyTransactionRequest
 eTR =
@@ -60,6 +49,12 @@ meshFrame =
   defMessage
       & time .~ (3424234453 :: Word64)
       & transaction .~ eTR
+attrName :: Maybe Text.Text
+attrName = Just "kibbutz"
+
+kbtz :: Maybe Text.Text
+kbtz = Just "PILOT"
+
 --}
 
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control
@@ -72,28 +67,23 @@ type ControlTopic = Text.Text
 
 type ThingName = Text.Text
 
-attrName :: Maybe Text.Text
-attrName = Just "kibbutz"
-
-kbtz :: Maybe Text.Text
-kbtz = Just "PILOT"
-
-ttn :: Maybe Text.Text
-ttn = Just "kibbutz-pilot-node"
-
-iiot :: Service
-iiot = Iot.ioT{_svcPrefix="execute-api"}
 
 getThings :: IO [Iot.ThingAttribute]
 getThings = do
-    lgr <- newLogger Trace stdout
-    env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot
-    runResourceT . runAWST env $ do
-      things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
-      return $ things ^. Iot.ltrsThings
+  let
+    iiot = Iot.ioT{_svcPrefix="execute-api"} :: Service 
+    ttn = (Just "kibbutz-pilot-node") :: Maybe Text.Text
+  lgr <- newLogger Trace stdout
+  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot
+  runResourceT . runAWST env $ do
+    things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
+    --   putStrLn (show (map (\t -> (fromMaybe ("NotFound", "NotFound") t)) topics))
+    return $ things ^. Iot.ltrsThings
+
 
 thingName :: Iot.ThingAttribute -> Maybe Text.Text
 thingName t = t ^. Iot.taThingName
+
 
 nameToTopics :: ThingName -> (StateTopic, ControlTopic)
 nameToTopics name = (st, ct)
@@ -108,15 +98,43 @@ nameToTopics name = (st, ct)
     n = Text.replace ":" "" name
 
 
+-- https://stackoverflow.com/questions/40081508/how-to-provide-a-client-certificate-to-http-client-tls
+mkTLSSettings :: IO TLSSettings
+mkTLSSettings = do
+  creds <- either (error "couldn't read cert") Just <$> credentialLoadX509 cert key
+  let
+    hooks = def { onCertificateRequest = \_ -> return creds
+                , onServerCertificate = \_ _ _ _ -> return []
+                }
+    clientParams = (defaultParamsClient hostName "")
+                  { clientHooks=hooks
+                  , clientSupported = def {supportedCiphers=ciphersuite_all}
+                  }
+  return (TLSSettings clientParams)
+  where
+    cert = "certs/chopaan.cert.pem"
+    key = "certs/chopaan.private.key.pem"
+    hostName = "thisguy"
+
 
 main :: IO ()
 main = do
   things <- getThings
+  tlsConf <- mkTLSSettings
   let
     topics = (fmap nameToTopics) <$> map thingName things
-  putStrLn (show (map (\t -> (fromMaybe ("NotFound", "NotFound") t)) topics))
-
-
+    stopics = zip (filter (\t -> t == "NoTopic") $ map ((fromMaybe "NoTopic") . fmap fst) topics) (repeat MQ.subOptions)
+    (Just uri) = parseURI "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
+    conf = MQ.mqttConfig
+           { MQ._protocol=MQ.Protocol311
+           , MQ._msgCB=MQ.SimpleCallback cb
+           , MQ._tlsSettings=tlsConf}
+  mc <- MQ.connectURI conf uri
+  print =<< MQ.subscribe mc stopics []
+  MQ.waitForClient mc
+  where
+    cb _ t m p =  print (t, m, p)
+  
 {--
 import Import
 import Run

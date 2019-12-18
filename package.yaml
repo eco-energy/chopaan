@@ -42,6 +42,11 @@ dependencies:
 - proto-lens
 - text
 - bytestring
+- connection
+- tls
+- x509-store
+- data-default-class
+- network-uri
 
 ghc-options:
 - -Wall
