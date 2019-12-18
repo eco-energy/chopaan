@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -26,12 +27,16 @@ import System.IO
 -- MQTT Imports
 import qualified Network.MQTT.Client as MQ
 import qualified Network.MQTT.Topic as MQ
+import Network.MQTT.Types (ConnACKFlags (..))
 import Network.Connection
 import Network.TLS
 import Data.X509.CertificateStore
 import Data.Default.Class 
 import Network.TLS.Extra.Cipher
 import Network.URI
+import Control.Exception (Handler (..), IOException, catches)
+import Control.Monad (forever, when)
+import Control.Concurrent (threadDelay)
 {--
 
 eTR :: NM.EnergyTransactionRequest
@@ -106,15 +111,16 @@ mkTLSSettings = do
     hooks = def { onCertificateRequest = \_ -> return creds
                 , onServerCertificate = \_ _ _ _ -> return []
                 }
-    clientParams = (defaultParamsClient hostName "")
+    clientParams = (defaultParamsClient hostName name)
                   { clientHooks=hooks
-                  , clientSupported = def {supportedCiphers=ciphersuite_all}
+                  , clientSupported = def {supportedCiphers=ciphersuite_strong}
                   }
   return (TLSSettings clientParams)
   where
     cert = "certs/chopaan.cert.pem"
     key = "certs/chopaan.private.key.pem"
-    hostName = "thisguy"
+    hostName = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
+    name = "chopaan-pilot"
 
 
 main :: IO ()
@@ -123,18 +129,28 @@ main = do
   tlsConf <- mkTLSSettings
   let
     topics = (fmap nameToTopics) <$> map thingName things
-    stopics = zip (filter (\t -> t == "NoTopic") $ map ((fromMaybe "NoTopic") . fmap fst) topics) (repeat MQ.subOptions)
-    (Just uri) = parseURI "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
+    stopics :: [(Text.Text, MQ.SubOptions)]
+    stopics = zip ts subopts
+      where
+        ts = (map ((fromMaybe "NoTopic") . fmap fst) topics)
+        subopts = (repeat MQ.subOptions)
+    (Just uri) = parseURI $ "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com" <> "#" <> "chopaan-pilot" 
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
+           , MQ._connID="chopaan-pilot"
            , MQ._msgCB=MQ.SimpleCallback cb
+           , MQ._connectTimeout=18000000000
            , MQ._tlsSettings=tlsConf}
-  mc <- MQ.connectURI conf uri
-  print =<< MQ.subscribe mc stopics []
-  MQ.waitForClient mc
+  putStrLn ("Topics: " <> (show stopics))
+  forever $ catches (go conf uri stopics) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
   where
+    go c u ts = do
+      mc <- MQ.connectURI c u
+      putStrLn (show ts)
+      print =<< MQ.subscribe mc ts []
+      MQ.waitForClient mc
     cb _ t m p =  print (t, m, p)
-  
+    handler e = putStrLn ("ERROR :" <> e) >> threadDelay 1000000
 {--
 import Import
 import Run
