@@ -7,6 +7,7 @@
 
 module Main (main) where
 
+-- Protobuf Imports
 import Proto.NodeMessages as NM
 import Proto.NodeMessages_Fields as NM
 import Data.ProtoLens (defMessage, showMessage, encodeMessage, decodeMessage)
@@ -37,8 +38,9 @@ import Network.URI
 import Control.Exception (Handler (..), IOException, catches)
 import Control.Monad (forever, when)
 import Control.Concurrent (threadDelay)
-{--
+import qualified Data.ByteString.Lazy as BL
 
+{--
 eTR :: NM.EnergyTransactionRequest
 eTR =
   defMessage
@@ -54,12 +56,14 @@ meshFrame =
   defMessage
       & time .~ (3424234453 :: Word64)
       & transaction .~ eTR
+
 attrName :: Maybe Text.Text
 attrName = Just "kibbutz"
 
+
+
 kbtz :: Maybe Text.Text
 kbtz = Just "PILOT"
-
 --}
 
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control
@@ -99,7 +103,7 @@ nameToTopics name = (st, ct)
     ct = prefix <> n <> cChannel
     stChannel = "/state"
     cChannel = "/control"
-    prefix = "kibbutz/node/"
+    prefix = "/kibbutz/node/"
     n = Text.replace ":" "" name
 
 
@@ -141,16 +145,24 @@ main = do
            , MQ._msgCB=MQ.SimpleCallback cb
            , MQ._connectTimeout=18000000000
            , MQ._tlsSettings=tlsConf}
-  putStrLn ("Topics: " <> (show stopics))
+  putStrLn ("Topics: " <> (show $ map fst stopics))
+  putStrLn (show (filter (\t -> t == ("/kibbutz/node/3c71bf644520/state" :: Text.Text)) $ map fst stopics))
   forever $ catches (go conf uri stopics) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
   where
     go c u ts = do
       mc <- MQ.connectURI c u
-      putStrLn (show ts)
       print =<< MQ.subscribe mc ts []
       MQ.waitForClient mc
-    cb _ t m p =  print (t, m, p)
+    cb _ t m p =  print (t, msg parsed, l)
+      where
+        msg (Right s) = show s
+        msg (Left a) = show a
+        parsed :: Either String EnergyState
+        parsed = decodeMessage $ toStrict m
+        l = BL.length m
+        toStrict = BS.concat . BL.toChunks
     handler e = putStrLn ("ERROR :" <> e) >> threadDelay 1000000
+    
 {--
 import Import
 import Run
