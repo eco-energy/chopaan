@@ -40,11 +40,11 @@ import Control.Monad (forever, when)
 import Control.Concurrent (threadDelay)
 import qualified Data.ByteString.Lazy as BL
 
-{--
+
 eTR :: NM.EnergyTransactionRequest
 eTR =
   defMessage
-      & uuid .~ ("123456" :: Text)
+      & uuid .~ ("12" :: Text.Text)
       & dispatchedAt .~ (223123123 :: Word64)
       & powerInWatts .~ (100 :: Double)
       & durationInSeconds .~ (60*60 :: Word64)
@@ -57,6 +57,7 @@ meshFrame =
       & time .~ (3424234453 :: Word64)
       & transaction .~ eTR
 
+{--
 attrName :: Maybe Text.Text
 attrName = Just "kibbutz"
 
@@ -145,13 +146,13 @@ main = do
            , MQ._msgCB=MQ.SimpleCallback cb
            , MQ._connectTimeout=18000000000
            , MQ._tlsSettings=tlsConf}
-  putStrLn ("Topics: " <> (show $ map fst stopics))
-  putStrLn (show (filter (\t -> t == ("/kibbutz/node/3c71bf644520/state" :: Text.Text)) $ map fst stopics))
+
   forever $ catches (go conf uri stopics) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
   where
     go c u ts = do
       mc <- MQ.connectURI c u
       print =<< MQ.subscribe mc ts []
+      pub mc
       MQ.waitForClient mc
     cb _ t m p =  print (t, msg parsed, l)
       where
@@ -161,8 +162,13 @@ main = do
         parsed = decodeMessage $ toStrict m
         l = BL.length m
         toStrict = BS.concat . BL.toChunks
+
     handler e = putStrLn ("ERROR :" <> e) >> threadDelay 1000000
-    
+    pub :: MQ.MQTTClient -> IO ()
+    pub c = do
+      forever $ MQ.publish c "/kibbutz/node/3c71bf644520/control" pMsg False >> threadDelay 10000
+      where
+        pMsg = (BL.fromStrict . BS.init) (encodeMessage meshFrame)
 {--
 import Import
 import Run
