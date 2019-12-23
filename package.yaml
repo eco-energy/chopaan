@@ -47,6 +47,8 @@ dependencies:
 - x509-store
 - data-default-class
 - network-uri
+- containers
+- stm
 
 ghc-options:
 - -Wall
