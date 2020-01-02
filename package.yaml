@@ -49,6 +49,10 @@ dependencies:
 - network-uri
 - containers
 - stm
+- pptable
+- time
+- ulid
+- convertible
 
 ghc-options:
 - -Wall
