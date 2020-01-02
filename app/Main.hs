@@ -1,9 +1,12 @@
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE TypeApplications #-}
-
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module Main (main) where
 
 -- Protobuf Imports
@@ -14,7 +17,7 @@ import Lens.Micro
 import Data.Word
 import qualified Data.Text as Text
 import qualified Data.ByteString as BS
-
+import qualified Data.ByteString.Char8 as BSC
 
 -- AWS Imports
 import qualified Network.AWS.IoT.ListThings as Iot
@@ -35,29 +38,23 @@ import Data.Default.Class
 import Network.TLS.Extra.Cipher
 import Network.URI
 import Control.Exception (Handler (..), IOException, catches)
-import Control.Monad (forever, when)
+import Control.Monad (forever, when, liftM)
 import Control.Concurrent (threadDelay)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Strict as Map
 import Control.Concurrent.STM
 import Control.Concurrent
 
+-- Vis and CLI
+import qualified Text.PrettyPrint.Tabulate as PPT
+import GHC.Generics (Generic)
+import Data.Data
 
-eTR :: NM.EnergyTransactionRequest
-eTR =
-  defMessage
-      & uuid .~ ("12" :: Text.Text)
-      & dispatchedAt .~ (223123123 :: Word64)
-      & powerInWatts .~ (100 :: Double)
-      & durationInSeconds .~ (60*60 :: Word64)
-      & direction .~ Outgoing
-
-
-meshFrame :: NM.MeshFrame
-meshFrame =
-  defMessage
-      & time .~ (3424234453 :: Word64)
-      & transaction .~ eTR
+-- Energy Transaction Stuff
+import qualified Data.Time as Time
+import Data.ULID (getULID)
+import Data.Convertible
+import Control.Concurrent.STM.TQueue
 
 {--
 attrName :: Maybe Text.Text
@@ -78,6 +75,8 @@ kbtz = Just "PILOT"
 
 type WattSeconds = Double
 
+type Watts = Double
+
 type S = Double
 
 data Metrics = Metrics
@@ -86,17 +85,19 @@ data Metrics = Metrics
   , consumed :: WattSeconds
   , generated :: WattSeconds
   , tDiff :: S
-  } deriving (Eq, Show, Ord)
+  } deriving (Eq, Show, Ord, Generic, Data)
 
 instance Semigroup Metrics where
   m0 <> m1 = Metrics tIn tOut c g newTimeDiff
     where
-      [tIn, tOut, c, g, newTimeDiff] = map (\t -> (sum $ map t ms)) ts 
+      [tIn, tOut, c, g, newTimeDiff] = map (\t -> (sum $ map t ms)) ts
       ms = [m0, m1]
       ts = [transmittedIn, transmittedOut, consumed, generated, tDiff]
 
 instance Monoid Metrics where
   mempty = Metrics 0 0 0 0 0
+
+instance PPT.Tabulate Metrics PPT.ExpandWhenNested
 
 processES :: S -> EnergyState -> Metrics
 processES prevTime es = Metrics tIn tOut c g tdiff
@@ -112,24 +113,81 @@ processES prevTime es = Metrics tIn tOut c g tdiff
     timeInSeconds = (fromIntegral $ es ^. cpuTime) / (1000 * 60) -- milliSToSeconds
     tdiff = timeInSeconds - prevTime
 
-type NodeStates = Map.Map NodeID Metrics
+newtype NodeStates = NodeStates { unNodeStates :: Map.Map NodeId Metrics } deriving (Show, Generic, Data)
 
-updateNodeState :: NodeStates -> NodeID -> EnergyState -> NodeStates
-updateNodeState ns n es = Map.adjust updateMetric n ns
+instance PPT.CellValueFormatter NodeId
+
+
+updateNodeState :: NodeStates -> NodeId -> EnergyState -> NodeStates
+updateNodeState ns n es = NodeStates $ Map.adjust updateMetric n ns'
   where
+    ns' = unNodeStates ns
     updateMetric = (<> processES s es)
-    s = tDiff $ ns Map.! n
+    s = tDiff $ ns' Map.! n
+
+printMetrics :: NodeStates -> IO ()
+printMetrics ns = PPT.printTable $ unNodeStates ns
 
 ----------------------------------------------------------------------------------
+-- Energy Transactor
+-- 1) Generate Demand Events
+-- 2) 
+-- 3) 
 
+type TransactionQ = TQueue (NodeId, NM.MeshFrame)
+
+mkEnergyTransactionR :: Watts -> S -> NM.PDirection -> IO NM.EnergyTransactionRequest
+mkEnergyTransactionR p t d = do
+  ulid <- getULID
+  time <- Time.getCurrentTime
+  let 
+   etr = defMessage
+         & uuid .~ (Text.pack . show) ulid
+         & dispatchedAt .~ (utcToWord64 time)
+         & powerInWatts .~ p
+         & durationInSeconds .~ (sToW64 t)
+         & direction .~ d
+   sToW64 :: S -> Word64
+   sToW64 = convert
+   utcToWord64 :: Time.UTCTime -> Word64
+   utcToWord64 = c'' . c'
+     where
+       c' :: Time.UTCTime -> Int
+       c' = convert
+       c'' :: Int -> Word64
+       c'' = convert
+  return etr
+
+class Frameable a where
+  toMeshFrame :: a -> NM.MeshFrame
+  fromMeshFrame :: NM.MeshFrame -> Maybe a
+
+
+instance Frameable NM.EnergyTransactionRequest where
+  toMeshFrame etr = undefined
+  fromMeshFrame m = undefined
+
+
+data Transaction = Transaction
+  { power :: Watts
+  , edge :: (Int, Int)
+  , time :: Integer
+  , edgeCost :: Watts
+  } deriving (Eq, Ord, Show, Generic)
+
+
+transactions :: [Transaction]
+transactions = undefined
+
+
+----------------------------------------------------------------------------------
 type StateTopic = Text.Text
+
 type ControlTopic = Text.Text
 
 type ThingName = Text.Text
 
-newtype NodeID = NodeID { unNodeID :: ThingName } deriving (Eq, Show, Ord)
-
-
+newtype NodeId = NodeId { unNodeId :: ThingName } deriving (Eq, Show, Ord, Data, Generic)
 
 getThings :: Text.Text -> IO [Iot.ThingAttribute]
 getThings thingTypeName = do
@@ -140,7 +198,6 @@ getThings thingTypeName = do
   env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot
   runResourceT . runAWST env $ do
     things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
-    --   putStrLn (show (map (\t -> (fromMaybe ("NotFound", "NotFound") t)) topics))
     return $ things ^. Iot.ltrsThings
 
 
@@ -160,8 +217,8 @@ nameToTopics name = (st, ct)
     prefix = "/kibbutz/node/"
     n = Text.replace ":" "" name
 
-stateTopicToNodeID :: Text.Text -> NodeID
-stateTopicToNodeID t = NodeID n
+stateTopicToNodeId :: Text.Text -> NodeId
+stateTopicToNodeId t = NodeId n
   where
     n = Text.replace "/state" "" $ Text.replace "/kibbutz/node" "" t
     
@@ -174,7 +231,7 @@ mkTLSSettings hostName name = do
     hooks = def { onCertificateRequest = \_ -> return creds
                 , onServerCertificate = \_ _ _ _ -> return []
                 }
-    clientParams = (defaultParamsClient hostName name)
+    clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
                   { clientHooks=hooks
                   , clientSupported = def {supportedCiphers=ciphersuite_strong}
                   }
@@ -184,62 +241,89 @@ mkTLSSettings hostName name = do
     key = "certs/chopaan.private.key.pem"
 
 initMonitorState :: [ThingName] -> NodeStates
-initMonitorState ts = Map.fromList [((NodeID t), mempty) | t <- ts]
+initMonitorState ts = NodeStates $ Map.fromList [((NodeId t), mempty) | t <- ts]
 
+--initTransaction 
+
+runEnergyTransactor :: TVar EnergyTransactorState -> IO ()
+runEnergyTransactor ts = undefined
 
 main :: IO ()
 main = do
   things <- getThings thingTypeName
-  tlsConf <- mkTLSSettings mqttURI connID
-  monitorState <- atomically $ newTVar initMonitorState
+  tlsConf <- mkTLSSettings mqttURI connId
   let
-    topics = (fmap nameToTopics) <$> map thingName things
+    tnames = map thingName things
+    topics = (fmap nameToTopics) <$> tnames 
     stopics :: [(Text.Text, MQ.SubOptions)]
     stopics = zip ts subopts
       where
         ts = (map ((fromMaybe "NoTopic") . fmap fst) topics)
         subopts = (repeat MQ.subOptions)
-    cb _ t m p =  print (t, msg parsed, l)
+  monitorStateT <- atomically $ newTVar $ initMonitorState (catMaybes tnames)
+  dispatchQueueT <- atomically $ newTQueue @Transaction
+  let
+    cb _ t m _ =  print (t, parsed) >>= \_-> atomically $ update
       where
-        nodeId = stateTopicToNodeID t
-        msg (Left a) = show a
-        msg (Right s) = updateNodeState s
+        update = do
+          ns <- readTVar monitorStateT
+          let
+            update' (Right es) = updateNodeState ns nodeId es
+          writeTVar monitorStateT (update' parsed)
+          return ()
+        nodeId = stateTopicToNodeId t
         parsed :: Either String EnergyState
         parsed = decodeMessage $ toStrict m
-        l = BL.length m
         toStrict = BS.concat . BL.toChunks
         
-    (Just uri) = parseURI $ mqttURI <> "#" <> connID 
+    (Just uri) = parseURI $ Text.unpack $ mqttURI <> "#" <> connId 
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
-           , MQ._connID=connID
+           , MQ._connID=Text.unpack connId
            , MQ._msgCB=MQ.SimpleCallback cb
-           , MQ._connectTimeout=18000000000
+           , MQ._connectTimeout=1800000000000
            , MQ._tlsSettings=tlsConf}
-
+  
+  _ <- forkIO $ forever $ printer monitorStateT
+  _ <- forkIO $ forever $ runEnergyTransactor transactorStateT
   forever $ catches (go conf uri stopics) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
   where
-    connID = "chopaan-pilot" :: Text.Text
-    mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com" :: Text.Text
-    thingTypeName = "kibbutz-pilot-node" :: Text.Text
+    connId = "chopaan-pilot"
+    mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
+    thingTypeName = "kibbutz-pilot-node"
     go c u ts = do
       mc <- MQ.connectURI c u
       print =<< MQ.subscribe mc ts []
-      pub mc
       MQ.waitForClient mc
     
-
     handler e = putStrLn ("ERROR :" <> e) >> threadDelay 1000000
-    pub :: MQ.MQTTClient -> IO ()
-    pub c = do
-      forever $ MQ.publish c "/kibbutz/node/3c71bf644520/control" pMsg False >> threadDelay 10000000
+    printer :: TVar NodeStates -> IO ()
+    printer st = do
+       ns' <- atomically $ do 
+         ns <- readTVar st
+         return ns
+       printMetrics ns'
+       threadDelay 10000000
+
+    
+    pubMessage :: MQ.MQTTClient -> TransactionQ -> IO ()
+    pubMessage c tv = do
+      forever $ pub =<< (atomically $ do readTQueue tv)
       where
-        pMsg = BL.fromStrict $ encodeMessage meshFrame
+        pub (nId, mf) = MQ.publish c (topic nId) (pMsg mf) False
+        topic n = "/kibbutz/node/" <> (unNodeId n) <> "/control"
+        pMsg = BL.fromStrict . encodeMessage
+
 
 data ChopaanOpts = ChopaanOpts
   { mqttURI :: Text.Text
-  , connID :: Text.Text
+  , connId :: Text.Text
   , thingTypeName :: Text.Text
+  }
+
+data TransactionOpts = TransactionOpts
+  { sources :: [Text.Text],
+    sinks :: [Text.Text]
   }
 
 {--
