@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -34,7 +35,7 @@ import Network.MQTT.Types (ConnACKFlags (..))
 import Network.Connection
 import Network.TLS
 import Data.X509.CertificateStore
-import Data.Default.Class 
+import Data.Default.Class
 import Network.TLS.Extra.Cipher
 import Network.URI
 import Control.Exception (Handler (..), IOException, catches)
@@ -79,7 +80,7 @@ type Watts = Double
 
 type S = Double
 
-data Metrics = Metrics
+data Audit = Audit
   { transmittedIn :: WattSeconds
   , transmittedOut :: WattSeconds
   , consumed :: WattSeconds
@@ -87,20 +88,20 @@ data Metrics = Metrics
   , tDiff :: S
   } deriving (Eq, Show, Ord, Generic, Data)
 
-instance Semigroup Metrics where
-  m0 <> m1 = Metrics tIn tOut c g newTimeDiff
+instance Semigroup Audit where
+  m0 <> m1 = Audit tIn tOut c g newTimeDiff
     where
       [tIn, tOut, c, g, newTimeDiff] = map (\t -> (sum $ map t ms)) ts
       ms = [m0, m1]
       ts = [transmittedIn, transmittedOut, consumed, generated, tDiff]
 
-instance Monoid Metrics where
-  mempty = Metrics 0 0 0 0 0
+instance Monoid Audit where
+  mempty = Audit 0 0 0 0 0
 
-instance PPT.Tabulate Metrics PPT.ExpandWhenNested
+instance PPT.Tabulate Audit PPT.ExpandWhenNested
 
-processES :: S -> EnergyState -> Metrics
-processES prevTime es = Metrics tIn tOut c g tdiff
+processES :: S -> EnergyState -> Audit
+processES prevTime es = Audit tIn tOut c g tdiff
   where
     tIn :: WattSeconds
     tIn = es ^. batteryVoltage * es ^. gridToBatteryCurrent 
@@ -113,7 +114,7 @@ processES prevTime es = Metrics tIn tOut c g tdiff
     timeInSeconds = (fromIntegral $ es ^. cpuTime) / (1000 * 60) -- milliSToSeconds
     tdiff = timeInSeconds - prevTime
 
-newtype NodeStates = NodeStates { unNodeStates :: Map.Map NodeId Metrics } deriving (Show, Generic, Data)
+newtype NodeStates = NodeStates { unNodeStates :: Map.Map NodeId Audit } deriving (Show, Generic, Data)
 
 instance PPT.CellValueFormatter NodeId
 
@@ -125,8 +126,8 @@ updateNodeState ns n es = NodeStates $ Map.adjust updateMetric n ns'
     updateMetric = (<> processES s es)
     s = tDiff $ ns' Map.! n
 
-printMetrics :: NodeStates -> IO ()
-printMetrics ns = PPT.printTable $ unNodeStates ns
+printAudit :: NodeStates -> IO ()
+printAudit ns = PPT.printTable $ unNodeStates ns
 
 ----------------------------------------------------------------------------------
 -- Energy Transactor
@@ -167,17 +168,35 @@ instance Frameable NM.EnergyTransactionRequest where
   toMeshFrame etr = undefined
   fromMeshFrame m = undefined
 
-
+{--
 data Transaction = Transaction
   { power :: Watts
   , edge :: (Int, Int)
   , time :: Integer
   , edgeCost :: Watts
   } deriving (Eq, Ord, Show, Generic)
+--}
 
 
-transactions :: [Transaction]
-transactions = undefined
+newtype VI a = VI { unVI :: (a, a)} deriving (Eq, Ord, Show, Generic, Functor)
+
+data Transaction = Transaction
+  { start :: Time.TimeOfDay,
+    end   :: Time.TimeOfDay,
+    nodes :: [VI Double]
+  } deriving (Eq, Ord, Show)
+
+
+transaction :: f g Audit -> f g Transaction
+transaction = decode . attend . encode
+
+
+encode :: f g a -> k b
+encode = undefined
+attend :: k b -> k c
+attend = undefined
+decode :: k c -> f g b
+decode = undefined
 
 
 ----------------------------------------------------------------------------------
@@ -229,7 +248,6 @@ mkTLSSettings hostName name = do
   creds <- either (error "couldn't read cert") Just <$> credentialLoadX509 cert key
   let
     hooks = def { onCertificateRequest = \_ -> return creds
-                , onServerCertificate = \_ _ _ _ -> return []
                 }
     clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
                   { clientHooks=hooks
@@ -245,7 +263,6 @@ initMonitorState ts = NodeStates $ Map.fromList [((NodeId t), mempty) | t <- ts]
 
 --initTransaction 
 
-runEnergyTransactor :: TVar EnergyTransactorState -> IO ()
 runEnergyTransactor ts = undefined
 
 main :: IO ()
@@ -259,11 +276,19 @@ main = do
     stopics = zip ts subopts
       where
         ts = (map ((fromMaybe "NoTopic") . fmap fst) topics)
-        subopts = (repeat MQ.subOptions)
-  monitorStateT <- atomically $ newTVar $ initMonitorState (catMaybes tnames)
-  dispatchQueueT <- atomically $ newTQueue @Transaction
+        subopts = (repeat MQ.subOptions{MQ._subQoS=MQ.QoS1})
+  monitorStateT <- atomically $ newTVar $ initMonitorState (map (Text.replace ":" "") $ catMaybes tnames)
+  dispatchQueueT <- atomically $ newTQueue @(NodeId, Transaction)
   let
-    cb _ t m _ =  print (t, parsed) >>= \_-> atomically $ update
+    -- writes a dumb message to a dumb topic. 
+    constantPublisher = do
+      atomically $
+        writeTQueue dispatchQueueT  ("test-123", Transaction  )
+  let
+    cb _ t m _ =  do
+      print (t, parsed)
+      _ <- atomically $ update
+      return ()
       where
         update = do
           ns <- readTVar monitorStateT
@@ -279,21 +304,24 @@ main = do
     (Just uri) = parseURI $ Text.unpack $ mqttURI <> "#" <> connId 
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
-           , MQ._connID=Text.unpack connId
+           , MQ._connID="chopaan-pilot"
            , MQ._msgCB=MQ.SimpleCallback cb
-           , MQ._connectTimeout=1800000000000
+           , MQ._connectTimeout=18000000000
            , MQ._tlsSettings=tlsConf}
   
   _ <- forkIO $ forever $ printer monitorStateT
-  _ <- forkIO $ forever $ runEnergyTransactor transactorStateT
-  forever $ catches (go conf uri stopics) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
+  forever $ catches (go conf uri stopics dispatchQueueT) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
   where
     connId = "chopaan-pilot"
     mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
     thingTypeName = "kibbutz-pilot-node"
-    go c u ts = do
+    go c u ts dq = do
       mc <- MQ.connectURI c u
-      print =<< MQ.subscribe mc ts []
+      print =<< mapM (\t -> do putStrLn (show . fst $ t)) ts
+      
+      -- just passing a list of subscriptions to the subscribe function results in a call that gives a client error on aws.
+      print =<< mapM (\t-> MQ.subscribe mc [t] []) ts
+      _ <- forkIO $ forever $ pubQueue mc dq
       MQ.waitForClient mc
     
     handler e = putStrLn ("ERROR :" <> e) >> threadDelay 1000000
@@ -302,17 +330,25 @@ main = do
        ns' <- atomically $ do 
          ns <- readTVar st
          return ns
-       printMetrics ns'
+       printAudit ns'
        threadDelay 10000000
 
-    
-    pubMessage :: MQ.MQTTClient -> TransactionQ -> IO ()
-    pubMessage c tv = do
+    -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
+    -- not stateful in haskell, are they?
+    pubQueue :: MQ.MQTTClient -> TransactionQ -> IO ()
+    pubQueue c tv = do
       forever $ pub =<< (atomically $ do readTQueue tv)
       where
         pub (nId, mf) = MQ.publish c (topic nId) (pMsg mf) False
         topic n = "/kibbutz/node/" <> (unNodeId n) <> "/control"
         pMsg = BL.fromStrict . encodeMessage
+
+
+
+
+configureNode :: NodeId -> (NM.BatteryParameters, NM.PVParameters) -> NM.MeshFrame
+configureNode = undefined
+
 
 
 data ChopaanOpts = ChopaanOpts
