@@ -53,6 +53,7 @@ dependencies:
 - time
 - ulid
 - convertible
+- time-lens
 
 ghc-options:
 - -Wall
