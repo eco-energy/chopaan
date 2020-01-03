@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RecordWildCards #-}
 module Main (main) where
 
 -- Protobuf Imports
@@ -79,7 +80,7 @@ type WattSeconds = Double
 
 type Watts = Double
 
-type S = Double
+type S = Time.DiffTime
 
 data Audit = Audit
   { transmittedIn :: WattSeconds
@@ -138,26 +139,39 @@ printAudit ns = PPT.printTable $ unNodeStates ns
 
 type TransactionQ = TQueue (NodeId, Transaction)
 
-mkEnergyTransactionR :: Watts -> S -> NM.PDirection -> IO NM.EnergyTransactionRequest
-mkEnergyTransactionR p t d = do
+
+mkETR :: Double -> S -> NM.PDirection -> Text -> Time.UTCTime -> NM.EnergyTransactionRequest
+mkETR power howLong d uid start = defMessage
+         & uuid .~ uid
+         & start .~ (utcToWord64 start)
+         & powerInWatts .~ power
+         & durationInSeconds .~ (sToW64 howLong)
+         & direction .~ d
+   where
+     sToW64 :: S -> Word64
+     sToW64 = convert
+     utcToWord64 :: Time.UTCTime -> Word64
+     utcToWord64 = c'' . c'
+       where
+         c' :: Time.UTCTime -> Int
+         c' = convert
+         c'' :: Int -> Word64
+         c'' = convert
+
+transactionRequests :: Transaction -> Time.DiffTime -> IO [NM.EnergyTransactionRequest]
+transactionRequests Transaction{..} leadTime = do
+  transactionId <- getULID
+  time <- Time.getCurrentTime + leadTime
+  let
+    etrs = map (\(n, vi)-> mkETR (fst vi * snd vi) duration ) nodes
+  
+
+mkRequest :: Transaction -> Watts -> S -> NM.PDirection -> IO NM.EnergyTransactionRequest
+mkRequest p t d = do
   ulid <- getULID
   time <- Time.getCurrentTime
-  let 
-   etr = defMessage
-         & uuid .~ (Text.pack . show) ulid
-         & dispatchedAt .~ (utcToWord64 time)
-         & powerInWatts .~ p
-         & durationInSeconds .~ (sToW64 t)
-         & direction .~ d
-   sToW64 :: S -> Word64
-   sToW64 = convert
-   utcToWord64 :: Time.UTCTime -> Word64
-   utcToWord64 = c'' . c'
-     where
-       c' :: Time.UTCTime -> Int
-       c' = convert
-       c'' :: Int -> Word64
-       c'' = convert
+  let
+    e = mkEtr (Text.pack . show) ulid
   return etr
 
 class Frameable a where
@@ -168,6 +182,7 @@ class Frameable a where
 instance Frameable NM.EnergyTransactionRequest where
   toMeshFrame etr = undefined
   fromMeshFrame m = undefined
+
 
 {--
 data Transaction = Transaction
@@ -186,8 +201,8 @@ mkVI = VI
 
 data Transaction = Transaction
   { start :: Time.UTCTime,
-    end   :: Time.UTCTime,
-    nodes :: [VI Double]
+    duration   :: Time.DiffTime,
+    nodes :: [(NodeId, VI Double)]
   } deriving (Eq, Ord, Show)
 
 
@@ -265,10 +280,15 @@ mkTLSSettings hostName name = do
 initMonitorState :: [ThingName] -> NodeStates
 initMonitorState ts = NodeStates $ Map.fromList [((NodeId t), mempty) | t <- ts]
 
-mkTxn t0 = Transaction t0 t1
+
+mkTxn :: (Num a, Num p) => Time.UTCTime -> a -> [VI p] -> Transaction
+mkTxn start duration ps  = Transaction start duration ps
+
+zeroTxn :: Time.UTCTime -> Transaction
+zeroTxn t0 = Transaction t0 t1 vs
   where
-    t1 = (modL minutes (+5) now)
-    vin = map (mkVI . (\a -> (a*0, a*0))) [0..10]
+    t1 = (modL minutes (+5) t0)
+    vs = map (mkVI . (\a -> (a*0, a*0))) [0..10]
 
 --initTransaction 
 
