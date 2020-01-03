@@ -53,6 +53,7 @@ import Data.Data
 
 -- Energy Transaction Stuff
 import qualified Data.Time as Time
+import Data.Time.Lens
 import Data.ULID (getULID)
 import Data.Convertible
 import Control.Concurrent.STM.TQueue
@@ -135,7 +136,7 @@ printAudit ns = PPT.printTable $ unNodeStates ns
 -- 2) 
 -- 3) 
 
-type TransactionQ = TQueue (NodeId, NM.MeshFrame)
+type TransactionQ = TQueue (NodeId, Transaction)
 
 mkEnergyTransactionR :: Watts -> S -> NM.PDirection -> IO NM.EnergyTransactionRequest
 mkEnergyTransactionR p t d = do
@@ -180,9 +181,12 @@ data Transaction = Transaction
 
 newtype VI a = VI { unVI :: (a, a)} deriving (Eq, Ord, Show, Generic, Functor)
 
+mkVI = VI
+
+
 data Transaction = Transaction
-  { start :: Time.TimeOfDay,
-    end   :: Time.TimeOfDay,
+  { start :: Time.UTCTime,
+    end   :: Time.UTCTime,
     nodes :: [VI Double]
   } deriving (Eq, Ord, Show)
 
@@ -261,6 +265,11 @@ mkTLSSettings hostName name = do
 initMonitorState :: [ThingName] -> NodeStates
 initMonitorState ts = NodeStates $ Map.fromList [((NodeId t), mempty) | t <- ts]
 
+mkTxn t0 = Transaction t0 t1
+  where
+    t1 = (modL minutes (+5) now)
+    vin = map (mkVI . (\a -> (a*0, a*0))) [0..10]
+
 --initTransaction 
 
 runEnergyTransactor ts = undefined
@@ -282,8 +291,10 @@ main = do
   let
     -- writes a dumb message to a dumb topic. 
     constantPublisher = do
-      atomically $
-        writeTQueue dispatchQueueT  ("test-123", Transaction  )
+      now <- Time.getCurrentTime
+      _ <- atomically $ writeTQueue dispatchQueueT  (("test-123" :: NodeId),
+                                                     ())
+      (threadDelay 10000000)
   let
     cb _ t m _ =  do
       print (t, parsed)
