@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings#-}
@@ -12,10 +14,10 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 
 
+
 import qualified Data.Time as Time
 
 
--- MQTT Imports
 import qualified Network.MQTT.Client as MQ
 import qualified Network.MQTT.Topic as MQ
 import Network.MQTT.Types (ConnACKFlags (..))
@@ -28,74 +30,49 @@ import Network.URI
 import Control.Exception (Handler (..), IOException, catches)
 import Control.Monad (forever, when, liftM)
 import Control.Concurrent (threadDelay)
+import Data.Maybe
 
 import qualified Data.Map.Strict as Map
 
--- Concurrency in the service
 import Control.Concurrent.STM
-import Control.Concurrent
 import qualified Control.Concurrent.STM.TQueue as TQ
 
-
-type StateTopic = Text.Text
-data ET
-data NodeConfig
-
-
-data ChoState = ChoState
-  { _subTopics :: TQ.TQueue StateTopic
-  , _txQueue :: TQ.TQueue ET
-  , _configurationQueue :: TQ.TQueue NodeConfig
-  }
+import Registry (NodeT, HasTopics(..), mkCallback, Kibbutz(..))
 
 
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control
--- We obtain the list of nodes for a particular kibbutz by using the kibbutz name and querying AWS Iot for all thing names
--- for things which belong to that kibbutz.
 
-runMqtt :: ChoState -> IO ()
-runMqtt subQueue transactionQueue  = do
-  things <- getThings thingTypeName
-  tlsConf <- mkTLSSettings certPath keyPath mqttURI connId
-  let
+{--
+
+
+let
     tnames = map thingName things
     topics = (fmap nameToTopics) <$> tnames 
-    stopics :: [(Text.Text, MQ.SubOptions)]
-    stopics = zip ts subopts
-      where
-        ts = (map ((fromMaybe "NoTopic") . fmap fst) topics)
-        subopts = (repeat MQ.subOptions{MQ._subQoS=MQ.QoS1})
-        
-  monitorStateT <- atomically $ newTVar $ initMonitorState (map (Text.replace ":" "") $ catMaybes tnames)
-  dispatchQueueT <- atomically $ newTQueue
+stopics :: [(Text.Text, MQ.SubOptions)]
+stopics = zip ts subopts
+where
+ts = (map ((fromMaybe "NoTopic") . fmap fst) topics)
+subopts = (repeat MQ.subOptions{MQ._subQoS=MQ.QoS1})
+monitorStateT <- atomically $ newTVar $ initMonitorState (map (Text.replace ":" "") $ catMaybes tnames)
+dispatchQueueT <- atomically $ newTQueue
+
+
+
+
+
+
+
+--}
+
+runMqtt :: Kibbutz -> IO ()
+runMqtt k@Kibbutz {..}  = do
+  tlsConf <- mkTLSSettings certPath keyPath mqttURI connId
   let
-    -- writes a dumb message to a dumb topic. 
-    constantPublisher = do
-      now <- Time.getCurrentTime
-      _ <- atomically $ writeTQueue dispatchQueueT  (1, 1)
-      (threadDelay 10000000)
-  let
-    cb _ t m _ =  do
-      print (t, parsed)
-      _ <- atomically $ update
-      return ()
-      where
-        update = do
-          ns <- readTVar monitorStateT
-          let
-            update' (Right es) = updateNodeState ns nodeId es
-          writeTVar monitorStateT (update' parsed)
-          return ()
-        nodeId = stateTopicToNodeId t
-        parsed :: Either String EnergyState
-        parsed = decodeMessage $ toStrict m
-        toStrict = BS.concat . BL.toChunks
-        
     (Just uri) = parseURI $ Text.unpack $ mqttURI <> "#" <> connId 
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
            , MQ._connID="chopaan-pilot"
-           , MQ._msgCB=MQ.SimpleCallback cb
+           , MQ._msgCB=mkCallback k 
            , MQ._connectTimeout=18000000000
            , MQ._tlsSettings=tlsConf}
   
@@ -109,8 +86,6 @@ runMqtt subQueue transactionQueue  = do
     keyPath = "certs/chopaan.private.key.pem"
     go c u ts dq = do
       mc <- MQ.connectURI c u
-      print =<< mapM (\t -> do putStrLn (show . fst $ t)) ts
-      
       -- just passing a list of subscriptions to the subscribe function results in a call that gives a client error on aws.
       print =<< mapM (\t-> MQ.subscribe mc [t] []) ts
       _ <- forkIO $ forever $ pubQueue mc dq
@@ -137,7 +112,7 @@ runMqtt subQueue transactionQueue  = do
 
 
 -- https://stackoverflow.com/questions/40081508/how-to-provide-a-client-certificate-to-http-client-tls
-mkTLSSettings :: a -> a -> Text.Text -> Text.Text -> IO TLSSettings
+mkTLSSettings :: FilePath -> FilePath -> Text.Text -> Text.Text -> IO TLSSettings
 mkTLSSettings cert key hostName name = do
   creds <- either (error "couldn't read cert") Just <$> credentialLoadX509 cert key
   let
