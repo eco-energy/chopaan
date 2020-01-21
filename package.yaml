@@ -59,6 +59,11 @@ dependencies:
 - vty
 - directory
 - cursor
+- estimator
+- ad
+- reflection
+- microlens
+- streamly
 
 ghc-options:
 - -Wall
@@ -84,7 +89,6 @@ executables:
     - chopaan
     - optparse-simple
     - base
-    - microlens
     - proto-lens
     ghc-options:
     - -threaded
