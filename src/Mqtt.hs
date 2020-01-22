@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -29,17 +30,20 @@ import Network.TLS.Extra.Cipher
 import Network.URI
 import Control.Exception (Handler (..), IOException, catches)
 import Control.Monad (forever, when, liftM)
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (forkIO, threadDelay)
 import Data.Maybe
 
+import qualified Data.Set as Set
 import qualified Data.Map.Strict as Map
 
 import Control.Concurrent.STM
 import qualified Control.Concurrent.STM.TQueue as TQ
 
-import Registry (NodeT, HasTopics(..), mkCallback, Kibbutz(..))
+import Registry (NodeT, HasTopics(..), mkCallback, Kibbutz(..), PubQueue, runNodeQueue)
 
+import Data.ProtoLens (encodeMessage, Message)
 
+import GHC.Generics (Generic)
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control
 
 {--
@@ -64,51 +68,55 @@ dispatchQueueT <- atomically $ newTQueue
 
 --}
 
-runMqtt :: Kibbutz -> IO ()
-runMqtt k@Kibbutz {..}  = do
+data MQTTOpts = MQTTOpts
+  { connId :: Text.Text
+  , mqttURI :: Text.Text
+  , certPath :: FilePath
+  , keyPath :: FilePath
+  } deriving (Eq, Ord, Show, Generic)
+
+defMQOpts = MQTTOpts {    connId = "chopaan-pilot"
+                     ,    mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
+                     ,    certPath = "certs/chopaan.cert.pem"
+                     ,    keyPath = "certs/chopaan.private.key.pem"}
+
+-- need reader for creds and logs
+runMqtt :: MQTTOpts -> Kibbutz -> IO ()
+runMqtt MQTTOpts{..} k@Kibbutz {..}  = do
   tlsConf <- mkTLSSettings certPath keyPath mqttURI connId
   let
     (Just uri) = parseURI $ Text.unpack $ mqttURI <> "#" <> connId 
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
-           , MQ._connID="chopaan-pilot"
+           , MQ._connID=Text.unpack $ connId
            , MQ._msgCB=mkCallback k 
            , MQ._connectTimeout=18000000000
            , MQ._tlsSettings=tlsConf}
-  
-  _ <- forkIO $ forever $ printer monitorStateT
-  forever $ catches (go conf uri stopics dispatchQueueT) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
+    topics = zip (map stateTopic $ Set.toList nodes) $ repeat MQ.subOptions
+  -- TODO: Add a logging Error Handler
+  mc <- MQ.connectURI conf uri
+  forkIO $ forever $ catches (sub mc topics) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
+  forever $ catches (pub mc outQueue) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
   where
-    connId = "chopaan-pilot"
-    mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
-    thingTypeName = "kibbutz-pilot-node"
-    certPath = "certs/chopaan.cert.pem"
-    keyPath = "certs/chopaan.private.key.pem"
-    go c u ts dq = do
-      mc <- MQ.connectURI c u
-      -- just passing a list of subscriptions to the subscribe function results in a call that gives a client error on aws.
-      print =<< mapM (\t-> MQ.subscribe mc [t] []) ts
-      _ <- forkIO $ forever $ pubQueue mc dq
-      MQ.waitForClient mc
+    sub :: MQ.MQTTClient -> [(MQ.Filter, MQ.SubOptions)] -> IO ()
+    sub c topics = do
+      print =<< mapM (\t-> MQ.subscribe c [t] []) topics
+      MQ.waitForClient c
     
     handler e = putStrLn ("ERROR :" <> e) >> threadDelay 1000000
-    printer :: TVar a -> IO ()
-    printer st = do
-       ns' <- atomically $ do 
-         ns <- readTVar st
-         return ns
-       printAudit ns'
-       threadDelay 10000000
 
     -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
     -- not stateful in haskell, are they?
-    pubQueue :: MQ.MQTTClient -> TQ.TQueue a -> IO ()
-    pubQueue c tv = do
-      forever $ pub =<< (atomically $ do readTQueue tv)
+    pub :: MQ.MQTTClient -> PubQueue -> IO ()
+    pub c tv = do
+      forever $ pub' =<< (atomically $ do readTQueue (runNodeQueue tv))
       where
-        pub (nId, mf) = MQ.publish c (topic nId) (pMsg mf) False
-        topic n = "/kibbutz/node/" <> (unNodeId n) <> "/control"
-        pMsg = BL.fromStrict . encodeMessage
+        pub' :: (Message b) => (NodeT, b) -> IO ()
+        pub' (nId, mf) = MQ.publish c (topic nId) (encode mf) False
+        topic :: NodeT -> MQ.Topic
+        topic = controlTopic
+        encode :: (Message b) => b -> BL.ByteString
+        encode = BL.fromStrict . encodeMessage
 
 
 -- https://stackoverflow.com/questions/40081508/how-to-provide-a-client-certificate-to-http-client-tls
