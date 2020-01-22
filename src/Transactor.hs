@@ -1,12 +1,23 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 module Transactor where
 
-import Registry (NodeId(..))
-import EnergyState (Watts)
+import Registry (NodeT)
+import Node (Watts)
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
 
+import Proto.NodeMessages as NM
+import Proto.NodeMessages_Fields as NM
+
+import Lens.Micro
+
+import Data.ProtoLens
+import Data.Convertible
+import Data.Convertible.Instances
+import Data.ULID
 
 import GHC.Generics (S, Generic)
 
@@ -31,29 +42,33 @@ decode = undefined
 data Transaction = Transaction
   { start :: Time.UTCTime,
     duration   :: Time.DiffTime,
-    nodes :: [(NodeId, VI Double)]
+    nodes :: [(NodeT, VI Double)]
   } deriving (Eq, Ord, Show)
 
 
-mkTxn :: (Num a, Num p) => Time.UTCTime -> a -> [VI p] -> Transaction
+mkTxn :: Time.UTCTime -> Time.DiffTime -> [(NodeT, VI Double)] -> Transaction
 mkTxn start duration ps  = Transaction start duration ps
 
+{--
 zeroTxn :: Time.UTCTime -> Transaction
 zeroTxn t0 = Transaction t0 t1 vs
   where
-    t1 = (modL minutes (+5) t0)
+    t1 = (mod minutes (+5) t0)
     vs = map (mkVI . (\a -> (a*0, a*0))) [0..10]
+--}
 
-mkETR :: Double -> Time.DiffTime -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
-mkETR power howLong d uid start = defMessage
+mkETR :: Double -> Time.NominalDiffTime -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
+mkETR power howLong dir uid stime = defMessage
          & uuid .~ uid
-         & start .~ (utcToWord64 start)
+         & NM.start .~ (utcToWord64 stime)
          & powerInWatts .~ power
-         & durationInSeconds .~ (sToW64 howLong)
-         & direction .~ d
+         & durationInSeconds .~ (d' $ d howLong)
+         & direction .~ dir
    where
-     sToW64 :: S -> Word64
-     sToW64 = convert
+     d :: Time.NominalDiffTime -> Int
+     d = convert
+     d' :: Int -> Word64
+     d' = convert
      utcToWord64 :: Time.UTCTime -> Word64
      utcToWord64 = c'' . c'
        where
@@ -61,11 +76,13 @@ mkETR power howLong d uid start = defMessage
          c' = convert
          c'' :: Int -> Word64
          c'' = convert
-
-transactionRequests :: Transaction -> Time.DiffTime -> IO [NM.EnergyTransactionRequest]
+{--
+transactionRequests :: Transaction -> Time.NominalDiffTime -> IO [NM.EnergyTransactionRequest]
 transactionRequests Transaction{..} leadTime = do
   transactionId <- getULID
-  time <- Time.getCurrentTime + leadTime
+  now <- Time.getCurrentTime
+  let
+    startTime = now + leadTime
   return $ map (\(n, vi)-> mkETR (fst vi * snd vi) duration ) nodes
 
 
@@ -77,4 +94,4 @@ mkRequest p t d = do
   let
     e = mkEtr (Text.pack . show) ulid
   return etr
-
+--}
