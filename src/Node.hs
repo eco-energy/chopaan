@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -5,7 +7,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-module Node where
+module Node (runNodeMonitor, NodeId(..), defaultES, Watts, unNodeId) where
 
 
 import qualified Data.Time as Time
@@ -26,6 +28,7 @@ import qualified Streamly.Prelude as S
 
 import qualified Data.Set as Set 
 
+import Data.ProtoLens (Message, defMessage)
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
@@ -66,15 +69,30 @@ instance Monoid EnergyBalance where
 
 instance PPT.Tabulate EnergyBalance PPT.ExpandWhenNested
 
-data NodeMetrics a = NodeMetrics
+data Power a = Power
+  { gen :: a
+  , tIn :: a
+  , tOut :: a
+  , load :: a }
+  deriving (Eq, Ord, Show, Generic, Data, Functor, Applicative)
+
+instance (Num a) => Semigroup (Power a) where
+  p <> p' = (+) <$> p <*> p'
+
+instance (Num a) => Monoid (Power a) where
+  mempty = Power 0 0 0 0
+
+data NodeMetrics e p = NodeMetrics
   { _lastW :: Time.NominalDiffTime
-  , _loss :: a
-  , _stored :: a
-  , _demand :: a
+  , _loss :: e
+  , _stored :: e
+  , _demand :: e
+  , _powerS :: Power p
+  , _energyS :: EnergyBalance
   } deriving (Eq, Ord, Show, Generic, Data)
 
-instance PPT.Tabulate (NodeMetrics a) PPT.ExpandWhenNested
 
+newtype NodeS m e p = NodeS { runNodeS :: (SerialT m (NodeMetrics e p)) } deriving (Generic)
 
 -- Streams over T, one for each n.
 stored :: (IsStream s, Monad m) => s m EnergyBalance -> s m WattSeconds
@@ -109,37 +127,30 @@ lastWait t es = S.map snd $ S.scanl' sf (t, 0 :: Time.NominalDiffTime) es
     sf (ptime, _) e = (utcTNow e, Time.diffUTCTime (utcTNow e) ptime)
 
 
-data Power = R
+nodeES :: (IsStream t, Monad m, Eq a) => NodeId a -> t m (NodeId a, EnergyState) -> t m EnergyState
+nodeES node s = S.filter (\a-> fst a == node) s
+                & S.map snd
 
-newtype PowerS m a = PowerS { unPS :: (Monad m, Fractional a) => SerialT m Power }
-
-newtype EnergyS m = EnergyS {unES :: Monad m => SerialT m EnergyState }
-
-runES s = S.scanl' scanToRecord unES s
+powerAndEnergy :: (IsStream t, Monad m) => Time.UTCTime -> t m EnergyState -> t m (Time.UTCTime, (Power Watts, EnergyBalance))
+powerAndEnergy t es' = S.scanl' audit' (t, (mempty, mempty)) es'
   where
-    scanToRecord = undefined
-
---powerBalance :: (Set.Set (EnergyS m)) -> PowerS m a 
---powerBalance es = S.concatMap `wAsync` (\s_t -> s_t ^. batteryVoltage * s_t ^. (gridToBatteryCurrent)) es
-
-audit :: (IsStream t, Monad m) => Time.UTCTime -> t m EnergyState -> t m (Time.UTCTime, EnergyBalance)
-audit t es' = S.scanl' audit' (t, initEA) es'
-  where
-    audit' :: (Time.UTCTime, EnergyBalance) -> EnergyState -> (Time.UTCTime, EnergyBalance)
-    audit' (t', prevEb) es = (utcTNow es, prevEb <> EnergyBalance txIn' txOut' cnsm' gen')
+    audit' :: (Time.UTCTime, (Power Watts, EnergyBalance)) -> EnergyState -> (Time.UTCTime, (Power Watts, EnergyBalance))
+    audit' (t', (_, prevEb)) es = (utcTNow es, (pb, prevEb <> eb))
       where
-        txIn' :: WattSeconds
-        txIn' = (es ^. batteryVoltage :: Double) * (es ^. gridToBatteryCurrent :: Double) 
-        txOut' :: WattSeconds
-        txOut' = (es ^. batteryVoltage :: Double) * (es ^. batteryToGridCurrent :: Double)
-        cnsm' :: WattSeconds
-        cnsm' = (es ^. batteryVoltage :: Double) * (es ^. batteryToLoadCurrent :: Double)
-        gen' :: WattSeconds
-        gen' = (es ^. batteryVoltage :: Double) * (es ^. solarInputCurrent :: Double) * (realToFrac (integralMultiplier))
-        integralMultiplier :: Time.NominalDiffTime
-        integralMultiplier = Time.diffUTCTime (utcTNow es) t'
+        eb = EnergyBalance (fst txIn') (fst txOut') (fst cnsm') (fst gen')
+        pb = Power (snd txIn') (snd txOut') (snd cnsm') (snd gen')
+        txIn' :: (Watts, WattSeconds)
+        txIn' = integrate $ p batteryVoltage gridToBatteryCurrent 
+        txOut' :: (Watts, WattSeconds)
+        txOut' = integrate $ p batteryVoltage batteryToGridCurrent
+        cnsm' :: (Watts, WattSeconds)
+        cnsm' = integrate $ p batteryVoltage batteryToLoadCurrent
+        gen' :: (Watts, WattSeconds)
+        gen' = integrate $ p batteryVoltage solarInputCurrent
+        delT = realToFrac $ Time.diffUTCTime (utcTNow es) t'
+        p v i = es ^. v * es ^. i
+        integrate p' = (p', p' * delT)
 
-    
 utcTNow :: EnergyState -> Time.UTCTime 
 utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
 
@@ -151,17 +162,29 @@ batteryCurrent es = i - o
 
 
 --nodeMonitor :: t IO EnergyState -> t IO EnergyState
-runNodeMonitor :: (Monad (s IO), IsStream s) => s IO EnergyState -> s IO (NodeMetrics WattSeconds, EnergyBalance)
-runNodeMonitor es = do
+runNodeMonitor :: (Eq a, Monad (s IO), IsStream s) => NodeId a -> s IO (NodeId a, EnergyState) -> s IO (NodeMetrics WattSeconds Watts)
+runNodeMonitor n allEs = do
   initTime <- S.yieldM Time.getCurrentTime
-  (t', eb) <- audit initTime es
-  t <- lastWait initTime es
-  l <- (loss . (S.map snd)) $ audit initTime es
-  s <- (stored . (S.map snd)) $ audit initTime es
-  d <- (demand . (S.map snd)) $ audit initTime es
   let
-    nm = NodeMetrics t l s d
-  S.yieldM $ (putStrLn $ "Energy Balance@" <> show t' <> "  " <> show eb)
-  S.yieldM $ (putStrLn $ "Node Metrics@" <> show t' <> "  " <> show nm)
-  return $ (nm, eb)
+    t = adapt $ lastWait initTime es
+    e = adapt $ e' initTime
+    p = adapt $ p' initTime
+    --nms :: s IO (NodeMetrics WattSeconds Watts)
+  nms <- zipAsyncly $ nm <$> t <*> loss e <*> stored e <*> demand e <*> p <*> e
+  return nms
+  where
+    e' t = powerAndEnergy t es & S.map (snd . snd)
+    p' t = powerAndEnergy t es & S.map (fst . snd)
+    es = nodeES n allEs
+    --nm :: 
+    nm t l s d p e = NodeMetrics t l s d p e
 
+defaultES :: EnergyState
+defaultES = defMessage
+               & batteryVoltage .~ 0
+               & gridVoltage .~ 0
+               & batteryToLoadCurrent .~ 0
+               & batteryToGridCurrent .~ 0
+               & gridToBatteryCurrent .~ 0
+               & solarInputCurrent .~ 0
+               & dutyCycle .~ 0
