@@ -64,6 +64,8 @@ dependencies:
 - reflection
 - microlens
 - streamly
+- mtl
+- vector
 
 ghc-options:
 - -Wall
