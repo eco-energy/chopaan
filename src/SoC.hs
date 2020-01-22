@@ -1,3 +1,7 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 module SoC where
 
 import Control.Applicative
@@ -15,11 +19,14 @@ import Proto.NodeMessages_Fields
 
 import Control.Monad.State (runStateT, StateT, get, put)
 
+import GHC.Generics (Generic)
 
+{--
 f v c temp t = do
   delT <- get
   iterEKF v i temp delT
   put (delT + t)
+--}
 
 data EKFState = EKFState
   { iR :: Double , h :: Double, soc :: Double} deriving (Eq, Ord, Show, Generic)
@@ -27,10 +34,10 @@ data EKFState = EKFState
 data EKFModelParams a = EKFModelParams
   { q' :: a, g' :: a, m' :: a, m'' :: a, rc' :: a, r :: a,  r' :: a, eta :: a} deriving (Eq, Ord, Show, Generic)
 
-data Measurements a = Measurements a
-  { vT :: a, iT :: a, t :: Int } deriving (Eq, Ord, Show)
+data Measurements a = Measurements
+  { vT :: a, iT :: a, t :: Int } deriving (Eq, Ord, Show, Generic)
 
-data EKFData a = EKFData a
+data EKFData a = EKFData
   { sigmaX :: a
   , sigmaY :: a
   , sigmaZ :: a
@@ -41,7 +48,7 @@ data EKFData a = EKFData a
 
 rc delT EKFModelParams {..} = exp (- delT / rc' )
 
-xHat0 :: EKFState
+xHat0 :: Double -> EKFState
 xHat0 v = EKFState 0 0 v
 
 initCovariance = EKFState 0.1 0.1 0.1  
@@ -49,7 +56,7 @@ initCovariance = EKFState 0.1 0.1 0.1
 -- 6 steps
 
 
-iterEKF = fold xHat0
+--iterEKF = fold xHat0
 
 
 
@@ -70,7 +77,7 @@ data SoCParams a = SoCParams
   { ceff :: a
   , q :: a  -- estimated capacity
   , zp :: a
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, Functor, Applicative)
 
 
 data HystParams a = HystParams
@@ -83,10 +90,10 @@ data StateVector a = StateVector
 type KalmanState m a = StateT (a, KalmanFilter StateVector a) m
 
 runKalmanState :: (Monad m, Fractional a) => a -> StateVector a -> KalmanState m a b -> m (b, (a, KalmanFilter StateVector a))
-runKalmanState ts state = runStateT (ts, KalmanFilter state initCovariance)
+runKalmanState ts state = undefined -- runStateT (ts, KalmanFilter state initCovariance)
 
 
-runProcessModel :: (Monad m, Floating a, Ord a) => a -> StateVector a -> a
+runProcessModel :: (Floating a, Ord a) => a -> StateVector a -> a
 runProcessModel = undefined
 
 
