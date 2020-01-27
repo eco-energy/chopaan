@@ -4,7 +4,7 @@
 module Transactor where
 
 import Registry (NodeT)
-import Node (Watts)
+import Node (NodeS)
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word

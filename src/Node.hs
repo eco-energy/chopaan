@@ -7,7 +7,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-module Node (runNodeMonitor, NodeId(..), defaultES, Watts, unNodeId) where
+module Node (runNodeMonitor, NodeId(..), defaultES, NodeS, NodeMetrics(..), defNodeS) where
 
 
 import qualified Data.Time as Time
@@ -76,6 +76,15 @@ data Power a = Power
   , load :: a }
   deriving (Eq, Ord, Show, Generic, Data, Functor, Applicative)
 
+{--
+instance Applicative (Power) where
+  pure v = Power { gen = v, tIn = v, tOut = v, load = v } 
+  v <*> v' = Power { gen = (gen v <*> gen v')
+                   , tIn = (tIn v <*> tIn v')
+                   , tOut =(tOut v <*> tOut v)
+                   , load =(load v <*> load v)  }
+--}
+
 instance (Num a) => Semigroup (Power a) where
   p <> p' = (+) <$> p <*> p'
 
@@ -92,7 +101,11 @@ data NodeMetrics e p = NodeMetrics
   } deriving (Eq, Ord, Show, Generic, Data)
 
 
-newtype NodeS m e p = NodeS { runNodeS :: (SerialT m (NodeMetrics e p)) } deriving (Generic)
+
+defNodeS :: NodeS
+defNodeS = NodeMetrics 0 0 0 0 mempty mempty
+
+type NodeS = NodeMetrics WattSeconds Watts
 
 -- Streams over T, one for each n.
 stored :: (IsStream s, Monad m) => s m EnergyBalance -> s m WattSeconds
@@ -162,7 +175,7 @@ batteryCurrent es = i - o
 
 
 --nodeMonitor :: t IO EnergyState -> t IO EnergyState
-runNodeMonitor :: (Eq a, Monad (s IO), IsStream s) => NodeId a -> s IO (NodeId a, EnergyState) -> s IO (NodeMetrics WattSeconds Watts)
+runNodeMonitor :: (Eq a, Monad (s IO), IsStream s) => NodeId a -> s IO (NodeId a, EnergyState) -> s IO NodeS
 runNodeMonitor n allEs = do
   initTime <- S.yieldM Time.getCurrentTime
   let

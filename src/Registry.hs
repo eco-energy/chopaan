@@ -158,8 +158,8 @@ mkCallback Kibbutz { inQueue } = MQ.SimpleCallback writer
         parsed = ((fromRight defaultES) . decodeMessage . toStrict) msg
         toStrict = BS.concat . BL.toChunks
 
-queueStream :: (IsStream t, (Monad (t IO))) => SubQueue -> t IO EnergyState
-queueStream (NodeQueue q) = undefined
+queueStream :: (IsStream t, (Monad (t IO))) => SubQueue -> t IO (NodeT, EnergyState)
+queueStream (NodeQueue q) = S.repeatM (atomically $ readTQueue q)
 
 getThings :: Text.Text -> IO [Iot.ThingAttribute]
 getThings thingTypeName = do
