@@ -78,7 +78,7 @@ data KibbutzUI = HHListUI | MonitorUI | TxListUI | TxFormUI TXFormField deriving
 
 type TxNodeId = Int
 
-data TXFormField = NodeField TxNodeId | ParticipatingField TxNodeId | PowerField TxNodeId | DurationField TxNodeId | IncomingField TxNodeId | OutgoingField TxNodeId deriving (Eq, Ord, Show)
+data TXFormField = NodeField TxNodeId | ParticipatingField TxNodeId | PowerField TxNodeId | DurationField TxNodeId  deriving (Eq, Ord, Show)
 
 newtype Transaction = Transaction { stakes :: [(NodeT, Double)] } deriving (Eq, Ord, Show, Generic)
 
@@ -97,10 +97,8 @@ data Stake = Stake
   , _participating :: Bool
   , _power :: Double
   , _duration :: Int
-  , _direction :: Direction
   } deriving (Eq, Ord, Show)
 
-data Direction = Incoming | Outgoing deriving (Eq, Ord, Show)
 
 makeLenses ''Stake
 
@@ -117,7 +115,7 @@ addStake xs x = L.listInsert 0 x xs
 --executeTransaction xs = map toETR xs 
 
 initStake :: NodeT -> Stake
-initStake n = Stake n False 0 0 Incoming
+initStake n = Stake n False 0 0
 
 
 
@@ -130,10 +128,7 @@ stakeForm i n =
     in F.newForm [ label selQ F.@@= F.checkboxField participating (TxFormUI (ParticipatingField i)) hname   
                  , label "Power" F.@@= F.editShowableField power (TxFormUI (PowerField i))
                  , label "Duration" F.@@= F.editShowableField duration (TxFormUI (DurationField i))
-                 , label "Direction" F.@@= F.radioField direction [ (Incoming, TxFormUI (IncomingField i), "Incoming")
-                                                                , (Outgoing, TxFormUI (OutgoingField i), "Outgoing")
-                                                                ]
-               ]
+                 ]
 
 mkTForms :: [NodeT] -> [Stake] -> [StakeForm]
 mkTForms ns stakes = map (uncurry3 stakeForm) $ zip3 ids ns stakes
@@ -220,7 +215,6 @@ drawList l = ui
                           , str " "
                           ]
 
-
 -- We have a transactor event handler
 kibbutzEvent :: KibbutzState -> T.BrickEvent KibbutzUI KibbutzEvents -> T.EventM KibbutzUI (T.Next (KibbutzState))
 kibbutzEvent s@KibbutzState{..} e =
@@ -229,9 +223,12 @@ kibbutzEvent s@KibbutzState{..} e =
     T.VtyEvent vtype ->
       case vtype of
         EvKey (KChar 'q') [] -> M.halt s
-        EvKey (KBackTab) [] -> M.continue s
+        EvKey (KEnter) [] -> M.continue =<< executeTransaction transactor
         _ -> M.continue . (\t-> s{transactor = t}) =<< handleTransactorEvent transactor e
     _ -> M.continue s
+
+executeTransaction :: TransactorS -> IO TransactorS
+executeTransaction = undefined 
 
 appEvent :: s -> p -> T.EventM n (T.Next s)
 appEvent l _ = M.continue l
@@ -267,17 +264,50 @@ data KibbutzState = KibbutzState
   }
   deriving (Generic)
 
-handleTransactorEvent :: TransactorS -> T.BrickEvent KibbutzUI e -> T.EventM KibbutzUI TransactorS
-handleTransactorEvent s e =
+isFormEvent :: T.BrickEvent KibbutzUI e -> Bool
+isFormEvent = undefined
+
+isListEvent :: T.BrickEvent KibbutzUI e -> Bool
+isListEvent e =
   case e of
-    T.VtyEvent vtype -> return ((\k-> s{txForms=k}) =<< L.handleListEvent vtype (txForms s))
+    T.VtyEvent vtype ->
+      case vtype of
+        EvKey KUp [] -> True
+        EvKey KDown [] -> True
+        EvKey KHome [] -> True
+        EvKey KEnd [] -> True
+        EvKey KPageDown [] -> True
+        EvKey KPageUp [] -> True
+        _ -> False
+    _ -> False
+
+handleTransactorEvent :: TransactorS -> T.BrickEvent KibbutzUI KibbutzEvents -> T.EventM KibbutzUI TransactorS
+handleTransactorEvent s e
+      | isListEvent e = (\(T.VtyEvent vtype) -> liftToForm $ L.handleListEvent vtype slist) e
+      | otherwise = do
+          f <- newf form
+          let
+            newslist = L.listModify (const f) slist
+          return $ (\k-> s{txForms=k}) newslist
+  where
+    liftToForm = liftM (\k-> s{txForms=k})
+    slist = (txForms s)
+    (_, form) = ((fromMaybe (0, (head . Vec.toList . listElements $ slist)) $ L.listSelectedElement slist))
+    newf :: StakeForm -> T.EventM KibbutzUI StakeForm
+    newf fm = F.handleFormEvent e fm
     {--
     T.VtyEvent vtype -> 
       case vtype of
         EvKey (KRight) [] -> undefined
         EvKey (KBegin) [] -> undefined
        _ -> return s --}
-    _ -> return s    
+
+theMap :: A.AttrMap
+theMap = A.attrMap V.defAttr []{--
+    [ (L.listAttr,            V.white `on` V.blue)
+    , (L.listSelectedAttr,    V.blue `on` V.white)
+    , (customAttr,            fg V.magenta)
+    ]--}
 
 kibbutzApp :: M.App KibbutzState KibbutzEvents KibbutzUI
 kibbutzApp = M.App
@@ -285,7 +315,7 @@ kibbutzApp = M.App
   , appChooseCursor = M.showFirstCursor
   , appHandleEvent = kibbutzEvent
   , appStartEvent = pure
-  , appAttrMap = const $ A.attrMap mempty []
+  , appAttrMap = const theMap
   }
 
 type KibbutzName = Text.Text
