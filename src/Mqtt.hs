@@ -98,7 +98,7 @@ runMqtt MQTTOpts{..} k@Kibbutz {..} brickChan = do
   where
     sub :: MQ.MQTTClient -> [(MQ.Filter, MQ.SubOptions)] -> IO ()
     sub c topics = do
-      print =<< mapM (\t-> MQ.subscribe c [t] []) topics
+      mapM (\t-> MQ.subscribe c [t] []) topics
       MQ.waitForClient c
     
     handler e = putStrLn ("ERROR :" <> e) >> threadDelay 1000000
