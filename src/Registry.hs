@@ -8,19 +8,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Registry (getThings, HasTopics(..), NodeT, NodeQueue, ThingName, getKibbutz, Kibbutz(..), mkCallback, PubQueue, SubQueue, runNodeQueue, queueStream) where
+module Registry (getThings, HasTopics(..), NodeT, NodeQueue, ThingName, getKibbutz, Kibbutz(..), mkCallback, PubQueue, SubQueue, runNodeQueue, queueStream, KibbutzEvents(..)) where
 
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
 import qualified Data.Text as Text
 import GHC.Generics (Generic)
-import Data.Data
 import Lens.Micro
-import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import qualified Text.PrettyPrint.Tabulate as PPT
 
 -- AWS Imports
 import qualified Network.AWS.IoT.ListThings as Iot
@@ -33,24 +30,20 @@ import qualified Network.MQTT.Topic as MQ
 import qualified Network.MQTT.Client as MQ
 import Node
 import Proto.NodeMessages
-import Proto.NodeMessages_Fields
 
 -- STM
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TQueue
 
 import Streamly
 
 import qualified Streamly.Prelude as S
-import Control.Monad (replicateM)
 
+import Brick.BChan (BChan, writeBChan)
 
 
 -- Protobuf
-import Proto.NodeMessages
-import Proto.NodeMessages_Fields
-import Data.ProtoLens.Encoding (decodeMessage, encodeMessage)
-import Data.ProtoLens (Message, defMessage)
+import Data.ProtoLens.Encoding (decodeMessage)
+import Data.ProtoLens (Message)
 
 
 type ThingName = Text.Text
@@ -85,23 +78,6 @@ initNodeQ = do
   n <- newTQueue
   return $ NodeQueue n
 
-{--
-newtype KibbutzState a = KibbutzState { unKibbutzState :: Map.Map NodeT a } deriving (Eq, Generic)
-
-type KibbutzStateT = KibbutzState (NodeQueue)
-
-initKibbutzStateT :: Set.Set NodeT -> STM (KibbutzStateT)
-initKibbutzStateT ns = do
-  qs <- replicateM (length ns) initNodeQ
-  return $ KibbutzState $ Map.fromList $ zip (Set.toList ns) qs
---}
--- window all the scanl fns
-
-{--
-printAudit :: KibbutzState -> IO ()
-printAudit ns = PPT.printTable $ unKibbutzState ns
---}
-
 
 data Kibbutz = Kibbutz
   { kname :: Text.Text
@@ -110,29 +86,13 @@ data Kibbutz = Kibbutz
   , outQueue :: PubQueue
   } deriving (Generic)
 
-{--
-foldQueue :: NodeQueue a b -> (x -> a -> IO x) -> IO x -> (x -> IO b) -> IO b
-foldQueue q step start done =
-  let go state =
-        do m <- atomically (readTQueue queue)
-           case m of
-             Nothing -> done state
-             Just a -> step state a >>= go
---}
-{--runKibbutz :: _
-runKibbutz Kibbutz {..} = do
-  let getES' = atomically do
-        es <- readTQueue $ runNodeQueue inQueue
-        es >>= getES
-      s = S.foldr (S.|:) S.nil (getES)
-  return 
-  --S.map (\n-> runNodeMonitor n es) $ (S.fromList . Set.toList) nodes
-  --forever $ runMqtt
---}  
 
 instance Show Kibbutz where
   show Kibbutz {..} = Text.unpack $ (kname <> " Kibbutz, " <> (Text.pack $ show $ length nodes) <> " nodes")
 
+data KibbutzEvents = StateUpdate deriving (Eq, Ord, Show)
+
+kbtz :: Text.Text -> Set.Set NodeT -> SubQueue -> PubQueue -> Kibbutz
 kbtz = Kibbutz
 
 getKibbutz :: Text.Text -> IO Kibbutz
@@ -144,13 +104,14 @@ getKibbutz n = do
   oq <- atomically $ initNodeQ
   return $ kbtz n ns iq oq
 
-mkCallback :: Kibbutz -> MQ.MessageCallback
-mkCallback Kibbutz { inQueue } = MQ.SimpleCallback writer
+mkCallback :: Kibbutz -> BChan KibbutzEvents -> MQ.MessageCallback
+mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
       atomically $ do
         writeTQueue (runNodeQueue inQueue) (nodeId, parsed)
+      writeBChan brickChan StateUpdate
       where
         nodeId :: NodeT
         nodeId = (fromJust . fromStateTopic) t
@@ -172,6 +133,9 @@ getThings thingTypeName = do
     things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
     return $ things ^. Iot.ltrsThings
 
+runKibbutzMonitor :: Set.Set NodeT -> SubQueue -> [(NodeT, NodeS)]
+runKibbutzMonitor = undefined
+
 thingName :: Iot.ThingAttribute -> Maybe ThingName
 thingName t = t ^. Iot.taThingName
 
@@ -190,3 +154,4 @@ topicToNodeId suffix t =
     n = Text.replace suffix "" $ Text.replace prefix "" t
     isValidTopic t' = prefix `Text.isPrefixOf` t' && suffix `Text.isSuffixOf` t'
     prefix = "/kibbutz/node/"
+
