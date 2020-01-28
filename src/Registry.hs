@@ -8,7 +8,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Registry (getThings, HasTopics(..), NodeT, NodeQueue, ThingName, getKibbutz, Kibbutz(..), mkCallback, PubQueue, SubQueue, runNodeQueue, queueStream, KibbutzEvents(..)) where
+module Registry (getThings, HasTopics(..), NodeT, NodeQueue, ThingName, getKibbutz, Kibbutz(..), mkCallback, PubQueue, SubQueue, runNodeQueue, queueStream, KibbutzEvents(..), printQueueStream) where
 
 
 import qualified Data.ByteString.Lazy as BL
@@ -109,6 +109,7 @@ mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
+      --print (nodeId, parsed)
       atomically $ do
         writeTQueue (runNodeQueue inQueue) (nodeId, parsed)
       writeBChan brickChan StateUpdate
@@ -119,8 +120,11 @@ mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback writer
         parsed = ((fromRight defaultES) . decodeMessage . toStrict) msg
         toStrict = BS.concat . BL.toChunks
 
-queueStream :: (IsStream t, (Monad (t IO))) => SubQueue -> t IO (NodeT, EnergyState)
+queueStream :: SubQueue -> SerialT IO (NodeT, EnergyState)
 queueStream (NodeQueue q) = S.repeatM (atomically $ readTQueue q)
+
+printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
+printQueueStream = S.mapM_ print
 
 getThings :: Text.Text -> IO [Iot.ThingAttribute]
 getThings thingTypeName = do
@@ -133,8 +137,11 @@ getThings thingTypeName = do
     things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
     return $ things ^. Iot.ltrsThings
 
-runKibbutzMonitor :: Set.Set NodeT -> SubQueue -> [(NodeT, NodeS)]
-runKibbutzMonitor = undefined
+runKibbutzMonitor :: Set.Set NodeT -> SubQueue -> [(NodeT, SerialT IO NodeS)]
+runKibbutzMonitor ns sq = map (\n-> (n, runNodeMonitor n s)) ns'
+  where
+    ns' = Set.toList ns
+    s = queueStream sq
 
 thingName :: Iot.ThingAttribute -> Maybe ThingName
 thingName t = t ^. Iot.taThingName
