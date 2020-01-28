@@ -223,7 +223,7 @@ kibbutzEvent s@KibbutzState{..} e =
     T.VtyEvent vtype ->
       case vtype of
         EvKey (KChar 'q') [] -> M.halt s
-        EvKey (KEnter) [] -> M.continue =<< executeTransaction transactor
+        --EvKey (KEnter) [] -> M.continue =<< executeTransaction transactor
         _ -> M.continue . (\t-> s{transactor = t}) =<< handleTransactorEvent transactor e
     _ -> M.continue s
 
