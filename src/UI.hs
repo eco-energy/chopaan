@@ -138,7 +138,7 @@ prepTx sf leadTime = do
     toETR :: Stake -> (NodeT, (Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest))
     toETR Stake {..} = (_stakingNode, msg)
       where
-        msg = mkETR _power _duration dir
+        msg = mkETR (abs _power) _duration dir
         dir = if (_power > 0) then NM.Outgoing else NM.Incoming
 
 executeTransaction :: TransactorS -> Kibbutz -> IO TransactorS
