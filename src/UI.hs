@@ -144,9 +144,12 @@ toETRs sf leadTime = do
         msg = mkETR _power _duration dir
         dir = if (_power > 0) then NM.Outgoing else NM.Incoming
 
+executeTransaction :: TransactorS -> Kibbutz -> IO TransactorS
+executeTransaction TransactorS{..} Kibbutz{..} = do
+  let
+    trx' = transactions
+  return $ mkTransactor nodes_t trx'
 
---executeTransaction :: StakeList -> IO ()
---executeTransaction xs = map toETR xs 
 
 initStake :: NodeT -> Stake
 initStake n = Stake n False 0 0
@@ -262,11 +265,6 @@ kibbutzEvent s@KibbutzState{..} e =
     where
       liftTransactor = (\t-> s{transactor = t})
 
-executeTransaction :: TransactorS -> Kibbutz -> IO TransactorS
-executeTransaction TransactorS{..} Kibbutz{..} = do
-  let
-    trx' = transactions
-  return $ mkTransactor nodes_t trx'
 
 appEvent :: s -> p -> T.EventM n (T.Next s)
 appEvent l _ = M.continue l

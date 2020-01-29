@@ -65,8 +65,6 @@ mkETR power howLong dir uid stime = defMessage
          & durationInSeconds .~ (d' howLong)
          & direction .~ dir
    where
-     d :: Time.NominalDiffTime -> Int
-     d = convert
      d' :: Int -> Word64
      d' = convert
      utcToWord64 :: Time.UTCTime -> Word64
@@ -76,6 +74,7 @@ mkETR power howLong dir uid stime = defMessage
          c' = convert
          c'' :: Int -> Word64
          c'' = convert
+
 {--
 transactionRequests :: Transaction -> Time.NominalDiffTime -> IO [NM.EnergyTransactionRequest]
 transactionRequests Transaction{..} leadTime = do
