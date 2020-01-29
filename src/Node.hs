@@ -76,14 +76,6 @@ data Power a = Power
   , load :: a }
   deriving (Eq, Ord, Show, Generic, Data, Functor, Applicative)
 
-{--
-instance Applicative (Power) where
-  pure v = Power { gen = v, tIn = v, tOut = v, load = v } 
-  v <*> v' = Power { gen = (gen v <*> gen v')
-                   , tIn = (tIn v <*> tIn v')
-                   , tOut =(tOut v <*> tOut v)
-                   , load =(load v <*> load v)  }
---}
 
 instance (Num a) => Semigroup (Power a) where
   p <> p' = (+) <$> p <*> p'
@@ -98,12 +90,13 @@ data NodeMetrics e p = NodeMetrics
   , _demand :: e
   , _powerS :: Power p
   , _energyS :: EnergyBalance
-  } deriving (Eq, Ord, Show, Generic, Data)
+  , sensors :: EnergyState
+  } deriving (Eq, Ord, Show, Generic)
 
 
 
 defNodeS :: NodeS
-defNodeS = NodeMetrics 0 0 0 0 mempty mempty
+defNodeS = NodeMetrics 0 0 0 0 mempty mempty defaultES
 
 type NodeS = NodeMetrics WattSeconds Watts
 
@@ -144,11 +137,11 @@ nodeES :: (IsStream t, Monad m, Eq a) => NodeId a -> t m (NodeId a, EnergyState)
 nodeES node s = S.filter (\a-> fst a == node) s
                 & S.map snd
 
-powerAndEnergy :: (IsStream t, Monad m) => Time.UTCTime -> t m EnergyState -> t m (Time.UTCTime, (Power Watts, EnergyBalance))
-powerAndEnergy t es' = S.scanl' audit' (t, (mempty, mempty)) es'
+audit :: (IsStream t, Monad m) => Time.UTCTime -> t m EnergyState -> t m (Time.UTCTime, (Power Watts, EnergyBalance, EnergyState))
+audit t es' = S.scanl' audit' (t, (mempty, mempty, defaultES)) es'
   where
-    audit' :: (Time.UTCTime, (Power Watts, EnergyBalance)) -> EnergyState -> (Time.UTCTime, (Power Watts, EnergyBalance))
-    audit' (t', (_, prevEb)) es = (utcTNow es, (pb, prevEb <> eb))
+    audit' :: (Time.UTCTime, (Power Watts, EnergyBalance, EnergyState)) -> EnergyState -> (Time.UTCTime, (Power Watts, EnergyBalance, EnergyState))
+    audit' (t', (_, prevEb, _)) es = (utcTNow es, (pb, prevEb <> eb, es))
       where
         eb = EnergyBalance (fst txIn') (fst txOut') (fst cnsm') (fst gen')
         pb = Power (snd txIn') (snd txOut') (snd cnsm') (snd gen')
@@ -160,37 +153,44 @@ powerAndEnergy t es' = S.scanl' audit' (t, (mempty, mempty)) es'
         cnsm' = integrate $ p batteryVoltage batteryToLoadCurrent
         gen' :: (Watts, WattSeconds)
         gen' = integrate $ p batteryVoltage solarInputCurrent
-        delT = realToFrac $ Time.diffUTCTime (utcTNow es) t'
+
+
+
+energyAtT :: Time.UTCTime -> EnergyBalance -> EnergyState -> EnergyBalance
+energyAtT t' eb es = eb <> EnergyBalance incoming outgoing consumed generated
+  where
+    p v i = es ^. v * es ^. i
+    integrate p' = (p', p' * delT)
+    delT = realToFrac $ Time.diffUTCTime (utcTNow es) t'
+
+
+powerStream :: (IsStream t, (Monad m)) => t m EnergyState -> t m (Power Watts)
+powerStream = S.map powerAtT
+  where
+    powerAtT :: EnergyState -> Power Watts
+    powerAtT es = Power txIn' txOut' cnsm' gen'
+      where
+        txIn' = p batteryVoltage gridToBatteryCurrent 
+        txOut' = p batteryVoltage batteryToGridCurrent
+        cnsm' = p batteryVoltage batteryToLoadCurrent
+        gen' = p batteryVoltage solarInputCurrent
         p v i = es ^. v * es ^. i
-        integrate p' = (p', p' * delT)
-
-utcTNow :: EnergyState -> Time.UTCTime 
-utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
-
--- negative is 
-batteryCurrent :: EnergyState -> Double
-batteryCurrent es = i - o
-  where o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
-        i = es ^. gridToBatteryCurrent + es ^. solarInputCurrent
-
-
---nodeMonitor :: t IO EnergyState -> t IO EnergyState
+    
 runNodeMonitor :: (Eq a, Monad (s IO), IsStream s) => NodeId a -> s IO (NodeId a, EnergyState) -> s IO NodeS
 runNodeMonitor n allEs = do
   initTime <- S.yieldM Time.getCurrentTime
   let
     t = adapt $ lastWait initTime es
-    e = adapt $ e' initTime
-    p = adapt $ p' initTime
+    (t', (p, eb, es')) = fn $ audit initTime es
     --nms :: s IO (NodeMetrics WattSeconds Watts)
-  nms <- zipAsyncly $ nm <$> t <*> loss e <*> stored e <*> demand e <*> p <*> e
+  nms <- zipAsyncly $ nm <$> t <*> loss eb <*> stored eb <*> demand eb <*> p <*> eb <*> es'
   return nms
   where
-    e' t = powerAndEnergy t es & S.map (snd . snd)
-    p' t = powerAndEnergy t es & S.map (fst . snd)
+    fn :: (Monad (s IO), IsStream s) => s IO (Time.UTCTime, (Power Watts, EnergyBalance, EnergyState)) -> (SerialT IO Time.UTCTime, (SerialT IO (Power Watts), SerialT IO EnergyBalance, SerialT IO EnergyState))
+    fn = undefined
     es = nodeES n allEs
     --nm :: 
-    nm t l s d p e = NodeMetrics t l s d p e
+    nm t l s d p eb es = NodeMetrics t l s d p eb es
 
 defaultES :: EnergyState
 defaultES = defMessage
@@ -201,3 +201,12 @@ defaultES = defMessage
                & gridToBatteryCurrent .~ 0
                & solarInputCurrent .~ 0
                & dutyCycle .~ 0
+
+utcTNow :: EnergyState -> Time.UTCTime 
+utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
+
+-- negative is 
+batteryCurrent :: EnergyState -> Double
+batteryCurrent es = i - o
+  where o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
+        i = es ^. gridToBatteryCurrent + es ^. solarInputCurrent

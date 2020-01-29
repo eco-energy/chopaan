@@ -96,6 +96,8 @@ data Stake = Stake
   , _power :: Double
   , _duration :: Int
   } deriving (Eq, Ord, Show)
+
+
 energyStake :: Stake -> Double
 
 energyStake Stake {..} = _power * (fromIntegral _duration)
@@ -350,7 +352,7 @@ selectCursor s@KibbutzState{transactor} clocs = case (L.listSelectedElement txFo
   Just (idx, _) -> safeIdx idx
   where
     TransactorS{txForms} = transactor
-    safeIdx idx = Just $ clocs !! (min (max 0 idx) (length clocs))
+    safeIdx idx = Just $ clocs !! (min ((length clocs) - 1) (max 0 idx))
 
 kibbutzApp :: M.App KibbutzState KibbutzEvents KibbutzUI
 kibbutzApp = M.App
