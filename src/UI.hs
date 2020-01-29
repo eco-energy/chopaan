@@ -9,10 +9,8 @@
 
 module UI where
 
-import Lens.Micro (Lens', (^?), (^.))
-import Control.Monad (void)
-import Data.Monoid
-import Data.Maybe (fromJust, fromMaybe)
+import Lens.Micro (Lens', (^.))
+import Data.Maybe (fromMaybe)
 import qualified Graphics.Vty as V
 
 import qualified Data.Text as Text
@@ -21,36 +19,25 @@ import qualified Data.Set as Set
 import qualified Brick.Main as M
 import qualified Brick.AttrMap as A
 import qualified Brick.Widgets.Border as B
-import qualified Brick.Main as M
 import qualified Brick.Types as T
 import qualified Brick.Widgets.List as L
-import Brick.Types (ViewportType(..), Padding(..),  Widget )
-import Brick.Widgets.Core (viewport, strWrap, padTop, fill, padBottom, str,  (<+>), (<=>)
-                          , vLimit
-                          , hLimit
-                          , vBox
-                          , withAttr
-                          , Named(..)
-                          ) 
--- color layering fns
-import Brick.Util (on, fg, bg)
+import Brick.Types (Padding(..), Widget )
+import Brick.Widgets.Core (strWrap, padTop, fill, padBottom, str, (<+>), (<=>), vLimit, hLimit, vBox, withAttr) 
 
--- dialog box
+-- color layering fns
+import Brick.Util (on, fg)
+
 import Brick.Widgets.Dialog (dialog, renderDialog, handleDialogEvent)
 
--- progress bar for transaction
 import Brick.Widgets.ProgressBar (progressBar)
 
 
 -- ** UI Combinators
 -- | Centering
 import qualified Brick.Widgets.Center as C
--- | Bordering
 import Brick.Widgets.Border (borderWithLabel, hBorder, vBorder)
 
 -- | List api
-import Brick.Widgets.List (listSelectedAttr, List, GenericList(..), list, renderList, renderListWithIndex)
-
 import Brick.BChan
 
 import qualified Brick.Forms as F
@@ -61,7 +48,9 @@ import Graphics.Vty.Input.Events
 
 import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS)
 
-import Registry (printQueueStream, NodeT, ThingName, getKibbutz, Kibbutz(..), queueStream, SubQueue, KibbutzEvents(..))
+import Registry (NodeT, getKibbutz, Kibbutz(..), queueStream, KibbutzEvents(..), writeToPubQ)
+
+import qualified Data.Vector as Vec
 
 import Streamly hiding ((<=>))
 import qualified Streamly.Prelude as S
@@ -69,8 +58,6 @@ import qualified Streamly.Prelude as S
 import GHC.Generics (Generic)
 
 import Control.Monad.Reader
-import qualified Data.Vector as Vec
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Lens.Micro.TH (makeLenses)
 
@@ -78,7 +65,6 @@ import Mqtt (defMQOpts, runMqtt)
 
 import qualified Proto.NodeMessages as NM
 
-import qualified Data.Time as Time
 import qualified Data.Time.Clock as Time
 import Data.ULID
 
@@ -96,7 +82,7 @@ newtype Transaction = Transaction { stakes :: [(NodeT, Double)] } deriving (Eq, 
 
 type StakeForm = F.Form Stake KibbutzEvents KibbutzUI
 
-type StakeList = List KibbutzUI StakeForm
+type StakeList = L.List KibbutzUI StakeForm
 
 data TransactorS = TransactorS
   { nodes_t :: Set.Set NodeT
@@ -110,6 +96,9 @@ data Stake = Stake
   , _power :: Double
   , _duration :: Int
   } deriving (Eq, Ord, Show)
+energyStake :: Stake -> Double
+
+energyStake Stake {..} = _power * (fromIntegral _duration)
 
 makeLenses ''Stake
 
@@ -118,6 +107,7 @@ stakeList xs = L.list TxListUI (Vec.fromList xs) 1
 
 unStakeList :: StakeList -> [Stake]
 unStakeList s =  F.formState <$> (Vec.toList . L.listElements $ s)
+initStakeList :: StakeList
 
 initStakeList = stakeList []
 
@@ -127,17 +117,22 @@ addStake xs x = L.listInsert 0 x xs
 validateStakeListForTx :: StakeList -> Bool
 validateStakeListForTx ss = energyBalance == 0
   where
-    energyBalance = sum $ map (\Stake{..}-> (fromIntegral _duration) * _power) $ unStakeList ss
+    energyBalance = sum $ map energyStake $ unStakeList ss
 
+toTransaction :: [Stake] -> Transaction
+toTransaction ss = Transaction $ map (\s-> (_stakingNode s, energyStake s)) ss
 
-toETRs :: StakeList -> Time.NominalDiffTime -> IO [(NodeT, NM.EnergyTransactionRequest)]
-toETRs sf leadTime = do
+prepTx :: StakeList -> Time.NominalDiffTime -> IO ([(NodeT, NM.EnergyTransactionRequest)], Transaction)
+prepTx sf leadTime = do
   txId <- (Text.pack . show) <$> getULID
   startTime <- Time.addUTCTime leadTime <$> Time.getCurrentTime
-  return $ map (\(n, et) -> (n, et txId startTime)) etrs
+  let
+    txReqs = map (\(n, et) -> (n, et txId startTime)) etrs
+    tx = toTransaction stakes
+  return (txReqs, tx)
   where
     etrs = map toETR stakes
-    stakes = unStakeList sf
+    stakes = filter (_participating) $ unStakeList sf
     toETR :: Stake -> (NodeT, (Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest))
     toETR Stake {..} = (_stakingNode, msg)
       where
@@ -145,10 +140,12 @@ toETRs sf leadTime = do
         dir = if (_power > 0) then NM.Outgoing else NM.Incoming
 
 executeTransaction :: TransactorS -> Kibbutz -> IO TransactorS
-executeTransaction TransactorS{..} Kibbutz{..} = do
-  let
-    trx' = transactions
-  return $ mkTransactor nodes_t trx'
+executeTransaction t@TransactorS{..} Kibbutz{..} = if validateStakeListForTx txForms then exec else return t
+  where
+    exec = do
+      (reqs, tx) <- prepTx txForms (60 * 2 :: Time.NominalDiffTime)
+      _ <- (mapM (uncurry $ writeToPubQ outQueue) reqs)
+      return $ mkTransactor nodes_t $ tx:transactions
 
 
 initStake :: NodeT -> Stake
@@ -158,7 +155,7 @@ initStake n = Stake n False 0 0
 stakeForm :: Int -> NodeT -> Stake -> StakeForm
 stakeForm i n =
     let
-      selQ = "Select Household?"
+      selQ = "Household?"
       hname = (unNodeId n)
       label s w = padBottom (T.Pad 1) $ (vLimit 1 $ hLimit 15 $ strWrap s <+> fill ' ') <+> w
     in F.newForm [ label selQ F.@@= F.checkboxField participating (TxFormUI (ParticipatingField i)) hname   
@@ -176,18 +173,16 @@ renderNodeId :: NodeT -> Widget n
 renderNodeId = strWrap . Text.unpack . unNodeId
 
 drawTForms :: [NodeT] -> StakeList -> Bool -> Widget KibbutzUI
-drawTForms ns fs focus = (renderList form focus fs) <+> C.hCenter help -- (form (head ns) (mkTForms ns $ (initStake $ head ns))) 
+drawTForms ns fs focus = (L.renderList form focus fs) <+> C.hCenter help -- (form (head ns) (mkTForms ns $ (initStake $ head ns))) 
     where
       form :: Bool -> StakeForm -> Widget KibbutzUI
       form selected f = B.border $ padTop (T.Pad 1) $ hLimit 50 $ F.renderForm f
       forms (n:nx) (f:fx) = foldl (<+>) (form n f) (map (uncurry form) $ zip nx fx)
       forms [] [] = str ""
       help = padTop (Pad 1) $ B.borderWithLabel (str "Help") body
-      body = strWrap $ "- Power is a float \n" <>
-                       "- Duration must be an integer (try entering an\n" <>
-                       "  invalid duration!)\n" <>
-                       "- Spacebar toggles direction\n" <>
-                       "- (q) quit, mouse interacts with fields"
+      body = strWrap $ "- Power is Watts in float. Positive for Outgoing, Negative for Incoming \n" <>
+                       "- Duration is in Seconds  \n" <>
+                       "- press (q) to exit"
 
 
 drawTransactor :: Bool -> [NodeT] -> TransactorS -> Widget KibbutzUI
@@ -218,6 +213,7 @@ drawMonitor nms = B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ dr
   where
     drawNodeMetrics :: [(NodeT, NodeS)] -> Widget KibbutzUI
     drawNodeMetrics (nm:nmx) = C.center $ foldl (<=>) (drawNodeMetric nm) $ map drawNodeMetric nmx
+    drawNodeMetrics [] = C.center $ str ""
     drawNodeMetric :: (NodeT, NodeS) -> Widget a
     drawNodeMetric (n, NodeMetrics {..}) = B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $ ((drawPower _powerS) <=> (drawEnergy _energyS))
       where
@@ -232,7 +228,7 @@ drawKibbutz KibbutzState { kibbutz,  nodeStates, transactor } =
   where
     Kibbutz{..} = kibbutz
 
-nodeList :: Set.Set NodeT -> List KibbutzUI NodeT
+nodeList :: Set.Set NodeT -> L.List KibbutzUI NodeT
 nodeList n = L.list HHListUI (Vec.fromList . Set.toList $ n) 1
 
 drawList :: L.List KibbutzUI NodeT -> Widget KibbutzUI
@@ -278,7 +274,7 @@ listDrawElement sel a =
 
 
 customAttr :: A.AttrName
-customAttr = listSelectedAttr <> "custom"
+customAttr = L.listSelectedAttr <> "custom"
 
 
 tui :: IO ()
@@ -330,7 +326,7 @@ handleTransactorEvent s e
   where
     liftToForm = liftM (\k-> s{txForms=k})
     slist = (txForms s)
-    (_, form) = ((fromMaybe (0, (head . Vec.toList . listElements $ slist)) $ L.listSelectedElement slist))
+    (_, form) = ((fromMaybe (0, (head . Vec.toList . L.listElements $ slist)) $ L.listSelectedElement slist))
     newf :: StakeForm -> T.EventM KibbutzUI StakeForm
     newf fm = F.handleFormEvent e fm
     {--

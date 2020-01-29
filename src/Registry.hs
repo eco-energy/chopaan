@@ -8,7 +8,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Registry (getThings, HasTopics(..), NodeT, NodeQueue, ThingName, getKibbutz, Kibbutz(..), mkCallback, PubQueue, SubQueue, runNodeQueue, queueStream, KibbutzEvents(..), printQueueStream) where
+module Registry (getThings, HasTopics(..), NodeT, NodeQueue, ThingName, getKibbutz, Kibbutz(..), mkCallback, PubQueue, SubQueue, runNodeQueue, queueStream, KibbutzEvents(..), printQueueStream, writeToPubQ) where
 
 
 import qualified Data.ByteString.Lazy as BL
@@ -69,7 +69,7 @@ instance HasTopics (NodeT) where
 
 newtype NodeQueue a b = NodeQueue { runNodeQueue :: ((HasTopics a, Message b) => TQueue (a, b)) }
 
-type PubQueue = NodeQueue NodeT MeshFrame
+type PubQueue = NodeQueue NodeT EnergyTransactionRequest
 
 type SubQueue = NodeQueue NodeT EnergyState
 
@@ -78,6 +78,9 @@ initNodeQ = do
   n <- newTQueue
   return $ NodeQueue n
 
+writeToPubQ :: PubQueue -> NodeT -> EnergyTransactionRequest -> IO ()
+writeToPubQ p n et = do
+  atomically $ writeTQueue (runNodeQueue p) (n, et)
 
 data Kibbutz = Kibbutz
   { kname :: Text.Text
