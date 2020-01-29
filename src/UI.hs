@@ -30,6 +30,7 @@ import Brick.Widgets.Core (viewport, strWrap, padTop, fill, padBottom, str,  (<+
                           , hLimit
                           , vBox
                           , withAttr
+                          , Named(..)
                           ) 
 -- color layering fns
 import Brick.Util (on, fg, bg)
@@ -54,11 +55,13 @@ import Brick.BChan
 
 import qualified Brick.Forms as F
 
+import qualified Brick.Focus as Focus
+
 import Graphics.Vty.Input.Events
 
 import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS)
 
-import Registry (NodeT, ThingName, getKibbutz, Kibbutz(..), queueStream, SubQueue, KibbutzEvents(..))
+import Registry (printQueueStream, NodeT, ThingName, getKibbutz, Kibbutz(..), queueStream, SubQueue, KibbutzEvents(..))
 
 import Streamly hiding ((<=>))
 import qualified Streamly.Prelude as S
@@ -118,7 +121,6 @@ initStake :: NodeT -> Stake
 initStake n = Stake n False 0 0
 
 
-
 stakeForm :: Int -> NodeT -> Stake -> StakeForm
 stakeForm i n =
     let
@@ -139,8 +141,8 @@ mkTForms ns stakes = map (uncurry3 stakeForm) $ zip3 ids ns stakes
 renderNodeId :: NodeT -> Widget n
 renderNodeId = strWrap . Text.unpack . unNodeId
 
-drawTForms :: [NodeT] -> StakeList -> Widget KibbutzUI
-drawTForms ns fs = (renderList form True fs) <+> C.hCenter help -- (form (head ns) (mkTForms ns $ (initStake $ head ns))) 
+drawTForms :: [NodeT] -> StakeList -> Bool -> Widget KibbutzUI
+drawTForms ns fs focus = (renderList form focus fs) <+> C.hCenter help -- (form (head ns) (mkTForms ns $ (initStake $ head ns))) 
     where
       form :: Bool -> StakeForm -> Widget KibbutzUI
       form selected f = B.border $ padTop (T.Pad 1) $ hLimit 50 $ F.renderForm f
@@ -154,11 +156,11 @@ drawTForms ns fs = (renderList form True fs) <+> C.hCenter help -- (form (head n
                        "- (q) quit, mouse interacts with fields"
 
 
-drawTransactor :: [NodeT] -> TransactorS -> Widget KibbutzUI
-drawTransactor ns TransactorS {..} = B.borderWithLabel (withAttr titleAttr $ str "Transactor") $ drawTransactions <=> drawTransactionForm
+drawTransactor :: Bool -> [NodeT] -> TransactorS -> Widget KibbutzUI
+drawTransactor focus ns TransactorS {..} = B.borderWithLabel (withAttr titleAttr $ str "Transactor") $ drawTransactions <=> drawTransactionForm
   where
     drawTransactions = strWrap $ show transactions
-    drawTransactionForm = drawTForms ns txForms
+    drawTransactionForm = drawTForms ns txForms focus
 
 mkTransactor :: Set.Set NodeT -> [Transaction] -> TransactorS
 mkTransactor ns txs = TransactorS ns txs fs
@@ -192,7 +194,7 @@ drawMonitor nms = B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ dr
 -- write a metricsheet render function which can be <*>'d over 
 drawKibbutz :: KibbutzState -> [Widget KibbutzUI]
 drawKibbutz KibbutzState { kibbutz,  nodeStates, transactor } =
-  [(drawMonitor nodeStates) <=> (drawTransactor (Set.toList nodes) transactor)]  
+  [(drawMonitor nodeStates) <=> (drawTransactor True (Set.toList nodes) transactor)]  
   where
     Kibbutz{..} = kibbutz
 
@@ -252,6 +254,7 @@ tui = do
   initialVty <- buildVty
   initialState <- buildInitialState thingTypeName
   (runMqtt defMQOpts (kibbutz initialState) eventChan)
+  --printQueueStream (queueStream . inQueue . kibbutz $ initialState)
   endState <- M.customMain initialVty buildVty (Just eventChan) kibbutzApp initialState
   return ()
   where
@@ -261,6 +264,7 @@ data KibbutzState = KibbutzState
   { kibbutz :: Kibbutz
   , nodeStates :: [(NodeT, NodeS)]
   , transactor :: TransactorS
+  , _focus :: Focus.FocusRing KibbutzUI
   }
   deriving (Generic)
 
@@ -309,10 +313,18 @@ theMap = A.attrMap V.defAttr []{--
     , (customAttr,            fg V.magenta)
     ]--}
 
+
+selectCursor :: KibbutzState -> [T.CursorLocation KibbutzUI] -> Maybe (T.CursorLocation KibbutzUI)
+selectCursor s@KibbutzState{transactor} clocs = case (L.listSelectedElement txForms) of
+  Nothing -> M.showFirstCursor s clocs
+  Just (idx, _) -> Just $ clocs !! (min ((length clocs) - 1) (max 0 idx))
+  where
+    TransactorS{txForms} = transactor
+
 kibbutzApp :: M.App KibbutzState KibbutzEvents KibbutzUI
 kibbutzApp = M.App
   { appDraw = drawKibbutz
-  , appChooseCursor = M.showFirstCursor
+  , appChooseCursor = selectCursor
   , appHandleEvent = kibbutzEvent
   , appStartEvent = pure
   , appAttrMap = const theMap
@@ -324,7 +336,7 @@ buildInitialState :: KibbutzName -> IO KibbutzState
 buildInitialState thingTypeName = do
   k <- getKibbutz thingTypeName
   ms <- monitorState k
-  return $ KibbutzState k ms (mkTransactor (nodes k) [])
+  return $ KibbutzState k ms (mkTransactor (nodes k) []) (Focus.focusRing [])
 
 nodeStream :: Kibbutz -> NodeT -> IO (Maybe NodeS)
 nodeStream k n = S.head $ runNodeMonitor n $ queueStream $ inQueue k
