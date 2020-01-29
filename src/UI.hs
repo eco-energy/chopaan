@@ -76,6 +76,15 @@ import Lens.Micro.TH (makeLenses)
 
 import Mqtt (defMQOpts, runMqtt)
 
+import qualified Proto.NodeMessages as NM
+
+import qualified Data.Time as Time
+import qualified Data.Time.Clock as Time
+import Data.ULID
+
+import Transactor (mkETR)
+
+
 
 data KibbutzUI = HHListUI | MonitorUI | TxListUI | TxFormUI TXFormField deriving (Eq, Ord, Show)
 
@@ -102,16 +111,38 @@ data Stake = Stake
   , _duration :: Int
   } deriving (Eq, Ord, Show)
 
-
 makeLenses ''Stake
 
 stakeList :: [StakeForm] -> StakeList
 stakeList xs = L.list TxListUI (Vec.fromList xs) 1 
 
+unStakeList :: StakeList -> [Stake]
+unStakeList s =  F.formState <$> (Vec.toList . L.listElements $ s)
+
 initStakeList = stakeList []
 
 addStake :: StakeList -> StakeForm -> StakeList
 addStake xs x = L.listInsert 0 x xs
+
+validateStakeListForTx :: StakeList -> Bool
+validateStakeListForTx ss = energyBalance == 0
+  where
+    energyBalance = sum $ map (\Stake{..}-> (fromIntegral _duration) * _power) $ unStakeList ss
+
+
+toETRs :: StakeList -> Time.NominalDiffTime -> IO [(NodeT, NM.EnergyTransactionRequest)]
+toETRs sf leadTime = do
+  txId <- (Text.pack . show) <$> getULID
+  startTime <- Time.addUTCTime leadTime <$> Time.getCurrentTime
+  return $ map (\(n, et) -> (n, et txId startTime)) etrs
+  where
+    etrs = map toETR stakes
+    stakes = unStakeList sf
+    toETR :: Stake -> (NodeT, (Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest))
+    toETR Stake {..} = (_stakingNode, msg)
+      where
+        msg = mkETR _power _duration dir
+        dir = if (_power > 0) then NM.Outgoing else NM.Incoming
 
 
 --executeTransaction :: StakeList -> IO ()
@@ -225,12 +256,17 @@ kibbutzEvent s@KibbutzState{..} e =
     T.VtyEvent vtype ->
       case vtype of
         EvKey (KChar 'q') [] -> M.halt s
-        --EvKey (KEnter) [] -> M.continue =<< executeTransaction transactor
-        _ -> M.continue . (\t-> s{transactor = t}) =<< handleTransactorEvent transactor e
+        EvKey (KEnter) [] -> M.continue . liftTransactor =<< (liftIO $ executeTransaction transactor kibbutz)
+        _ -> M.continue . liftTransactor =<< handleTransactorEvent transactor e
     _ -> M.continue s
+    where
+      liftTransactor = (\t-> s{transactor = t})
 
-executeTransaction :: TransactorS -> IO TransactorS
-executeTransaction = undefined 
+executeTransaction :: TransactorS -> Kibbutz -> IO TransactorS
+executeTransaction TransactorS{..} Kibbutz{..} = do
+  let
+    trx' = transactions
+  return $ mkTransactor nodes_t trx'
 
 appEvent :: s -> p -> T.EventM n (T.Next s)
 appEvent l _ = M.continue l
@@ -317,9 +353,10 @@ theMap = A.attrMap V.defAttr []{--
 selectCursor :: KibbutzState -> [T.CursorLocation KibbutzUI] -> Maybe (T.CursorLocation KibbutzUI)
 selectCursor s@KibbutzState{transactor} clocs = case (L.listSelectedElement txForms) of
   Nothing -> M.showFirstCursor s clocs
-  Just (idx, _) -> Just $ clocs !! (min ((length clocs) - 1) (max 0 idx))
+  Just (idx, _) -> safeIdx idx
   where
     TransactorS{txForms} = transactor
+    safeIdx idx = Just $ clocs !! (min (max 0 idx) (length clocs))
 
 kibbutzApp :: M.App KibbutzState KibbutzEvents KibbutzUI
 kibbutzApp = M.App

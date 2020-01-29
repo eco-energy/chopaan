@@ -57,12 +57,12 @@ zeroTxn t0 = Transaction t0 t1 vs
     vs = map (mkVI . (\a -> (a*0, a*0))) [0..10]
 --}
 
-mkETR :: Double -> Time.NominalDiffTime -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
+mkETR :: Double -> Int -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
 mkETR power howLong dir uid stime = defMessage
          & uuid .~ uid
          & NM.start .~ (utcToWord64 stime)
          & powerInWatts .~ power
-         & durationInSeconds .~ (d' $ d howLong)
+         & durationInSeconds .~ (d' howLong)
          & direction .~ dir
    where
      d :: Time.NominalDiffTime -> Int
@@ -87,11 +87,12 @@ transactionRequests Transaction{..} leadTime = do
 
 
 
-mkRequest :: Transaction -> Watts -> Time.DiffTime -> NM.PDirection -> IO NM.EnergyTransactionRequest
+mkRequest :: Double -> Time.DiffTime -> NM.PDirection -> IO NM.EnergyTransactionRequest
 mkRequest p t d = do
   ulid <- getULID
   time <- Time.getCurrentTime
   let
-    e = mkEtr (Text.pack . show) ulid
+    e = mkEtr p time ((Text.pack . show) ulid)
   return etr
+
 --}
