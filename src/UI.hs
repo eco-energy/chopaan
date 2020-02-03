@@ -10,7 +10,7 @@
 module UI where
 
 import Lens.Micro (Lens', (^.))
-import Data.Maybe (fromMaybe)
+import Data.Maybe (maybeToList, fromMaybe)
 import qualified Graphics.Vty as V
 
 import qualified Data.Text as Text
@@ -48,7 +48,7 @@ import Graphics.Vty.Input.Events
 
 import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS)
 
-import Registry (NodeT, getKibbutz, Kibbutz(..), queueStream, KibbutzEvents(..), writeToPubQ)
+import Registry (printQueueStream, NodeT, getKibbutz, Kibbutz(..), queueStream, KibbutzEvents(..), writeToPubQ)
 
 import qualified Data.Vector as Vec
 
@@ -85,7 +85,7 @@ type StakeForm = F.Form Stake KibbutzEvents KibbutzUI
 type StakeList = L.List KibbutzUI StakeForm
 
 data TransactorS = TransactorS
-  { nodes_t :: Set.Set NodeT
+  { nodes_t :: [NodeT]
   , transactions :: [Transaction]
   , txForms :: StakeList
   } deriving (Generic)
@@ -193,13 +193,10 @@ drawTransactor focus ns TransactorS {..} = B.borderWithLabel (withAttr titleAttr
     drawTransactions = strWrap $ show transactions
     drawTransactionForm = drawTForms ns txForms focus
 
-mkTransactor :: Set.Set NodeT -> [Transaction] -> TransactorS
+mkTransactor :: [NodeT] -> [Transaction] -> TransactorS
 mkTransactor ns txs = TransactorS ns txs fs
   where
-    fs = stakeList $ mkTForms nl sts
-      where
-        nl = Set.toList ns
-        sts = map initStake nl
+    fs = stakeList $ mkTForms ns $ map initStake ns
 
 titleAttr :: A.AttrName
 titleAttr = "title"
@@ -226,12 +223,12 @@ drawMonitor nms = B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ dr
 -- write a metricsheet render function which can be <*>'d over 
 drawKibbutz :: KibbutzState -> [Widget KibbutzUI]
 drawKibbutz KibbutzState { kibbutz,  nodeStates, transactor } =
-  [(drawMonitor nodeStates) <=> (drawTransactor True (Set.toList nodes) transactor)]  
+  [(drawMonitor nodeStates) <=> (drawTransactor True nodes transactor)]  
   where
     Kibbutz{..} = kibbutz
 
-nodeList :: Set.Set NodeT -> L.List KibbutzUI NodeT
-nodeList n = L.list HHListUI (Vec.fromList . Set.toList $ n) 1
+nodeList :: [NodeT] -> L.List KibbutzUI NodeT
+nodeList n = L.list HHListUI (Vec.fromList n) 1
 
 drawList :: L.List KibbutzUI NodeT -> Widget KibbutzUI
 drawList l = ui
@@ -279,18 +276,17 @@ customAttr :: A.AttrName
 customAttr = L.listSelectedAttr <> "custom"
 
 
-tui :: IO ()
-tui = do
-  eventChan <- newBChan 1000
+mkUIChan :: IO (BChan KibbutzEvents)
+mkUIChan = newBChan 1000
+
+runTUI :: Kibbutz -> BChan KibbutzEvents -> IO ()
+runTUI kbtz uiChan = do
   let buildVty = V.mkVty V.defaultConfig
   initialVty <- buildVty
-  initialState <- buildInitialState thingTypeName
-  (runMqtt defMQOpts (kibbutz initialState) eventChan)
-  --printQueueStream (queueStream . inQueue . kibbutz $ initialState)
-  endState <- M.customMain initialVty buildVty (Just eventChan) kibbutzApp initialState
+  initialState <- buildInitialState kbtz
+  -- printQueueStream (queueStream . inQueue . kibbutz $ initialState)
+  endState <- M.customMain initialVty buildVty (Just uiChan) kibbutzApp initialState
   return ()
-  where
-    thingTypeName = "kibbutz-pilot-node"
 
 data KibbutzState = KibbutzState
   { kibbutz :: Kibbutz
@@ -331,12 +327,7 @@ handleTransactorEvent s e
     (_, form) = ((fromMaybe (0, (head . Vec.toList . L.listElements $ slist)) $ L.listSelectedElement slist))
     newf :: StakeForm -> T.EventM KibbutzUI StakeForm
     newf fm = F.handleFormEvent e fm
-    {--
-    T.VtyEvent vtype -> 
-      case vtype of
-        EvKey (KRight) [] -> undefined
-        EvKey (KBegin) [] -> undefined
-       _ -> return s --}
+
 
 theMap :: A.AttrMap
 theMap = A.attrMap V.defAttr []{--
@@ -365,19 +356,24 @@ kibbutzApp = M.App
 
 type KibbutzName = Text.Text
 
-buildInitialState :: KibbutzName -> IO KibbutzState
-buildInitialState thingTypeName = do
-  k <- getKibbutz thingTypeName
+buildInitialState :: Kibbutz -> IO KibbutzState
+buildInitialState k = do
   ms <- monitorState k
-  return $ KibbutzState k ms (mkTransactor (nodes k) []) (Focus.focusRing [])
+  let
+    trxtr = mkTransactor (nodes k) []
+    focusR = Focus.focusRing []
+  return $ KibbutzState k ms trxtr focusR 
 
-nodeStream :: Kibbutz -> NodeT -> IO (Maybe NodeS)
-nodeStream k n = S.head $ runNodeMonitor n $ queueStream $ inQueue k
+nodeStream :: Time.UTCTime -> Kibbutz -> NodeT -> SerialT IO NodeS
+nodeStream initTime k n = runNodeMonitor initTime n $ queueStream $ inQueue k
+
+initMonitorState :: Kibbutz -> IO [(NodeT, NodeS)]
+initMonitorState = undefined
 
 monitorState :: Kibbutz -> IO [(NodeT, NodeS)]
 monitorState k@Kibbutz{..} = do
+  initTime <- Time.getCurrentTime
   let
-    ns = nodes
-    nlist = Set.toList ns
-  states <- mapM (nodeStream k) nlist
-  return $ zip nlist (map (fromMaybe defNodeS) states)
+    nS = nodeStream initTime k
+  ns' <- S.toList $ nS =<< S.fromList nodes
+  return $ zip nodes ns' -- zip nlist (map () states)
