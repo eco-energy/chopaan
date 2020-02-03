@@ -48,7 +48,14 @@ import Graphics.Vty.Input.Events
 
 import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS)
 
-import Registry (printQueueStream, NodeT, getKibbutz, Kibbutz(..), queueStream, KibbutzEvents(..), writeToPubQ)
+import Registry (printQueueStream,
+                 NodeT, Kibbutz(..), KibbutzEvents(..), KibbutzMonitor
+                 -- effectful
+                , getKibbutz
+                , initKibbutzMonitor
+                , updateKM
+                , queueStream
+                , writeToPubQ)
 
 import qualified Data.Vector as Vec
 
@@ -358,7 +365,9 @@ type KibbutzName = Text.Text
 
 buildInitialState :: Kibbutz -> IO KibbutzState
 buildInitialState k = do
+  print ("initMonitState")
   ms <- monitorState k
+  print ("initTrx etc")
   let
     trxtr = mkTransactor (nodes k) []
     focusR = Focus.focusRing []
@@ -370,10 +379,19 @@ nodeStream initTime k n = runNodeMonitor initTime n $ queueStream $ inQueue k
 initMonitorState :: Kibbutz -> IO [(NodeT, NodeS)]
 initMonitorState = undefined
 
-monitorState :: Kibbutz -> IO [(NodeT, NodeS)]
+-- this should be a scan
+monitorState :: Kibbutz -> t m (SMap.Map NodeT NodeS)
 monitorState k@Kibbutz{..} = do
   initTime <- Time.getCurrentTime
+  print ("initTime", initTime)
   let
-    nS = nodeStream initTime k
-  ns' <- S.toList $ nS =<< S.fromList nodes
-  return $ zip nodes ns' -- zip nlist (map () states)
+    nS a = nodeStream initTime k a
+  print ("getting ns")
+  (x:xs) <- S.toList $ serially $ S.scanl' (id . id) nS $ S.fromList nodes
+  print ("got ns")
+  return $ zip nodes $ map (fromMaybe defNodeS) (x:xs) -- zip nlist (map () states)
+
+
+-- the monadic action that is visualization must be S.mapM'd over it.
+runMonitorVis :: (Foldable f, Monad m) => f NodeT -> t m (NodeT, NodeS) -> Widget KibbutzUI
+runMonitorVis = undefined
