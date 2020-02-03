@@ -376,11 +376,11 @@ buildInitialState k = do
 nodeStream :: Time.UTCTime -> Kibbutz -> NodeT -> SerialT IO NodeS
 nodeStream initTime k n = runNodeMonitor initTime n $ queueStream $ inQueue k
 
-initMonitorState :: Kibbutz -> IO [(NodeT, NodeS)]
-initMonitorState = undefined
+initMonitorState :: Kibbutz -> KibbutzMonitor
+initMonitorState Kibbutz{..} = initKibbutzMonitor nodes 
 
 -- this should be a scan
-monitorState :: Kibbutz -> t m (SMap.Map NodeT NodeS)
+monitorState :: Kibbutz -> KibbutzMonitor
 monitorState k@Kibbutz{..} = do
   initTime <- Time.getCurrentTime
   print ("initTime", initTime)
