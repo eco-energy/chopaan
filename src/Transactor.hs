@@ -21,6 +21,11 @@ import Data.ULID
 
 import GHC.Generics (S, Generic)
 
+--------------------------------------------------------------------------------
+
+runTransactor = undefined
+
+
 newtype VI a = VI { unVI :: (a, a)} deriving (Eq, Ord, Show, Generic, Functor)
 
 mkVI = VI
@@ -44,6 +49,7 @@ data Transaction = Transaction
     duration   :: Time.DiffTime,
     nodes :: [(NodeT, VI Double)]
   } deriving (Eq, Ord, Show)
+
 
 
 mkTxn :: Time.UTCTime -> Time.DiffTime -> [(NodeT, VI Double)] -> Transaction
