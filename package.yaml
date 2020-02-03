@@ -67,7 +67,10 @@ dependencies:
 - mtl
 - vector
 - microlens-th
-
+- stm-containers
+- hashable
+- hspec
+- QuickCheck
 ghc-options:
 - -Wall
 - -Wcompat
@@ -92,7 +95,8 @@ executables:
     - chopaan
     - optparse-simple
     - base
-    - proto-lens
+    other-modules:
+    - Paths_chopaan
     ghc-options:
     - -threaded
     - -rtsopts
