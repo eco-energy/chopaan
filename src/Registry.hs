@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Rank2Types #-}
@@ -8,7 +9,18 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Registry (getThings, HasTopics(..), NodeT, NodeQueue, ThingName, getKibbutz, Kibbutz(..), mkCallback, PubQueue, SubQueue, runNodeQueue, queueStream, KibbutzEvents(..), printQueueStream, writeToPubQ) where
+module Registry (NodeT,
+                 HasTopics(..),
+                 getKibbutz,
+                 Kibbutz(..),
+                 mkCallback,
+                 PubQueue,
+                 SubQueue,
+                 runNodeQueue,
+                 queueStream,
+                 KibbutzEvents(..),
+                 writeToPubQ,
+                 printQueueStream) where
 
 
 import qualified Data.ByteString.Lazy as BL
@@ -33,7 +45,7 @@ import Proto.NodeMessages
 
 -- STM
 import Control.Concurrent.STM
-
+import Control.Concurrent (forkIO)
 import Streamly
 
 import qualified Streamly.Prelude as S
@@ -44,6 +56,13 @@ import Brick.BChan (BChan, writeBChan)
 -- Protobuf
 import Data.ProtoLens.Encoding (decodeMessage)
 import Data.ProtoLens (Message)
+
+import Control.Monad (void)
+import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.State (MonadState, get, modify, runStateT)
+
+import Data.Hashable (Hashable(..))
+import qualified StmContainers.Map as SMap
 
 
 type ThingName = Text.Text
@@ -84,7 +103,7 @@ writeToPubQ p n et = do
 
 data Kibbutz = Kibbutz
   { kname :: Text.Text
-  , nodes :: Set.Set NodeT
+  , nodes :: [NodeT]
   , inQueue :: SubQueue
   , outQueue :: PubQueue
   } deriving (Generic)
@@ -95,27 +114,31 @@ instance Show Kibbutz where
 
 data KibbutzEvents = StateUpdate deriving (Eq, Ord, Show)
 
-kbtz :: Text.Text -> Set.Set NodeT -> SubQueue -> PubQueue -> Kibbutz
+kbtz :: Text.Text -> [NodeT] -> SubQueue -> PubQueue -> Kibbutz
 kbtz = Kibbutz
 
 getKibbutz :: Text.Text -> IO Kibbutz
 getKibbutz n = do
   ts <- getThings n
   let
-    ns = Set.fromList $ map (mkNode. fromJust . thingName) ts
+    ns = map (mkNode. fromJust . thingName) ts
   iq <- atomically $ initNodeQ
   oq <- atomically $ initNodeQ
   return $ kbtz n ns iq oq
 
 mkCallback :: Kibbutz -> BChan KibbutzEvents -> MQ.MessageCallback
-mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback writer
+mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback $ writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
-      --print (nodeId, parsed)
-      atomically $ do
-        writeTQueue (runNodeQueue inQueue) (nodeId, parsed)
-      writeBChan brickChan StateUpdate
+      --print parsed
+      let
+        this = do
+          atomically $ do
+            writeTQueue (runNodeQueue inQueue) (nodeId, parsed)
+          writeBChan brickChan StateUpdate
+      _ <- forkIO this
+      return ()
       where
         nodeId :: NodeT
         nodeId = (fromJust . fromStateTopic) t
@@ -124,30 +147,26 @@ mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback writer
         toStrict = BS.concat . BL.toChunks
 
 queueStream :: SubQueue -> SerialT IO (NodeT, EnergyState)
-queueStream (NodeQueue q) = S.repeatM (atomically $ readTQueue q)
+queueStream (NodeQueue q) = S.repeatM (atomically $ readTQueue q) -- ((NodeId "a4:12:36:ss:cc" :: NodeT), defaultES) --
 
 printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
 printQueueStream = S.mapM_ print
 
-getThings :: Text.Text -> IO [Iot.ThingAttribute]
-getThings thingTypeName = do
-  let
-    iiot = Iot.ioT{_svcPrefix="execute-api"} :: Service
-    ttn = (Just thingTypeName) :: Maybe Text.Text
-  lgr <- newLogger Trace stdout
-  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot
-  runResourceT . runAWST env $ do
-    things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
-    return $ things ^. Iot.ltrsThings
 
-runKibbutzMonitor :: Set.Set NodeT -> SubQueue -> [(NodeT, SerialT IO NodeS)]
-runKibbutzMonitor ns sq = map (\n-> (n, runNodeMonitor n s)) ns'
-  where
-    ns' = Set.toList ns
-    s = queueStream sq
+type KibbutzMonitor = SMap.Map NodeT NodeS
 
-thingName :: Iot.ThingAttribute -> Maybe ThingName
-thingName t = t ^. Iot.taThingName
+initKibbutzMonitor :: [NodeT] -> STM KibbutzMonitor
+initKibbutzMonitor ns = do
+    m <- SMap.new
+    _ <- mapM (\n -> SMap.insert defNodeS n m) ns
+    return m
+
+updateKM :: NodeT -> NodeS -> KibbutzMonitor -> STM ()
+updateKM n v m = do
+  SMap.insert v n m
+
+runKibbutzMonitor :: (MonadAsync m, MonadState KibbutzMonitor m) => SerialT m NodeS -> m ()
+runKibbutzMonitor s = undefined
 
 nameToTopic :: Text.Text -> ThingName -> MQ.Topic
 nameToTopic suffix name = prefix <> n <> suffix
@@ -161,7 +180,25 @@ topicToNodeId suffix t =
        False  -> Nothing
        _ -> Just (NodeId n)
   where
-    n = Text.replace suffix "" $ Text.replace prefix "" t
+    n = colonize $ Text.replace suffix "" $ Text.replace prefix "" t
     isValidTopic t' = prefix `Text.isPrefixOf` t' && suffix `Text.isSuffixOf` t'
     prefix = "/kibbutz/node/"
+    colonize :: Text.Text -> Text.Text
+    colonize cs = Text.intercalate i $ Text.chunksOf 2 cs
+      where
+        i = ":"
+    -- TODO : Add back the colons!
 
+thingName :: Iot.ThingAttribute -> Maybe ThingName
+thingName t = t ^. Iot.taThingName
+
+getThings :: Text.Text -> IO [Iot.ThingAttribute]
+getThings thingTypeName = do
+  let
+    iiot = Iot.ioT{_svcPrefix="execute-api"} :: Service
+    ttn = (Just thingTypeName) :: Maybe Text.Text
+  lgr <- newLogger Trace stdout
+  env <- newEnv Discover <&> set envRegion Singapore <&> configure iiot -- set envLogger lgr . 
+  runResourceT . runAWST env $ do
+    things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
+    return $ things ^. Iot.ltrsThings
