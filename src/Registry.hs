@@ -20,7 +20,10 @@ module Registry (NodeT,
                  queueStream,
                  KibbutzEvents(..),
                  writeToPubQ,
-                 printQueueStream) where
+                 printQueueStream,
+                 KibbutzMonitor,
+                 initKibbutzMonitor,
+                 updateKM) where
 
 
 import qualified Data.ByteString.Lazy as BL
@@ -59,7 +62,7 @@ import Data.ProtoLens (Message)
 
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Control.Monad.State (MonadState, get, modify, runStateT)
+import Control.Monad.State (put, MonadState, get, modify, runStateT)
 
 import Data.Hashable (Hashable(..))
 import qualified StmContainers.Map as SMap
@@ -131,14 +134,10 @@ mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback $ writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
-      --print parsed
-      let
-        this = do
-          atomically $ do
-            writeTQueue (runNodeQueue inQueue) (nodeId, parsed)
-          writeBChan brickChan StateUpdate
-      _ <- forkIO this
-      return ()
+      print (nodeId, parsed)
+      atomically $ do
+        writeTQueue (runNodeQueue inQueue) (nodeId, parsed)
+      writeBChan brickChan StateUpdate
       where
         nodeId :: NodeT
         nodeId = (fromJust . fromStateTopic) t
@@ -147,7 +146,7 @@ mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback $ writer
         toStrict = BS.concat . BL.toChunks
 
 queueStream :: SubQueue -> SerialT IO (NodeT, EnergyState)
-queueStream (NodeQueue q) = S.repeatM (atomically $ readTQueue q) -- ((NodeId "a4:12:36:ss:cc" :: NodeT), defaultES) --
+queueStream (NodeQueue q) = S.repeatM $ do return ((NodeId "a4:12:36:ss:cc" :: NodeT), defaultES) -- (atomically $ readTQueue q) --
 
 printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
 printQueueStream = S.mapM_ print
@@ -161,12 +160,15 @@ initKibbutzMonitor ns = do
     _ <- mapM (\n -> SMap.insert defNodeS n m) ns
     return m
 
-updateKM :: NodeT -> NodeS -> KibbutzMonitor -> STM ()
-updateKM n v m = do
+updateKM :: KibbutzMonitor -> NodeT -> NodeS ->  STM ()
+updateKM m n v = do
   SMap.insert v n m
 
-runKibbutzMonitor :: (MonadAsync m, MonadState KibbutzMonitor m) => SerialT m NodeS -> m ()
-runKibbutzMonitor s = undefined
+
+-- foldMapWith :: (IsStream t, Foldable f) => (t m b -> t m b -> t m b) -> (a -> t m b) -> f a -> t m b
+runKibbutzMonitor :: SMap.Map NodeT NodeS -> f SerialT (STM (NodeT, NodeS)) -> SerialT STM (SMap.Map NodeT NodeS)
+runKibbutzMonitor km st = do undefined
+    -- foldMapWith (S.mapM_ (\(m, v)-> updateKM km m v)) st
 
 nameToTopic :: Text.Text -> ThingName -> MQ.Topic
 nameToTopic suffix name = prefix <> n <> suffix
