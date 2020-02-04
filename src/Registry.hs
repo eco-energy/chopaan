@@ -23,7 +23,8 @@ module Registry (NodeT,
                  printQueueStream,
                  KibbutzMonitor,
                  initKibbutzMonitor,
-                 updateKM) where
+                 updateKM,
+                 currentKMState) where
 
 
 import qualified Data.ByteString.Lazy as BL
@@ -73,7 +74,7 @@ type ThingName = Text.Text
 type NodeT = (NodeId ThingName)
 
 mkNode :: ThingName -> NodeT
-mkNode = NodeId
+mkNode = NodeId 
 
 class HasTopics a where
   fromThingAttr :: Iot.ThingAttribute -> Maybe a
@@ -146,7 +147,7 @@ mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback $ writer
         toStrict = BS.concat . BL.toChunks
 
 queueStream :: SubQueue -> SerialT IO (NodeT, EnergyState)
-queueStream (NodeQueue q) = S.repeatM $ do return ((NodeId "a4:12:36:ss:cc" :: NodeT), defaultES) -- (atomically $ readTQueue q) --
+queueStream (NodeQueue q) = S.repeatM $ (atomically $ readTQueue q) --
 
 printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
 printQueueStream = S.mapM_ print
@@ -157,19 +158,35 @@ type KibbutzMonitor = SMap.Map NodeT NodeS
 initKibbutzMonitor :: [NodeT] -> STM KibbutzMonitor
 initKibbutzMonitor ns = do
     m <- SMap.new
-    _ <- mapM (\n -> SMap.insert defNodeS n m) ns
+    mapM_ (\n -> SMap.insert defNodeS n m) ns
     return m
 
 updateKM :: KibbutzMonitor -> NodeT -> NodeS ->  STM ()
 updateKM m n v = do
   SMap.insert v n m
 
+currentKMState :: KibbutzMonitor -> [NodeT] -> STM [(NodeT, NodeS)]
+currentKMState km ns = do
+  ns' <- mapM (flip SMap.lookup km) ns
+  let
+    ns'' :: [(NodeT, Maybe NodeS)]
+    ns'' = zip ns ns'
+    ns''' :: [(NodeT, NodeS)]
+    ns''' = map (fmap fromJust) (filter (\(x, i)-> i /= Nothing) ns'')
+  return $ ns'''
 
+{--
 -- foldMapWith :: (IsStream t, Foldable f) => (t m b -> t m b -> t m b) -> (a -> t m b) -> f a -> t m b
-runKibbutzMonitor :: SMap.Map NodeT NodeS -> f SerialT (STM (NodeT, NodeS)) -> SerialT STM (SMap.Map NodeT NodeS)
-runKibbutzMonitor km st = do undefined
+stepKM :: SMap.Map NodeT NodeS -> SerialT STM (NodeT, NodeS) -> STM (SMap.Map NodeT NodeS)
+stepKM km st = do
+  -- update map with current NodeT, NodeS
+  case (S.head st) of
+    Nothing -> Nothing
+    Just (i, s) -> updateKM km i s
+  return km
+    
     -- foldMapWith (S.mapM_ (\(m, v)-> updateKM km m v)) st
-
+--}
 nameToTopic :: Text.Text -> ThingName -> MQ.Topic
 nameToTopic suffix name = prefix <> n <> suffix
   where
@@ -200,7 +217,7 @@ getThings thingTypeName = do
     iiot = Iot.ioT{_svcPrefix="execute-api"} :: Service
     ttn = (Just thingTypeName) :: Maybe Text.Text
   lgr <- newLogger Trace stdout
-  env <- newEnv Discover <&> set envRegion Singapore <&> configure iiot -- set envLogger lgr . 
+  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot --  
   runResourceT . runAWST env $ do
     things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
     return $ things ^. Iot.ltrsThings
