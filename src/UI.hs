@@ -48,12 +48,9 @@ import Graphics.Vty.Input.Events
 
 import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS)
 
-import Registry (currentKMState, printQueueStream,
-                 NodeT, Kibbutz(..), KibbutzEvents(..), KibbutzMonitor
+import Registry (Kibbutz(..), KibbutzEvents(..)
                  -- effectful
                 , getKibbutz
-                , initKibbutzMonitor
-                , updateKM
                 , queueStream
                 , writeToPubQ)
 
@@ -77,6 +74,8 @@ import Data.ULID
 
 import Transactor (mkETR)
 import Control.Concurrent.STM
+import qualified Data.Map.Strict as Map
+import StateMonitor (lookupKM, NodeT, KMState, KConnM, initKMConn, initKMS, updateKM, readKM,)
 
 
 data KibbutzUI = HHListUI | MonitorUI | TxListUI | TxFormUI TXFormField deriving (Eq, Ord, Show)
@@ -124,9 +123,10 @@ addStake :: StakeList -> StakeForm -> StakeList
 addStake xs x = L.listInsert 0 x xs
 
 validateStakeListForTx :: StakeList -> Bool
-validateStakeListForTx ss = energyBalance == 0
+validateStakeListForTx ss = energyBalance == 0 && powerBalance == 0
   where
     energyBalance = sum $ map energyStake $ unStakeList ss
+    powerBalance = sum $ map _power $ unStakeList ss
 
 toTransaction :: [Stake] -> Transaction
 toTransaction ss = Transaction $ map (\s-> (_stakingNode s, energyStake s)) ss
@@ -257,7 +257,7 @@ drawList l = ui
 kibbutzEvent :: KibbutzState -> T.BrickEvent KibbutzUI KibbutzEvents -> T.EventM KibbutzUI (T.Next (KibbutzState))
 kibbutzEvent s@KibbutzState{..} e =
   case e of
-    T.AppEvent (StateUpdate) -> M.continue . (\(ns, cns) -> s{nodeStates = ns, currentNodeState = cns}) =<< (liftIO $ monitorState kbtzTime kibbutz nodeStates)
+    T.AppEvent (StateUpdate) -> M.continue . (\(ns, cns) -> s{nodeStates = ns, currentNodeState = cns}) =<< ((\_-> liftIO $ monitorState kbtzTime kibbutz nodeStates connStates)) =<< (liftIO $ print "state update")
     T.VtyEvent vtype ->
       case vtype of
         EvKey (KChar 'q') [] -> M.halt s
@@ -297,13 +297,29 @@ runTUI kbtz uiChan = do
 
 data KibbutzState = KibbutzState
   { kibbutz :: Kibbutz
-  , nodeStates :: KibbutzMonitor
+  , nodeStates :: KMState
+  , connStates :: KConnM
   , currentNodeState :: [(NodeT, NodeS)]
+  , currentConnStates :: [(NodeT, Int)]
   , transactor :: TransactorS
   , _focus :: Focus.FocusRing KibbutzUI
   , kbtzTime :: Time.UTCTime
   }
   deriving (Generic)
+
+buildInitialState :: Kibbutz -> IO KibbutzState
+buildInitialState k = do
+  initTime <- Time.getCurrentTime
+  initM <- atomically $ initKMS $ nodes k
+  initConn <- atomically $ initKMConn $ nodes k
+  -- ms <- monitorState initTime k initM
+  crntNS <- atomically $ readKM initM (nodes k)
+  crntConn <- atomically $ readKM initConn (nodes k)
+  let
+    trxtr = mkTransactor (nodes k) []
+    focusR = Focus.focusRing []
+  return $ KibbutzState k initM initConn crntNS crntConn trxtr focusR initTime 
+
 
 isFormEvent :: T.BrickEvent KibbutzUI e -> Bool
 isFormEvent = undefined
@@ -365,26 +381,13 @@ kibbutzApp = M.App
 
 type KibbutzName = Text.Text
 
-buildInitialState :: Kibbutz -> IO KibbutzState
-buildInitialState k = do
-  initTime <- Time.getCurrentTime
-  initM <- initMonitorState $ nodes k
-  -- ms <- monitorState initTime k initM
-  crntNS <- atomically $ currentKMState initM (nodes k)
-  let
-    trxtr = mkTransactor (nodes k) []
-    focusR = Focus.focusRing []
-  return $ KibbutzState k initM crntNS trxtr focusR initTime 
 
 nodeStream :: Time.UTCTime -> Kibbutz -> NodeT -> SerialT IO NodeS
 nodeStream initTime k n = serially $ runNodeMonitor initTime n $ queueStream $ inQueue k
 
-initMonitorState :: [NodeT] -> IO KibbutzMonitor
-initMonitorState nodes = atomically $ initKibbutzMonitor nodes 
-
 -- this should be a scan
-monitorState :: Time.UTCTime -> Kibbutz -> KibbutzMonitor -> IO (KibbutzMonitor, [(NodeT, NodeS)])
-monitorState initTime k@Kibbutz{..} nodeStates = do
+monitorState :: Time.UTCTime -> Kibbutz -> KMState -> KConnM -> IO (KMState, [(NodeT, NodeS)])
+monitorState initTime k@Kibbutz{..} nodeStates connStates = do
   let nS = (S.head . (nodeStream initTime k)) :: NodeT -> IO (Maybe NodeS)
       ns' :: NodeT -> Maybe NodeS ->  (NodeT, Maybe NodeS)
       ns' i s = (i, s)
@@ -395,10 +398,15 @@ monitorState initTime k@Kibbutz{..} nodeStates = do
     ns :: [(NodeT, NodeS)]
     ns = map (fmap fromJust) $ filter (\a -> snd a /= Nothing) nsx'''
     ns'' (i, s) = do
-      atomically $
+      atomically $ do
         updateKM nodeStates i s
+        c <- lookupKM connStates i
+        let
+          c' = fromMaybe 0 c
+        updateKM connStates i (c'+1)
   _ <- mapM ns'' ns
-  cns <- atomically $ currentKMState nodeStates nodes
+  cns <- atomically $ readKM nodeStates nodes
+  connCount <- atomically $ readKM connStates nodes
   return $ (nodeStates, cns)
 
 -- the monadic action that is visualization must be S.mapM'd over it.

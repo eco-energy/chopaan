@@ -21,10 +21,8 @@ module Registry (NodeT,
                  KibbutzEvents(..),
                  writeToPubQ,
                  printQueueStream,
-                 KibbutzMonitor,
-                 initKibbutzMonitor,
-                 updateKM,
-                 currentKMState) where
+                 KMState,
+                 updateKM) where
 
 
 import qualified Data.ByteString.Lazy as BL
@@ -67,14 +65,12 @@ import Control.Monad.State (put, MonadState, get, modify, runStateT)
 
 import Data.Hashable (Hashable(..))
 import qualified StmContainers.Map as SMap
+import StateMonitor
 
 
-type ThingName = Text.Text
-
-type NodeT = (NodeId ThingName)
 
 mkNode :: ThingName -> NodeT
-mkNode = NodeId 
+mkNode = NodeId
 
 class HasTopics a where
   fromThingAttr :: Iot.ThingAttribute -> Maybe a
@@ -135,10 +131,10 @@ mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback $ writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
-      print (nodeId, parsed)
+      -- print (nodeId, parsed)
       atomically $ do
         writeTQueue (runNodeQueue inQueue) (nodeId, parsed)
-      writeBChan brickChan StateUpdate
+      (writeBChan brickChan StateUpdate)
       where
         nodeId :: NodeT
         nodeId = (fromJust . fromStateTopic) t
@@ -153,40 +149,8 @@ printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
 printQueueStream = S.mapM_ print
 
 
-type KibbutzMonitor = SMap.Map NodeT NodeS
 
-initKibbutzMonitor :: [NodeT] -> STM KibbutzMonitor
-initKibbutzMonitor ns = do
-    m <- SMap.new
-    mapM_ (\n -> SMap.insert defNodeS n m) ns
-    return m
 
-updateKM :: KibbutzMonitor -> NodeT -> NodeS ->  STM ()
-updateKM m n v = do
-  SMap.insert v n m
-
-currentKMState :: KibbutzMonitor -> [NodeT] -> STM [(NodeT, NodeS)]
-currentKMState km ns = do
-  ns' <- mapM (flip SMap.lookup km) ns
-  let
-    ns'' :: [(NodeT, Maybe NodeS)]
-    ns'' = zip ns ns'
-    ns''' :: [(NodeT, NodeS)]
-    ns''' = map (fmap fromJust) (filter (\(x, i)-> i /= Nothing) ns'')
-  return $ ns'''
-
-{--
--- foldMapWith :: (IsStream t, Foldable f) => (t m b -> t m b -> t m b) -> (a -> t m b) -> f a -> t m b
-stepKM :: SMap.Map NodeT NodeS -> SerialT STM (NodeT, NodeS) -> STM (SMap.Map NodeT NodeS)
-stepKM km st = do
-  -- update map with current NodeT, NodeS
-  case (S.head st) of
-    Nothing -> Nothing
-    Just (i, s) -> updateKM km i s
-  return km
-    
-    -- foldMapWith (S.mapM_ (\(m, v)-> updateKM km m v)) st
---}
 nameToTopic :: Text.Text -> ThingName -> MQ.Topic
 nameToTopic suffix name = prefix <> n <> suffix
   where
