@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Run (run) where
 
-import UI (runTUI, mkUIChan)
+import UI (runTUI, mkUIChan, nodeStream)
 import Mqtt (runMqtt, defMQOpts)
 import Registry (getKibbutz, nodes, mkCallback, outQueue, inQueue, queueStream, printQueueStream)
 
@@ -17,6 +17,7 @@ run = do
   _ <- liftIO $ forkIO $ runMqtt defMQOpts (outQueue kbtz) (nodes kbtz) (mkCallback kbtz uiChan)
   -- _ <- liftIO $ forkIO $ printQueueStream . queueStream . inQueue $ kbtz
   -- _ <- liftIO $ (print . show) =<< (readBChan uiChan)
+  -- liftIO $ S.mapM nodeStream k
   liftIO $ runTUI kbtz uiChan
   where
     thingTypeName = "kibbutz-pilot-node"

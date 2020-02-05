@@ -214,23 +214,32 @@ borderMappings =
     , (titleAttr,            fg V.cyan)
     ]
 
-drawMonitor :: [(NodeT, NodeS)] -> Widget KibbutzUI
-drawMonitor nms = B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics nms
+
+drawConn :: (NodeT, Int) -> Widget n
+drawConn n = B.borderWithLabel (withAttr titleAttr $ strWrap $ (show . fst $ n)) $ strWrap (show . snd $ n)
+
+drawMonitor :: [(NodeT, NodeS)] -> [(NodeT, Int)] -> Widget KibbutzUI
+drawMonitor nms ncs = B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics nms <+> drawNodeConns ncs
   where
+    drawNodeConns :: [(NodeT, Int)] -> Widget KibbutzUI
+    drawNodeConns (n:ns) = foldl (<=>) (drawConn n) $ map drawConn ns
+    drawNodeConns [] = C.center $ str "No Connection Counts!"
     drawNodeMetrics :: [(NodeT, NodeS)] -> Widget KibbutzUI
     drawNodeMetrics (nm:nmx) = C.center $ foldl (<=>) (drawNodeMetric nm) $ map drawNodeMetric nmx
-    drawNodeMetrics [] = C.center $ str "No Nodes Found!"
+    drawNodeMetrics [] = C.center $ str "No Monitor Nodes Found!"
     drawNodeMetric :: (NodeT, NodeS) -> Widget a
-    drawNodeMetric (n, NodeMetrics {..}) = B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $ ((drawPower _powerS) <=> (drawEnergy _energyS))
+    drawNodeMetric (n, NodeMetrics {..}) = B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $ (drawSensor _sensors) <=> (drawPower _powerS) <=> (drawEnergy _energyS)
       where
-        drawPower ps = strWrap $ show ps <> "\n"
-        drawEnergy es = strWrap $ show es <> "\n"
+        drawSensor sr = strWrap $ show sr <> "\n\n\n"
+        drawPower ps = strWrap $ show ps <> "\n\n\n"
+        drawEnergy es = strWrap $ show es <> "\n\n\n"
+
 
 
 -- write a metricsheet render function which can be <*>'d over 
 drawKibbutz :: KibbutzState -> [Widget KibbutzUI]
-drawKibbutz KibbutzState { kibbutz, transactor, currentNodeState } =
-  [(drawMonitor $ currentNodeState) <+> (drawTransactor True nodes transactor)]  
+drawKibbutz KibbutzState { kibbutz, transactor, currentNodeState, currentConnStates } =
+  [(drawMonitor currentNodeState currentConnStates) <+> (drawTransactor True nodes transactor)]  
   where
     Kibbutz{..} = kibbutz
 
@@ -380,34 +389,6 @@ kibbutzApp = M.App
   }
 
 type KibbutzName = Text.Text
-
-
-nodeStream :: Time.UTCTime -> Kibbutz -> NodeT -> SerialT IO NodeS
-nodeStream initTime k n = serially $ runNodeMonitor initTime n $ queueStream $ inQueue k
-
--- this should be a scan
-monitorState :: Time.UTCTime -> Kibbutz -> KMState -> KConnM -> IO (KMState, [(NodeT, NodeS)])
-monitorState initTime k@Kibbutz{..} nodeStates connStates = do
-  let nS = (S.head . (nodeStream initTime k)) :: NodeT -> IO (Maybe NodeS)
-      ns' :: NodeT -> Maybe NodeS ->  (NodeT, Maybe NodeS)
-      ns' i s = (i, s)
-  nsx'' <- mapM nS nodes
-  let
-    nsx''' :: [(NodeT, Maybe NodeS)]
-    nsx''' = zip nodes nsx''
-    ns :: [(NodeT, NodeS)]
-    ns = map (fmap fromJust) $ filter (\a -> snd a /= Nothing) nsx'''
-    ns'' (i, s) = do
-      atomically $ do
-        updateKM nodeStates i s
-        c <- lookupKM connStates i
-        let
-          c' = fromMaybe 0 c
-        updateKM connStates i (c'+1)
-  _ <- mapM ns'' ns
-  cns <- atomically $ readKM nodeStates nodes
-  connCount <- atomically $ readKM connStates nodes
-  return $ (nodeStates, cns)
 
 -- the monadic action that is visualization must be S.mapM'd over it.
 runMonitorVis :: (Foldable f, Monad m) => f NodeT -> t m (NodeT, NodeS) -> Widget KibbutzUI

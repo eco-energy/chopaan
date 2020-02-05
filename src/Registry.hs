@@ -22,7 +22,10 @@ module Registry (NodeT,
                  writeToPubQ,
                  printQueueStream,
                  KMState,
-                 updateKM) where
+                 updateKM,
+                 nodeStream,
+                 monitorState,
+                 runMonitor) where
 
 
 import qualified Data.ByteString.Lazy as BL
@@ -66,8 +69,9 @@ import Control.Monad.State (put, MonadState, get, modify, runStateT)
 import Data.Hashable (Hashable(..))
 import qualified StmContainers.Map as SMap
 import StateMonitor
+import qualified Data.Time as Time
 
-
+import Control.Monad.Reader
 
 mkNode :: ThingName -> NodeT
 mkNode = NodeId
@@ -148,7 +152,59 @@ queueStream (NodeQueue q) = S.repeatM $ (atomically $ readTQueue q) --
 printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
 printQueueStream = S.mapM_ print
 
+nodeStream :: Time.UTCTime -> Kibbutz -> NodeT -> SerialT IO NodeS
+nodeStream initTime k n = serially $ runNodeMonitor initTime n $ queueStream $ inQueue k
 
+
+-- this should be a scan
+monitorState :: Time.UTCTime -> Kibbutz -> KMState -> KConnM -> IO ([(NodeT, NodeS)], [(NodeT, Int)])
+monitorState initTime k@Kibbutz{..} nodeStates connStates = do
+  let nS = (S.head . (nodeStream initTime k)) :: NodeT -> IO (Maybe NodeS)
+  nsx'' <- mapM nS nodes
+  let
+    ns :: [(NodeT, NodeS)]
+    ns = map (fmap fromJust) $ filter (\a -> snd a /= Nothing) $ zip nodes nsx''
+    ns'' (i, s) = do
+      atomically $ do
+        updateKM nodeStates i s
+        c <- lookupKM connStates i
+        let
+          c' = fromMaybe 0 c
+        updateKM connStates i (c'+1)
+  _ <- mapM ns'' ns
+  cns <- atomically $ readKM nodeStates nodes
+  connCount <- atomically $ readKM connStates nodes
+  return $ (cns, connCount)
+
+t :: (Time.UTCTime -> Kibbutz -> KMState -> KConnM -> ReaderT KibbutzName IO a) -> IO a 
+t f = (\(f'', ns)-> join $ liftIO $ (atomically $ withKStates (ns) f'')) =<< (\f' -> (runReaderT (withKibbutz f') defKName)) =<< (liftIO $ withCurrentTime f)
+
+initMonitor ::  ReaderT KibbutzName IO ([(NodeT, NodeS)], [(NodeT, Int)])
+initMonitor = t monitorState
+
+runMonitor :: IO ([(NodeT, NodeS)], [(NodeT, Int)])
+runMonitor = runReaderT (t monitorState) defKName
+
+defKName = Text.pack "kibbutz-pilot-node"
+
+withKStates :: [NodeT] -> (KMState -> KConnM -> a) -> STM a
+withKStates ns f = do
+  km <- initKMS ns
+  kc <- initKMConn ns
+  return $ f km kc
+
+withCurrentTime :: (Time.UTCTime -> a) -> IO a
+withCurrentTime f = do
+  t <- Time.getCurrentTime
+  return $ f t
+
+type KibbutzName = Text.Text
+
+withKibbutz :: (Kibbutz -> a) -> ReaderT KibbutzName IO (a, [NodeT])
+withKibbutz f = do
+  kibbutzName <- ask
+  k <- liftIO $ getKibbutz kibbutzName
+  return $ (f k, nodes k)
 
 
 nameToTopic :: Text.Text -> ThingName -> MQ.Topic

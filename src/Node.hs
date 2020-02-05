@@ -96,6 +96,7 @@ instance (Num a) => Semigroup (Power a) where
 instance (Num a) => Monoid (Power a) where
   mempty = Power 0 0 0 0
 
+
 data NodeMetrics e p = NodeMetrics
   { _lastW :: Time.NominalDiffTime
   , _loss :: e
@@ -103,7 +104,7 @@ data NodeMetrics e p = NodeMetrics
   , _demand :: e
   , _powerS :: Power p
   , _energyS :: EnergyBalance
-  , sensors :: EnergyState
+  , _sensors :: EnergyState
   } deriving (Eq, Ord, Show, Generic)
 
 
@@ -131,11 +132,6 @@ runNodeMonitor initTime nodeId stream =
   where
     nodeStream = S.filter (\a-> fst a == nodeId) stream & S.map snd
 
-
-newtype Monitor = Monitor { runMonitor :: NodeS } deriving (Eq, Ord, Show)
-
-updateMonitor :: Monitor -> NodeS -> Monitor
-updateMonitor (Monitor _) n = (Monitor n)
 
 utcTNow :: EnergyState -> Time.UTCTime 
 utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime

@@ -23,11 +23,10 @@ import qualified Data.Text as Text
 
 --------------------------------------------------------------------------------}
 
-runStateMonitor = undefined
 
 newtype KibbutzMonitor k v = KM { runKM :: SMap.Map k v } deriving (Generic)
 
-initKM :: (Eq k, Hashable k, Eq v) => [k] -> v -> STM (KibbutzMonitor k v)
+initKM :: (Eq k, Hashable k) => [k] -> v -> STM (KibbutzMonitor k v)
 initKM ns def = do
     m <-  SMap.new
     mapM_ (\n -> SMap.insert def n m) ns
@@ -41,7 +40,7 @@ readKM :: (Eq k, Hashable k, Eq v) => KibbutzMonitor k v -> [k] -> STM [(k, v)]
 readKM (KM km) ns = do
   ns' <- mapM (flip SMap.lookup km) ns
   let
-    ns''' = map (fmap fromJust) (filter (\(x, i)-> i /= Nothing) $ zip ns ns')
+    ns''' = map (fmap fromJust) (filter (\(_, i)-> i /= Nothing) $ zip ns ns')
   return $ ns'''
 
 lookupKM :: (Eq k, Hashable k) => KibbutzMonitor k v -> k -> STM (Maybe v)
@@ -61,3 +60,5 @@ type KConnM = KibbutzMonitor NodeT Int
 
 initKMConn :: [NodeT] -> STM KConnM
 initKMConn ns = initKM ns 0
+
+
