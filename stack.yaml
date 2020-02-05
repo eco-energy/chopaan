@@ -35,6 +35,25 @@ packages:
 # forks / in-progress versions pinned to a git hash. For example:
 #
 extra-deps:
+ - git: https://bitbucket.org/ecoenergy/mgenv
+   commit: 871ac22a55f61e809f68850d00f48f77077a194a
+   subdirs:
+     - .
+ - git: https://github.com/conal/concat.git
+   commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+   subdirs:
+     - inline
+     - known
+     - satisfy
+     - classes
+     - plugin
+     - examples
+     - graphics
+     - hardware
+ - git: https://github.com/eco-energy/monad-bayes.git
+   commit: 8078cced02401f4c58f5fb15da6be8b71eb246ba
+   subdirs:
+    - .
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
  - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
  - amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135
@@ -45,10 +64,12 @@ extra-deps:
  - estimator-1.2.0.0@sha256:44c85267299ea1e3eeb3e4eb9f317e4972563c84ba8220924c834a99b9048960,2424
  - stm-containers-1.1.0.4@sha256:f83a683357b6e3b1dda3e70d2077a37224ed534df1f74c4e11f3f6daa7945c5b,3248
  - stm-hamt-1.2.0.4@sha256:7957497c022554b7599e790696d1a3e56359ad99e5da36a251894c626ca1f60a,3970
+ - elminator-0.2.4.1@sha256:bea735d38084310f3e3809d645b141aefe3476d6470f71fb3721a23747024488,1541
+ - geodetics-0.1.0@sha256:699c10cd8d69222b125d054cdc8e2bcee7cb0558c78fa1b4fa06b2d3ecf29f5c,2387
+ - hgeometry-0.9.0.0@sha256:43043574d2ce39c543dfadb629ab3a41fe65d7bf68a1426d8d01312818bc6e4e,9702
+ - hgeometry-combinatorial-0.9.0.0@sha256:a03b48302d8c542ff2ff90ba5d45f2742cc21ed1a676c8fa4870cd461a273354,7367
 
- # - acme-missiles-0.3
-# - git: https://github.com/commercialhaskell/stack.git
-#   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
+
 #
 # extra-deps: []
 

@@ -71,6 +71,10 @@ dependencies:
 - hashable
 - hspec
 - QuickCheck
+- mgenv
+- concat-classes
+- concat-examples
+
 ghc-options:
 - -Wall
 - -Wcompat
