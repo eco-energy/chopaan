@@ -64,7 +64,7 @@ import Data.ProtoLens (Message)
 
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Control.Monad.State (put, MonadState, get, modify, runStateT)
+import Control.Monad.State (StateT, put, MonadState, get, modify, runStateT)
 
 import Data.Hashable (Hashable(..))
 import qualified StmContainers.Map as SMap
@@ -135,7 +135,6 @@ mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback $ writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
-      -- print (nodeId, parsed)
       atomically $ do
         writeTQueue (runNodeQueue inQueue) (nodeId, parsed)
       (writeBChan brickChan StateUpdate)
@@ -146,21 +145,29 @@ mkCallback Kibbutz { inQueue } brickChan  = MQ.SimpleCallback $ writer
         parsed = ((fromRight defaultES) . decodeMessage . toStrict) msg
         toStrict = BS.concat . BL.toChunks
 
-queueStream :: SubQueue -> SerialT IO (NodeT, EnergyState)
-queueStream (NodeQueue q) = S.repeatM $ (atomically $ readTQueue q) --
+queueStream :: (IsStream t) => SubQueue -> t IO (NodeT, EnergyState)
+queueStream (NodeQueue q) = parallely $ S.repeatM $ (atomically $ readTQueue q) --
 
 printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
 printQueueStream = S.mapM_ print
 
-nodeStream :: Time.UTCTime -> Kibbutz -> NodeT -> SerialT IO NodeS
-nodeStream initTime k n = serially $ runNodeMonitor initTime n $ queueStream $ inQueue k
+nodeStream :: (IsStream t) => Time.UTCTime -> Kibbutz -> t IO NodeS
+nodeStream initTime k = foldr (<>) (runNodeMonitor initTime n q) $ map (\n'-> runNodeMonitor initTime n' q) ns
+  where n:ns = (nodes k)
+        q = queueStream $ inQueue k
 
 
+monitorState' = undefined
 -- this should be a scan
-monitorState :: Time.UTCTime -> Kibbutz -> KMState -> KConnM -> IO ([(NodeT, NodeS)], [(NodeT, Int)])
-monitorState initTime k@Kibbutz{..} nodeStates connStates = do
-  let nS = (S.head . (nodeStream initTime k)) :: NodeT -> IO (Maybe NodeS)
-  nsx'' <- mapM nS nodes
+-- tm = queueStream
+
+monitorState :: (IsStream t, (Monad (StateT (KMState, KConnM) m))) => [NodeT] -> (t m (NodeT, NodeS)) -> StateT (KMState, KConnM) IO ([(NodeT, NodeS)], [(NodeT, Int)])
+monitorState nodes ss = do
+  (nodeStates, connStates) <- get
+  let nS = (S.head ss) :: IO (Maybe (NodeT, NodeS))
+      nS' :: [NodeT] -> IO [Maybe (NodeT, NodeS)] 
+      nS' s = join $ map (\n -> filter (\(i, _)-> i == n) s)
+  nsx'' <- mapM (nS' . nS) ss
   let
     ns :: [(NodeT, NodeS)]
     ns = map (fmap fromJust) $ filter (\a -> snd a /= Nothing) $ zip nodes nsx''
@@ -176,14 +183,20 @@ monitorState initTime k@Kibbutz{..} nodeStates connStates = do
   connCount <- atomically $ readKM connStates nodes
   return $ (cns, connCount)
 
-t :: (Time.UTCTime -> Kibbutz -> KMState -> KConnM -> ReaderT KibbutzName IO a) -> IO a 
-t f = (\(f'', ns)-> join $ liftIO $ (atomically $ withKStates (ns) f'')) =<< (\f' -> (runReaderT (withKibbutz f') defKName)) =<< (liftIO $ withCurrentTime f)
 
-initMonitor ::  ReaderT KibbutzName IO ([(NodeT, NodeS)], [(NodeT, Int)])
-initMonitor = t monitorState
+runMonitor'' :: (Time.UTCTime -> Kibbutz -> KMState -> KConnM -> IO a) -> IO a 
+runMonitor'' f = (\(f'', ns)-> join $ liftIO $ (atomically $ withKStates (ns) f'')) =<< (\f' -> (runReaderT (withKibbutz f') defKName)) =<< (liftIO $ withCurrentTime f)
+
+runMonitor' :: a -> StateT (Kibbutz, KMState, KConnM, Serial a) IO ([(NodeT, NodeS)], [(NodeT, Int)])
+runMonitor' a = do
+  time <- liftIO $ Time.getCurrentTime
+  (kibbutz, kmState, kconn, s) <- get
+  (cns, connCount) <- liftIO $ monitorState time kibbutz kmState kconn
+  put (kibbutz, kmState, kconn, s)
+  return (cns, connCount)
 
 runMonitor :: IO ([(NodeT, NodeS)], [(NodeT, Int)])
-runMonitor = runReaderT (t monitorState) defKName
+runMonitor = (runMonitor'' monitorState)
 
 defKName = Text.pack "kibbutz-pilot-node"
 
