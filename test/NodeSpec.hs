@@ -32,7 +32,7 @@ spec = do
       thisState = runNodeMonitor initTime (NodeId 1) emptyStream'
       fs :: (Monad m) => m (Maybe NodeS)
       fs = S.head thisState
-    e <- S.foldl (<>) mempty id es
+    e <- S.foldl' (<>) mempty es
     p <- ps
     strd <- S.sum (stored es)
     l <- S.sum (loss es)
