@@ -48,11 +48,12 @@ import Graphics.Vty.Input.Events
 
 import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS)
 
-import Registry (Kibbutz(..), KibbutzEvents(..)
+import Registry (monitorState, Kibbutz(..), KibbutzEvents(..)
                  -- effectful
                 , getKibbutz
                 , queueStream
-                , writeToPubQ)
+                , writeToPubQ
+                , monitorState)
 
 import qualified Data.Vector as Vec
 
@@ -75,7 +76,7 @@ import Data.ULID
 import Transactor (mkETR)
 import Control.Concurrent.STM
 import qualified Data.Map.Strict as Map
-import StateMonitor (lookupKM, NodeT, KMState, KConnM, initKMConn, initKMS, updateKM, readKM,)
+import StateMonitor (lookupKM, NodeT, KMState, KConnM, initKMConn, initKMS, updateKM, readKM)
 
 
 data KibbutzUI = HHListUI | MonitorUI | TxListUI | TxFormUI TXFormField deriving (Eq, Ord, Show)
@@ -266,7 +267,7 @@ drawList l = ui
 kibbutzEvent :: KibbutzState -> T.BrickEvent KibbutzUI KibbutzEvents -> T.EventM KibbutzUI (T.Next (KibbutzState))
 kibbutzEvent s@KibbutzState{..} e =
   case e of
-    T.AppEvent (StateUpdate) -> M.continue . (\(ns, cns) -> s{nodeStates = ns, currentNodeState = cns}) =<< ((\_-> liftIO $ monitorState kbtzTime kibbutz nodeStates connStates)) =<< (liftIO $ print "state update")
+    T.AppEvent (StateUpdate) -> M.continue . (\(ns, cns) -> s{currentNodeState = ns, currentConnStates = cns}) =<< (liftIO $ monitorState kbtzTime kibbutz nodeStates connStates)
     T.VtyEvent vtype ->
       case vtype of
         EvKey (KChar 'q') [] -> M.halt s
