@@ -11,7 +11,9 @@ import qualified StmContainers.Map as SMap
 import Control.Concurrent.STM (atomically)
 import Import (liftIO, join)
 import StateMonitor
-
+import Registry (updateMonitorState, getMonitorState)
+import Node (NodeId(..))
+import qualified Data.Text as Text
 
 spec :: Spec
 spec = do
@@ -32,6 +34,13 @@ spec = do
       initM <- liftIO (atomically $ initKM [1..10 :: Int] 1)
       let ss :: (IsStream t, Monad m) => t m (Int, Double)
           ss = S.zipWith (,) (S.enumerateFromTo (1 :: Int) 100) (S.enumerateFromTo (1.0 :: Double) 100)
-      atomically $ S.mapM_ (\(i, s) -> updateKM initM i s) ss
-      maxEl <- S.fold FL.maximum (S.map snd $ S.fromList =<< (liftIO $ atomically $ readKM initM [1..10 :: Int]))
-      maxEl `shouldBe` (Just (10 :: Double))
+      S.mapM_ (\(i, s) -> atomically $ updateKM initM i s) ss
+      maxEl <- S.fold FL.maximum (S.map snd $ S.fromList =<< (liftIO $ atomically $ readKM initM [1..100 :: Int]))
+      maxEl `shouldBe` (Just (100 :: Double))
+  {--
+    it "mapping updateMonitorState over a KMState and KConnM should result in a KConnM that is the size of the stream" $ do
+      let nodes = [NodeId (Text.pack $ replicate 10 a) | a <- ['a'..'z']]
+      kmState <- initKMS nodes
+      kConnM <- initKMConn nodes
+      S.mapM_ (updateMonitorState kmState kConnM) $ S.fromList $ zip nodes [] 
+--}
