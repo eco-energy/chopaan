@@ -72,6 +72,8 @@ dependencies:
 - hspec
 - QuickCheck
 - checkers
+- proto-lens-arbitrary
+- quickcheck-instances
 ghc-options:
 - -Wall
 - -Wcompat
@@ -112,7 +114,8 @@ tests:
     - hspec
     - QuickCheck
     - checkers
-
+    - proto-lens-arbitrary
+    - quickcheck-instances
     ghc-options:
     - -threaded
     - -rtsopts

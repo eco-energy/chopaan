@@ -6,7 +6,7 @@ module Run (run) where
 import UI (runTUI, mkUIChan, refreshTick)
 import Mqtt (runMqtt, defMQOpts)
 import Registry (getKibbutz, mkCallback, Kibbutz(..), nodeStream, updateMonitorState)
-import Node (_energyS, NodeS, NodeMetrics(..), defNodeS, EnergyBalance(..))
+import Node (_energyS, NodeS, NodeMetrics(..), defNodeS, Energy(..))
 import Import
 import Control.Concurrent (forkIO)
 import Streamly
@@ -33,4 +33,4 @@ run = do
     thingTypeName = "kibbutz-pilot-node"
     ns' :: (IsStream t) => [NodeT] -> t IO (NodeT, NodeS)
     ns' nodex = S.zipWith (,) (S.fromList $ P.cycle nodex) (S.repeat defNodeS{_energyS=es})
-      where es = EnergyBalance{txOut=10, txIn=10, consumed=10, generated=10}
+      where es = Energy{txOut=10, txIn=10, consumed=10, generated=10}

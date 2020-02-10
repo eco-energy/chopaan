@@ -5,14 +5,13 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Node (
   -- functional export
   runNodeMonitor
   -- data constructors
-  , EnergyState, NodeId(..), NodeS, NodeMetrics(..), EnergyBalance(..)
+  , EnergyState, NodeId(..), NodeS, NodeMetrics(..), Energy(..), Power(..)
   -- calculations exported for tests
   , stored, demand, loss, lastWait, energyStream, powerStream
   -- default builders
@@ -21,10 +20,7 @@ module Node (
 import qualified Data.Time as Time
 import Data.Time.Clock.POSIX
 
--- Vis
-import qualified Text.PrettyPrint.Tabulate as PPT
 import GHC.Generics (Generic)
-import Data.Data
 
 import Proto.NodeMessages
 import Proto.NodeMessages_Fields
@@ -34,9 +30,7 @@ import Lens.Micro
 import Streamly
 import qualified Streamly.Prelude as S
 
-import qualified Data.Set as Set 
-
-import Data.ProtoLens (Message, defMessage)
+import Data.ProtoLens (defMessage)
 import Data.ProtoLens.TextFormat
 
 import Data.Hashable
@@ -50,47 +44,44 @@ type WattSeconds = Double
 
 type Watts = Double
 
-type Demand = Double
+newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Generic)
 
-newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Data, Generic)
-
-instance (Show a) => PPT.CellValueFormatter (NodeId a)
 
 instance (Hashable a) => Hashable (NodeId a) where
   hashWithSalt n (NodeId a) = hashWithSalt n a
 
 -- Episodic Metrics
 
-data EnergyBalance = EnergyBalance
-  { txIn :: WattSeconds
-  , txOut :: WattSeconds
-  , consumed :: WattSeconds
-  , generated :: WattSeconds
-  } deriving (Eq, Show, Ord, Generic, Data)
+data Energy a = Energy
+  { txIn :: !a
+  , txOut :: !a
+  , consumed :: !a
+  , generated :: !a
+  } deriving (Eq, Show, Ord, Generic, Functor, Applicative)
 
-initEA :: EnergyBalance
-initEA = EnergyBalance 0 0 0 0
+type EnergyBalance = Energy WattSeconds
+
+initEA :: (Num a) => Energy a
+initEA = Energy 0 0 0 0
 
 -- Check associativity
-instance Semigroup EnergyBalance where
-  v1 <> v2 = EnergyBalance
+instance (Num a) => Semigroup (Energy a) where
+  v1 <> v2 = Energy
     { txIn = txIn v1 + txIn v2
     , txOut = txOut v1 + txOut v2
     , consumed = consumed v1 + consumed v2
     , generated = generated v1 + generated v2
     }
 
-instance Monoid EnergyBalance where
+instance (Num a) => Monoid (Energy a) where
   mempty = initEA
 
-instance PPT.Tabulate EnergyBalance PPT.ExpandWhenNested
-
 data Power a = Power
-  { gen :: a
-  , tIn :: a
-  , tOut :: a
-  , load :: a }
-  deriving (Eq, Ord, Show, Generic, Data, Functor, Applicative)
+  { gen :: !a
+  , tIn :: !a
+  , tOut :: !a
+  , load :: !a }
+  deriving (Eq, Ord, Show, Generic, Functor, Applicative)
 
 
 instance (Num a) => Semigroup (Power a) where
@@ -101,26 +92,26 @@ instance (Num a) => Monoid (Power a) where
 
 
 data NodeMetrics e p = NodeMetrics
-  { _lastW :: Time.NominalDiffTime
-  , _loss :: e
-  , _stored :: e
-  , _demand :: e
+  { _lastW :: !Time.NominalDiffTime
+  , _loss :: !e
+  , _stored :: !e
+  , _demand :: !e
   , _powerS :: Power p
-  , _energyS :: EnergyBalance
-  , _sensors :: EnergyState
+  , _energyS :: !EnergyBalance
+  , _sensors :: !EnergyState
   } deriving (Eq, Ord, Generic)
 
 
 instance (Show e, Show p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _lastW)
     <> sep <> ("total loss (Ws): " <> show _loss)
-    <> sep <> ("current stored (Ws): " <> show _loss)
+    <> sep <> ("current stored (Ws): " <> show _stored)
     <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerS)
     <> sep <> ("current energy:" <> sep <> show _energyS)
     <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensors)))
     where sep = "\n"
---instance (Show e, Show p) => Show (NodeMetrics e p)
+
 
 defNodeS :: NodeS
 defNodeS = NodeMetrics 0 0 0 0 mempty mempty defaultES
@@ -146,7 +137,7 @@ runNodeMonitor initTime nodeId stream =
     nodeStream = S.filter (\a-> fst a == nodeId) stream & S.map snd
 
 
-utcTNow :: EnergyState -> Time.UTCTime 
+utcTNow :: EnergyState -> Time.UTCTime
 utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
 
 defaultES :: EnergyState
@@ -164,9 +155,9 @@ stored :: (IsStream t, Monad m) => t m EnergyBalance -> t m WattSeconds
 stored es = S.scanl' stored' 0 es
   where
     stored' :: WattSeconds -> EnergyBalance -> WattSeconds
-    stored' s' (EnergyBalance{..}) = s' +
-                                     (generated + ((withLossFrac cLoss) * txIn))
-                                     - ((withLossFrac dLoss * txOut) + (withLossFrac cLoss) * consumed)
+    stored' s' (Energy{..}) = s' +
+                              (generated + ((withLossFrac cLoss) * txIn))
+                              - ((withLossFrac dLoss * txOut) + (withLossFrac cLoss) * consumed)
     withLossFrac a = (1 + a)
     cLoss = 0.01
     dLoss = 0.1
@@ -175,7 +166,7 @@ demand :: (IsStream t, Monad m) => t m EnergyBalance -> t m WattSeconds
 demand es = S.map demand' es
   where
     demand' :: EnergyBalance -> WattSeconds
-    demand' EnergyBalance{..} = (consumed - generated)
+    demand' Energy{..} = (consumed - generated)
 
 -- Imagine we're getting the energy audits of all the nodes for a certain window,
 -- and that we have to calculate thesum txIn across all nodes
@@ -183,7 +174,7 @@ loss :: (IsStream t, Monad m) => t m EnergyBalance -> t m WattSeconds
 loss es = (S.scanl' nLoss 0 es)
   where
     nLoss :: WattSeconds -> EnergyBalance -> WattSeconds
-    nLoss l' (EnergyBalance {txOut, txIn}) = l' + (txOut - txIn)
+    nLoss l' (Energy {txOut, txIn}) = l' + (txOut - txIn)
 
 lastWait :: (IsStream t, Monad m) => Time.UTCTime -> t m EnergyState -> t m Time.NominalDiffTime
 lastWait t es = S.map snd $ S.scanl' sf (t, 0 :: Time.NominalDiffTime) es
@@ -198,7 +189,7 @@ energyStream t es = S.scanl' energyAtT (t, mempty) es
     energyAtT :: (Time.UTCTime, EnergyBalance) -> EnergyState -> (Time.UTCTime, EnergyBalance)
     energyAtT (prevT, prevEb) es' = (tNow, prevEb <> eb)
       where
-        eb = EnergyBalance txIn' txOut' cnsm' gen'
+        eb = Energy txIn' txOut' cnsm' gen'
         txIn' :: WattSeconds
         txIn' = integrate $ p batteryVoltage gridToBatteryCurrent 
         txOut' :: WattSeconds
