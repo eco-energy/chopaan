@@ -7,7 +7,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module UI where
+module UI (runTUI, mkUIChan, refreshTick) where
 
 import Lens.Micro (Lens', (^.))
 import Data.Maybe (fromJust, maybeToList, fromMaybe)
@@ -48,12 +48,9 @@ import Graphics.Vty.Input.Events
 
 import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS)
 
-import Registry (monitorState, Kibbutz(..), KibbutzEvents(..)
-                 -- effectful
-                , getKibbutz
-                , queueStream
+import Registry (Kibbutz(..), KibbutzEvents(..)
                 , writeToPubQ
-                , monitorState)
+                , getMonitorState)
 
 import qualified Data.Vector as Vec
 
@@ -75,8 +72,9 @@ import Data.ULID
 
 import Transactor (mkETR)
 import Control.Concurrent.STM
+import Control.Concurrent (threadDelay)
 import qualified Data.Map.Strict as Map
-import StateMonitor (lookupKM, NodeT, KMState, KConnM, initKMConn, initKMS, updateKM, readKM)
+import StateMonitor (NodeT, KMState, KConnM, initKMS, readKM)
 
 
 data KibbutzUI = HHListUI | MonitorUI | TxListUI | TxFormUI TXFormField deriving (Eq, Ord, Show)
@@ -182,24 +180,24 @@ mkTForms ns stakes = map (uncurry3 stakeForm) $ zip3 ids ns stakes
 renderNodeId :: NodeT -> Widget n
 renderNodeId = strWrap . Text.unpack . unNodeId
 
-drawTForms :: [NodeT] -> StakeList -> Bool -> Widget KibbutzUI
-drawTForms ns fs focus = C.hCenter help <=> (L.renderList form focus fs)  -- (form (head ns) (mkTForms ns $ (initStake $ head ns))) 
+drawTForms :: StakeList -> Bool -> Widget KibbutzUI
+drawTForms fs focus = C.hCenter help <=> (L.renderList form focus fs)  -- (form (head ns) (mkTForms ns $ (initStake $ head ns))) 
     where
       form :: Bool -> StakeForm -> Widget KibbutzUI
       form selected f = B.border $ padTop (T.Pad 1) $ hLimit 50 $ F.renderForm f
       forms (n:nx) (f:fx) = foldl (<+>) (form n f) (map (uncurry form) $ zip nx fx)
-      forms [] [] = str ""
+      forms [] [] = str "No Nodes Found!"
       help = padTop (Pad 1) $ B.borderWithLabel (str "Help") body
       body = strWrap $ "- Power is Watts in float. Positive for Outgoing, Negative for Incoming \n" <>
                        "- Duration is in Seconds  \n" <>
                        "- press (q) to exit"
 
 
-drawTransactor :: Bool -> [NodeT] -> TransactorS -> Widget KibbutzUI
-drawTransactor focus ns TransactorS {..} = B.borderWithLabel (withAttr titleAttr $ str "Transactor") $ drawTransactions <=> drawTransactionForm
+drawTransactor :: Bool -> TransactorS -> Widget KibbutzUI
+drawTransactor focus TransactorS {..} = B.borderWithLabel (withAttr titleAttr $ str "Transactor") $ drawTransactions <=> drawTransactionForm
   where
     drawTransactions = strWrap $ show transactions
-    drawTransactionForm = drawTForms ns txForms focus
+    drawTransactionForm = drawTForms txForms focus
 
 mkTransactor :: [NodeT] -> [Transaction] -> TransactorS
 mkTransactor ns txs = TransactorS ns txs fs
@@ -209,38 +207,31 @@ mkTransactor ns txs = TransactorS ns txs fs
 titleAttr :: A.AttrName
 titleAttr = "title"
 
-borderMappings :: [(A.AttrName, V.Attr)]
-borderMappings =
-    [ (B.borderAttr,         V.yellow `on` V.black)
-    , (titleAttr,            fg V.cyan)
-    ]
-
-
-drawConn :: (NodeT, Int) -> Widget n
-drawConn n = B.borderWithLabel (withAttr titleAttr $ strWrap $ (show . fst $ n)) $ strWrap (show . snd $ n)
 
 drawMonitor :: [(NodeT, NodeS)] -> [(NodeT, Int)] -> Widget KibbutzUI
-drawMonitor nms ncs = B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics nms <+> drawNodeConns ncs
+drawMonitor nms ncs = B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics (merge nms ncs)
   where
-    drawNodeConns :: [(NodeT, Int)] -> Widget KibbutzUI
-    drawNodeConns (n:ns) = foldl (<=>) (drawConn n) $ map drawConn ns
-    drawNodeConns [] = C.center $ str "No Connection Counts!"
-    drawNodeMetrics :: [(NodeT, NodeS)] -> Widget KibbutzUI
+    drawNodeMetrics :: [(NodeT, NodeS, Int)] -> Widget KibbutzUI
     drawNodeMetrics (nm:nmx) = C.center $ foldl (<=>) (drawNodeMetric nm) $ map drawNodeMetric nmx
     drawNodeMetrics [] = C.center $ str "No Monitor Nodes Found!"
-    drawNodeMetric :: (NodeT, NodeS) -> Widget a
-    drawNodeMetric (n, NodeMetrics {..}) = B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $ (drawSensor _sensors) <=> (drawPower _powerS) <=> (drawEnergy _energyS)
+    drawNodeMetric :: (NodeT, NodeS, Int) -> Widget a
+    drawNodeMetric (n, nm@NodeMetrics {..}, count) = B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $ strWrap (show nm)  <=> strWrap ("connection count: " <> (show count))
       where
         drawSensor sr = strWrap $ show sr <> "\n\n\n"
         drawPower ps = strWrap $ show ps <> "\n\n\n"
         drawEnergy es = strWrap $ show es <> "\n\n\n"
+    merge :: [(NodeT, NodeS)] -> [(NodeT, Int)] -> [(NodeT, NodeS, Int)]
+    merge ss ii = map (uncurry a') (zip ss ii) 
+      where
+        a' (n, ns) (n', ni) = (n, ns, ni)
+        -- (drawSensor _sensors) <=> (drawPower _powerS) <=> (drawEnergy _energyS)
 
 
 
 -- write a metricsheet render function which can be <*>'d over 
 drawKibbutz :: KibbutzState -> [Widget KibbutzUI]
 drawKibbutz KibbutzState { kibbutz, transactor, currentNodeState, currentConnStates } =
-  [(drawMonitor currentNodeState currentConnStates) <+> (drawTransactor True nodes transactor)]  
+  [(drawMonitor currentNodeState currentConnStates) <+> (drawTransactor True transactor)]  
   where
     Kibbutz{..} = kibbutz
 
@@ -267,7 +258,10 @@ drawList l = ui
 kibbutzEvent :: KibbutzState -> T.BrickEvent KibbutzUI KibbutzEvents -> T.EventM KibbutzUI (T.Next (KibbutzState))
 kibbutzEvent s@KibbutzState{..} e =
   case e of
-    T.AppEvent (StateUpdate) -> M.continue . (\(ns, cns) -> s{currentNodeState = ns, currentConnStates = cns}) =<< (liftIO $ monitorState kbtzTime kibbutz nodeStates connStates)
+    T.AppEvent (StateUpdate) ->
+      M.continue . (\(ns, cns) ->
+                      s{currentNodeState = ns, currentConnStates = cns})
+      =<< (liftIO $ atomically $ getMonitorState nodeStates connStates (nodes $ kibbutz))
     T.VtyEvent vtype ->
       case vtype of
         EvKey (KChar 'q') [] -> M.halt s
@@ -288,20 +282,22 @@ listDrawElement sel a =
                    else strWrap $ (Text.unpack . unNodeId $ s)
     in C.hCenter $ selStr a
 
-
 customAttr :: A.AttrName
 customAttr = L.listSelectedAttr <> "custom"
-
 
 mkUIChan :: IO (BChan KibbutzEvents)
 mkUIChan = newBChan 1000
 
-runTUI :: Kibbutz -> BChan KibbutzEvents -> IO ()
-runTUI kbtz uiChan = do
+refreshTick :: Int -> BChan KibbutzEvents -> IO ()
+refreshTick d chan = do
+  forever $
+    writeBChan chan StateUpdate >> threadDelay d
+
+runTUI :: Kibbutz -> KMState -> KConnM -> BChan KibbutzEvents -> IO ()
+runTUI kbtz kmState kConnS uiChan = do
   let buildVty = V.mkVty V.defaultConfig
   initialVty <- buildVty
-  initialState <- buildInitialState kbtz
-  -- printQueueStream (queueStream . inQueue . kibbutz $ initialState)
+  initialState <- buildInitialState kbtz kmState kConnS
   endState <- M.customMain initialVty buildVty (Just uiChan) kibbutzApp initialState
   return ()
 
@@ -317,18 +313,15 @@ data KibbutzState = KibbutzState
   }
   deriving (Generic)
 
-buildInitialState :: Kibbutz -> IO KibbutzState
-buildInitialState k = do
+buildInitialState :: Kibbutz -> KMState -> KConnM -> IO KibbutzState
+buildInitialState k kmState kConnS = do
   initTime <- Time.getCurrentTime
-  initM <- atomically $ initKMS $ nodes k
-  initConn <- atomically $ initKMConn $ nodes k
-  -- ms <- monitorState initTime k initM
-  crntNS <- atomically $ readKM initM (nodes k)
-  crntConn <- atomically $ readKM initConn (nodes k)
+  crntNS <- atomically $ readKM kmState (nodes k)
+  crntConn <- atomically $ readKM kConnS (nodes k)
   let
     trxtr = mkTransactor (nodes k) []
     focusR = Focus.focusRing []
-  return $ KibbutzState k initM initConn crntNS crntConn trxtr focusR initTime 
+  return $ KibbutzState k kmState kConnS crntNS crntConn trxtr focusR initTime 
 
 
 isFormEvent :: T.BrickEvent KibbutzUI e -> Bool
@@ -390,7 +383,3 @@ kibbutzApp = M.App
   }
 
 type KibbutzName = Text.Text
-
--- the monadic action that is visualization must be S.mapM'd over it.
-runMonitorVis :: (Foldable f, Monad m) => f NodeT -> t m (NodeT, NodeS) -> Widget KibbutzUI
-runMonitorVis = undefined
