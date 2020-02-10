@@ -12,7 +12,7 @@ module Node (
   -- functional export
   runNodeMonitor
   -- data constructors
-  , EnergyState, NodeId(..), NodeS, NodeMetrics(..), EnergyBalance
+  , EnergyState, NodeId(..), NodeS, NodeMetrics(..), EnergyBalance(..)
   -- calculations exported for tests
   , stored, demand, loss, lastWait, energyStream, powerStream
   -- default builders
