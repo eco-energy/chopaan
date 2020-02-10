@@ -1,37 +1,36 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Run (run) where
 
-import UI (runTUI, mkUIChan)
+import UI (runTUI, mkUIChan, refreshTick)
 import Mqtt (runMqtt, defMQOpts)
-import Registry (getKibbutz, nodes, mkCallback, outQueue, inQueue, queueStream, printQueueStream)
-import Node (NodeS, runNodeMonitor)
+import Registry (getKibbutz, mkCallback, Kibbutz(..), nodeStream, updateMonitorState)
+import Node (_energyS, NodeS, NodeMetrics(..), defNodeS, EnergyBalance(..))
 import Import
 import Control.Concurrent (forkIO)
 import Streamly
 import qualified Streamly.Prelude as S
 import qualified Data.Time as Time
-
+import StateMonitor (initKMS, initKMConn, NodeT)
+import qualified Prelude as P
 
 run :: RIO App ()
 run = do
-  kbtz <- liftIO $ getKibbutz thingTypeName
+  k@Kibbutz{..} <- liftIO $ getKibbutz thingTypeName
   uiChan <- liftIO $ mkUIChan
   initTime <- liftIO $ Time.getCurrentTime
-  _ <- liftIO $ forkIO $ runMqtt defMQOpts (outQueue kbtz) (nodes kbtz) (mkCallback kbtz uiChan)
-  -- _ <- liftIO $ forkIO $ printQueueStream . queueStream . inQueue $ kbtz
-  -- _ <- liftIO $ (print . show) =<< (readBChan uiChan)
+  kmState <- liftIO $ atomically $ initKMS nodes
+  kConnM <- liftIO $ atomically $ initKMConn nodes
+  _ <- liftIO $ forkIO $ refreshTick 1000000 uiChan
+  _ <- liftIO $ forkIO $ runMqtt defMQOpts outQueue nodes (mkCallback k)
   let
-    -- nmNow = runNodeMonitor initTime
-    ns' :: Parallel (NodeS)
-    ns' = parallely . adapt $ foldr (<>) (runNodeMonitor initTime n s) $ [(runNodeMonitor initTime n' s) | n' <- ns]
-      where
-        s = queueStream $ inQueue kbtz
-        (n:ns) = nodes kbtz
-  -- _ <- liftIO $
-  liftIO $ runTUI kbtz uiChan
+    ns :: (IsStream t) => t IO (NodeT, NodeS)
+    ns = nodeStream initTime nodes inQueue
+  _ <- liftIO $ forkIO $ S.drain $ S.mapM (\s' -> atomically $ updateMonitorState kmState kConnM s') ns
+  liftIO $ runTUI k kmState kConnM uiChan
   where
     thingTypeName = "kibbutz-pilot-node"
-    updateState = undefined
-    toDB = undefined
-    
+    ns' :: (IsStream t) => [NodeT] -> t IO (NodeT, NodeS)
+    ns' nodex = S.zipWith (,) (S.fromList $ P.cycle nodex) (S.repeat defNodeS{_energyS=es})
+      where es = EnergyBalance{txOut=10, txIn=10, consumed=10, generated=10}
