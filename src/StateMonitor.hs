@@ -10,7 +10,7 @@ import Data.Hashable
 
 import GHC.Generics (Generic)
 
-import Data.Maybe (fromJust)
+import Data.Maybe (fromMaybe, fromJust)
 
 import qualified Data.Text as Text
 
@@ -62,3 +62,17 @@ initKMConn :: [NodeT] -> STM KConnM
 initKMConn ns = initKM ns 0
 
 
+type MonitorAtT a b c = ([(a, b)], [(a, c)])
+
+getMonitorState :: (Hashable a, Eq a, Eq b, Eq c) => KibbutzMonitor a b -> KibbutzMonitor a c -> [a] -> STM (MonitorAtT a b c)
+getMonitorState nodeStates connStates nodes = do
+  currentNodeStates <- readKM nodeStates nodes
+  currentConnectionCounts <- readKM connStates nodes
+  return $ (currentNodeStates, currentConnectionCounts)
+
+--  KMState -> KConnM -> (NodeT, NodeS)
+updateMonitorState :: (Hashable a, Eq a, Eq b, Num c) => KibbutzMonitor a b -> KibbutzMonitor a c -> (a, b) -> STM ()
+updateMonitorState kmState kConnM (n, ns) = do
+  updateKM kmState n ns
+  c <- lookupKM kConnM n
+  updateKM kConnM n ((fromMaybe 0 c) + 1)
