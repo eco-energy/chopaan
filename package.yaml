@@ -71,6 +71,7 @@ dependencies:
 - hashable
 - hspec
 - QuickCheck
+- checkers
 ghc-options:
 - -Wall
 - -Wcompat
@@ -109,6 +110,8 @@ tests:
     dependencies:
     - chopaan
     - hspec
+    - QuickCheck
+    - checkers
 
     ghc-options:
     - -threaded
