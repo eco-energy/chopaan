@@ -2,21 +2,21 @@ module NodeSpec (spec) where
 
 import Node
 import Test.Hspec
-import Test.Hspec.QuickCheck
 import Test.QuickCheck.Classes
+import Test.QuickCheck.Checkers
 import Test.QuickCheck
-import Test.QuickCheck.Instances.Time
+import Test.QuickCheck.Instances.Time ()
 
-import Streamly.Prelude as S
+import qualified Streamly.Prelude as S
 import Streamly
 
 import qualified Data.Time as Time
-import Import
-import Proto.NodeMessages
-import Proto.NodeMessages_Fields
-import Lens.Micro
-import Data.ProtoLens (defMessage)
+import Proto.NodeMessages ()
+import Proto.NodeMessages_Fields ()
+import Lens.Micro ()
 import Data.ProtoLens.Arbitrary
+
+import Data.Semigroup (Product(..))
 
 instance Arbitrary EnergyState where
   arbitrary = arbitraryMessage
@@ -31,24 +31,28 @@ instance (Arbitrary a) => Arbitrary (Energy a) where
 instance (Arbitrary a, Arbitrary b) => Arbitrary (NodeMetrics a b) where
   arbitrary = NodeMetrics <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
+
+-- | Allows to insert a 'TestBatch' into a Spec.
+testBatch :: TestBatch -> Spec
+testBatch (batchName, tests) = describe ("laws for: " ++ batchName) $
+    foldr (>>) (return ()) (map (uncurry it) tests)
+
+
+instance (Eq a) => EqProp (Power a) where
+  a =-= b = eq a b
+
+instance (Eq a) => EqProp (Energy a) where
+  a =-= b = eq a b
+
 spec :: Spec
 spec = do
   describe "This is how we use node streams" $ do
-    it "run Node Monitor" $ do
-      let
-        tES :: EnergyState
-        tES = defMessage
-          & batteryVoltage .~ 12.0
-          & gridVoltage .~ 60.0
-          & batteryToLoadCurrent .~ 10.0
-          & batteryToGridCurrent .~ 10.0
-          & gridToBatteryCurrent .~ 0.0
-          & solarInputCurrent .~ 10.0
-          & dutyCycle .~ 3.0
-          & cpuTime .~ (100)
-        stream :: (IsStream t, Monad m) => t m (NodeId Int, EnergyState)
-        stream = S.repeat ((NodeId 10), tES)
-
-    --it "loss 2" $ (S.foldl (<>) initEA id es) `shouldBe` initEA -- \i -> plus2 i - 2 `shouldBe` i
-    --it "lastWait" $ (S.foldl (<>) initEA id es) `shouldBe` initEA -- \i -> plus2 i - 2 `shouldBe`i
-
+    it "gens values of power" $ do
+      as <- (arbs 10) :: IO [Power Int]  
+      (map (\a -> a <> mempty) as) `shouldBe` as 
+    it "power is a monoid" $ do
+      verboseBatch (monoid (undefined :: (Power Int)))
+    it "energy is a monoid" $ do
+      verboseBatch (monoid (undefined :: (Energy Int)))
+    --it "run Node Monitor" $ do
+    --  1 `shouldBe` 2
