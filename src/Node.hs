@@ -37,8 +37,11 @@ import qualified Streamly.Prelude as S
 import qualified Data.Set as Set 
 
 import Data.ProtoLens (Message, defMessage)
+import Data.ProtoLens.TextFormat
 
 import Data.Hashable
+
+
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
@@ -105,9 +108,19 @@ data NodeMetrics e p = NodeMetrics
   , _powerS :: Power p
   , _energyS :: EnergyBalance
   , _sensors :: EnergyState
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Generic)
 
 
+instance (Show e, Show p) => Show (NodeMetrics e p) where
+  show NodeMetrics{..} = ("last connection: " <> show _lastW)
+    <> sep <> ("total loss (Ws): " <> show _loss)
+    <> sep <> ("current stored (Ws): " <> show _loss)
+    <> sep <> ("current demand (Ws): " <> show _demand)
+    <> sep <> ("current power:" <> sep <> show _powerS)
+    <> sep <> ("current energy:" <> sep <> show _energyS)
+    <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensors)))
+    where sep = "\n"
+--instance (Show e, Show p) => Show (NodeMetrics e p)
 
 defNodeS :: NodeS
 defNodeS = NodeMetrics 0 0 0 0 mempty mempty defaultES
