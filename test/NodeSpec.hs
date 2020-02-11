@@ -12,15 +12,13 @@ import Test.QuickCheck.Instances.Time ()
 
 import qualified Streamly.Prelude as S
 import Streamly
-import qualified Streamly.Data.Fold as FL
 
-import qualified Data.Time as Time
+
 import Proto.NodeMessages ()
 import Proto.NodeMessages_Fields
 import Lens.Micro ()
 import Data.ProtoLens.Arbitrary
 
-import Data.Semigroup (Product(..))
 import Data.ProtoLens (defMessage)
 import Lens.Micro
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
