@@ -29,13 +29,7 @@ instance (Arbitrary a) => Arbitrary (Energy a) where
 
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (NodeMetrics a b) where
-  arbitrary = NodeMetrics <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
-
-
--- | Allows to insert a 'TestBatch' into a Spec.
-testBatch :: TestBatch -> Spec
-testBatch (batchName, tests) = describe ("laws for: " ++ batchName) $
-    foldr (>>) (return ()) (map (uncurry it) tests)
+  arbitrary = NodeMetrics <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
 
 instance (Eq a) => EqProp (Power a) where
@@ -44,15 +38,15 @@ instance (Eq a) => EqProp (Power a) where
 instance (Eq a) => EqProp (Energy a) where
   a =-= b = eq a b
 
+
 spec :: Spec
 spec = do
   describe "This is how we use node streams" $ do
-    it "gens values of power" $ do
-      as <- (arbs 10) :: IO [Power Int]  
-      (map (\a -> a <> mempty) as) `shouldBe` as 
-    it "power is a monoid" $ do
+    it "power is a monoid and an applicative" $ do
       verboseBatch (monoid (undefined :: (Power Int)))
-    it "energy is a monoid" $ do
+      verboseBatch (applicative (undefined :: Power (Int, Int, Int)))
+    it "energy is a monoid and an applicative" $ do
       verboseBatch (monoid (undefined :: (Energy Int)))
+      verboseBatch (applicative (undefined :: Energy (Int, Int, Int)))
     --it "run Node Monitor" $ do
     --  1 `shouldBe` 2

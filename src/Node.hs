@@ -57,7 +57,22 @@ data Energy a = Energy
   , txOut :: !a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Show, Ord, Generic, Functor, Applicative)
+  } deriving (Eq, Show, Ord, Generic, Functor)
+
+
+instance Applicative Energy where
+  pure v = Energy
+    { txIn = v
+    , txOut = v
+    , consumed = v
+    , generated = v
+    }
+  f <*> v = Energy
+              { txIn = txIn f $ txIn v
+              , txOut = txOut f $ txOut v
+              , consumed = consumed f $ consumed v
+              , generated = generated f $ generated v
+              }
 
 type EnergyBalance = Energy WattSeconds
 
@@ -81,7 +96,22 @@ data Power a = Power
   , tIn :: !a
   , tOut :: !a
   , load :: !a }
-  deriving (Eq, Ord, Show, Generic, Functor, Applicative)
+  deriving (Eq, Ord, Show, Generic, Functor)
+
+
+instance Applicative Power where
+  pure v = Power
+    { tIn = v
+    , tOut = v
+    , load = v
+    , gen = v
+    }
+  f <*> v = Power
+              { tIn = tIn f $ tIn v
+              , tOut = tOut f $ tOut v
+              , load = load f $ load v
+              , gen = gen f $ gen v
+              }
 
 
 instance (Num a) => Semigroup (Power a) where
@@ -93,18 +123,16 @@ instance (Num a) => Monoid (Power a) where
 
 data NodeMetrics e p = NodeMetrics
   { _lastW :: !Time.NominalDiffTime
-  , _loss :: !e
   , _stored :: !e
   , _demand :: !e
-  , _powerS :: Power p
-  , _energyS :: !EnergyBalance
+  , _powerS :: !(Power p)
+  , _energyS :: !(Energy e)
   , _sensors :: !EnergyState
   } deriving (Eq, Ord, Generic)
-
+  
 
 instance (Show e, Show p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _lastW)
-    <> sep <> ("total loss (Ws): " <> show _loss)
     <> sep <> ("current stored (Ws): " <> show _stored)
     <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerS)
@@ -114,9 +142,14 @@ instance (Show e, Show p) => Show (NodeMetrics e p) where
 
 
 defNodeS :: NodeS
-defNodeS = NodeMetrics 0 0 0 0 mempty mempty defaultES
+defNodeS = NodeMetrics 0 0 0 mempty mempty defaultES
 
 type NodeS = NodeMetrics WattSeconds Watts
+
+data GridMetrics e p = GridMetrics
+  { _uptime :: ! Time.NominalDiffTime
+  , _loss :: !e
+  }
 
 
 runNodeMonitor :: (Eq a, Monad m, IsStream t, Applicative (t m)) => Time.UTCTime -> NodeId a -> t m (NodeId a, EnergyState) -> t m NodeS
@@ -126,7 +159,6 @@ runNodeMonitor initTime nodeId stream =
     energyBalance = S.map snd $ energyStream initTime nodeStream
     power = powerStream nodeStream
     nms = NodeMetrics <$> t
-      <*> loss energyBalance
       <*> stored energyBalance
       <*> demand energyBalance
       <*> power
