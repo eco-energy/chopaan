@@ -48,5 +48,4 @@ spec = do
     it "energy is a monoid and an applicative" $ do
       verboseBatch (monoid (undefined :: (Energy Int)))
       verboseBatch (applicative (undefined :: Energy (Int, Int, Int)))
-    --it "run Node Monitor" $ do
-    --  1 `shouldBe` 2
+    -- it "A stream of node metrics "

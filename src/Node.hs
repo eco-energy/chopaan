@@ -246,3 +246,9 @@ powerStream = S.map powerAtT
         cnsm' = p batteryVoltage batteryToLoadCurrent
         gen' = p batteryVoltage solarInputCurrent
         p v i = es ^. v * es ^. i
+
+
+--ns' :: (IsStream t) => [NodeT] -> t IO (NodeT Int, NodeS)
+--ns' nodex = S.zipWith (,) (S.fromList $ P.cycle nodex) (S.repeat defNodeS{_energyS=es})
+--  where es = Energy{txOut=10, txIn=10, consumed=10, generated=10}
+
