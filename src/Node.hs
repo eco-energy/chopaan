@@ -157,7 +157,7 @@ data GridMetrics e p = GridMetrics
 
 
 runNodeMonitor :: (Eq a, Monad m, IsStream t, Applicative (t m)) => Time.UTCTime -> NodeId a -> t m (NodeId a, EnergyState) -> t m NodeS
-runNodeMonitor initTime nodeId stream = nms 
+runNodeMonitor initTime nodeId stream = nms
   where
     t = S.map (\e -> Just e) $ timeStream thisNode
     dt = ((timeDiff initTime) (timeStream thisNode))
@@ -204,14 +204,14 @@ energyStream p dt = S.scan (FL.mconcat) eAtT
                                                 , consumed = (pToE t load)
                                                 , generated = (pToE t gen)}) p dt
     pToE :: Time.NominalDiffTime -> Watts ->  WattSeconds
-    pToE t p = p * (realToFrac t)
+    pToE t p' = p' * (realToFrac t)
     
 -- FL.Fold :: forall s. Fold (s -> a -> m s) (m s) (s -> m b)
 timeDiff :: forall m t . (IsStream t, (Monad m)) => Time.UTCTime -> t m (Time.UTCTime) -> t m (Time.NominalDiffTime)
 timeDiff st = S.scan (FL.Fold step' begin' done')
   where
     step' :: ((Time.UTCTime, Time.NominalDiffTime) -> Time.UTCTime -> m (Time.UTCTime, Time.NominalDiffTime))
-    step' (!prev, !res) cur = pure (cur, Time.diffUTCTime cur prev)
+    step' (!prev, _) cur = pure (cur, Time.diffUTCTime cur prev)
     begin' :: m (Time.UTCTime, Time.NominalDiffTime)
     begin' = return (st, 0)
     done' :: (Time.UTCTime, Time.NominalDiffTime) -> m Time.NominalDiffTime
