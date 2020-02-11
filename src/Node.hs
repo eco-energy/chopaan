@@ -219,26 +219,6 @@ lastWait t es = S.map snd $ S.scanl' sf (t, 0 :: Time.NominalDiffTime) es
     sf (ptime, _) e = (utcTNow e, Time.diffUTCTime (utcTNow e) ptime)
 
 
-energyStream :: (IsStream t, Monad m) => Time.UTCTime -> t m EnergyState -> t m (Time.UTCTime, EnergyBalance)
-energyStream t es = S.scanl' energyAtT (t, mempty) es
-  where 
-    energyAtT :: (Time.UTCTime, EnergyBalance) -> EnergyState -> (Time.UTCTime, EnergyBalance)
-    energyAtT (prevT, prevEb) es' = (tNow, prevEb <> eb)
-      where
-        eb = Energy txIn' txOut' cnsm' gen'
-        txIn' :: WattSeconds
-        txIn' = integrate $ p batteryVoltage gridToBatteryCurrent 
-        txOut' :: WattSeconds
-        txOut' = integrate $ p batteryVoltage batteryToGridCurrent
-        cnsm' :: WattSeconds
-        cnsm' = integrate $ p batteryVoltage batteryToLoadCurrent
-        gen' :: WattSeconds
-        gen' = integrate $ p batteryVoltage solarInputCurrent
-        p v i = es' ^. v * es' ^. i
-        integrate p' = p' * delT
-        delT = realToFrac $ Time.diffUTCTime tNow prevT
-        tNow = utcTNow es'
-
 
 energyStream' :: (IsStream t, Monad m) => t m (Power Watts) -> t m (Time.NominalDiffTime) -> t m (Energy WattSeconds)
 energyStream' = S.zipWith (\Power{..} t-> Energy (pToE t tIn)  (pToE t tOut) (pToE t load) (pToE t gen)) 
