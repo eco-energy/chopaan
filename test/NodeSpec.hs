@@ -48,4 +48,5 @@ spec = do
     it "energy is a monoid and an applicative" $ do
       verboseBatch (monoid (undefined :: (Energy Int)))
       verboseBatch (applicative (undefined :: Energy (Int, Int, Int)))
-    -- it "A stream of node metrics "
+    --it "a stream with txOut > 0 and txIn = 0 drains the stored to zero and no more" $ do
+      

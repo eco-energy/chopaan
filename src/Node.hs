@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -7,6 +8,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Node (
   -- functional export
   runNodeMonitor
@@ -29,6 +31,8 @@ import Lens.Micro
 
 import Streamly
 import qualified Streamly.Prelude as S
+import qualified Streamly.Data.Fold as FL
+import qualified Streamly.Internal.Data.Fold as FL
 
 import Data.ProtoLens (defMessage)
 import Data.ProtoLens.TextFormat
@@ -235,13 +239,34 @@ energyStream t es = S.scanl' energyAtT (t, mempty) es
         delT = realToFrac $ Time.diffUTCTime tNow prevT
         tNow = utcTNow es'
 
+
+energyStream' :: (IsStream t, Monad m) => t m (Power Watts) -> t m (Time.NominalDiffTime) -> t m (Energy WattSeconds)
+energyStream' = S.zipWith (\Power{..} t-> Energy (pToE t tIn)  (pToE t tOut) (pToE t load) (pToE t gen)) 
+  where
+    pToE :: Time.NominalDiffTime -> Watts ->  WattSeconds
+    pToE t p = p * (realToFrac t)
+    
+-- FL.Fold :: forall s. Fold (s -> a -> m s) (m s) (s -> m b)
+timeDiff :: forall m t . (IsStream t, (Monad m)) => Time.UTCTime -> t m (Time.UTCTime) -> t m (Time.NominalDiffTime)
+timeDiff start = S.scan (FL.Fold step' begin' done')
+  where
+    step' :: ((Time.UTCTime, Time.NominalDiffTime) -> Time.UTCTime -> m (Time.UTCTime, Time.NominalDiffTime))
+    step' (!prev, !res) cur = pure (cur, Time.diffUTCTime cur prev)
+    begin' :: m (Time.UTCTime, Time.NominalDiffTime)
+    begin' = return (start, 0)
+    done' :: (Time.UTCTime, Time.NominalDiffTime) -> m Time.NominalDiffTime
+    done' = pure . snd
+
+timeStream :: (IsStream t, (Monad m)) => t m EnergyState -> t m (Time.UTCTime)
+timeStream = S.map utcTNow
+
 powerStream :: (IsStream t, (Monad m)) => t m EnergyState -> t m (Power Watts)
 powerStream = S.map powerAtT
   where
     powerAtT :: EnergyState -> Power Watts
     powerAtT es = Power txIn' txOut' cnsm' gen'
       where
-        txIn' = p batteryVoltage gridToBatteryCurrent 
+        txIn' = p batteryVoltage gridToBatteryCurrent
         txOut' = p batteryVoltage batteryToGridCurrent
         cnsm' = p batteryVoltage batteryToLoadCurrent
         gen' = p batteryVoltage solarInputCurrent
