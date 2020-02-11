@@ -1,3 +1,6 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 module NodeSpec (spec) where
 
 import Node
@@ -12,11 +15,15 @@ import Streamly
 
 import qualified Data.Time as Time
 import Proto.NodeMessages ()
-import Proto.NodeMessages_Fields ()
+import Proto.NodeMessages_Fields
 import Lens.Micro ()
 import Data.ProtoLens.Arbitrary
 
 import Data.Semigroup (Product(..))
+import Data.ProtoLens (defMessage)
+import Lens.Micro
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
+
 
 instance Arbitrary EnergyState where
   arbitrary = arbitraryMessage
@@ -48,5 +55,26 @@ spec = do
     it "energy is a monoid and an applicative" $ do
       verboseBatch (monoid (undefined :: (Energy Int)))
       verboseBatch (applicative (undefined :: Energy (Int, Int, Int)))
-    --it "a stream with txOut > 0 and txIn = 0 drains the stored to zero and no more" $ do
-      
+    it "a stream at a 1 sec interval with a fixed power has an energy after n steps equivalent to the sum of the powers" $ do
+      let
+        initTime = 1581444138
+        m :: Int -> EnergyState
+        m t = defMessage
+                & batteryVoltage .~ 12
+                & gridVoltage .~ 60
+                & batteryToLoadCurrent .~ 5
+                & batteryToGridCurrent .~ 5
+                & gridToBatteryCurrent .~ 0
+                & solarInputCurrent .~ 10
+                & dutyCycle .~ 0
+                & cpuTime .~ (fromIntegral $ (1581444138 + t))
+        msgStream :: (IsStream t, Monad m) => t m (EnergyState)
+        msgStream = S.map m $ S.enumerateFromTo 0 100
+        expectedP = Power (12 * 0) (12 * 5) (12 * 5) (12 * 10)
+        expectedE = Energy tIn tOut load gen
+          where
+            Power{..} = sP
+            sP = foldl (<>) expectedP $ replicate 99 expectedP
+      pExp <- S.all (\a-> a == expectedP) (powerStream msgStream)
+      eExp <- S.head $ energyStream (powerStream msgStream) ((timeDiff $ posixSecondsToUTCTime initTime) . timeStream $ msgStream) 
+      pExp  `shouldBe` True

@@ -15,7 +15,7 @@ module Node (
   -- data constructors
   , EnergyState, NodeId(..), NodeS, NodeMetrics(..), Energy(..), Power(..), WattSeconds, Watts
   -- calculations exported for tests
-  , stored, demand, loss, lastWait, energyStream, powerStream
+  , energyStream, powerStream, timeDiff, timeStream
   -- default builders
   , defaultES, defNodeS
   ) where
@@ -157,7 +157,7 @@ data GridMetrics e p = GridMetrics
 
 
 runNodeMonitor :: (Eq a, Monad m, IsStream t, Applicative (t m)) => Time.UTCTime -> NodeId a -> t m (NodeId a, EnergyState) -> t m NodeS
-runNodeMonitor initTime nodeId stream =
+runNodeMonitor initTime nodeId stream = undefined {--
   let
     t = lastWait initTime nodeStream
     energyBalance = S.map snd $ energyStream initTime nodeStream
@@ -171,7 +171,7 @@ runNodeMonitor initTime nodeId stream =
   in nms
   where
     nodeStream = S.filter (\a-> fst a == nodeId) stream & S.map snd
-
+--}
 
 utcTNow :: EnergyState -> Time.UTCTime
 utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
@@ -212,16 +212,10 @@ loss es = (S.scanl' nLoss 0 es)
     nLoss :: WattSeconds -> EnergyBalance -> WattSeconds
     nLoss l' (Energy {txOut, txIn}) = l' + (txOut - txIn)
 
-lastWait :: (IsStream t, Monad m) => Time.UTCTime -> t m EnergyState -> t m Time.NominalDiffTime
-lastWait t es = S.map snd $ S.scanl' sf (t, 0 :: Time.NominalDiffTime) es
-  where
-    sf :: (Time.UTCTime, Time.NominalDiffTime) -> EnergyState -> (Time.UTCTime, Time.NominalDiffTime)
-    sf (ptime, _) e = (utcTNow e, Time.diffUTCTime (utcTNow e) ptime)
 
 
-
-energyStream' :: (IsStream t, Monad m) => t m (Power Watts) -> t m (Time.NominalDiffTime) -> t m (Energy WattSeconds)
-energyStream' = S.zipWith (\Power{..} t-> Energy (pToE t tIn)  (pToE t tOut) (pToE t load) (pToE t gen)) 
+energyStream :: (IsStream t, Monad m) => t m (Power Watts) -> t m (Time.NominalDiffTime) -> t m (Energy WattSeconds)
+energyStream = S.zipWith (\Power{..} t-> Energy (pToE t tIn)  (pToE t tOut) (pToE t load) (pToE t gen)) 
   where
     pToE :: Time.NominalDiffTime -> Watts ->  WattSeconds
     pToE t p = p * (realToFrac t)
@@ -251,6 +245,8 @@ powerStream = S.map powerAtT
         cnsm' = p batteryVoltage batteryToLoadCurrent
         gen' = p batteryVoltage solarInputCurrent
         p v i = es ^. v * es ^. i
+
+
 
 
 --ns' :: (IsStream t) => [NodeT] -> t IO (NodeT Int, NodeS)
