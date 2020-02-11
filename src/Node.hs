@@ -157,7 +157,15 @@ data GridMetrics e p = GridMetrics
 
 
 runNodeMonitor :: (Eq a, Monad m, IsStream t, Applicative (t m)) => Time.UTCTime -> NodeId a -> t m (NodeId a, EnergyState) -> t m NodeS
-runNodeMonitor initTime nodeId stream = undefined {--
+runNodeMonitor initTime nodeId stream = nms 
+  where
+    t = S.map (\e -> Just e) $ timeStream thisNode
+    dt = ((timeDiff initTime) (timeStream thisNode))
+    p = powerStream thisNode
+    en = energyStream p dt
+    thisNode = S.map (snd) . S.filter (\e -> fst e == nodeId) $ stream
+    nms = NodeMetrics <$> t <*> p <*> en <*> thisNode
+      {--
   let
     t = lastWait initTime nodeStream
     energyBalance = S.map snd $ energyStream initTime nodeStream
@@ -189,11 +197,12 @@ defaultES = defMessage
 
 
 energyStream :: (IsStream t, Monad m) => t m (Power Watts) -> t m (Time.NominalDiffTime) -> t m (Energy WattSeconds)
-energyStream = S.zipWith (\Power{..} t-> Energy { txIn = (pToE t tIn)
+energyStream p dt = S.scan (FL.mconcat) eAtT
+  where
+    eAtT = S.zipWith (\Power{..} t-> Energy { txIn = (pToE t tIn)
                                                 , txOut = (pToE t tOut)
                                                 , consumed = (pToE t load)
-                                                , generated = (pToE t gen)}) 
-  where
+                                                , generated = (pToE t gen)}) p dt
     pToE :: Time.NominalDiffTime -> Watts ->  WattSeconds
     pToE t p = p * (realToFrac t)
     

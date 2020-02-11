@@ -77,6 +77,6 @@ spec = do
             Power{..} = sP
             sP = foldl (<>) expectedP $ replicate 99 expectedP
       pExp <- S.all (\a-> a == expectedP) (powerStream msgStream)
-      eExp <- S.fold (FL.mconcat) $ energyStream (powerStream msgStream) ((timeDiff $ posixSecondsToUTCTime initTime) . timeStream $ msgStream) 
+      eExp <- S.last $ energyStream (powerStream msgStream) ((timeDiff $ posixSecondsToUTCTime initTime) . timeStream $ msgStream) 
       pExp  `shouldBe` True
-      eExp `shouldBe` (expectedE)
+      eExp `shouldBe` (Just expectedE)
