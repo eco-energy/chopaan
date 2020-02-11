@@ -126,9 +126,9 @@ instance (Num a) => Monoid (Power a) where
 
 
 data NodeMetrics e p = NodeMetrics
-  { _lastW :: !Time.NominalDiffTime
-  , _stored :: !e
-  , _demand :: !e
+  { _lastConn :: !(Maybe Time.UTCTime)
+  -- , _stored :: !e
+  -- , _demand :: !e
   , _powerS :: !(Power p)
   , _energyS :: !(Energy e)
   , _sensors :: !EnergyState
@@ -136,9 +136,9 @@ data NodeMetrics e p = NodeMetrics
   
 
 instance (Show e, Show p) => Show (NodeMetrics e p) where
-  show NodeMetrics{..} = ("last connection: " <> show _lastW)
-    <> sep <> ("current stored (Ws): " <> show _stored)
-    <> sep <> ("current demand (Ws): " <> show _demand)
+  show NodeMetrics{..} = ("last connection: " <> show _lastConn)
+    -- <> sep <> ("current stored (Ws): " <> show _stored)
+    -- <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerS)
     <> sep <> ("current energy:" <> sep <> show _energyS)
     <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensors)))
@@ -146,7 +146,7 @@ instance (Show e, Show p) => Show (NodeMetrics e p) where
 
 
 defNodeS :: NodeS
-defNodeS = NodeMetrics 0 0 0 mempty mempty defaultES
+defNodeS = NodeMetrics Nothing mempty mempty defaultES
 
 type NodeS = NodeMetrics WattSeconds Watts
 
@@ -187,47 +187,24 @@ defaultES = defMessage
                & dutyCycle .~ 0
                & cpuTime .~ 0
 
-stored :: (IsStream t, Monad m) => t m EnergyBalance -> t m WattSeconds
-stored es = S.scanl' stored' 0 es
-  where
-    stored' :: WattSeconds -> EnergyBalance -> WattSeconds
-    stored' s' (Energy{..}) = s' +
-                              (generated + ((withLossFrac cLoss) * txIn))
-                              - ((withLossFrac dLoss * txOut) + (withLossFrac cLoss) * consumed)
-    withLossFrac a = (1 + a)
-    cLoss = 0.01
-    dLoss = 0.1
-
-demand :: (IsStream t, Monad m) => t m EnergyBalance -> t m WattSeconds
-demand es = S.map demand' es
-  where
-    demand' :: EnergyBalance -> WattSeconds
-    demand' Energy{..} = (consumed - generated)
-
--- Imagine we're getting the energy audits of all the nodes for a certain window,
--- and that we have to calculate thesum txIn across all nodes
-loss :: (IsStream t, Monad m) => t m EnergyBalance -> t m WattSeconds
-loss es = (S.scanl' nLoss 0 es)
-  where
-    nLoss :: WattSeconds -> EnergyBalance -> WattSeconds
-    nLoss l' (Energy {txOut, txIn}) = l' + (txOut - txIn)
-
-
 
 energyStream :: (IsStream t, Monad m) => t m (Power Watts) -> t m (Time.NominalDiffTime) -> t m (Energy WattSeconds)
-energyStream = S.zipWith (\Power{..} t-> Energy (pToE t tIn)  (pToE t tOut) (pToE t load) (pToE t gen)) 
+energyStream = S.zipWith (\Power{..} t-> Energy { txIn = (pToE t tIn)
+                                                , txOut = (pToE t tOut)
+                                                , consumed = (pToE t load)
+                                                , generated = (pToE t gen)}) 
   where
     pToE :: Time.NominalDiffTime -> Watts ->  WattSeconds
     pToE t p = p * (realToFrac t)
     
 -- FL.Fold :: forall s. Fold (s -> a -> m s) (m s) (s -> m b)
 timeDiff :: forall m t . (IsStream t, (Monad m)) => Time.UTCTime -> t m (Time.UTCTime) -> t m (Time.NominalDiffTime)
-timeDiff start = S.scan (FL.Fold step' begin' done')
+timeDiff st = S.scan (FL.Fold step' begin' done')
   where
     step' :: ((Time.UTCTime, Time.NominalDiffTime) -> Time.UTCTime -> m (Time.UTCTime, Time.NominalDiffTime))
     step' (!prev, !res) cur = pure (cur, Time.diffUTCTime cur prev)
     begin' :: m (Time.UTCTime, Time.NominalDiffTime)
-    begin' = return (start, 0)
+    begin' = return (st, 0)
     done' :: (Time.UTCTime, Time.NominalDiffTime) -> m Time.NominalDiffTime
     done' = pure . snd
 
@@ -238,7 +215,10 @@ powerStream :: (IsStream t, (Monad m)) => t m EnergyState -> t m (Power Watts)
 powerStream = S.map powerAtT
   where
     powerAtT :: EnergyState -> Power Watts
-    powerAtT es = Power txIn' txOut' cnsm' gen'
+    powerAtT es = Power { tIn = txIn'
+                        , tOut = txOut'
+                        , load = cnsm'
+                        , gen = gen'}
       where
         txIn' = p batteryVoltage gridToBatteryCurrent
         txOut' = p batteryVoltage batteryToGridCurrent

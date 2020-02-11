@@ -12,6 +12,7 @@ import Test.QuickCheck.Instances.Time ()
 
 import qualified Streamly.Prelude as S
 import Streamly
+import qualified Streamly.Data.Fold as FL
 
 import qualified Data.Time as Time
 import Proto.NodeMessages ()
@@ -36,7 +37,7 @@ instance (Arbitrary a) => Arbitrary (Energy a) where
 
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (NodeMetrics a b) where
-  arbitrary = NodeMetrics <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+  arbitrary = NodeMetrics <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
 
 instance (Eq a) => EqProp (Power a) where
@@ -69,12 +70,13 @@ spec = do
                 & dutyCycle .~ 0
                 & cpuTime .~ (fromIntegral $ (1581444138 + t))
         msgStream :: (IsStream t, Monad m) => t m (EnergyState)
-        msgStream = S.map m $ S.enumerateFromTo 0 100
-        expectedP = Power (12 * 0) (12 * 5) (12 * 5) (12 * 10)
-        expectedE = Energy tIn tOut load gen
+        msgStream = S.map m $ S.enumerateFromTo 0 101
+        expectedP = Power {gen=(12 * 10), tIn=(12 * 0), tOut=(12 * 5), load=(12 * 5)} 
+        expectedE = Energy {txIn=tIn, txOut=tOut, consumed=load, generated=gen}
           where
             Power{..} = sP
             sP = foldl (<>) expectedP $ replicate 99 expectedP
       pExp <- S.all (\a-> a == expectedP) (powerStream msgStream)
-      eExp <- S.head $ energyStream (powerStream msgStream) ((timeDiff $ posixSecondsToUTCTime initTime) . timeStream $ msgStream) 
+      eExp <- S.fold (FL.mconcat) $ energyStream (powerStream msgStream) ((timeDiff $ posixSecondsToUTCTime initTime) . timeStream $ msgStream) 
       pExp  `shouldBe` True
+      eExp `shouldBe` (expectedE)
