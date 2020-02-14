@@ -29,7 +29,7 @@ newtype KibbutzMonitor k v = KM { runKM :: SMap.Map k v } deriving (Generic)
 initKM :: (Eq k, Hashable k) => [k] -> v -> STM (KibbutzMonitor k v)
 initKM ns def = do
     m <-  SMap.new
-    mapM_ (\n -> SMap.insert def n m) ns
+    --mapM_ (\n -> SMap.insert def n m) ns
     return $ KM m
 
 updateKM :: (Eq k, Hashable k) => KibbutzMonitor k v -> k -> v ->  STM ()
@@ -71,7 +71,7 @@ getMonitorState nodeStates connStates nodes = do
   return $ (currentNodeStates, currentConnectionCounts)
 
 --  KMState -> KConnM -> (NodeT, NodeS)
-updateMonitorState :: (Hashable a, Eq a, Eq b, Num c) => KibbutzMonitor a b -> KibbutzMonitor a c -> (a, b) -> STM ()
+updateMonitorState :: (Hashable a, Eq a, Num c) => KibbutzMonitor a b -> KibbutzMonitor a c -> (a, b) -> STM ()
 updateMonitorState kmState kConnM (n, ns) = do
   updateKM kmState n ns
   c <- lookupKM kConnM n
