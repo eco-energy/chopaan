@@ -1,3 +1,28 @@
+.PHONY: build gen_schema mqtt_cert dev hoogle setup_hoogle
+
+#DEFAULT_GOAL: help
+
+PROJECT_NAME ?= $(shell grep "^name" chopaan.cabal | cut -d " " -f17)
+VERSION ?= $(shell grep "^version:" chopaan.cabal | cut -d " " -f14)
+RESOLVER ?= $(shell grep "^resolver:" stack.yaml | cut -d " " -f2)
+GHC_VERSION ?= $(shell stack ghc -- --version | cut -d " " -f8)
+ARCH=$(shell uname -m)
+
+export LOCAL_USER_ID ?= $(shell id -u $$USER)
+export BINARY_ROOT = $(shell stack path --local-install-root)
+export BINARY_PATH = $(shell echo ${BINARY_ROOT}/bin/${PROJECT_NAME})
+export BINARY_PATH_RELATIVE = $(shell BINARY_PATH=${BINARY_PATH} python -c "import os; p = os.environ['BINARY_PATH']; print(os.path.relpath(p).strip())")
+
+
+IMAGE_NAME=dosti/chopaan
+
+
+build-d:
+	@BINARY_PATH=${BINARY_PATH_RELATIVE} docker-compose build
+
+run-d:
+	@LOCAL_USER_ID=${LOCAL_USER_ID} docker-compose-up
+
 gen_schema:
 	git submodule update --remote --merge 
 
