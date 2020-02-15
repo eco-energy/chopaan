@@ -1,0 +1,13 @@
+version: '3'
+services:
+  chopaan:
+    build:
+      context: .
+      args:
+        - BINARY_PATH
+    image: dosti/chopaan
+    environment:
+      - LOCAL_USER_ID=${LOCAL_USER_ID}
+    ports:
+      - 3000:3000
+    #command: /opt/chopaan/chopaan
