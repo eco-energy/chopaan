@@ -50,7 +50,6 @@ dependencies:
 - network-uri
 - containers
 - stm
-- pptable
 - time
 - ulid
 - convertible
@@ -59,8 +58,6 @@ dependencies:
 - vty
 - directory
 - cursor
-- estimator
-- ad
 - reflection
 - microlens
 - streamly
@@ -74,6 +71,7 @@ dependencies:
 - checkers
 - proto-lens-arbitrary
 - quickcheck-instances
+- kalman
 ghc-options:
 - -Wall
 - -Wcompat
