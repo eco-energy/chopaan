@@ -11,6 +11,8 @@ import GHC.Generics (Generic)
 import Numeric.LinearAlgebra.Static
 import Numeric.Kalman
 
+import Streamly
+import qualified Streamly.Prelude as S
 
 deltaT, g :: Double
 deltaT = 0.01
@@ -66,8 +68,8 @@ initialDist = (vector [1.6, 0.0],
 multiEKF :: [ℝ] -> [(R 2, Sym 2)]
 multiEKF obs = scanl singleEKF initialDist (map (vector . pure) obs)
 
-multiUKF :: [ℝ] -> [(R 2, Sym 2)]
-multiUKF obs = scanl singleUKF initialDist (map (vector . pure) obs)
+multiUKF :: (IsStream t, Monad m) => t m ℝ -> t m (R 2, Sym 2)
+multiUKF obs = S.scanl' singleUKF initialDist (S.map (vector . pure) obs)
 
 
 
