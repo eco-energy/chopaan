@@ -6,14 +6,13 @@ module Run (run) where
 import UI (runTUI, mkUIChan, refreshTick)
 import Mqtt (runMqtt, defMQOpts)
 import Registry (getKibbutz, mkCallback, Kibbutz(..), nodeStream, updateMonitorState)
-import Node (_energyS, NodeS, NodeMetrics(..), defNodeS, Energy(..))
+import Node (NodeS)
 import Import
 import Control.Concurrent (forkIO)
 import Streamly
 import qualified Streamly.Prelude as S
 import qualified Data.Time as Time
 import StateMonitor (initKMS, initKMConn, NodeT)
-import qualified Prelude as P
 
 run :: RIO App ()
 run = do
@@ -22,7 +21,7 @@ run = do
   initTime <- liftIO $ Time.getCurrentTime
   kmState <- liftIO $ atomically $ initKMS nodes
   kConnM <- liftIO $ atomically $ initKMConn nodes
-  _ <- liftIO $ forkIO $ refreshTick 1000000 uiChan
+  _ <- liftIO $ forkIO $ refreshTick 1000 uiChan
   _ <- liftIO $ forkIO $ runMqtt defMQOpts outQueue nodes (mkCallback k)
   let
     ns :: (IsStream t) => t IO (NodeT, NodeS)
