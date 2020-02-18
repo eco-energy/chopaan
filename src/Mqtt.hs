@@ -19,10 +19,11 @@ import qualified Data.Time as Time
 
 import qualified Network.MQTT.Client as MQ
 import qualified Network.MQTT.Topic as MQ
-import Network.MQTT.Types (ConnACKFlags (..))
+import qualified Network.MQTT.Types as MQTy
 import Network.Connection
 import Network.TLS
 import Data.X509.CertificateStore
+import Data.X509.Validation (validateDefault)
 import Data.Default.Class
 import Network.TLS.Extra.Cipher
 import Network.URI
@@ -37,7 +38,7 @@ import qualified Data.Map.Strict as Map
 import Control.Concurrent.STM
 import qualified Control.Concurrent.STM.TQueue as TQ
 
-import Registry (NodeT, HasTopics(..), mkCallback, Kibbutz(..), PubQueue, runNodeQueue, KibbutzEvents)
+import Registry (NodeT, HasTopics(..), mkCallback, Kibbutz(..), PubQueue, runNodeQueue, KibbutzEvents, NodeQueue(..))
 
 import Data.ProtoLens (encodeMessage, Message)
 
@@ -52,24 +53,27 @@ data MQTTOpts = MQTTOpts
   , mqttURI :: Text.Text
   , certPath :: FilePath
   , keyPath :: FilePath
+  , caPath :: FilePath
   } deriving (Eq, Ord, Show, Generic)
 
 
 defMQOpts :: MQTTOpts
-defMQOpts = MQTTOpts {    connId = "chopaan-pilot"
+defMQOpts = MQTTOpts {    connId = "chopaan-pilot-1"
                      ,    mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
                      ,    certPath = "certs/chopaan.cert.pem"
                      ,    keyPath = "certs/chopaan.private.key.pem"
+                     ,    caPath = "certs/ca.cert.pem"
                      }
 
 
 -- https://stackoverflow.com/questions/40081508/how-to-provide-a-client-certificate-to-http-client-tls
-mkTLSSettings :: FilePath -> FilePath -> Text.Text -> Text.Text -> IO TLSSettings
-mkTLSSettings cert key hostName name = do
-  creds <- either (error "couldn't read cert") Just <$> credentialLoadX509 cert key
+mkTLSSettings :: FilePath -> FilePath -> FilePath -> Text.Text -> Text.Text -> IO TLSSettings
+mkTLSSettings cert key caPath hostName name = do
+  creds <- either (error "Client Certificate Not Found") Just <$> credentialLoadX509 cert key
+  --caCreds <- fromJust (error "CA Certificate Not Found") (readCertificateStore caPath)
   let
     hooks = def { onCertificateRequest = \_ -> return creds
-                , onServerCertificate = \_ _ _ _ -> return []
+                , onServerCertificate = \_ a b c -> return [] --validateDefault caCreds a b c
                 }
     clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
                   { clientHooks=hooks
@@ -79,41 +83,57 @@ mkTLSSettings cert key hostName name = do
 
 
 -- need reader for creds and logs
-runMqtt :: (HasTopics a) => MQTTOpts -> PubQueue -> [a] -> MQ.MessageCallback -> IO ()
+runMqtt :: (HasTopics a, Message b) => MQTTOpts -> NodeQueue NodeT b -> [a] -> MQ.MessageCallback -> IO ()
 runMqtt MQTTOpts{..} outQueue ts msgCB = do
-  tlsConf <- mkTLSSettings certPath keyPath mqttURI connId
+  tlsConf <- mkTLSSettings certPath keyPath caPath mqttURI connId
   let
     (Just uri) = parseURI $ Text.unpack $ mqttURI <> "#" <> connId 
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
            , MQ._connID=Text.unpack $ connId
-           , MQ._msgCB= msgCB
-           , MQ._connectTimeout=18000000000
+           --, MQ._port=443
+           , MQ._msgCB=msgCB
+           , MQ._connectTimeout=180000000000
            , MQ._tlsSettings=tlsConf}
-    topics = zip (map stateTopic ts) $ repeat MQ.subOptions
+    topics = zip (map stateTopic ts) $ repeat MQ.subOptions --{MQ._retainHandling=MQTy.DoNotSendOnSubscribe,
+                                                            --MQ._retainAsPublished=False,
+                                                            --MQ._noLocal=True,
+                                                            --MQ._subQoS=MQ.QoS0}
   -- TODO: Add a logging Error Handler
   mc <- MQ.connectURI conf uri
-  _ <- forkIO $ forever $ catches (sub mc topics) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
-  _ <- forkIO $ forever $ catches (pub mc outQueue) [Handler (\(ex :: MQ.MQTTException) -> handler (show ex))]
-  return ()
+  forkIO $ forever $ catches (pub mc outQueue) [Handler handler]
+  print (topics)
+  mapM (\t -> print =<< MQ.subscribe mc [t] []) [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
+  MQ.waitForClient mc
+  --_ <- forkIO $ forever $  catches (sub mc [head topics]) [Handler (\(ex :: IOException) -> putStrLn $ "IOError: " <> show ex)]
   where
     sub :: MQ.MQTTClient -> [(MQ.Filter, MQ.SubOptions)] -> IO ()
     sub c topics = do
-      mapM (\t-> MQ.subscribe c [t] []) topics
+      --print topics
+      (s, _) <- MQ.subscribe c topics []
+      mapM_ handleSub s
       MQ.waitForClient c
-    
-    handler e = putStrLn ("ERROR :" <> e) >> threadDelay 1000000
+      where
+        handleSub :: (Either MQTy.SubErr MQTy.QoS) -> IO ()
+        handleSub (Right e) = print e
+        handleSub (Left q) = print q
+
+    handler :: MQ.MQTTException -> IO ()
+    handler (MQ.Timeout) = putStrLn ("ERROR : Timeout") >> threadDelay 100000
+    handler (MQ.BadData) = putStrLn ("ERROR : BadData") >> threadDelay 100000
+    handler (MQ.Discod d) = putStrLn ("ERROR Discod -> " <> (show d)) >> threadDelay 100000
+    handler (MQ.MQTTException e) = putStrLn ("ERROR :" <> (show e)) >> threadDelay 100000
 
     -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
     -- not stateful.
-    pub :: MQ.MQTTClient -> PubQueue -> IO ()
+    pub :: (Message b) => MQ.MQTTClient -> NodeQueue NodeT b -> IO ()
     pub c tv = do
       forever $ pub' =<< (atomically $ do readTQueue (runNodeQueue tv))
       where
         pub' :: (Message b) => (NodeT, b) -> IO ()
-        pub' (nId, mf) = MQ.publish c (topic nId) (encode mf) False
+        pub' (nId, mf) = putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >> MQ.publish c (topic nId) (encode mf) False
         topic :: NodeT -> MQ.Topic
-        topic = controlTopic
+        topic = stateTopic --controlTopic
         encode :: (Message b) => b -> BL.ByteString
         encode = BL.fromStrict . encodeMessage
 

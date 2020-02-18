@@ -46,6 +46,7 @@ dependencies:
 - connection
 - tls
 - x509-store
+- x509-validation
 - data-default-class
 - network-uri
 - containers
@@ -73,6 +74,10 @@ dependencies:
 - quickcheck-instances
 - kalman
 - hmatrix
+- concat-classes
+- concat-examples
+- estimator
+
 ghc-options:
 - -Wall
 - -Wcompat

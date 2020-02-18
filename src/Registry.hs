@@ -16,7 +16,6 @@ module Registry (NodeT,
                  mkCallback,
                  PubQueue,
                  SubQueue,
-                 runNodeQueue,
                  queueStream,
                  KibbutzEvents(..),
                  writeToPubQ,
@@ -24,7 +23,11 @@ module Registry (NodeT,
                  nodeStream,
                  getMonitorState,
                  updateMonitorState,
-                 defKName) where
+                 defKName,
+                 isTQEmpty,
+                 NodeQueue(..),
+                 initNodeQ,
+                 writeToNodeQ) where
 
 
 import qualified Data.ByteString.Lazy as BL
@@ -48,6 +51,7 @@ import Proto.NodeMessages
 
 -- STM
 import Control.Concurrent.STM
+import Control.Concurrent.STM.TVar
 import Streamly
 
 import qualified Streamly.Prelude as S
@@ -86,7 +90,7 @@ instance HasTopics (NodeT) where
   fromControlTopic = topicToNodeId "/control"
   fromStateTopic = topicToNodeId "/state"
 
-newtype NodeQueue a b = NodeQueue { runNodeQueue :: ((HasTopics a, Message b) => TQueue (a, b)) }
+newtype NodeQueue a b = NodeQueue { runNodeQueue :: ((HasTopics a, Message b) => TBQueue (a, b)) }
 
 type PubQueue = NodeQueue NodeT EnergyTransactionRequest
 
@@ -94,27 +98,35 @@ type SubQueue = NodeQueue NodeT EnergyState
 
 initNodeQ :: (HasTopics a, Message b) => STM (NodeQueue a b)
 initNodeQ = do
-  n <- newTQueue
+  n <- newTBQueue 5
   return $ NodeQueue n
+
+
+writeToNodeQ :: (HasTopics a, Message b) => NodeQueue a b -> a -> b -> IO ()
+writeToNodeQ q topic msg = atomically $ writeTBQueue (runNodeQueue q) (topic, msg) 
 
 writeToPubQ :: PubQueue -> NodeT -> EnergyTransactionRequest -> IO ()
 writeToPubQ p n et = do
-  atomically $ writeTQueue (runNodeQueue p) (n, et)
+  atomically $ writeTBQueue (runNodeQueue p) (n, et)
 
 data Kibbutz = Kibbutz
   { kname :: Text.Text
   , nodes :: [NodeT]
   , inQueue :: SubQueue
   , outQueue :: PubQueue
+  , msgCount :: TVar Int
   } deriving (Generic)
 
+
+isTQEmpty :: Kibbutz -> STM (Bool)
+isTQEmpty Kibbutz {inQueue} = isEmptyTBQueue . runNodeQueue $ inQueue 
 
 instance Show Kibbutz where
   show Kibbutz {..} = Text.unpack $ (kname <> " Kibbutz, " <> (Text.pack $ show $ length nodes) <> " nodes")
 
 data KibbutzEvents = StateUpdate deriving (Eq, Ord, Show)
 
-kbtz :: Text.Text -> [NodeT] -> SubQueue -> PubQueue -> Kibbutz
+kbtz :: Text.Text -> [NodeT] -> SubQueue -> PubQueue -> TVar Int -> Kibbutz
 kbtz = Kibbutz
 
 getKibbutz :: Text.Text -> IO Kibbutz
@@ -124,15 +136,17 @@ getKibbutz n = do
     ns = map (mkNode. fromJust . thingName) ts
   iq <- atomically $ initNodeQ
   oq <- atomically $ initNodeQ
-  return $ kbtz n ns iq oq
+  mc <- newTVarIO 0
+  return $ kbtz n ns iq oq mc
 
 mkCallback :: Kibbutz -> MQ.MessageCallback
-mkCallback Kibbutz { inQueue }  = MQ.SimpleCallback $ writer
+mkCallback Kibbutz { inQueue, msgCount }  = MQ.SimpleCallback $ writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
       atomically $ do
-        writeTQueue (runNodeQueue inQueue) (nodeId, parsed)
+        writeTBQueue (runNodeQueue inQueue) (nodeId, parsed)
+        modifyTVar' msgCount (\a -> a + 1)
       where
         nodeId :: NodeT
         nodeId = (fromJust . fromStateTopic) t
@@ -141,13 +155,13 @@ mkCallback Kibbutz { inQueue }  = MQ.SimpleCallback $ writer
         toStrict = BS.concat . BL.toChunks
 
 queueStream :: (IsStream t) => SubQueue -> t IO (NodeT, EnergyState)
-queueStream (NodeQueue q) = aheadly $ S.repeatM $ (atomically $ readTQueue q) --
+queueStream (NodeQueue q) = S.yieldM $ (atomically $ readTBQueue q) --
 
 printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
 printQueueStream = S.mapM_ print
 
 nodeStream :: (IsStream t) => Time.UTCTime -> [NodeT] -> SubQueue -> t IO (NodeT, NodeS)
-nodeStream initTime nodes inQueue = aheadly $ foldr (<>) (go n) $ map (\n'-> go n') ns
+nodeStream initTime nodes inQueue = wAsyncly $ foldr (<>) (go n) $ map (\n'-> go n') ns
   where (n:ns) = nodes
         q = queueStream $ inQueue
         go n' = S.zipWith (,) (S.repeat n') $ runNodeMonitor initTime n' q

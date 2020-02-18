@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -7,7 +8,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module UI (runTUI, mkUIChan, refreshTick) where
+module UI (runTUI, mkUIChan, refreshTick, prepTx, Stake(..)) where
 
 import Lens.Micro (Lens', (^.))
 import Data.Maybe (fromJust, maybeToList, fromMaybe)
@@ -48,7 +49,7 @@ import Graphics.Vty.Input.Events
 
 import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS)
 
-import Registry (Kibbutz(..), KibbutzEvents(..)
+import Registry (isTQEmpty, Kibbutz(..), KibbutzEvents(..)
                 , writeToPubQ
                 , getMonitorState)
 
@@ -130,7 +131,7 @@ validateStakeListForTx ss = energyBalance == 0 && powerBalance == 0
 toTransaction :: [Stake] -> Transaction
 toTransaction ss = Transaction $ map (\s-> (_stakingNode s, energyStake s)) ss
 
-prepTx :: StakeList -> Time.NominalDiffTime -> IO ([(NodeT, NM.EnergyTransactionRequest)], Transaction)
+prepTx :: [Stake] -> Time.NominalDiffTime -> IO ([(NodeT, NM.EnergyTransactionRequest)], Transaction)
 prepTx sf leadTime = do
   txId <- (Text.pack . show) <$> getULID
   startTime <- Time.addUTCTime leadTime <$> Time.getCurrentTime
@@ -140,7 +141,7 @@ prepTx sf leadTime = do
   return (txReqs, tx)
   where
     etrs = map toETR stakes
-    stakes = filter (_participating) $ unStakeList sf
+    stakes = filter (_participating) sf
     toETR :: Stake -> (NodeT, (Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest))
     toETR Stake {..} = (_stakingNode, msg)
       where
@@ -151,7 +152,7 @@ executeTransaction :: TransactorS -> Kibbutz -> IO TransactorS
 executeTransaction t@TransactorS{..} Kibbutz{..} = if validateStakeListForTx txForms then exec else return t
   where
     exec = do
-      (reqs, tx) <- prepTx txForms (60 * 2 :: Time.NominalDiffTime)
+      (reqs, tx) <- prepTx (unStakeList txForms) (60 * 2 :: Time.NominalDiffTime)
       _ <- (mapM (uncurry $ writeToPubQ outQueue) reqs)
       return $ mkTransactor nodes_t $ tx:transactions
 
@@ -208,9 +209,14 @@ titleAttr :: A.AttrName
 titleAttr = "title"
 
 
-drawMonitor :: [(NodeT, NodeS)] -> [(NodeT, Int)] -> Widget KibbutzUI
-drawMonitor nms ncs = B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics (merge nms ncs)
+drawMonitor :: Bool -> Int -> [(NodeT, NodeS)] -> [(NodeT, Int)] -> Widget KibbutzUI
+drawMonitor emptyTQ msgCnt nms ncs =
+  B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawTQ <=> drawNodeMetrics (merge nms ncs)
   where
+    drawTQ :: Widget KibbutzUI
+    drawTQ = B.borderWithLabel (withAttr titleAttr $ str "Message Count") $ C.center $ (if emptyTQ
+                                                                                        then str "Queue Empty"
+                                                                                        else str "Not Empty") <=> (str $ show msgCnt) 
     drawNodeMetrics :: [(NodeT, NodeS, Int)] -> Widget KibbutzUI
     drawNodeMetrics (nm:nmx) = C.center $ foldl (<=>) (drawNodeMetric nm) $ map drawNodeMetric nmx
     drawNodeMetrics [] = C.center $ str "No Monitor Nodes Found!"
@@ -230,8 +236,8 @@ drawMonitor nms ncs = B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") 
 
 -- write a metricsheet render function which can be <*>'d over 
 drawKibbutz :: KibbutzState -> [Widget KibbutzUI]
-drawKibbutz KibbutzState { kibbutz, transactor, currentNodeState, currentConnStates } =
-  [(drawMonitor currentNodeState currentConnStates) <+> (drawTransactor True transactor)]  
+drawKibbutz KibbutzState { kibbutz, transactor, currentNodeState, currentConnStates, queueEmpty, msgCount' } =
+  [(drawMonitor queueEmpty msgCount' currentNodeState currentConnStates) <+> (drawTransactor True transactor)]  
   where
     Kibbutz{..} = kibbutz
 
@@ -259,9 +265,7 @@ kibbutzEvent :: KibbutzState -> T.BrickEvent KibbutzUI KibbutzEvents -> T.EventM
 kibbutzEvent s@KibbutzState{..} e =
   case e of
     T.AppEvent (StateUpdate) ->
-      M.continue . (\(ns, cns) ->
-                      s{currentNodeState = ns, currentConnStates = cns})
-      =<< (liftIO $ atomically $ getMonitorState nodeStates connStates (nodes $ kibbutz))
+      (M.continue =<< (liftIO . stateU $ s))
     T.VtyEvent vtype ->
       case vtype of
         EvKey (KChar 'q') [] -> M.halt s
@@ -270,7 +274,19 @@ kibbutzEvent s@KibbutzState{..} e =
     _ -> M.continue s
     where
       liftTransactor = (\t-> s{transactor = t})
-
+      stateU :: KibbutzState -> IO (KibbutzState)
+      stateU s@KibbutzState{..} = su <$> comb
+        where
+          su :: (Bool, (CurNodes, CurConns)) -> KibbutzState 
+          su (etq, (ns, cns)) = s{queueEmpty = etq,
+                        currentNodeState = ns,
+                        currentConnStates = cns}
+          comb :: IO (Bool, (CurNodes, CurConns))
+          comb = ((,) <$> emp <*> nsu)
+          emp :: IO Bool
+          emp = (liftIO $ atomically $ isTQEmpty kibbutz)
+          nsu :: IO (CurNodes, CurConns)
+          nsu =  liftIO $ atomically $ getMonitorState nodeStates connStates (nodes $ kibbutz)
 
 appEvent :: s -> p -> T.EventM n (T.Next s)
 appEvent l _ = M.continue l
@@ -301,15 +317,20 @@ runTUI kbtz kmState kConnS uiChan = do
   endState <- M.customMain initialVty buildVty (Just uiChan) kibbutzApp initialState
   return ()
 
+type CurNodes = [(NodeT, NodeS)]
+type CurConns = [(NodeT, Int)]
+
 data KibbutzState = KibbutzState
   { kibbutz :: Kibbutz
   , nodeStates :: KMState
   , connStates :: KConnM
-  , currentNodeState :: [(NodeT, NodeS)]
-  , currentConnStates :: [(NodeT, Int)]
+  , currentNodeState :: CurNodes 
+  , currentConnStates :: CurConns
   , transactor :: TransactorS
   , _focus :: Focus.FocusRing KibbutzUI
   , kbtzTime :: Time.UTCTime
+  , queueEmpty :: Bool
+  , msgCount' :: Int
   }
   deriving (Generic)
 
@@ -321,7 +342,7 @@ buildInitialState k kmState kConnS = do
   let
     trxtr = mkTransactor (nodes k) []
     focusR = Focus.focusRing []
-  return $ KibbutzState k kmState kConnS crntNS crntConn trxtr focusR initTime 
+  return $ KibbutzState k kmState kConnS crntNS crntConn trxtr focusR initTime True 0 
 
 
 isFormEvent :: T.BrickEvent KibbutzUI e -> Bool

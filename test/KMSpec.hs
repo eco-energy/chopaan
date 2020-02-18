@@ -22,13 +22,13 @@ spec = do
       initM <- liftIO (atomically $ initKM [1..10 :: Int] (0 :: Int))
       s <- liftIO $ (atomically $ SMap.size (runKM $ initM))
       as <- liftIO $ (atomically $ readKM initM [1..10 :: Int])
-      (s) `shouldBe` (length [1..10 :: Int])
+      (s) `shouldBe` (0)
       (sum $ map snd as) `shouldBe` 0
       
     it "an initialized KM read can be a streamly stream" $ do
       initM <- liftIO (atomically $ initKM [1..10 :: Int] (0 :: Int))
       uf <- join (fmap (S.length . S.fromList) (atomically $ readKM initM [1..10 :: Int]))
-      uf `shouldBe` (length [1..10 :: Int])
+      uf `shouldBe` (0)
       
     it "an initially serial stream should be able to write concurrently to a KM" $ do
       initM <- liftIO (atomically $ initKM [1..10 :: Int] 1)

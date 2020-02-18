@@ -165,21 +165,6 @@ runNodeMonitor initTime nodeId stream = nms
     en = energyStream p dt
     thisNode = S.map (snd) . S.filter (\e -> fst e == nodeId) $ stream
     nms = NodeMetrics <$> t <*> p <*> en <*> thisNode
-      {--
-  let
-    t = lastWait initTime nodeStream
-    energyBalance = S.map snd $ energyStream initTime nodeStream
-    power = powerStream nodeStream
-    nms = NodeMetrics <$> t
-      <*> stored energyBalance
-      <*> demand energyBalance
-      <*> power
-      <*> energyBalance
-      <*> nodeStream
-  in nms
-  where
-    nodeStream = S.filter (\a-> fst a == nodeId) stream & S.map snd
---}
 
 utcTNow :: EnergyState -> Time.UTCTime
 utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
