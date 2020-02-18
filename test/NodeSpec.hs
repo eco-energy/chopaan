@@ -81,9 +81,12 @@ spec = do
         expectedNM = (NodeMetrics lastConn expectedP expectedE expectedS) 
           where
             lastConn = (Just $ posixSecondsToUTCTime (initTime + 101))
+        a = runNodeMonitor (posixSecondsToUTCTime initTime) (NodeId (1 :: Int)) (S.zipWith (,) (S.repeat (NodeId (1 :: Int))) msgStream)
       pExp <- S.all (\a-> a == expectedP) (powerStream msgStream)
       eExp <- S.last $ energyStream (powerStream msgStream) ((timeDiff $ posixSecondsToUTCTime initTime) . timeStream $ msgStream)
-      nmExp <- S.last $ runNodeMonitor (posixSecondsToUTCTime initTime) (NodeId (1 :: Int)) (S.zipWith (,) (S.repeat (NodeId (1 :: Int))) msgStream)
+      nmExp <- S.last $ a
+      lenExp <- S.length a
       pExp  `shouldBe` True
       eExp `shouldBe` (Just expectedE)
       nmExp `shouldBe` (Just expectedNM)
+      lenExp `shouldBe` (102)
