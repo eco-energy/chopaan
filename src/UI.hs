@@ -47,7 +47,7 @@ import qualified Brick.Focus as Focus
 
 import Graphics.Vty.Input.Events
 
-import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS)
+import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS, EnergyState(..), defaultES)
 
 import Registry (isTQEmpty, Kibbutz(..), KibbutzEvents(..)
                 , writeToPubQ
@@ -75,7 +75,7 @@ import Transactor (mkETR)
 import Control.Concurrent.STM
 import Control.Concurrent (threadDelay)
 import qualified Data.Map.Strict as Map
-import StateMonitor (NodeT, KMState, KConnM, initKMS, readKM)
+import StateMonitor (KMSensor, NodeT, KMState, KConnM, initKMS, readKM)
 
 
 data KibbutzUI = HHListUI | MonitorUI | TxListUI | TxFormUI TXFormField deriving (Eq, Ord, Show)
@@ -209,56 +209,32 @@ titleAttr :: A.AttrName
 titleAttr = "title"
 
 
-drawMonitor :: Bool -> Int -> [(NodeT, NodeS)] -> [(NodeT, Int)] -> Widget KibbutzUI
-drawMonitor emptyTQ msgCnt nms ncs =
-  B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawTQ <=> drawNodeMetrics (merge nms ncs)
+drawMonitor :: (Show n) => Bool -> Int -> [(NodeT, n)] -> [(NodeT, Int)] -> Widget KibbutzUI
+drawMonitor _ _ nms _ =
+  B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics nms
   where
-    drawTQ :: Widget KibbutzUI
-    drawTQ = B.borderWithLabel (withAttr titleAttr $ str "Message Count") $ C.center $ (if emptyTQ
-                                                                                        then str "Queue Empty"
-                                                                                        else str "Not Empty") <=> (str $ show msgCnt) 
-    drawNodeMetrics :: [(NodeT, NodeS, Int)] -> Widget KibbutzUI
+    drawNodeMetrics :: Show n => [(NodeT, n)] -> Widget KibbutzUI
     drawNodeMetrics (nm:nmx) = C.center $ foldl (<=>) (drawNodeMetric nm) $ map drawNodeMetric nmx
     drawNodeMetrics [] = C.center $ str "No Monitor Nodes Found!"
-    drawNodeMetric :: (NodeT, NodeS, Int) -> Widget a
-    drawNodeMetric (n, nm@NodeMetrics {..}, count) = B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $ strWrap (show nm)  <=> strWrap ("connection count: " <> (show count))
-      where
-        drawSensor sr = strWrap $ show sr <> "\n\n\n"
-        drawPower ps = strWrap $ show ps <> "\n\n\n"
-        drawEnergy es = strWrap $ show es <> "\n\n\n"
-    merge :: [(NodeT, NodeS)] -> [(NodeT, Int)] -> [(NodeT, NodeS, Int)]
-    merge ss ii = map (uncurry a') (zip ss ii) 
-      where
-        a' (n, ns) (n', ni) = (n, ns, ni)
+    drawNodeMetric :: Show n => (NodeT, n) -> Widget a
+    drawNodeMetric (n, nm) =
+      B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
+          strWrap (show nm)
+          -- <=>
+          --strWrap ("connection count: " <> (show count))
+    --merge :: [(a, b)] -> [(a, c)] -> [(a, b, c)]
+    --merge ss ii = map (uncurry a') (zip ss ii) 
+      --where
+        --a' (n, ns) (n', ni) = (n, ns, ni)
         -- (drawSensor _sensors) <=> (drawPower _powerS) <=> (drawEnergy _energyS)
 
 
 
 -- write a metricsheet render function which can be <*>'d over 
 drawKibbutz :: KibbutzState -> [Widget KibbutzUI]
-drawKibbutz KibbutzState { kibbutz, transactor, currentNodeState, currentConnStates, queueEmpty, msgCount' } =
-  [(drawMonitor queueEmpty msgCount' currentNodeState currentConnStates) <+> (drawTransactor True transactor)]  
-  where
-    Kibbutz{..} = kibbutz
+drawKibbutz KibbutzState { transactor, currentNodeState, currentConnStates, queueEmpty, msgCount' } =
+  [(drawMonitor queueEmpty msgCount' currentNodeState currentConnStates) <+> (drawTransactor True transactor)] 
 
-nodeList :: [NodeT] -> L.List KibbutzUI NodeT
-nodeList n = L.list HHListUI (Vec.fromList n) 1
-
-drawList :: L.List KibbutzUI NodeT -> Widget KibbutzUI
-drawList l = ui
-  where
-    label = str "Household " <+> cur <+> str " of " <+> total
-    cur = case l^.(L.listSelectedL) of
-      Nothing -> str "-"
-      Just i -> str (show (i + 1))
-    total = str $ show $ Vec.length $ l^.(L.listElementsL)
-    box = B.borderWithLabel label $
-      hLimit 25 $
-      vLimit 15 $
-      L.renderList listDrawElement True l
-    ui = C.vCenter $ vBox [ C.hCenter box
-                          , str " "
-                          ]
 
 -- We have a transactor event handler
 kibbutzEvent :: KibbutzState -> T.BrickEvent KibbutzUI KibbutzEvents -> T.EventM KibbutzUI (T.Next (KibbutzState))
@@ -275,31 +251,18 @@ kibbutzEvent s@KibbutzState{..} e =
     where
       liftTransactor = (\t-> s{transactor = t})
       stateU :: KibbutzState -> IO (KibbutzState)
-      stateU s@KibbutzState{..} = su <$> comb
+      stateU s' = su <$> comb
         where
-          su :: (Bool, (CurNodes, CurConns)) -> KibbutzState 
-          su (etq, (ns, cns)) = s{queueEmpty = etq,
-                        currentNodeState = ns,
-                        currentConnStates = cns}
-          comb :: IO (Bool, (CurNodes, CurConns))
+          su :: (Bool, CurNodes) -> KibbutzState 
+          su (etq, ns) = s'{queueEmpty = etq,
+                        currentNodeState = ns}
+          comb :: IO (Bool, CurNodes)
           comb = ((,) <$> emp <*> nsu)
           emp :: IO Bool
           emp = (liftIO $ atomically $ isTQEmpty kibbutz)
-          nsu :: IO (CurNodes, CurConns)
-          nsu =  liftIO $ atomically $ getMonitorState nodeStates connStates (nodes $ kibbutz)
+          nsu :: IO (CurNodes)
+          nsu =  liftIO $ atomically $ readKM nodeStates (nodes $ kibbutz)
 
-appEvent :: s -> p -> T.EventM n (T.Next s)
-appEvent l _ = M.continue l
-
-listDrawElement :: Bool -> NodeT -> Widget KibbutzUI
-listDrawElement sel a =
-    let selStr s = if sel
-                   then withAttr customAttr (strWrap $ "<" <> (Text.unpack . unNodeId $ s) <> ">")
-                   else strWrap $ (Text.unpack . unNodeId $ s)
-    in C.hCenter $ selStr a
-
-customAttr :: A.AttrName
-customAttr = L.listSelectedAttr <> "custom"
 
 mkUIChan :: IO (BChan KibbutzEvents)
 mkUIChan = newBChan 1000
@@ -309,7 +272,7 @@ refreshTick d chan = do
   forever $
     writeBChan chan StateUpdate >> threadDelay d
 
-runTUI :: Kibbutz -> KMState -> KConnM -> BChan KibbutzEvents -> IO ()
+runTUI :: Kibbutz -> KMSensor -> KConnM -> BChan KibbutzEvents -> IO ()
 runTUI kbtz kmState kConnS uiChan = do
   let buildVty = V.mkVty V.defaultConfig
   initialVty <- buildVty
@@ -317,12 +280,12 @@ runTUI kbtz kmState kConnS uiChan = do
   endState <- M.customMain initialVty buildVty (Just uiChan) kibbutzApp initialState
   return ()
 
-type CurNodes = [(NodeT, NodeS)]
+type CurNodes = [(NodeT, EnergyState)]
 type CurConns = [(NodeT, Int)]
 
 data KibbutzState = KibbutzState
   { kibbutz :: Kibbutz
-  , nodeStates :: KMState
+  , nodeStates :: KMSensor
   , connStates :: KConnM
   , currentNodeState :: CurNodes 
   , currentConnStates :: CurConns
@@ -334,7 +297,7 @@ data KibbutzState = KibbutzState
   }
   deriving (Generic)
 
-buildInitialState :: Kibbutz -> KMState -> KConnM -> IO KibbutzState
+buildInitialState :: Kibbutz -> KMSensor -> KConnM -> IO KibbutzState
 buildInitialState k kmState kConnS = do
   initTime <- Time.getCurrentTime
   crntNS <- atomically $ readKM kmState (nodes k)
@@ -344,9 +307,6 @@ buildInitialState k kmState kConnS = do
     focusR = Focus.focusRing []
   return $ KibbutzState k kmState kConnS crntNS crntConn trxtr focusR initTime True 0 
 
-
-isFormEvent :: T.BrickEvent KibbutzUI e -> Bool
-isFormEvent = undefined
 
 isListEvent :: T.BrickEvent KibbutzUI e -> Bool
 isListEvent e =

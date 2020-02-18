@@ -126,7 +126,7 @@ instance (Num a) => Monoid (Power a) where
 
 
 data NodeMetrics e p = NodeMetrics
-  { _lastConn :: !(Maybe Time.UTCTime)
+  { _time :: !(Maybe Time.UTCTime)
   -- , _stored :: !e
   -- , _demand :: !e
   , _powerS :: !(Power p)
@@ -136,7 +136,7 @@ data NodeMetrics e p = NodeMetrics
   
 
 instance (Show e, Show p) => Show (NodeMetrics e p) where
-  show NodeMetrics{..} = ("last connection: " <> show _lastConn)
+  show NodeMetrics{..} = ("last connection: " <> show _time)
     -- <> sep <> ("current stored (Ws): " <> show _stored)
     -- <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerS)
@@ -156,15 +156,21 @@ data GridMetrics e p = GridMetrics
   }
 
 
-runNodeMonitor :: (Eq a, Monad m, IsStream t, Applicative (t m)) => Time.UTCTime -> NodeId a -> t m (NodeId a, EnergyState) -> t m NodeS
-runNodeMonitor initTime nodeId stream = nms
+runNodeMonitor :: (Eq a, Monad m, IsStream t, Monad (t m)) => Time.UTCTime -> NodeId a -> t m (NodeId a, EnergyState) -> t m NodeS
+runNodeMonitor initTime nodeId stream =
+  do
+    t' <- t
+    p' <- p
+    en' <- en
+    s' <- thisNode
+    return $ NodeMetrics t' p' en' s'
   where
     t = S.map (\e -> Just e) $ timeStream thisNode
-    dt = ((timeDiff initTime) (timeStream thisNode))
+    dt = (timeDiff initTime $ timeStream thisNode)
     p = powerStream thisNode
     en = energyStream p dt
     thisNode = S.map (snd) . S.filter (\e -> fst e == nodeId) $ stream
-    nms = NodeMetrics <$> t <*> p <*> en <*> thisNode
+    --nms = NodeMetrics <$> t <*> p <*> en <*> thisNode
 
 utcTNow :: EnergyState -> Time.UTCTime
 utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
@@ -182,7 +188,7 @@ defaultES = defMessage
 
 
 energyStream :: (IsStream t, Monad m) => t m (Power Watts) -> t m (Time.NominalDiffTime) -> t m (Energy WattSeconds)
-energyStream p dt = S.scan (FL.mconcat) eAtT
+energyStream p dt = S.postscan (FL.mconcat) eAtT
   where
     eAtT = S.zipWith (\Power{..} t-> Energy { txIn = (pToE t tIn)
                                                 , txOut = (pToE t tOut)

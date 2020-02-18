@@ -98,7 +98,7 @@ type SubQueue = NodeQueue NodeT EnergyState
 
 initNodeQ :: (HasTopics a, Message b) => STM (NodeQueue a b)
 initNodeQ = do
-  n <- newTBQueue 5
+  n <- newTBQueue 20
   return $ NodeQueue n
 
 
@@ -155,16 +155,15 @@ mkCallback Kibbutz { inQueue, msgCount }  = MQ.SimpleCallback $ writer
         toStrict = BS.concat . BL.toChunks
 
 queueStream :: (IsStream t) => SubQueue -> t IO (NodeT, EnergyState)
-queueStream (NodeQueue q) = S.yieldM $ (atomically $ readTBQueue q) --
+queueStream (NodeQueue q) = S.repeatM $ (atomically $ readTBQueue q)
 
 printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
 printQueueStream = S.mapM_ print
 
-nodeStream :: (IsStream t) => Time.UTCTime -> [NodeT] -> SubQueue -> t IO (NodeT, NodeS)
-nodeStream initTime nodes inQueue = wAsyncly $ foldr (<>) (go n) $ map (\n'-> go n') ns
+nodeStream :: (IsStream t, Monad (t IO)) => Time.UTCTime -> [NodeT] -> t IO (NodeT, EnergyState) -> SerialT IO (NodeT, NodeS)
+nodeStream initTime nodes q = serially $ foldr (<>) (go n) $ map (\n'-> go n') ns
   where (n:ns) = nodes
-        q = queueStream $ inQueue
-        go n' = S.zipWith (,) (S.repeat n') $ runNodeMonitor initTime n' q
+        go n' = S.zipWith (,) (S.repeat n') (adapt $ runNodeMonitor initTime n' q)
 
 
 defKName :: KibbutzName

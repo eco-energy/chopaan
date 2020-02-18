@@ -3,7 +3,7 @@ module StateMonitor where
 
 import qualified StmContainers.Map as SMap
 
-import Node (defNodeS, NodeId(..), NodeS)
+import Node (defaultES, EnergyState, defNodeS, NodeId(..), NodeS)
 
 import Control.Concurrent.STM
 import Data.Hashable
@@ -55,6 +55,10 @@ type KMState = KibbutzMonitor NodeT NodeS
 initKMS :: [NodeT] -> STM (KMState)
 initKMS ns = initKM ns defNodeS
 
+type KMSensor = KibbutzMonitor NodeT EnergyState
+
+initKSensorM :: [NodeT] -> STM (KMSensor)
+initKSensorM ns = initKM ns defaultES
 
 type KConnM = KibbutzMonitor NodeT Int
 

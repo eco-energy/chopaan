@@ -102,21 +102,19 @@ runMqtt MQTTOpts{..} outQueue ts msgCB = do
   -- TODO: Add a logging Error Handler
   mc <- MQ.connectURI conf uri
   forkIO $ forever $ catches (pub mc outQueue) [Handler handler]
-  print (topics)
-  mapM (\t -> print =<< MQ.subscribe mc [t] []) [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
+  mapM (\t -> MQ.subscribe mc [t] []) [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
   MQ.waitForClient mc
   --_ <- forkIO $ forever $  catches (sub mc [head topics]) [Handler (\(ex :: IOException) -> putStrLn $ "IOError: " <> show ex)]
   where
     sub :: MQ.MQTTClient -> [(MQ.Filter, MQ.SubOptions)] -> IO ()
     sub c topics = do
-      --print topics
       (s, _) <- MQ.subscribe c topics []
       mapM_ handleSub s
       MQ.waitForClient c
       where
         handleSub :: (Either MQTy.SubErr MQTy.QoS) -> IO ()
-        handleSub (Right e) = print e
-        handleSub (Left q) = print q
+        handleSub (Right e) = return () -- print e
+        handleSub (Left q) = return () -- print q
 
     handler :: MQ.MQTTException -> IO ()
     handler (MQ.Timeout) = putStrLn ("ERROR : Timeout") >> threadDelay 100000
@@ -128,10 +126,11 @@ runMqtt MQTTOpts{..} outQueue ts msgCB = do
     -- not stateful.
     pub :: (Message b) => MQ.MQTTClient -> NodeQueue NodeT b -> IO ()
     pub c tv = do
-      forever $ pub' =<< (atomically $ do readTQueue (runNodeQueue tv))
+      forever $ pub' =<< (atomically $ do readTBQueue (runNodeQueue tv))
       where
         pub' :: (Message b) => (NodeT, b) -> IO ()
-        pub' (nId, mf) = putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >> MQ.publish c (topic nId) (encode mf) False
+        -- putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >> 
+        pub' (nId, mf) = MQ.publish c (topic nId) (encode mf) False
         topic :: NodeT -> MQ.Topic
         topic = stateTopic --controlTopic
         encode :: (Message b) => b -> BL.ByteString
