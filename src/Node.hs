@@ -156,21 +156,15 @@ data GridMetrics e p = GridMetrics
   }
 
 
-runNodeMonitor :: (Eq a, Monad m, IsStream t, Monad (t m)) => Time.UTCTime -> NodeId a -> t m (NodeId a, EnergyState) -> t m NodeS
-runNodeMonitor initTime nodeId stream =
-  do
-    t' <- t
-    p' <- p
-    en' <- en
-    s' <- thisNode
-    return $ NodeMetrics t' p' en' s'
+--runNodeMonitor :: (Eq a, Monad m, IsStream t, Applicative (t m)) => Time.UTCTime -> NodeId a -> t m (NodeId a, EnergyState) -> ZipSerialM m NodeS
+runNodeMonitor :: (IsStream t, Eq a, Monad m) => Time.UTCTime -> a -> ZipSerialM m (a, EnergyState) -> t m (NodeMetrics WattSeconds Watts)
+runNodeMonitor initTime nodeId stream = zipSerially $ NodeMetrics <$> t <*> p <*> en <*> thisNode
   where
     t = S.map (\e -> Just e) $ timeStream thisNode
     dt = (timeDiff initTime $ timeStream thisNode)
     p = powerStream thisNode
     en = energyStream p dt
     thisNode = S.map (snd) . S.filter (\e -> fst e == nodeId) $ stream
-    --nms = NodeMetrics <$> t <*> p <*> en <*> thisNode
 
 utcTNow :: EnergyState -> Time.UTCTime
 utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime

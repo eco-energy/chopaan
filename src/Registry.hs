@@ -51,27 +51,20 @@ import Proto.NodeMessages
 
 -- STM
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
 import Streamly
 
 import qualified Streamly.Prelude as S
-
-import Brick.BChan (BChan, writeBChan)
+import qualified Data.Time as Time 
 
 
 -- Protobuf
 import Data.ProtoLens.Encoding (decodeMessage)
 import Data.ProtoLens (Message)
 
-import Control.Monad.IO.Class (MonadIO(liftIO))
-import Control.Monad.State (StateT, get, runStateT)
 
 import StateMonitor
-import qualified Data.Time as Time
 
-import Control.Monad.Reader
 
-import Data.Hashable
 
 mkNode :: ThingName -> NodeT
 mkNode = NodeId
@@ -160,10 +153,11 @@ queueStream (NodeQueue q) = S.repeatM $ (atomically $ readTBQueue q)
 printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
 printQueueStream = S.mapM_ print
 
-nodeStream :: (IsStream t, Monad (t IO)) => Time.UTCTime -> [NodeT] -> t IO (NodeT, EnergyState) -> SerialT IO (NodeT, NodeS)
+--nodeStream :: (IsStream t, Monad (t IO)) => Time.UTCTime -> [NodeT] -> ZipSerialM IO (NodeT, EnergyState) -> SerialT IO (NodeT, NodeS)
+nodeStream :: (IsStream t, Monad m, Eq a) => Time.UTCTime -> [a] -> ZipSerialM m (a, EnergyState) -> t m (a, NodeMetrics WattSeconds Watts)
 nodeStream initTime nodes q = serially $ foldr (<>) (go n) $ map (\n'-> go n') ns
   where (n:ns) = nodes
-        go n' = S.zipWith (,) (S.repeat n') (adapt $ runNodeMonitor initTime n' q)
+        go n' = S.zipWith (,) (S.repeat n') (runNodeMonitor initTime n' q)
 
 
 defKName :: KibbutzName
