@@ -3,8 +3,6 @@ module StateMonitor where
 
 import qualified StmContainers.Map as SMap
 
-import Node (defaultES, EnergyState, defNodeS, NodeId(..), NodeS)
-
 import Control.Concurrent.STM
 import Data.Hashable
 
@@ -45,25 +43,6 @@ readKM (KM km) ns = do
 
 lookupKM :: (Eq k, Hashable k) => KibbutzMonitor k v -> k -> STM (Maybe v)
 lookupKM = (flip SMap.lookup) . runKM
-
-type ThingName = Text.Text
-
-type NodeT = NodeId ThingName
-
-type KMState = KibbutzMonitor NodeT NodeS
-
-initKMS :: [NodeT] -> STM (KMState)
-initKMS ns = initKM ns defNodeS
-
-type KMSensor = KibbutzMonitor NodeT EnergyState
-
-initKSensorM :: [NodeT] -> STM (KMSensor)
-initKSensorM ns = initKM ns defaultES
-
-type KConnM = KibbutzMonitor NodeT Int
-
-initKMConn :: [NodeT] -> STM KConnM
-initKMConn ns = initKM ns 0
 
 
 type MonitorAtT a b c = ([(a, b)], [(a, c)])

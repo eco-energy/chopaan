@@ -49,22 +49,21 @@ import Graphics.Vty.Input.Events
 
 import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS, EnergyState(..), defaultES)
 
-import Registry (isTQEmpty, Kibbutz(..), KibbutzEvents(..)
+import Registry ( Kibbutz(..)
+                , KibbutzEvents(..)
                 , writeToPubQ
-                , getMonitorState)
+                , KMSensor
+                , NodeT
+                , KMState
+                , KConnM
+                , initKMS)
 
 import qualified Data.Vector as Vec
-
-import Streamly hiding ((<=>))
-import qualified Streamly.Prelude as S
 
 import GHC.Generics (Generic)
 
 import Control.Monad.Reader
-import qualified Data.Set as Set
 import Lens.Micro.TH (makeLenses)
-
-import Mqtt (defMQOpts, runMqtt)
 
 import qualified Proto.NodeMessages as NM
 
@@ -74,8 +73,7 @@ import Data.ULID
 import Transactor (mkETR)
 import Control.Concurrent.STM
 import Control.Concurrent (threadDelay)
-import qualified Data.Map.Strict as Map
-import StateMonitor (KMSensor, NodeT, KMState, KConnM, initKMS, readKM)
+import StateMonitor (KibbutzMonitor, readKM)
 
 
 data KibbutzUI = HHListUI | MonitorUI | TxListUI | TxFormUI TXFormField deriving (Eq, Ord, Show)
@@ -259,7 +257,7 @@ kibbutzEvent s@KibbutzState{..} e =
           comb :: IO (Bool, CurNodes)
           comb = ((,) <$> emp <*> nsu)
           emp :: IO Bool
-          emp = (liftIO $ atomically $ isTQEmpty kibbutz)
+          emp = (liftIO $ return False)
           nsu :: IO (CurNodes)
           nsu =  liftIO $ atomically $ readKM nodeStates (nodes $ kibbutz)
 
@@ -272,7 +270,7 @@ refreshTick d chan = do
   forever $
     writeBChan chan StateUpdate >> threadDelay d
 
-runTUI :: Kibbutz -> KMSensor -> KConnM -> BChan KibbutzEvents -> IO ()
+runTUI :: Kibbutz -> KMState -> KConnM -> BChan KibbutzEvents -> IO ()
 runTUI kbtz kmState kConnS uiChan = do
   let buildVty = V.mkVty V.defaultConfig
   initialVty <- buildVty
@@ -280,12 +278,12 @@ runTUI kbtz kmState kConnS uiChan = do
   endState <- M.customMain initialVty buildVty (Just uiChan) kibbutzApp initialState
   return ()
 
-type CurNodes = [(NodeT, EnergyState)]
+type CurNodes = [(NodeT, NodeS)]
 type CurConns = [(NodeT, Int)]
 
 data KibbutzState = KibbutzState
   { kibbutz :: Kibbutz
-  , nodeStates :: KMSensor
+  , nodeStates :: KMState
   , connStates :: KConnM
   , currentNodeState :: CurNodes 
   , currentConnStates :: CurConns
@@ -297,7 +295,7 @@ data KibbutzState = KibbutzState
   }
   deriving (Generic)
 
-buildInitialState :: Kibbutz -> KMSensor -> KConnM -> IO KibbutzState
+buildInitialState :: Kibbutz -> KMState -> KConnM -> IO KibbutzState
 buildInitialState k kmState kConnS = do
   initTime <- Time.getCurrentTime
   crntNS <- atomically $ readKM kmState (nodes k)

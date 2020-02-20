@@ -11,7 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Node (
   -- functional export
-  runNodeMonitor
+  runNodeMonitor, gridStream
   -- data constructors
   , EnergyState, NodeId(..), NodeS, NodeMetrics(..), Energy(..), Power(..), WattSeconds, Watts
   -- calculations exported for tests
@@ -38,18 +38,18 @@ import Data.ProtoLens (defMessage)
 import Data.ProtoLens.TextFormat
 
 import Data.Hashable
-
+import Subscriber
 
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
 -- Our Scalars
+
 type WattSeconds = Double
 
 type Watts = Double
 
 newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Generic)
-
 
 instance (Hashable a) => Hashable (NodeId a) where
   hashWithSalt n (NodeId a) = hashWithSalt n a
@@ -150,21 +150,26 @@ defNodeS = NodeMetrics Nothing mempty mempty defaultES
 
 type NodeS = NodeMetrics WattSeconds Watts
 
+{--
 data GridMetrics e p = GridMetrics
   { _uptime :: ! Time.NominalDiffTime
   , _loss :: !e
   }
+--}
 
-
---runNodeMonitor :: (Eq a, Monad m, IsStream t, Applicative (t m)) => Time.UTCTime -> NodeId a -> t m (NodeId a, EnergyState) -> ZipSerialM m NodeS
-runNodeMonitor :: (IsStream t, Eq a, Monad m) => Time.UTCTime -> a -> ZipSerialM m (a, EnergyState) -> t m (NodeMetrics WattSeconds Watts)
-runNodeMonitor initTime nodeId stream = zipSerially $ NodeMetrics <$> t <*> p <*> en <*> thisNode
+gridStream :: forall t m n . (IsStream t, MonadAsync m, Hashable n, Ord n) => Time.UTCTime -> [n] -> (StreamMap t m n EnergyState) -> t m (n , NodeS)
+gridStream initTime (n:ns) ss = serially $ foldr (<>) (go n) $ map go ns
   where
-    t = S.map (\e -> Just e) $ timeStream thisNode
-    dt = (timeDiff initTime $ timeStream thisNode)
-    p = powerStream thisNode
+    go n' = S.zipWith (,) (S.repeat n') (runNodeMonitor initTime $ adapt $ (getStream ss n'))
+gridStream _ [] _ = S.nil
+
+runNodeMonitor :: (IsStream t, MonadAsync m) => Time.UTCTime -> ZipSerialM m (EnergyState) -> t m (NodeMetrics WattSeconds Watts)
+runNodeMonitor initTime stream = zipSerially $ NodeMetrics <$> t <*> p <*> en <*> stream
+  where
+    t = S.map (\e -> Just e) $ timeStream stream
+    dt = (timeDiff initTime $ timeStream stream)
+    p = powerStream stream
     en = energyStream p dt
-    thisNode = S.map (snd) . S.filter (\e -> fst e == nodeId) $ stream
 
 utcTNow :: EnergyState -> Time.UTCTime
 utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime

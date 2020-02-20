@@ -38,7 +38,7 @@ import qualified Data.Map.Strict as Map
 import Control.Concurrent.STM
 import qualified Control.Concurrent.STM.TQueue as TQ
 
-import Registry (NodeT, HasTopics(..), mkCallback, Kibbutz(..), PubQueue, runNodeQueue, KibbutzEvents, NodeQueue(..))
+import Registry (NodeT, HasTopics(..), mkCallback, Kibbutz(..), PubQueue, Outbox(..), KibbutzEvents)
 
 import Data.ProtoLens (encodeMessage, Message)
 
@@ -83,7 +83,7 @@ mkTLSSettings cert key caPath hostName name = do
 
 
 -- need reader for creds and logs
-runMqtt :: (HasTopics a, Message b) => MQTTOpts -> NodeQueue NodeT b -> [a] -> MQ.MessageCallback -> IO ()
+runMqtt :: (HasTopics a, Message b) => MQTTOpts -> Outbox NodeT b -> [a] -> MQ.MessageCallback -> IO ()
 runMqtt MQTTOpts{..} outQueue ts msgCB = do
   tlsConf <- mkTLSSettings certPath keyPath caPath mqttURI connId
   let
@@ -101,11 +101,33 @@ runMqtt MQTTOpts{..} outQueue ts msgCB = do
                                                             --MQ._subQoS=MQ.QoS0}
   -- TODO: Add a logging Error Handler
   mc <- MQ.connectURI conf uri
-  forkIO $ forever $ catches (pub mc outQueue) [Handler handler]
-  mapM (\t -> MQ.subscribe mc [t] []) [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
+  _ <- forkIO $ forever $ catches (pub mc outQueue) [Handler handler]
+  _ <- mapM (\t -> MQ.subscribe mc [t] []) topics -- [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
   MQ.waitForClient mc
   --_ <- forkIO $ forever $  catches (sub mc [head topics]) [Handler (\(ex :: IOException) -> putStrLn $ "IOError: " <> show ex)]
   where
+    handler :: MQ.MQTTException -> IO ()
+    handler (MQ.Timeout) = putStrLn ("ERROR : Timeout") >> threadDelay 100000
+    handler (MQ.BadData) = putStrLn ("ERROR : BadData") >> threadDelay 100000
+    handler (MQ.Discod d) = putStrLn ("ERROR Discod -> " <> (show d)) >> threadDelay 100000
+    handler (MQ.MQTTException e) = putStrLn ("ERROR :" <> (show e)) >> threadDelay 100000
+
+    -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
+    -- not stateful.
+    pub :: (Message b) => MQ.MQTTClient -> Outbox NodeT b -> IO ()
+    pub c tv = do
+      forever $ pub' =<< (atomically $ do readTBQueue (runOutbox tv))
+      where
+        pub' :: (Message b) => (NodeT, b) -> IO ()
+         
+        pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >>
+          MQ.publish c (topic nId) (encode mf) False
+        topic :: NodeT -> MQ.Topic
+        topic = stateTopic --controlTopic
+        encode :: (Message b) => b -> BL.ByteString
+        encode = BL.fromStrict . encodeMessage
+
+{--
     sub :: MQ.MQTTClient -> [(MQ.Filter, MQ.SubOptions)] -> IO ()
     sub c topics = do
       (s, _) <- MQ.subscribe c topics []
@@ -115,26 +137,5 @@ runMqtt MQTTOpts{..} outQueue ts msgCB = do
         handleSub :: (Either MQTy.SubErr MQTy.QoS) -> IO ()
         handleSub (Right e) = return () -- print e
         handleSub (Left q) = return () -- print q
-
-    handler :: MQ.MQTTException -> IO ()
-    handler (MQ.Timeout) = putStrLn ("ERROR : Timeout") >> threadDelay 100000
-    handler (MQ.BadData) = putStrLn ("ERROR : BadData") >> threadDelay 100000
-    handler (MQ.Discod d) = putStrLn ("ERROR Discod -> " <> (show d)) >> threadDelay 100000
-    handler (MQ.MQTTException e) = putStrLn ("ERROR :" <> (show e)) >> threadDelay 100000
-
-    -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
-    -- not stateful.
-    pub :: (Message b) => MQ.MQTTClient -> NodeQueue NodeT b -> IO ()
-    pub c tv = do
-      forever $ pub' =<< (atomically $ do readTBQueue (runNodeQueue tv))
-      where
-        pub' :: (Message b) => (NodeT, b) -> IO ()
-        -- putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >> 
-        pub' (nId, mf) = MQ.publish c (topic nId) (encode mf) False
-        topic :: NodeT -> MQ.Topic
-        topic = stateTopic --controlTopic
-        encode :: (Message b) => b -> BL.ByteString
-        encode = BL.fromStrict . encodeMessage
-
-
+    --}
 

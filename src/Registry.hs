@@ -9,25 +9,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Registry (NodeT,
-                 HasTopics(..),
-                 getKibbutz,
-                 Kibbutz(..),
-                 mkCallback,
-                 PubQueue,
-                 SubQueue,
-                 queueStream,
-                 KibbutzEvents(..),
-                 writeToPubQ,
-                 printQueueStream,
-                 nodeStream,
-                 getMonitorState,
-                 updateMonitorState,
-                 defKName,
-                 isTQEmpty,
-                 NodeQueue(..),
-                 initNodeQ,
-                 writeToNodeQ) where
+{-# LANGUAGE ScopedTypeVariables #-}
+module Registry (NodeT, HasTopics(..), ThingName
+                , Kibbutz(..), KibbutzEvents(..), getKibbutz, mkCallback, defKName
+                , PubQueue, writeToPubQ
+                , Outbox (..), initOutbox, writeToOutbox
+                , KConnM, KMState, KMSensor, initKMS, initKMConn
+                , SensorSM, SensorSub
+                ) where
 
 
 import qualified Data.ByteString.Lazy as BL
@@ -63,11 +52,95 @@ import Data.ProtoLens (Message)
 
 
 import StateMonitor
+import Subscriber (Subscriber, StreamMap, mkSub, subStream, subMap, getStream, runSubscriber)
+import Control.Monad.Reader
 
+import qualified Control.Concurrent.STM.TChan as TChan
 
 
 mkNode :: ThingName -> NodeT
 mkNode = NodeId
+
+newtype Outbox a b = Outbox { runOutbox :: ((HasTopics a, Message b) => TBQueue (a, b)) }
+
+type PubQueue = Outbox NodeT EnergyTransactionRequest
+
+initOutbox :: STM (Outbox a b)
+initOutbox = do
+  n <- newTBQueue 10000
+  return $ Outbox n
+
+writeToOutbox :: (HasTopics a, Message b) => Outbox a b -> a -> b -> IO ()
+writeToOutbox q n m = do
+  atomically $ writeTBQueue (runOutbox q) (n, m)
+
+writeToPubQ :: PubQueue -> NodeT -> EnergyTransactionRequest -> IO ()
+writeToPubQ p n et = do
+  atomically $ writeTBQueue (runOutbox p) (n, et)
+
+type SensorSub = Subscriber NodeT EnergyState
+
+type SensorSM t m = (IsStream t, MonadAsync m) => StreamMap t m NodeT EnergyState
+
+type MetricsSM t m = (IsStream t, MonadAsync m) => StreamMap t m NodeT NodeS
+
+data Kibbutz = Kibbutz
+  { kname :: Text.Text
+  , nodes :: [NodeT]
+  , inQueue :: SensorSub
+  , outQueue :: PubQueue
+  , msgCount :: TVar Int
+  } deriving (Generic)
+
+
+instance Show Kibbutz where
+  show Kibbutz {..} = Text.unpack $ (kname <> " Kibbutz, " <> (Text.pack $ show $ length nodes) <> " nodes")
+
+data KibbutzEvents = StateUpdate deriving (Eq, Ord, Show)
+
+kbtz :: Text.Text -> [NodeT] -> SensorSub -> PubQueue -> TVar Int -> Kibbutz
+kbtz = Kibbutz
+
+getKibbutz :: Text.Text -> IO Kibbutz
+getKibbutz n = do
+  ts <- getThings n
+  let
+    ns = map (mkNode . fromJust . thingName) ts
+  iq <- mkSub
+  oq <- atomically $ initOutbox
+  mc <- newTVarIO 0
+  return $ kbtz n ns iq oq mc
+
+mkCallback :: Kibbutz -> MQ.MessageCallback
+mkCallback Kibbutz { inQueue, msgCount }  = MQ.SimpleCallback $ writer
+  where
+    writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
+    writer _ t msg _ = do
+      print ((show t) <> "\t" <> (show nodeId))
+      atomically $ do
+        writeTChan (runSubscriber inQueue) (nodeId, parsed)
+        modifyTVar' msgCount (\a -> a + 1)
+      where
+        nodeId :: NodeT
+        nodeId = (fromJust . fromStateTopic) t
+        parsed :: EnergyState
+        parsed = ((fromRight defaultES) . decodeMessage . toStrict) msg
+        toStrict = BS.concat . BL.toChunks
+
+defKName :: KibbutzName
+defKName = Text.pack "kibbutz-pilot-node"
+
+type KibbutzName = Text.Text
+
+
+{--------------------------------------------------------------------------------------------------------
+
+                   Thing Tings and Rules for Topics
+---------------------------------------------------------------------------------------------------------}
+
+type ThingName = Text.Text
+
+type NodeT = NodeId ThingName
 
 class HasTopics a where
   fromThingAttr :: Iot.ThingAttribute -> Maybe a
@@ -82,88 +155,6 @@ instance HasTopics (NodeT) where
   controlTopic = (nameToTopic "/control" )  . unNodeId
   fromControlTopic = topicToNodeId "/control"
   fromStateTopic = topicToNodeId "/state"
-
-newtype NodeQueue a b = NodeQueue { runNodeQueue :: ((HasTopics a, Message b) => TBQueue (a, b)) }
-
-type PubQueue = NodeQueue NodeT EnergyTransactionRequest
-
-type SubQueue = NodeQueue NodeT EnergyState
-
-initNodeQ :: (HasTopics a, Message b) => STM (NodeQueue a b)
-initNodeQ = do
-  n <- newTBQueue 20
-  return $ NodeQueue n
-
-
-writeToNodeQ :: (HasTopics a, Message b) => NodeQueue a b -> a -> b -> IO ()
-writeToNodeQ q topic msg = atomically $ writeTBQueue (runNodeQueue q) (topic, msg) 
-
-writeToPubQ :: PubQueue -> NodeT -> EnergyTransactionRequest -> IO ()
-writeToPubQ p n et = do
-  atomically $ writeTBQueue (runNodeQueue p) (n, et)
-
-data Kibbutz = Kibbutz
-  { kname :: Text.Text
-  , nodes :: [NodeT]
-  , inQueue :: SubQueue
-  , outQueue :: PubQueue
-  , msgCount :: TVar Int
-  } deriving (Generic)
-
-
-isTQEmpty :: Kibbutz -> STM (Bool)
-isTQEmpty Kibbutz {inQueue} = isEmptyTBQueue . runNodeQueue $ inQueue 
-
-instance Show Kibbutz where
-  show Kibbutz {..} = Text.unpack $ (kname <> " Kibbutz, " <> (Text.pack $ show $ length nodes) <> " nodes")
-
-data KibbutzEvents = StateUpdate deriving (Eq, Ord, Show)
-
-kbtz :: Text.Text -> [NodeT] -> SubQueue -> PubQueue -> TVar Int -> Kibbutz
-kbtz = Kibbutz
-
-getKibbutz :: Text.Text -> IO Kibbutz
-getKibbutz n = do
-  ts <- getThings n
-  let
-    ns = map (mkNode. fromJust . thingName) ts
-  iq <- atomically $ initNodeQ
-  oq <- atomically $ initNodeQ
-  mc <- newTVarIO 0
-  return $ kbtz n ns iq oq mc
-
-mkCallback :: Kibbutz -> MQ.MessageCallback
-mkCallback Kibbutz { inQueue, msgCount }  = MQ.SimpleCallback $ writer
-  where
-    writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
-    writer _ t msg _ = do
-      atomically $ do
-        writeTBQueue (runNodeQueue inQueue) (nodeId, parsed)
-        modifyTVar' msgCount (\a -> a + 1)
-      where
-        nodeId :: NodeT
-        nodeId = (fromJust . fromStateTopic) t
-        parsed :: EnergyState
-        parsed = ((fromRight defaultES) . decodeMessage . toStrict) msg
-        toStrict = BS.concat . BL.toChunks
-
-queueStream :: (IsStream t) => SubQueue -> t IO (NodeT, EnergyState)
-queueStream (NodeQueue q) = S.repeatM $ (atomically $ readTBQueue q)
-
-printQueueStream :: SerialT IO (NodeT, EnergyState) -> IO ()
-printQueueStream = S.mapM_ print
-
---nodeStream :: (IsStream t, Monad (t IO)) => Time.UTCTime -> [NodeT] -> ZipSerialM IO (NodeT, EnergyState) -> SerialT IO (NodeT, NodeS)
-nodeStream :: (IsStream t, Monad m, Eq a) => Time.UTCTime -> [a] -> ZipSerialM m (a, EnergyState) -> t m (a, NodeMetrics WattSeconds Watts)
-nodeStream initTime nodes q = serially $ foldr (<>) (go n) $ map (\n'-> go n') ns
-  where (n:ns) = nodes
-        go n' = S.zipWith (,) (S.repeat n') (runNodeMonitor initTime n' q)
-
-
-defKName :: KibbutzName
-defKName = Text.pack "kibbutz-pilot-node"
-
-type KibbutzName = Text.Text
 
 nameToTopic :: Text.Text -> ThingName -> MQ.Topic
 nameToTopic suffix name = prefix <> n <> suffix
@@ -184,18 +175,126 @@ topicToNodeId suffix t =
     colonize cs = Text.intercalate i $ Text.chunksOf 2 cs
       where
         i = ":"
-    -- TODO : Add back the colons!
 
 thingName :: Iot.ThingAttribute -> Maybe ThingName
 thingName t = t ^. Iot.taThingName
 
+
+iot :: BS.ByteString -> Service
+iot svc = Iot.ioT{_svcPrefix=svc} :: Service
+
 getThings :: Text.Text -> IO [Iot.ThingAttribute]
 getThings thingTypeName = do
   let
-    iiot = Iot.ioT{_svcPrefix="execute-api"} :: Service
+    iiot = iot "execute-api"
     ttn = (Just thingTypeName) :: Maybe Text.Text
   lgr <- newLogger Trace stdout
   env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot --  
   runResourceT . runAWST env $ do
     things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
     return $ things ^. Iot.ltrsThings
+
+
+
+--registerThing :: (exceptions-0.10.3:Control.Monad.Catch.MonadCatch m, unliftio-core-0.1.2.0:Control.Monad.IO.Unlift.MonadUnliftIO m) => p -> m (a, b)
+registerThing t = do
+  let
+    iiot = iot "execute-api"
+  lgr <- newLogger Trace stdout
+  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot
+  runResourceT . runAWST env $ do
+    (cert, reg) <- undefined (Iot.registrationConfig)
+    return $ (cert, reg) 
+
+
+{-----------------------------------------------------------------------------------------
+
+              Streamly APIs
+-----------------------------------------------------------------------------------------}
+
+duplicateS
+  :: forall t m a .
+  MonadAsync m
+  => IsStream t
+  => Monad (t m)
+  => t m a
+  -> m (t m a, t m a)
+duplicateS src = do
+  (writeChan', readChan1, readChan2) <- liftIO $ do
+    chan <- TChan.newBroadcastTChanIO
+    chan' <- atomically $ TChan.dupTChan chan
+    chan'' <- atomically $ TChan.dupTChan chan
+    pure (chan, chan', chan'')
+  let
+    writes =
+      S.mapM (liftIO . atomically . TChan.writeTChan writeChan') src
+    reads1 =
+      S.repeatM (liftIO $ atomically $ TChan.readTChan readChan1)
+    reads2 =
+      S.repeatM (liftIO $ atomically $ TChan.readTChan readChan2)
+    tp :: (t m a, t m a)
+    tp =
+      (fmap (fromRight undefined) $ S.filter isRight $ (Left <$> writes) `async` (Right <$> reads1), reads2)
+  pure $ tp
+
+
+
+duplicateSN
+  :: forall t m a .
+  MonadAsync m
+  => IsStream t
+  => Monad (t m)
+  => Show a
+  => t m a
+  -> Int
+  -> m [t m a]
+duplicateSN src n = do
+  (writeChan', rCs) <- liftIO $ do
+    chan <- TChan.newBroadcastTChanIO
+    (rChans') <- replicateM n (atomically $ TChan.dupTChan chan)
+    pure (chan, rChans')
+  let
+    (r:rChans) = rCs
+    writes :: t m ()
+    writes = (S.mapM (liftIO . atomically . TChan.writeTChan writeChan') $ src)
+    reads :: TChan.TChan a -> t m a
+    reads c = (fmap (fromJust undefined) $ S.filter (not . isNothing) $ S.repeatM (liftIO $ atomically $ TChan.tryReadTChan c))
+    cs :: [t m a]
+    cs = map reads rChans
+    h = (fmap (fromRight undefined) $ S.filter isRight $ (Left <$> writes) `serial` (Right <$> (S.repeatM (liftIO $ atomically $ TChan.readTChan r))))
+  pure $ (h:cs)
+
+
+duplicateSN'
+  :: MonadAsync m
+  => IsStream t
+  => Monad (t m)
+  => t m a
+  -> Int
+  -> m [t m a]
+duplicateSN' src n = fmap tupleToList (replicateM n (duplicateS src))
+  where
+    tupleToList :: [(a, a)] -> [a]
+    tupleToList ((a,b):xs) = a : b : tupleToList xs
+    tupleToList _          = []
+
+
+{-----------------------------------------------------------------------------
+
+                 Monitor Tings
+------------------------------------------------------------------------------}
+
+type KMState = KibbutzMonitor NodeT NodeS
+
+initKMS :: [NodeT] -> STM (KMState)
+initKMS ns = initKM ns defNodeS
+
+type KMSensor = KibbutzMonitor NodeT EnergyState
+
+initKSensorM :: [NodeT] -> STM (KMSensor)
+initKSensorM ns = initKM ns defaultES
+
+type KConnM = KibbutzMonitor NodeT Int
+
+initKMConn :: [NodeT] -> STM KConnM
+initKMConn ns = initKM ns 0
