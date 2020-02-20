@@ -50,6 +50,7 @@ dependencies:
 - data-default-class
 - network-uri
 - containers
+- unordered-containers
 - stm
 - time
 - ulid

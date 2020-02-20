@@ -4,16 +4,14 @@ module KMSpec (spec) where
 
 import Test.Hspec
 
-import qualified Streamly.Prelude as S
-import Streamly
 import qualified Streamly.Data.Fold as FL
 import qualified StmContainers.Map as SMap
 import Control.Concurrent.STM (atomically)
-import Import (liftIO, join)
+import Control.Monad.IO.Class (liftIO)
 import StateMonitor
-import Registry (updateMonitorState, getMonitorState)
-import Node (NodeId(..))
-import qualified Data.Text as Text
+
+import Streamly
+import qualified Streamly.Prelude as S
 
 spec :: Spec
 spec = do
@@ -25,10 +23,11 @@ spec = do
       (s) `shouldBe` (0)
       (sum $ map snd as) `shouldBe` 0
       
-    it "an initialized KM read can be a streamly stream" $ do
+    it "a KM that is written to can be read" $ do
       initM <- liftIO (atomically $ initKM [1..10 :: Int] (0 :: Int))
-      uf <- join (fmap (S.length . S.fromList) (atomically $ readKM initM [1..10 :: Int]))
-      uf `shouldBe` (0)
+      liftIO $ S.mapM_ (\(n, s) -> atomically $ ((updateKM initM n s))) $ S.fromList $ zip [1..10 :: Int] [1..10 :: Int]
+      uf <- liftIO $ S.length . S.fromList =<< (atomically $ readKM initM [1..10 :: Int])
+      uf `shouldBe` (10)
       
     it "an initially serial stream should be able to write concurrently to a KM" $ do
       initM <- liftIO (atomically $ initKM [1..10 :: Int] 1)
