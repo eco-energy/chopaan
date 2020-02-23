@@ -12,7 +12,7 @@ import Test.QuickCheck.Instances.Time ()
 
 import qualified Streamly.Prelude as S
 import Streamly
-
+import qualified Streamly.Data.Fold as FL
 
 import Proto.NodeMessages ()
 import Proto.NodeMessages_Fields
@@ -29,6 +29,10 @@ import Control.Concurrent (threadDelay, forkIO)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (isEmptyTChan, dupTChan)
 import Control.Monad (forever, liftM)
+
+import Registry (duplicateS)
+import StateMonitor (initKM, updateKM, readKM)
+
 
 instance Arbitrary EnergyState where
   arbitrary = arbitraryMessage
@@ -86,32 +90,48 @@ spec = do
         expectedNM = (NodeMetrics lastConn expectedP expectedE expectedS) 
           where
             lastConn = (Just $ posixSecondsToUTCTime (initTime + 101))
-        a = runNodeMonitor (posixSecondsToUTCTime initTime) msgStream
-      pExp <- S.all (\a'-> a' == expectedP) (powerStream msgStream)
-      eExp <- S.last $ energyStream (powerStream msgStream) ((timeDiff $ tUTC) . timeStream $ msgStream)
+        a = S.postscan (runNodeMonitor $ posixSecondsToUTCTime initTime) msgStream
+      pExp <- S.all (\a'-> a' == expectedP) (S.postscan power msgStream)
+      eExp <- S.last $ S.postscan (energyStream tUTC) msgStream
       nmExp <- S.last $ a
       lenExp <- S.length a
       pExp  `shouldBe` True
       eExp `shouldBe` (Just expectedE)
       nmExp `shouldBe` (Just expectedNM)
       lenExp `shouldBe` (102)
+    {--
     it "mapping a gridStream over a KM should be a nice ting" $ do
       let
         ns :: [NodeId Int]
         ns = NodeId <$> [1..10 :: Int]
+        msgStream = S.map m $ S.enumerateFromTo 0 100
         msgs :: (SerialT IO (NodeId Int, EnergyState))
-        msgs = S.zipWith (,) (S.fromList $ cycle ns) msgStream
+        msgs = (,) <$> (S.fromList ns) <*> msgStream
       sub <- mkSub
-      _ <- forkIO $ S.drain (serially $ writeSub sub msgs)
-      print ("Writing")
-      smap <- ((subMap ns sub) :: IO (StreamMap SerialT IO (NodeId Int) EnergyState))
-      print ("Smap")
+      _ <- forkIO $ S.drain (parallely $ adapt $ writeSub sub msgs)
+      smap <- ((subMap ns sub) :: IO (StreamMap (NodeId Int) EnergyState))
+      km <- atomically $ initKM ns defNodeS
       let
         gs :: Serial (NodeId Int, NodeS)
         gs = gridStream tUTC ns smap
-      msgl <- S.length msgs
-      print ("Length of Message")
-      S.mapM_ print gs
-      gsl <- S.length $ S.takeWhile (const True) gs
-      print ("Length of gsl")
-      gsl `shouldBe` msgl
+      S.drain $ S.mapM (\(n, s) -> atomically $ updateKM km n s) gs
+      endStates <- atomically $ readKM km ns
+      let
+        expectedP = Power {gen=(12 * 10), tIn=(12 * 0), tOut=(12 * 5), load=(12 * 5)} 
+        expectedE = Energy {txIn=tIn, txOut=tOut, consumed=load, generated=gen}
+          where
+            Power{..} = sP
+            sP = foldl (<>) expectedP $ replicate 99 expectedP
+      (Just expectedS) <- S.last msgStream
+      let
+        expectedNM = (NodeMetrics lastConn expectedP expectedE expectedS) 
+          where
+            lastConn = (Just $ posixSecondsToUTCTime (initTime + 101))
+      mapM_ (\e -> (snd e) `shouldBe` expectedNM) endStates
+--}
+      --forkIO $ forever $ do
+      --  gl <- S.length $ S.take 5 gs 
+      --  print ("Length of take: " <> show gl)
+      --printed <- S.length $ S.mapM print gs
+      --print ("Length of printed" <> show printed)
+      

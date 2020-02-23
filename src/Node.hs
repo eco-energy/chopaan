@@ -10,22 +10,23 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Node (
-  -- functional export
-  runNodeMonitor, gridStream
+  -- scans
+  gridS, nodeS, energyS, powerS, timeS
+  -- folds
+  , energyFold, power, time
   -- data constructors
   , EnergyState, NodeId(..), NodeS, NodeMetrics(..), Energy(..), Power(..), WattSeconds, Watts
-  -- calculations exported for tests
-  , energyStream, powerStream, timeDiff, timeStream
   -- default builders
-  , defaultES, defNodeS
+  , zeroMsg, defNodeS
   ) where
+
 import qualified Data.Time as Time
 import Data.Time.Clock.POSIX
 
 import GHC.Generics (Generic)
 
 import Proto.NodeMessages
-import Proto.NodeMessages_Fields
+import Proto.NodeMessages_Fields hiding (time)
 
 import Lens.Micro
 
@@ -39,7 +40,16 @@ import Data.ProtoLens.TextFormat
 
 import Data.Hashable
 import Subscriber
+import qualified Data.Map.Strict as Map
+import Data.Function ((&))
 
+
+import ConCat.Free.Affine (Affine(..))
+import qualified ConCat.Free.Affine as Aff
+import qualified ConCat.GradientDescent as GD
+import qualified ConCat.Scan as Scan
+import qualified ConCat.Free.LinearRow as LR
+import qualified ConCat.Free.VectorSpace as VS
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
@@ -117,13 +127,13 @@ instance Applicative Power where
               , gen = gen f $ gen v
               }
 
-
 instance (Num a) => Semigroup (Power a) where
   p <> p' = (+) <$> p <*> p'
 
 instance (Num a) => Monoid (Power a) where
   mempty = Power 0 0 0 0
 
+--instance (Num a) => VS.V R (Power a) where
 
 data NodeMetrics e p = NodeMetrics
   { _time :: !(Maybe Time.UTCTime)
@@ -146,36 +156,159 @@ instance (Show e, Show p) => Show (NodeMetrics e p) where
 
 
 defNodeS :: NodeS
-defNodeS = NodeMetrics Nothing mempty mempty defaultES
+defNodeS = NodeMetrics Nothing mempty mempty zeroMsg
 
 type NodeS = NodeMetrics WattSeconds Watts
 
-{--
-data GridMetrics e p = GridMetrics
-  { _uptime :: ! Time.NominalDiffTime
-  , _loss :: !e
-  }
---}
+type Timestamp = (Time.UTCTime, Time.NominalDiffTime)
 
-gridStream :: forall t m n . (IsStream t, MonadAsync m, Hashable n, Ord n) => Time.UTCTime -> [n] -> (StreamMap t m n EnergyState) -> t m (n , NodeS)
-gridStream initTime (n:ns) ss = serially $ foldr (<>) (go n) $ map go ns
-  where
-    go n' = S.zipWith (,) (S.repeat n') (runNodeMonitor initTime $ adapt $ (getStream ss n'))
-gridStream _ [] _ = S.nil
 
-runNodeMonitor :: (IsStream t, MonadAsync m) => Time.UTCTime -> ZipSerialM m (EnergyState) -> t m (NodeMetrics WattSeconds Watts)
+
+
+
+
+
+{-
+runNodeMonitor :: (IsStream t, MoncadAsync m) => Time.UTCTime -> ZipSerialM m (EnergyState) -> t m (NodeMetrics WattSeconds Watts)
 runNodeMonitor initTime stream = zipSerially $ NodeMetrics <$> t <*> p <*> en <*> stream
   where
     t = S.map (\e -> Just e) $ timeStream stream
     dt = (timeDiff initTime $ timeStream stream)
     p = powerStream stream
     en = energyStream p dt
+--}
 
-utcTNow :: EnergyState -> Time.UTCTime
-utcTNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
 
-defaultES :: EnergyState
-defaultES = defMessage
+
+{----------------------------------------------------------------------------------------------------
+
+
+Folds of type FL.Fold, as functions to the instantatenous values of the system over an indexed set.
+                      :: forall s. Fold (s -> a -> m s) (m s) (s -> m b)
+
+
+-----------------------------------------------------------------------------------------------------}
+
+time :: forall m. Monad m => Time.UTCTime -> FL.Fold m (EnergyState) Timestamp
+time startT = FL.Fold step' begin' done'
+  where
+    step' :: (Timestamp -> EnergyState -> m Timestamp)
+    step' (!prev, _) cur = pure (tn, Time.diffUTCTime tn prev)
+      where
+        tn = utcTimeNow cur
+    begin' :: m Timestamp
+    begin' = pure (startT, 0)
+    done' :: Timestamp -> m Timestamp
+    done' = pure
+
+
+-- (s -> a -> m s) (m s) (s -> m b)
+power :: forall m a. (Monad m) => FL.Fold m EnergyState (Power Watts)
+power = FL.Fold powerAtT (pure $ mempty) return
+  where
+    powerAtT _ es = pure $ Power
+                    { tIn = txIn'
+                    , tOut = txOut'
+                    , load = cnsm'
+                    , gen = gen' }
+      where
+        txIn' = p batteryVoltage gridToBatteryCurrent
+        txOut' = p batteryVoltage batteryToGridCurrent
+        cnsm' = p batteryVoltage batteryToLoadCurrent
+        gen' = p batteryVoltage solarInputCurrent
+        p :: Getting Double EnergyState Double -> Getting Double EnergyState Double -> Watts
+        p v i = es ^. v * es ^. i
+
+
+energyFold :: forall m. (Monad m) => Time.UTCTime -> FL.Fold m (EnergyState) (Energy WattSeconds)
+energyFold startT = eAtT <$> power <*> td
+  where
+    --pt :: FL.Fold m (EnergyState) (Power Watts, Timestamp)
+    --pt = ((,) <$> power <*> td)
+    td = time startT
+    --eFold :: FL.Fold m (Power Watts, Timestamp) EnergyBalance
+    --eFold = FL.Fold eAtT (pure mempty) (pure)
+    eAtT :: (Power Watts) ->  Timestamp -> (Energy WattSeconds)
+    eAtT p (_, t) = Energy { txIn = (pToE t tIn)
+                           , txOut = (pToE t tOut)
+                           , consumed = (pToE t load)
+                           , generated = (pToE t gen)}
+      where
+        Power{..} = p
+    --pToE :: (Num b) => Time.NominalDiffTime -> b -> a
+    pToE t p' = p' * (realToFrac t)
+
+
+nodeMonitor :: forall m. (Monad m) => Time.UTCTime -> FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
+nodeMonitor startT = NodeMetrics <$> ((Just . fst) <$> tn) <*> power <*> en <*> sensors 
+  where
+    tn :: FL.Fold m (EnergyState) Timestamp
+    tn = time startT
+    en :: FL.Fold m (EnergyState) (Energy WattSeconds)
+    en =  energyFold startT
+    sensors :: FL.Fold m (EnergyState) (EnergyState)
+    sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
+
+
+
+runNodeMonitor :: forall m t. (MonadAsync m, IsStream t) => Time.UTCTime -> t m EnergyState -> t m NodeS
+runNodeMonitor initTime = S.scan (nodeMonitor initTime)
+
+{--------------------------------------------------------------------------------------------------------------
+
+                                          Streams of Folds
+---------------------------------------------------------------------------------------------------------------}
+
+
+{--
+slice :: (IsStream t, Monad m) => Int -> Int -> t m a -> t m a
+slice i j = (S.take (j - i)) . (S.drop i)
+
+eval :: (IsStream t, Monad m) => (a -> b) -> (FL.Fold m a b) -> Int -> Int -> t m a -> t m b
+eval e f start end = S.map e $ S.scan f $ slice start end 
+
+
+evalAll :: (a -> b) -> FL.Fold m a b -> t m a -> t m b
+evalAll e f x =  eval e f (0) (S.length x) $ x
+--}
+
+--type Stream a = t m a
+
+energyS :: (MonadAsync m, IsStream t) => Time.UTCTime -> t m EnergyState -> t m (Energy WattSeconds)
+energyS = S.postscan . energyFold
+
+timeS :: (MonadAsync m, IsStream t) => Time.UTCTime -> t m EnergyState -> t m Timestamp
+timeS = S.postscan . time
+
+
+powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m (Power Watts)
+powerS = S.postscan power
+
+nodeS :: (MonadAsync m, IsStream t) => Time.UTCTime -> t m EnergyState -> t m NodeS
+nodeS = S.postscan . nodeMonitor
+
+
+gridS :: forall t m n . (IsStream t, MonadAsync m, Ord n) => Time.UTCTime -> [n] -> t m (n, EnergyState) -> t m (Map.Map n (NodeS))
+gridS startT ns ss = S.postscan gridMap ss
+  where
+    gridMap = FL.demux nodeMap
+      where
+        nodeMap = Map.fromList $ zip ns $ repeat (nodeMonitor startT) 
+
+
+
+
+{---------------------------------------------------------------------------------------------------------------------
+
+                                          Helper Functions
+---------------------------------------------------------------------------------------------------------------------}
+
+
+utcTimeNow :: EnergyState -> Time.UTCTime
+utcTimeNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
+
+zeroMsg :: EnergyState
+zeroMsg = defMessage
                & batteryVoltage .~ 0
                & gridVoltage .~ 0
                & batteryToLoadCurrent .~ 0
@@ -185,50 +318,4 @@ defaultES = defMessage
                & dutyCycle .~ 0
                & cpuTime .~ 0
 
-
-energyStream :: (IsStream t, Monad m) => t m (Power Watts) -> t m (Time.NominalDiffTime) -> t m (Energy WattSeconds)
-energyStream p dt = S.postscan (FL.mconcat) eAtT
-  where
-    eAtT = S.zipWith (\Power{..} t-> Energy { txIn = (pToE t tIn)
-                                                , txOut = (pToE t tOut)
-                                                , consumed = (pToE t load)
-                                                , generated = (pToE t gen)}) p dt
-    pToE :: Time.NominalDiffTime -> Watts ->  WattSeconds
-    pToE t p' = p' * (realToFrac t)
-    
--- FL.Fold :: forall s. Fold (s -> a -> m s) (m s) (s -> m b)
-timeDiff :: forall m t . (IsStream t, (Monad m)) => Time.UTCTime -> t m (Time.UTCTime) -> t m (Time.NominalDiffTime)
-timeDiff st = S.scan (FL.Fold step' begin' done')
-  where
-    step' :: ((Time.UTCTime, Time.NominalDiffTime) -> Time.UTCTime -> m (Time.UTCTime, Time.NominalDiffTime))
-    step' (!prev, _) cur = pure (cur, Time.diffUTCTime cur prev)
-    begin' :: m (Time.UTCTime, Time.NominalDiffTime)
-    begin' = return (st, 0)
-    done' :: (Time.UTCTime, Time.NominalDiffTime) -> m Time.NominalDiffTime
-    done' = pure . snd
-
-timeStream :: (IsStream t, (Monad m)) => t m EnergyState -> t m (Time.UTCTime)
-timeStream = S.map utcTNow
-
-powerStream :: (IsStream t, (Monad m)) => t m EnergyState -> t m (Power Watts)
-powerStream = S.map powerAtT
-  where
-    powerAtT :: EnergyState -> Power Watts
-    powerAtT es = Power { tIn = txIn'
-                        , tOut = txOut'
-                        , load = cnsm'
-                        , gen = gen'}
-      where
-        txIn' = p batteryVoltage gridToBatteryCurrent
-        txOut' = p batteryVoltage batteryToGridCurrent
-        cnsm' = p batteryVoltage batteryToLoadCurrent
-        gen' = p batteryVoltage solarInputCurrent
-        p v i = es ^. v * es ^. i
-
-
-
-
---ns' :: (IsStream t) => [NodeT] -> t IO (NodeT Int, NodeS)
---ns' nodex = S.zipWith (,) (S.fromList $ P.cycle nodex) (S.repeat defNodeS{_energyS=es})
---  where es = Energy{txOut=10, txIn=10, consumed=10, generated=10}
-
+hamiltonianLoss = undefined

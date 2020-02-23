@@ -15,7 +15,7 @@ module Registry (NodeT, HasTopics(..), ThingName
                 , PubQueue, writeToPubQ
                 , Outbox (..), initOutbox, writeToOutbox
                 , KConnM, KMState, KMSensor, initKMS, initKMConn
-                , SensorSM, SensorSub
+                , SensorSM, SensorSub, duplicateS
                 ) where
 
 
@@ -80,9 +80,9 @@ writeToPubQ p n et = do
 
 type SensorSub = Subscriber NodeT EnergyState
 
-type SensorSM t m = (IsStream t, MonadAsync m) => StreamMap t m NodeT EnergyState
+type SensorSM = StreamMap NodeT EnergyState
 
-type MetricsSM t m = (IsStream t, MonadAsync m) => StreamMap t m NodeT NodeS
+type MetricsSM = StreamMap NodeT NodeS
 
 data Kibbutz = Kibbutz
   { kname :: Text.Text
@@ -124,7 +124,7 @@ mkCallback Kibbutz { inQueue, msgCount }  = MQ.SimpleCallback $ writer
         nodeId :: NodeT
         nodeId = (fromJust . fromStateTopic) t
         parsed :: EnergyState
-        parsed = ((fromRight defaultES) . decodeMessage . toStrict) msg
+        parsed = ((fromRight zeroMsg) . decodeMessage . toStrict) msg
         toStrict = BS.concat . BL.toChunks
 
 defKName :: KibbutzName
@@ -292,7 +292,7 @@ initKMS ns = initKM ns defNodeS
 type KMSensor = KibbutzMonitor NodeT EnergyState
 
 initKSensorM :: [NodeT] -> STM (KMSensor)
-initKSensorM ns = initKM ns defaultES
+initKSensorM ns = initKM ns zeroMsg
 
 type KConnM = KibbutzMonitor NodeT Int
 
