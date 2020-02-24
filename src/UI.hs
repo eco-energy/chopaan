@@ -47,7 +47,7 @@ import qualified Brick.Focus as Focus
 
 import Graphics.Vty.Input.Events
 
-import Node (NodeId(..), NodeS, NodeMetrics(..), runNodeMonitor, defNodeS, EnergyState(..), defaultES)
+import Node (NodeId(..), NodeS)
 
 import Registry ( Kibbutz(..)
                 , KibbutzEvents(..)

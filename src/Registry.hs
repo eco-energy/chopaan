@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE RankNTypes #-}
@@ -11,11 +12,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Registry (NodeT, HasTopics(..), ThingName
-                , Kibbutz(..), KibbutzEvents(..), getKibbutz, mkCallback, defKName
+                , Kibbutz(..), KibbutzEvents(..), getKibbutz, mkCallback, defKName, subStream
                 , PubQueue, writeToPubQ
-                , Outbox (..), initOutbox, writeToOutbox
+                , NodeQueue(..), initNodeQueue, writeToNodeQueue
                 , KConnM, KMState, KMSensor, initKMS, initKMConn
-                , SensorSM, SensorSub
+                , SensorSM, SensorSub, duplicateS
                 ) where
 
 
@@ -52,7 +53,7 @@ import Data.ProtoLens (Message)
 
 
 import StateMonitor
-import Subscriber (Subscriber, StreamMap, mkSub, subStream, subMap, getStream, runSubscriber)
+import Subscriber (Subscriber, StreamMap)
 import Control.Monad.Reader
 
 import qualified Control.Concurrent.STM.TChan as TChan
@@ -61,33 +62,35 @@ import qualified Control.Concurrent.STM.TChan as TChan
 mkNode :: ThingName -> NodeT
 mkNode = NodeId
 
-newtype Outbox a b = Outbox { runOutbox :: ((HasTopics a, Message b) => TBQueue (a, b)) }
+newtype NodeQueue a b = NodeQueue { runNodeQueue :: ((HasTopics a, Message b) => TBQueue (a, b)) }
 
-type PubQueue = Outbox NodeT EnergyTransactionRequest
+type PubQueue = NodeQueue NodeT EnergyTransactionRequest
 
-initOutbox :: STM (Outbox a b)
-initOutbox = do
+type SubQueue = NodeQueue NodeT EnergyState
+
+initNodeQueue :: STM (NodeQueue a b)
+initNodeQueue = do
   n <- newTBQueue 10000
-  return $ Outbox n
+  return $ NodeQueue n
 
-writeToOutbox :: (HasTopics a, Message b) => Outbox a b -> a -> b -> IO ()
-writeToOutbox q n m = do
-  atomically $ writeTBQueue (runOutbox q) (n, m)
+writeToNodeQueue :: (HasTopics a, Message b) => NodeQueue a b -> a -> b -> IO ()
+writeToNodeQueue q n m = do
+  atomically $ writeTBQueue (runNodeQueue q) (n, m)
 
 writeToPubQ :: PubQueue -> NodeT -> EnergyTransactionRequest -> IO ()
 writeToPubQ p n et = do
-  atomically $ writeTBQueue (runOutbox p) (n, et)
+  atomically $ writeTBQueue (runNodeQueue p) (n, et)
 
 type SensorSub = Subscriber NodeT EnergyState
 
-type SensorSM t m = (IsStream t, MonadAsync m) => StreamMap t m NodeT EnergyState
+type SensorSM = StreamMap NodeT EnergyState
 
-type MetricsSM t m = (IsStream t, MonadAsync m) => StreamMap t m NodeT NodeS
+type MetricsSM = StreamMap NodeT NodeS
 
 data Kibbutz = Kibbutz
   { kname :: Text.Text
   , nodes :: [NodeT]
-  , inQueue :: SensorSub
+  , inQueue :: SubQueue
   , outQueue :: PubQueue
   , msgCount :: TVar Int
   } deriving (Generic)
@@ -98,7 +101,7 @@ instance Show Kibbutz where
 
 data KibbutzEvents = StateUpdate deriving (Eq, Ord, Show)
 
-kbtz :: Text.Text -> [NodeT] -> SensorSub -> PubQueue -> TVar Int -> Kibbutz
+kbtz :: Text.Text -> [NodeT] -> SubQueue -> PubQueue -> TVar Int -> Kibbutz
 kbtz = Kibbutz
 
 getKibbutz :: Text.Text -> IO Kibbutz
@@ -106,25 +109,30 @@ getKibbutz n = do
   ts <- getThings n
   let
     ns = map (mkNode . fromJust . thingName) ts
-  iq <- mkSub
-  oq <- atomically $ initOutbox
+  iq <- atomically $ initNodeQueue
+  oq <- atomically $ initNodeQueue
   mc <- newTVarIO 0
   return $ kbtz n ns iq oq mc
+
+subStream :: forall t m. (IsStream t, MonadAsync m) => SubQueue -> t m (NodeT, EnergyState)
+subStream sq = asyncly $ S.unfoldrM step ()
+  where
+    step :: () -> m (Maybe ((NodeT, EnergyState), ()))
+    step _ = liftIO $  (fmap (, ())) <$> (atomically . tryReadTBQueue . runNodeQueue $ sq)
 
 mkCallback :: Kibbutz -> MQ.MessageCallback
 mkCallback Kibbutz { inQueue, msgCount }  = MQ.SimpleCallback $ writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
-      print ((show t) <> "\t" <> (show nodeId))
       atomically $ do
-        writeTChan (runSubscriber inQueue) (nodeId, parsed)
+        writeTBQueue (runNodeQueue inQueue) (nodeId, parsed)
         modifyTVar' msgCount (\a -> a + 1)
       where
         nodeId :: NodeT
         nodeId = (fromJust . fromStateTopic) t
         parsed :: EnergyState
-        parsed = ((fromRight defaultES) . decodeMessage . toStrict) msg
+        parsed = ((fromRight zeroMsg) . decodeMessage . toStrict) msg
         toStrict = BS.concat . BL.toChunks
 
 defKName :: KibbutzName
@@ -292,7 +300,7 @@ initKMS ns = initKM ns defNodeS
 type KMSensor = KibbutzMonitor NodeT EnergyState
 
 initKSensorM :: [NodeT] -> STM (KMSensor)
-initKSensorM ns = initKM ns defaultES
+initKSensorM ns = initKM ns zeroMsg
 
 type KConnM = KibbutzMonitor NodeT Int
 
