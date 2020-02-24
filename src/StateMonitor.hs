@@ -11,7 +11,7 @@ import GHC.Generics (Generic)
 import Data.Maybe (fromMaybe, fromJust)
 
 import qualified Data.Text as Text
-
+import qualified Data.Map.Strict as Map
 {-------------------------------------------------------------------------------
 
              A KibbutzMonitor is an STM protected map that is used
@@ -33,6 +33,9 @@ initKM ns def = do
 updateKM :: (Eq k, Hashable k) => KibbutzMonitor k v -> k -> v ->  STM ()
 updateKM m n v = do
   SMap.insert v n (runKM m)
+
+updateKMAll :: (Eq k, Hashable k) => KibbutzMonitor k v -> Map.Map k v -> STM ()
+updateKMAll km kv = mapM_ (uncurry $ updateKM km) $ Map.toList kv
 
 readKM :: (Eq k, Hashable k, Eq v) => KibbutzMonitor k v -> [k] -> STM [(k, v)]
 readKM (KM km) ns = do
