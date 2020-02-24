@@ -78,6 +78,7 @@ dependencies:
 - concat-classes
 - concat-examples
 - estimator
+- db-chopaan
 
 ghc-options:
 - -Wall
