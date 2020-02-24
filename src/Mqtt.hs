@@ -27,23 +27,19 @@ import Data.X509.Validation (validateDefault)
 import Data.Default.Class
 import Network.TLS.Extra.Cipher
 import Network.URI
-import Control.Exception (Handler (..), IOException, catches)
-import Control.Monad (forever, when, liftM)
+import Control.Exception (Handler (..), catches)
+import Control.Monad (forever)
 import Control.Concurrent (forkIO, threadDelay)
-import Data.Maybe
 
-import qualified Data.Set as Set
-import qualified Data.Map.Strict as Map
 
 import Control.Concurrent.STM
-import qualified Control.Concurrent.STM.TQueue as TQ
 
-import Registry (NodeT, HasTopics(..), mkCallback, Kibbutz(..), PubQueue, Outbox(..), KibbutzEvents)
+import Registry (NodeT, HasTopics(..), NodeQueue(..))
 
 import Data.ProtoLens (encodeMessage, Message)
 
 import GHC.Generics (Generic)
-import Brick.BChan (BChan)
+
 
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control
 
@@ -83,7 +79,7 @@ mkTLSSettings cert key caPath hostName name = do
 
 
 -- need reader for creds and logs
-runMqtt :: (HasTopics a, Message b) => MQTTOpts -> Outbox NodeT b -> [a] -> MQ.MessageCallback -> IO ()
+runMqtt :: forall a b. (HasTopics a, Message b) => MQTTOpts -> NodeQueue NodeT b -> [a] -> MQ.MessageCallback -> IO ()
 runMqtt MQTTOpts{..} outQueue ts msgCB = do
   tlsConf <- mkTLSSettings certPath keyPath caPath mqttURI connId
   let
@@ -114,28 +110,14 @@ runMqtt MQTTOpts{..} outQueue ts msgCB = do
 
     -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
     -- not stateful.
-    pub :: (Message b) => MQ.MQTTClient -> Outbox NodeT b -> IO ()
+    pub :: MQ.MQTTClient -> NodeQueue NodeT b -> IO ()
     pub c tv = do
-      forever $ pub' =<< (atomically $ do readTBQueue (runOutbox tv))
+      forever $ pub' =<< (atomically $ do readTBQueue (runNodeQueue tv))
       where
-        pub' :: (Message b) => (NodeT, b) -> IO ()
-         
+        pub' :: (NodeT, b) -> IO ()
         pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >>
           MQ.publish c (topic nId) (encode mf) False
         topic :: NodeT -> MQ.Topic
         topic = stateTopic --controlTopic
-        encode :: (Message b) => b -> BL.ByteString
+        encode :: b -> BL.ByteString
         encode = BL.fromStrict . encodeMessage
-
-{--
-    sub :: MQ.MQTTClient -> [(MQ.Filter, MQ.SubOptions)] -> IO ()
-    sub c topics = do
-      (s, _) <- MQ.subscribe c topics []
-      mapM_ handleSub s
-      MQ.waitForClient c
-      where
-        handleSub :: (Either MQTy.SubErr MQTy.QoS) -> IO ()
-        handleSub (Right e) = return () -- print e
-        handleSub (Left q) = return () -- print q
-    --}
-
