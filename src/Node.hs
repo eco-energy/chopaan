@@ -162,7 +162,7 @@ defNodeS = NodeMetrics Nothing mempty mempty zeroMsg
 
 type NodeS = NodeMetrics WattSeconds Watts
 
-type Timestamp = (Time.UTCTime, Time.NominalDiffTime)
+type Timestamp = (Maybe Time.UTCTime, Time.NominalDiffTime)
 
 
 {----------------------------------------------------------------------------------------------------
@@ -174,15 +174,18 @@ Folds of type FL.Fold, as functions to the instantatenous values of the system o
 
 -----------------------------------------------------------------------------------------------------}
 
-timeFold :: forall m. Monad m => Time.UTCTime -> FL.Fold m (EnergyState) Timestamp
-timeFold startT = FL.Fold step' begin' done'
+timeFold :: forall m. Monad m => FL.Fold m (EnergyState) Timestamp
+timeFold = FL.Fold step' begin' done'
   where
     step' :: (Timestamp -> EnergyState -> m Timestamp)
-    step' (!prev, _) cur = pure (tn, Time.diffUTCTime tn prev)
+    step' (Nothing, _) cur = pure (Just tn, Time.diffUTCTime tn tn)
+      where
+        tn = utcTimeNow cur
+    step' ((Just !prev), _) cur = pure (Just tn, Time.diffUTCTime tn prev)
       where
         tn = utcTimeNow cur
     begin' :: m Timestamp
-    begin' = pure (startT, 0)
+    begin' = pure (Nothing, 0)
     done' :: Timestamp -> m Timestamp
     done' = pure
 
@@ -190,17 +193,20 @@ timeFold startT = FL.Fold step' begin' done'
 powerFold :: forall m. (Monad m) => FL.Fold m EnergyState (Power Watts)
 powerFold = FL.Fold (\_ b-> pure $ power b) (pure $ mempty) return 
 
-energyFold :: forall m. (Monad m) => Time.UTCTime -> FL.Fold m (EnergyState) (Energy WattSeconds)
-energyFold startT = (FL.Fold step begin end)
+energyFold :: forall m. (Monad m) => FL.Fold m (EnergyState) (Energy WattSeconds)
+energyFold = (FL.Fold step begin end)
   where
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
-    step :: (Energy WattSeconds, Time.UTCTime) -> EnergyState -> m (Energy WattSeconds, Time.UTCTime)
-    step (esPrev, tPrev) cur = pure $ ((esPrev <> (eAtT (power cur) (tn, Time.diffUTCTime tn tPrev))), tn)
+    step :: (Energy WattSeconds, Maybe Time.UTCTime) -> EnergyState -> m (Energy WattSeconds, Maybe Time.UTCTime)
+    step (esPrev, (Just tPrev)) cur = pure $ ((esPrev <> (eAtT (power cur) (Just tn, Time.diffUTCTime tn tPrev))), Just tn)
       where
         tn = utcTimeNow cur
-    begin :: m (Energy WattSeconds, Time.UTCTime)
-    begin = pure $ (mempty, startT)
-    end :: (Energy WattSeconds, Time.UTCTime) -> m (Energy WattSeconds)
+    step (esPrev, Nothing) cur = pure $ ((esPrev <> (eAtT (power cur) (Just tn, Time.diffUTCTime tn tn))), Just tn)
+      where
+        tn = utcTimeNow cur
+    begin :: m (Energy WattSeconds, Maybe Time.UTCTime)
+    begin = pure $ (mempty, Nothing)
+    end :: (Energy WattSeconds, Maybe Time.UTCTime) -> m (Energy WattSeconds)
     end = pure . fst
     eAtT :: Power Watts -> Timestamp -> (Energy WattSeconds)
     eAtT p (_, t) = Energy { txIn = (pToE t tIn)
@@ -211,18 +217,18 @@ energyFold startT = (FL.Fold step begin end)
         Power{..} = p
     pToE t p' = p' * (realToFrac t)
 
-nodeMonitor :: forall m. (Monad m) => Time.UTCTime -> FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
-nodeMonitor startT = NodeMetrics <$> ((Just . fst) <$> tn) <*> powerFold <*> en <*> sensors 
+nodeMonitor :: forall m. (Monad m) => FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
+nodeMonitor = NodeMetrics <$> ((fst) <$> tn) <*> powerFold <*> en <*> sensors 
   where
     tn :: FL.Fold m (EnergyState) Timestamp
-    tn = timeFold startT
+    tn = timeFold
     en :: FL.Fold m (EnergyState) (Energy WattSeconds)
-    en =  energyFold startT
+    en =  energyFold
     sensors :: FL.Fold m (EnergyState) (EnergyState)
     sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
 
-runNodeMonitor :: forall m t. (MonadAsync m, IsStream t) => Time.UTCTime -> t m EnergyState -> t m NodeS
-runNodeMonitor initTime = S.scan (nodeMonitor initTime)
+runNodeMonitor :: forall m t. (MonadAsync m, IsStream t) => t m EnergyState -> t m NodeS
+runNodeMonitor = S.scan nodeMonitor
 
 {--------------------------------------------------------------------------------------------------------------
 
@@ -244,24 +250,24 @@ evalAll e f x =  eval e f (0) (S.length x) $ x
 
 --type Stream a = t m a
 
-energyS :: (MonadAsync m, IsStream t) => Time.UTCTime -> t m EnergyState -> t m (Energy WattSeconds)
-energyS = S.postscan . energyFold
+energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m (Energy WattSeconds)
+energyS = S.postscan energyFold
 
-timeS :: (MonadAsync m, IsStream t) => Time.UTCTime -> t m EnergyState -> t m Timestamp
-timeS = S.postscan . timeFold
+timeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
+timeS = S.postscan timeFold
 
 powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m (Power Watts)
 powerS = S.postscan powerFold
 
-nodeS :: (MonadAsync m, IsStream t) => Time.UTCTime -> t m EnergyState -> t m NodeS
-nodeS = S.postscan . nodeMonitor
+nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m NodeS
+nodeS = S.postscan nodeMonitor
 
-gridS :: forall t m n . (IsStream t, MonadAsync m, Ord n) => Time.UTCTime -> [n] -> t m (n, EnergyState) -> t m (Map.Map n (NodeS))
-gridS startT ns ss = S.postscan gridMap ss
+gridS :: forall t m n . (IsStream t, MonadAsync m, Ord n) => [n] -> t m (n, EnergyState) -> t m (Map.Map n (NodeS))
+gridS ns ss = S.postscan gridMap ss
   where
     gridMap = FL.demux nodeMap
       where
-        nodeMap = Map.fromList $ zip ns $ repeat (nodeMonitor startT) 
+        nodeMap = Map.fromList $ zip ns $ repeat nodeMonitor 
 
 
 {---------------------------------------------------------------------------------------------------------------------
@@ -285,7 +291,7 @@ power es = Power
     p v i = es ^. v * es ^. i
 
 timestamp :: Time.UTCTime -> EnergyState -> Timestamp
-timestamp t es = (t', Time.diffUTCTime t' t)
+timestamp t es = (Just t', Time.diffUTCTime t' t)
   where
     t' = utcTimeNow es 
 

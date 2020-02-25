@@ -90,9 +90,9 @@ spec = do
         expectedNM = (NodeMetrics lastConn expectedP expectedE expectedS) 
           where
             lastConn = (Just $ posixSecondsToUTCTime (initTime + (fromIntegral $ len - 1)))
-        a = nodeS tUTC msgStream
+        a = nodeS msgStream
       pExp <- S.all (\a'-> a' == expectedP) (powerS msgStream)
-      eExp <- S.last $ (energyS tUTC) msgStream
+      eExp <- S.last $ energyS msgStream
       nmExp <- S.last $ a
       lenExp <- S.length a
       pExp  `shouldBe` True

@@ -26,13 +26,12 @@ run :: RIO App ()
 run = do
   k@Kibbutz{..} <- liftIO $ getKibbutz thingTypeName
   uiChan <- liftIO $ mkUIChan
-  initTime <- liftIO $ Time.getCurrentTime
   kmState <- liftIO $ atomically $ initKMS nodes
   kConnM <- liftIO $ atomically $ initKMConn nodes
   _ <- liftIO $ forkIO $ forever $ refreshTick 100 uiChan
   _ <- liftIO $ forkIO $ forever $ runMqtt defMQOpts outQueue nodes (mkCallback k)
   _ <- liftIO $ forkIO $ forever $ do
-      S.mapM_ (\stateMap -> liftIO . atomically $ updateKMAll kmState stateMap) $ gridS initTime nodes (subStream inQueue)
+      S.mapM_ (\stateMap -> liftIO . atomically $ updateKMAll kmState stateMap) $ gridS nodes (subStream inQueue)
       threadDelay 10000000
   liftIO $ runTUI k kmState kConnM uiChan
   where
