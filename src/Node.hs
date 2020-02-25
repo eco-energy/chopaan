@@ -18,6 +18,7 @@ module Node (
   , EnergyState, NodeId(..), NodeS, NodeMetrics(..), Energy(..), Power(..), WattSeconds, Watts
   -- default builders
   , zeroMsg, defNodeS
+  , nmFilter
   ) where
 
 import qualified Data.Time as Time
@@ -41,9 +42,9 @@ import Data.ProtoLens (defMessage)
 import Data.ProtoLens.TextFormat
 
 import Data.Hashable
-import Subscriber
 import qualified Data.Map.Strict as Map
 import Data.Function ((&))
+import Data.Maybe (isNothing, isJust)
 
 
 import ConCat.Free.Affine (Affine(..))
@@ -159,6 +160,9 @@ instance (Show e, Show p) => Show (NodeMetrics e p) where
 
 defNodeS :: NodeS
 defNodeS = NodeMetrics Nothing mempty mempty zeroMsg
+
+nmFilter :: (NodeId a) -> NodeS -> Bool
+nmFilter _ = isJust . _time 
 
 type NodeS = NodeMetrics WattSeconds Watts
 

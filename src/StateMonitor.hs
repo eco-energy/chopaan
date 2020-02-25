@@ -34,8 +34,8 @@ updateKM :: (Eq k, Hashable k) => KibbutzMonitor k v -> k -> v ->  STM ()
 updateKM m n v = do
   SMap.insert v n (runKM m)
 
-updateKMAll :: (Eq k, Hashable k) => KibbutzMonitor k v -> Map.Map k v -> STM ()
-updateKMAll km kv = mapM_ (uncurry $ updateKM km) $ Map.toList kv
+updateKMAll :: (Eq k, Hashable k) => KibbutzMonitor k v -> Map.Map k v -> ((k, v) -> Bool) -> STM ()
+updateKMAll km kv f = mapM_ (uncurry $ updateKM km) $ filter f $ Map.toList kv
 
 readKM :: (Eq k, Hashable k, Eq v) => KibbutzMonitor k v -> [k] -> STM [(k, v)]
 readKM (KM km) ns = do

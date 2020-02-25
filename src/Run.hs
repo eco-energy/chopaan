@@ -11,7 +11,7 @@ import Registry (
   , initKMS, initKMConn, subStream
   )
 
-import Node (gridS)
+import Node (gridS, nmFilter)
 import Import
 import Control.Concurrent (forkIO)
 
@@ -31,7 +31,9 @@ run = do
   _ <- liftIO $ forkIO $ forever $ refreshTick 100 uiChan
   _ <- liftIO $ forkIO $ forever $ runMqtt defMQOpts outQueue nodes (mkCallback k)
   _ <- liftIO $ forkIO $ forever $ do
-      S.mapM_ (\stateMap -> liftIO . atomically $ updateKMAll kmState stateMap) $ gridS nodes (subStream inQueue)
+      S.mapM_ (\stateMap -> liftIO . atomically $
+                            updateKMAll kmState stateMap (uncurry nmFilter)) $
+        gridS nodes (subStream inQueue)
       threadDelay 10000000
   liftIO $ runTUI k kmState kConnM uiChan
   where
