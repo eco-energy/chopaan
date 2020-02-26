@@ -3,8 +3,8 @@
 {-# LANGUAGE RecordWildCards #-}
 module Transactor where
 
-import Registry (NodeT)
-import Node (NodeS)
+import Registry (PubQueue)
+import Node (NodeId(..))
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
@@ -44,16 +44,16 @@ decode = undefined
 ----------------------------------------------------------------------------------
 -- Energy Transactor
 
-data Transaction = Transaction
+data Transaction' a = Transaction'
   { start :: Time.UTCTime,
     duration   :: Time.DiffTime,
-    nodes :: [(NodeT, VI Double)]
+    nodes :: [(NodeId a, VI Double)]
   } deriving (Eq, Ord, Show)
 
 
 
-mkTxn :: Time.UTCTime -> Time.DiffTime -> [(NodeT, VI Double)] -> Transaction
-mkTxn start duration ps  = Transaction start duration ps
+mkTxn' :: Time.UTCTime -> Time.DiffTime -> [(NodeId a, VI Double)] -> Transaction'
+mkTxn' start duration ps  = Transaction' start duration ps
 
 {--
 zeroTxn :: Time.UTCTime -> Transaction
@@ -101,3 +101,60 @@ mkRequest p t d = do
   return etr
 
 --}
+
+newtype Transaction a = Transaction { stakes :: [(NodeId a, Double)] } deriving (Eq, Ord, Show, Generic)
+
+data TransactorS a = TransactorS
+  { nodes_t :: [NodeId a]
+  , transactions :: [Transaction a]
+  , txForms :: [Stake a]
+  } deriving (Generic)
+
+
+data Stake a = Stake
+  { _stakingNode :: NodeId a
+  , _participating :: Bool
+  , _power :: Double
+  , _duration :: Int
+  } deriving (Eq, Ord, Show)
+
+
+energyStake :: Stake a -> Double
+energyStake Stake {..} = _power * (fromIntegral _duration)
+
+validateStakeListForTx :: [Stake a] -> Bool
+validateStakeListForTx ss = energyBalance == 0 && powerBalance == 0
+  where
+    energyBalance = sum $ map energyStake ss
+    powerBalance = sum $ map _power ss
+
+toTransaction :: [Stake a] -> Transaction a
+toTransaction ss = Transaction $ map (\s-> (_stakingNode s, energyStake s)) ss
+
+prepTx :: [Stake a] -> Time.NominalDiffTime -> IO ([(NodeId a, NM.EnergyTransactionRequest)], Transaction a)
+prepTx sf leadTime = do
+  txId <- (Text.pack . show) <$> getULID
+  startTime <- Time.addUTCTime leadTime <$> Time.getCurrentTime
+  let
+    txReqs = map (\(n, et) -> (n, et txId startTime)) etrs
+    tx = toTransaction stakes
+  return (txReqs, tx)
+  where
+    etrs = map toETR stakes
+    stakes = filter (_participating) sf
+    toETR :: Stake -> (NodeId, (Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest))
+    toETR Stake {..} = (_stakingNode, msg)
+      where
+        msg = mkETR (abs _power) _duration dir
+        dir = if (_power > 0) then NM.Outgoing else NM.Incoming
+
+executeTransaction :: TransactorS a -> PubQueue -> IO (TransactorS a)
+executeTransaction t@TransactorS{..} outQueue = if validateStakeListForTx txForms then exec else return t
+  where
+    exec = do
+      (reqs, tx) <- prepTx txForms (60 * 2 :: Time.NominalDiffTime)
+      _ <- (mapM (uncurry $ writeToPubQ outQueue) reqs)
+      return $ mkTransactor nodes_t $ tx:transactions
+
+initStake :: NodeId a -> Stake a
+initStake n = Stake n False 0 0

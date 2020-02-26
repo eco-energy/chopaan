@@ -52,11 +52,10 @@ import Node (NodeId(..), NodeS)
 import Registry ( Kibbutz(..)
                 , KibbutzEvents(..)
                 , writeToPubQ
-                , KMSensor
                 , NodeT
                 , KMState
                 , KConnM
-                , initKMS)
+                )
 
 import qualified Data.Vector as Vec
 
@@ -70,10 +69,12 @@ import qualified Proto.NodeMessages as NM
 import qualified Data.Time.Clock as Time
 import Data.ULID
 
-import Transactor (mkETR)
+import Transactor
 import Control.Concurrent.STM
 import Control.Concurrent (threadDelay)
-import StateMonitor (KibbutzMonitor, readKM)
+import StateMonitor (readKM)
+
+
 
 
 data KibbutzUI = HHListUI | MonitorUI | TxListUI | TxFormUI TXFormField deriving (Eq, Ord, Show)
