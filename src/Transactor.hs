@@ -1,9 +1,13 @@
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Transactor where
 
-import Registry (PubQueue)
+import Registry (writeToPubQ, PubQueue, Message, NodeT, KibbutzEvents)
 import Node (NodeId(..))
 import qualified Data.Time as Time
 import qualified Data.Text as Text
@@ -13,57 +17,57 @@ import Proto.NodeMessages as NM
 import Proto.NodeMessages_Fields as NM
 
 import Lens.Micro
+import Lens.Micro.TH (makeLenses)
+
 
 import Data.ProtoLens
 import Data.Convertible
-import Data.Convertible.Instances
+import Data.Convertible.Instances ()
 import Data.ULID
 
-import GHC.Generics (S, Generic)
-
---------------------------------------------------------------------------------
-
-runTransactor = undefined
+import GHC.Generics (Generic)
 
 
-newtype VI a = VI { unVI :: (a, a)} deriving (Eq, Ord, Show, Generic, Functor)
-
-mkVI = VI
-
-
-
-transaction = decode . attend . encode
-encode :: f g a -> k b
-encode = undefined
-attend :: k b -> k c
-attend = undefined
-decode :: k c -> f g b
-decode = undefined
+-- Brick
+import qualified Brick.Forms as F
+import qualified Brick.Types as T
+import qualified Brick.Widgets.List as L
+import Brick.Widgets.Core (strWrap, fill, padBottom, (<+>), vLimit, hLimit)
 
 
-----------------------------------------------------------------------------------
--- Energy Transactor
+import qualified Data.Vector as Vec
+import UI.Types (TXFormField(..), KibbutzUI(..))
 
-data Transaction' a = Transaction'
-  { start :: Time.UTCTime,
-    duration   :: Time.DiffTime,
-    nodes :: [(NodeId a, VI Double)]
+
+
+
+
+type R = Double
+
+class (Monad m, Show a) => Transactable m a where
+  price :: a -> R
+  execute :: a -> m a
+  serialize :: (Message b) => a -> b
+
+
+data Tx = Tx
+  { voltage :: R
+  , current :: R
+  , resistance :: R
+  , distance :: R
+  , dt :: Time.NominalDiffTime
   } deriving (Eq, Ord, Show)
 
-
-
-mkTxn' :: Time.UTCTime -> Time.DiffTime -> [(NodeId a, VI Double)] -> Transaction'
-mkTxn' start duration ps  = Transaction' start duration ps
-
-{--
-zeroTxn :: Time.UTCTime -> Transaction
-zeroTxn t0 = Transaction t0 t1 vs
+energyT :: (RealFloat a) => Tx -> R
+energyT Tx{..} = effEnergy
   where
-    t1 = (mod minutes (+5) t0)
-    vs = map (mkVI . (\a -> (a*0, a*0))) [0..10]
---}
+    pAtV = (voltage**2 / resistance)
+    iAtP = pAtV / voltage
+    lossAtPI = (iAtP**2 * resistance)
+    effPower = pAtV - lossAtPI
+    effEnergy = effPower * (fromIntegral $ round dt)
 
-mkETR :: Double -> Int -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
+mkETR :: R -> Int -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
 mkETR power howLong dir uid stime = defMessage
          & uuid .~ uid
          & NM.start .~ (utcToWord64 stime)
@@ -81,80 +85,108 @@ mkETR power howLong dir uid stime = defMessage
          c'' :: Int -> Word64
          c'' = convert
 
-{--
-transactionRequests :: Transaction -> Time.NominalDiffTime -> IO [NM.EnergyTransactionRequest]
-transactionRequests Transaction{..} leadTime = do
-  transactionId <- getULID
-  now <- Time.getCurrentTime
-  let
-    startTime = now + leadTime
-  return $ map (\(n, vi)-> mkETR (fst vi * snd vi) duration ) nodes
+newtype Transaction = Transaction
+  { stakes :: [(NodeT, R, NM.EnergyTransactionRequest)]
+  } deriving (Eq, Ord, Show, Generic)
 
-
-
-mkRequest :: Double -> Time.DiffTime -> NM.PDirection -> IO NM.EnergyTransactionRequest
-mkRequest p t d = do
-  ulid <- getULID
-  time <- Time.getCurrentTime
-  let
-    e = mkEtr p time ((Text.pack . show) ulid)
-  return etr
-
---}
-
-newtype Transaction a = Transaction { stakes :: [(NodeId a, Double)] } deriving (Eq, Ord, Show, Generic)
-
-data TransactorS a = TransactorS
-  { nodes_t :: [NodeId a]
-  , transactions :: [Transaction a]
-  , txForms :: [Stake a]
-  } deriving (Generic)
-
-
-data Stake a = Stake
-  { _stakingNode :: NodeId a
+data Stake = Stake
+  { _stakingNode :: NodeT
   , _participating :: Bool
-  , _power :: Double
+  , _power :: R
   , _duration :: Int
   } deriving (Eq, Ord, Show)
 
 
-energyStake :: Stake a -> Double
-energyStake Stake {..} = _power * (fromIntegral _duration)
+makeLenses ''Stake
 
-validateStakeListForTx :: [Stake a] -> Bool
+initStake :: NodeT -> Stake
+initStake n = Stake n False 0 0
+
+stakeEnergy :: Stake -> R
+stakeEnergy Stake {..} = _power * (fromIntegral _duration)
+
+validateStakeListForTx :: [Stake] -> Bool
 validateStakeListForTx ss = energyBalance == 0 && powerBalance == 0
   where
-    energyBalance = sum $ map energyStake ss
+    energyBalance = sum $ map stakeEnergy ss
     powerBalance = sum $ map _power ss
 
-toTransaction :: [Stake a] -> Transaction a
-toTransaction ss = Transaction $ map (\s-> (_stakingNode s, energyStake s)) ss
+toTransaction :: [Stake] -> [NM.EnergyTransactionRequest] -> Transaction
+toTransaction ss es = Transaction $ map (\(s, e) -> (_stakingNode s, stakeEnergy s, e)) $ zip ss es
 
-prepTx :: [Stake a] -> Time.NominalDiffTime -> IO ([(NodeId a, NM.EnergyTransactionRequest)], Transaction a)
-prepTx sf leadTime = do
-  txId <- (Text.pack . show) <$> getULID
-  startTime <- Time.addUTCTime leadTime <$> Time.getCurrentTime
-  let
-    txReqs = map (\(n, et) -> (n, et txId startTime)) etrs
-    tx = toTransaction stakes
-  return (txReqs, tx)
+toETR :: Stake -> (NodeT, (Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest))
+toETR Stake {..} = (_stakingNode, msg)
   where
-    etrs = map toETR stakes
-    stakes = filter (_participating) sf
-    toETR :: Stake -> (NodeId, (Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest))
-    toETR Stake {..} = (_stakingNode, msg)
-      where
-        msg = mkETR (abs _power) _duration dir
-        dir = if (_power > 0) then NM.Outgoing else NM.Incoming
+    msg = mkETR (abs _power) _duration dir
+    dir = if (_power > 0) then NM.Outgoing else NM.Incoming
 
-executeTransaction :: TransactorS a -> PubQueue -> IO (TransactorS a)
-executeTransaction t@TransactorS{..} outQueue = if validateStakeListForTx txForms then exec else return t
+prepTx :: [Stake] -> ULID -> Time.UTCTime -> Time.NominalDiffTime -> ([(NodeT, NM.EnergyTransactionRequest)], Transaction)
+prepTx sf ulid tNow leadTime = (txReqs, tx)
+  where
+  txId = (Text.pack . show) ulid
+  startTime = Time.addUTCTime leadTime tNow
+  txReqs = map (\(n, et) -> (n, et txId startTime)) etrs
+  tx = toTransaction stakes (map snd txReqs)
+  etrs = map toETR stakes
+  stakes = filter (_participating) sf
+  
+
+data TransactorS = TransactorS
+  { nodes_t :: [NodeT]
+  , transactions :: [Transaction]
+  , txForms :: StakeList
+  } deriving (Generic)
+
+executeTransaction :: TransactorS -> PubQueue -> IO (TransactorS)
+executeTransaction t@TransactorS{..} outQueue = if validateStakeListForTx (unStakeList txForms) then exec else return t
   where
     exec = do
-      (reqs, tx) <- prepTx txForms (60 * 2 :: Time.NominalDiffTime)
+      ulid <- getULID
+      startTime <- Time.getCurrentTime
+      let
+        (reqs, tx) = prepTx stakes ulid startTime (60 * 2 :: Time.NominalDiffTime)
       _ <- (mapM (uncurry $ writeToPubQ outQueue) reqs)
       return $ mkTransactor nodes_t $ tx:transactions
+      where
+        stakes = unStakeList txForms
+        
+mkTransactor :: [NodeT] -> [Transaction] -> TransactorS
+mkTransactor ns txs = TransactorS ns txs fs
+  where
+    fs = stakeList $ mkTForms ns $ map initStake ns
 
-initStake :: NodeId a -> Stake a
-initStake n = Stake n False 0 0
+
+type StakeForm = F.Form Stake KibbutzEvents KibbutzUI
+
+type StakeList = L.List KibbutzUI StakeForm
+
+
+stakeList :: [StakeForm] -> StakeList
+stakeList xs = L.list TxListUI (Vec.fromList xs) 1 
+
+unStakeList :: StakeList -> [Stake]
+unStakeList s =  F.formState <$> (Vec.toList . L.listElements $ s)
+
+initStakeList :: StakeList
+initStakeList = stakeList []
+
+addStake :: StakeList -> StakeForm -> StakeList
+addStake xs x = L.listInsert 0 x xs
+
+
+stakeForm :: Int -> NodeT -> Stake -> StakeForm
+stakeForm i n =
+    let
+      selQ = "Household?"
+      hname = (unNodeId n)
+      label s w = padBottom (T.Pad 1) $ (vLimit 2 $ hLimit 25 $ strWrap s <+> fill ' ') <+> w
+    in F.newForm [ label selQ F.@@= F.checkboxField participating (TxFormUI (ParticipatingField i)) hname   
+                 , label "Power" F.@@= F.editShowableField power (TxFormUI (PowerField i))
+                 , label "Duration" F.@@= F.editShowableField duration (TxFormUI (DurationField i))
+                 ]
+
+mkTForms :: [NodeT] -> [Stake] -> [StakeForm]
+mkTForms ns stakes = map (uncurry3 stakeForm) $ zip3 ids ns stakes
+  where
+    uncurry3 f (a, b, c) = f a b c
+    ids = [1,2..]
