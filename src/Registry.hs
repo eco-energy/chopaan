@@ -16,7 +16,7 @@ module Registry (NodeT, HasTopics(..), ThingName
                 , PubQueue, writeToPubQ
                 , NodeQueue(..), initNodeQueue, writeToNodeQueue
                 , KConnM, KMState, KMSensor, initKMS, initKMConn
-                , SensorSM, SensorSub, duplicateS
+                , SensorSM, SensorSub, duplicateS, Message(..)
                 ) where
 
 
@@ -49,7 +49,7 @@ import qualified Data.Time as Time
 
 -- Protobuf
 import Data.ProtoLens.Encoding (decodeMessage)
-import Data.ProtoLens (Message)
+import Data.ProtoLens (Message(..))
 
 
 import StateMonitor
