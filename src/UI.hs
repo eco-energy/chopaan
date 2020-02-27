@@ -10,73 +10,37 @@
 
 module UI (runTUI, mkUIChan, refreshTick, prepTx, Stake(..)) where
 
-import Lens.Micro (Lens', (^.))
-import Data.Maybe (fromJust, maybeToList, fromMaybe)
-import UI.Types
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as Text
+import qualified Data.Vector as Vec
+import qualified Data.Time.Clock as Time
 
 import qualified Graphics.Vty as V
-
-import qualified Data.Text as Text
-import qualified Data.Set as Set
-
 import qualified Brick.Main as M
 import qualified Brick.AttrMap as A
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Types as T
 import qualified Brick.Widgets.List as L
 import Brick.Types (Padding(..), Widget )
-import Brick.Widgets.Core (strWrap, padTop, fill, padBottom, str, (<+>), (<=>), vLimit, hLimit, vBox, withAttr)
-
--- color layering fns
-import Brick.Util (on, fg)
-
-import Brick.Widgets.Dialog (dialog, renderDialog, handleDialogEvent)
-
-import Brick.Widgets.ProgressBar (progressBar)
-
-
--- ** UI Combinators
--- | Centering
+import Brick.Widgets.Core (strWrap, padTop, str, (<+>), (<=>), hLimit, withAttr)
 import qualified Brick.Widgets.Center as C
-import Brick.Widgets.Border (borderWithLabel, hBorder, vBorder)
-
--- | List api
 import Brick.BChan
-
 import qualified Brick.Forms as F
-
 import qualified Brick.Focus as Focus
-
 import Graphics.Vty.Input.Events
 
-import Node (NodeId(..), NodeS)
-
-import Registry ( Kibbutz(..)
-                , KibbutzEvents(..)
-                , writeToPubQ
-                , NodeT
-                , KMState
-                , KConnM
-                )
-
-import qualified Data.Vector as Vec
-
-import GHC.Generics (Generic)
 
 import Control.Monad.Reader
-
-
-import qualified Proto.NodeMessages as NM
-
-import qualified Data.Time.Clock as Time
-import Data.ULID
-
-import Transactor
 import Control.Concurrent.STM
 import Control.Concurrent (threadDelay)
-import StateMonitor (readKM)
-import UI.Types
+import GHC.Generics (Generic)
 
+
+import Node (NodeId(..), NodeS)
+import Transactor
+import Registry (Kibbutz(..), KibbutzEvents(..), NodeT, KMState, KConnM)
+import UI.Types
+import StateMonitor (readKM)
 
 
 
@@ -87,9 +51,7 @@ drawTForms :: StakeList -> Bool -> Widget KibbutzUI
 drawTForms fs focus = C.hCenter help <=> (L.renderList form focus fs)  -- (form (head ns) (mkTForms ns $ (initStake $ head ns))) 
     where
       form :: Bool -> StakeForm -> Widget KibbutzUI
-      form selected f = B.border $ padTop (T.Pad 1) $ hLimit 50 $ F.renderForm f
-      forms (n:nx) (f:fx) = foldl (<+>) (form n f) (map (uncurry form) $ zip nx fx)
-      forms [] [] = str "No Nodes Found!"
+      form _ f = B.border $ padTop (T.Pad 1) $ hLimit 50 $ F.renderForm f
       help = padTop (Pad 1) $ B.borderWithLabel (str "Help") body
       body = strWrap $ "- Power is Watts in float. Positive for Outgoing, Negative for Incoming \n" <>
                        "- Duration is in Seconds  \n" <>
@@ -101,7 +63,6 @@ drawTransactor focus TransactorS {..} = B.borderWithLabel (withAttr titleAttr $ 
   where
     drawTransactions = strWrap $ show transactions
     drawTransactionForm = drawTForms txForms focus
-
 
 
 titleAttr :: A.AttrName
@@ -119,13 +80,6 @@ drawMonitor _ _ nms _ =
     drawNodeMetric (n, nm) =
       B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
           strWrap (show nm)
-          -- <=>
-          --strWrap ("connection count: " <> (show count))
-    --merge :: [(a, b)] -> [(a, c)] -> [(a, b, c)]
-    --merge ss ii = map (uncurry a') (zip ss ii) 
-      --where
-        --a' (n, ns) (n', ni) = (n, ns, ni)
-        -- (drawSensor _sensors) <=> (drawPower _powerS) <=> (drawEnergy _energyS)
 
 
 
@@ -176,7 +130,7 @@ runTUI kbtz kmState kConnS uiChan = do
   let buildVty = V.mkVty V.defaultConfig
   initialVty <- buildVty
   initialState <- buildInitialState kbtz kmState kConnS
-  endState <- M.customMain initialVty buildVty (Just uiChan) kibbutzApp initialState
+  _ <- M.customMain initialVty buildVty (Just uiChan) kibbutzApp initialState
   return ()
 
 type CurNodes = [(NodeT, NodeS)]
