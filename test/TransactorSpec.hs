@@ -14,7 +14,6 @@ import Data.ULID (getULID)
 import Registry (NodeT)
 import Node (NodeId(..))
 import Lens.Micro
-import Proto.NodeMessages as NM
 import Proto.NodeMessages_Fields as NM
 
 
