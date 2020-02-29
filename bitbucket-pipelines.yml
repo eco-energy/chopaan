@@ -8,6 +8,7 @@ image: haskell:8.6.5
 pipelines:
   default:
     - step:
+        size: 2x
         script: # Modify the commands below to build your repository.
           - git submodule update --init --recursive
           - stack test
