@@ -62,7 +62,7 @@ dependencies:
 - cursor
 - reflection
 - microlens
-- streamly
+- streamly >= 0.7.0 && < 0.7.1
 - mtl
 - vector
 - microlens-th
