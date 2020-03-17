@@ -5,7 +5,9 @@ COPY . /opt/build
 
 VOLUME /tmp/stackroot
 
-RUN cd /opt/build && stack --stack-root=/tmp/stackroot build --system-ghc
+RUN mkdir /opt/build/binaries
+
+RUN cd /opt/build && stack --stack-root=/tmp/stackroot build --system-ghc --copy-bins --local-bin-path=/opt/build/binaries
 
 FROM fpco/pid1
 RUN mkdir -p /opt/app
@@ -17,6 +19,6 @@ RUN apt-get update && apt-get install -y ca-certificates libgmp-dev
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-COPY --from=build /opt/build/.stack-work/install/x86_64-linux/lts-14.17/8.6.5/bin .
+COPY --from=build /opt/build/binaries .
 
-CMD ["/opt/app/chopaan"]
+CMD ["/opt/app/chopaan-exe"]
