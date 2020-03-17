@@ -118,6 +118,6 @@ runMqtt MQTTOpts{..} outQueue ts msgCB = do
         pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >>
           MQ.publish c (topic nId) (encode mf) False
         topic :: NodeT -> MQ.Topic
-        topic = stateTopic --controlTopic
+        topic = controlTopic
         encode :: b -> BL.ByteString
         encode = BL.fromStrict . encodeMessage
