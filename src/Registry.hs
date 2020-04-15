@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
@@ -38,6 +40,9 @@ import qualified Network.MQTT.Topic as MQ
 import qualified Network.MQTT.Client as MQ
 import Node
 import Proto.NodeMessages
+import qualified Proto.NodeMessages_Fields as NM
+import Data.ProtoLens.Labels()
+
 
 -- STM
 import Control.Concurrent.STM
@@ -50,7 +55,7 @@ import qualified Data.Time as Time
 -- Protobuf
 import Data.ProtoLens.Encoding (decodeMessage)
 import Data.ProtoLens (Message(..))
-
+import Data.ProtoLens.Combinators
 
 import StateMonitor
 import Subscriber (Subscriber, StreamMap)
@@ -64,7 +69,7 @@ mkNode = NodeId
 
 newtype NodeQueue a b = NodeQueue { runNodeQueue :: ((HasTopics a, Message b) => TBQueue (a, b)) }
 
-type PubQueue = NodeQueue NodeT EnergyTransactionRequest
+type PubQueue = NodeQueue NodeT MeshFrame
 
 type SubQueue = NodeQueue NodeT EnergyState
 
@@ -79,7 +84,10 @@ writeToNodeQueue q n m = do
 
 writeToPubQ :: PubQueue -> NodeT -> EnergyTransactionRequest -> IO ()
 writeToPubQ p n et = do
-  atomically $ writeTBQueue (runNodeQueue p) (n, et)
+  atomically $ writeTBQueue (runNodeQueue p) (n, toMeshFrame et)
+
+toMeshFrame :: EnergyTransactionRequest -> MeshFrame
+toMeshFrame etr = defMessage & #transaction .~ etr
 
 type SensorSub = Subscriber NodeT EnergyState
 
