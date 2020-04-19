@@ -20,7 +20,7 @@ import qualified Streamly.Prelude as S
 
 import qualified Data.Time as Time
 import StateMonitor (updateKMAll)
-
+import Prelude (print)
 
 run :: RIO App ()
 run = do
@@ -30,11 +30,11 @@ run = do
   kConnM <- liftIO $ atomically $ initKMConn nodes
   _ <- liftIO $ forkIO $ forever $ refreshTick 100 uiChan
   _ <- liftIO $ forkIO $ forever $ runMqtt defMQOpts outQueue nodes (mkCallback k)
-  _ <- liftIO $ forkIO $ forever $ do
-      S.mapM_ (\stateMap -> liftIO . atomically $
-                            updateKMAll kmState stateMap (uncurry nmFilter)) $
+  _ <- liftIO $ forkIO $ do
+      S.mapM_ (\stateMap -> liftIO . atomically $ updateKMAll kmState stateMap (uncurry nmFilter)) $
+        S.trace (print) $
         gridS nodes (subStream inQueue)
-      threadDelay 10000000
+      --threadDelay 10000000
   liftIO $ runTUI k kmState kConnM uiChan
   where
     thingTypeName = "kibbutz-pilot-node"

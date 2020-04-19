@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveAnyClass #-}
@@ -35,8 +36,11 @@ import Streamly
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
-import qualified Streamly.Internal.Data.Pipe as P
-
+import qualified Streamly.FileSystem.Handle as FH
+import qualified Streamly.Csv as Csv
+--import qualified Streamly.Internal.FileSystem.File as FH
+import qualified Streamly.External.ByteString as SBS
+import qualified Streamly.Memory.Array as A
 
 import Data.ProtoLens (defMessage)
 import Data.ProtoLens.TextFormat
@@ -44,15 +48,14 @@ import Data.ProtoLens.TextFormat
 import Data.Hashable
 import qualified Data.Map.Strict as Map
 import Data.Function ((&))
-import Data.Maybe (isNothing, isJust)
+import Data.Maybe (isJust)
 
-
-import ConCat.Free.Affine (Affine(..))
-import qualified ConCat.Free.Affine as Aff
-import qualified ConCat.GradientDescent as GD
-import qualified ConCat.Scan as Scan
-import qualified ConCat.Free.LinearRow as LR
-import qualified ConCat.Free.VectorSpace as VS
+import Data.Csv
+import Data.Vector (fromList)
+import qualified Data.ByteString as BS
+import Data.ByteString.Char8 (pack)
+import Data.Word
+import System.IO
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
@@ -67,6 +70,7 @@ newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Generic)
 instance (Hashable a) => Hashable (NodeId a) where
   hashWithSalt n (NodeId a) = hashWithSalt n a
 
+
 -- Episodic Metrics
 
 data Energy a = Energy
@@ -76,6 +80,7 @@ data Energy a = Energy
   , generated :: !a
   } deriving (Eq, Show, Ord, Generic, Functor)
 
+instance (ToField a) => ToRecord (Energy a)
 
 instance Applicative Energy where
   pure v = Energy
@@ -109,25 +114,28 @@ instance (Num a) => Monoid (Energy a) where
   mempty = initEA
 
 data Power a = Power
-  { gen :: !a
-  , tIn :: !a
-  , tOut :: !a
-  , load :: !a }
+  { genP :: !a
+  , tInP :: !a
+  , tOutP :: !a
+  , loadP :: !a }
   deriving (Eq, Ord, Show, Generic, Functor)
 
+instance (ToField a) => ToRecord (Power a)
+
+instance DefaultOrdered (Power a)
 
 instance Applicative Power where
   pure v = Power
-    { tIn = v
-    , tOut = v
-    , load = v
-    , gen = v
+    { tInP = v
+    , tOutP = v
+    , loadP = v
+    , genP = v
     }
   f <*> v = Power
-              { tIn = tIn f $ tIn v
-              , tOut = tOut f $ tOut v
-              , load = load f $ load v
-              , gen = gen f $ gen v
+              { tInP = tInP f $ tInP v
+              , tOutP = tOutP f $ tOutP v
+              , loadP = loadP f $ loadP v
+              , genP = genP f $ genP v
               }
 
 instance (Num a) => Semigroup (Power a) where
@@ -146,7 +154,29 @@ data NodeMetrics e p = NodeMetrics
   , _energyT :: !(Energy e)
   , _sensorsT :: !EnergyState
   } deriving (Eq, Ord, Generic)
-  
+
+--deriving instance Generic EnergyState
+instance ToRecord EnergyState where
+  toRecord es = fromList $
+                map (toField) $
+                es ^.. ( batteryVoltage
+                         <> gridVoltage
+                         <> batteryToLoadCurrent
+                         <> batteryToGridCurrent
+                         <> gridToBatteryCurrent
+                         <> solarInputCurrent
+                         <> dutyCycle
+                       )
+
+
+instance ToField Time.UTCTime where
+  toField t = pack (show t)
+
+instance (ToField e, ToField p) => ToRecord (NodeMetrics e p) where
+  toRecord (NodeMetrics {..}) = foldl (<>) (fromList [toField _time]) [toRecord _powerT,
+                                                                       toRecord _energyT,
+                                                                       toRecord _sensorsT
+                                                                      ]
 
 instance (Show e, Show p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
@@ -165,6 +195,8 @@ nmFilter :: (NodeId a) -> NodeS -> Bool
 nmFilter _ = isJust . _time 
 
 type NodeS = NodeMetrics WattSeconds Watts
+
+instance DefaultOrdered (NodeMetrics p e)
 
 type Timestamp = (Maybe Time.UTCTime, Time.NominalDiffTime)
 
@@ -213,10 +245,10 @@ energyFold = (FL.Fold step begin end)
     end :: (Energy WattSeconds, Maybe Time.UTCTime) -> m (Energy WattSeconds)
     end = pure . fst
     eAtT :: Power Watts -> Timestamp -> (Energy WattSeconds)
-    eAtT p (_, t) = Energy { txIn = (pToE t tIn)
-                           , txOut = (pToE t tOut)
-                           , consumed = (pToE t load)
-                           , generated = (pToE t gen)}
+    eAtT p (_, t) = Energy { txIn = (pToE t tInP)
+                           , txOut = (pToE t tOutP)
+                           , consumed = (pToE t loadP)
+                           , generated = (pToE t genP)}
       where
         Power{..} = p
     pToE t p' = p' * (realToFrac t)
@@ -274,6 +306,25 @@ gridS ns ss = S.postscan gridMap ss
         nodeMap = Map.fromList $ zip ns $ repeat nodeMonitor 
 
 
+newtype TaggedNode n = TaggedNode (n, NodeS) deriving (Generic)
+
+instance (ToField n) => ToRecord (TaggedNode n) where
+  toRecord (TaggedNode (n, ns)) = (fromList [toField n]) <> toRecord ns
+
+--instance DefaultOrdered (TaggedNode n) where
+
+--TODO: Generalize This
+writeCSVRecords :: forall t m n a. (ToField n, Ord n, MonadAsync m, IsStream t)
+  => Handle
+  -> t m (Map.Map n (NodeS))
+  ->  FL.Fold m (A.Array Word8) ()
+writeCSVRecords fp gs = FH.writeChunks fp
+  where
+    as = S.map ((S.map SBS.toArray) . Csv.encodeDefault . atT) gs
+    atT :: Map.Map n (NodeS) -> t m (TaggedNode n)
+    atT nmap = S.fromList $ TaggedNode <$> Map.toList nmap
+
+
 {---------------------------------------------------------------------------------------------------------------------
 
                                           Helper Functions
@@ -282,15 +333,15 @@ gridS ns ss = S.postscan gridMap ss
 
 power :: EnergyState -> Power Watts
 power es = Power
-           { tIn = txIn'
-           , tOut = txOut'
-           , load = cnsm'
-           , gen = gen' }
+           { tInP = txIn'
+           , tOutP = txOut'
+           , loadP = cnsm'
+           , genP = genP' }
   where
     txIn' = p batteryVoltage gridToBatteryCurrent
     txOut' = p batteryVoltage batteryToGridCurrent
     cnsm' = p batteryVoltage batteryToLoadCurrent
-    gen' = p batteryVoltage solarInputCurrent
+    genP' = p batteryVoltage solarInputCurrent
     p :: Getting Double EnergyState Double -> Getting Double EnergyState Double -> Watts
     p v i = es ^. v * es ^. i
 
@@ -312,5 +363,7 @@ zeroMsg = defMessage
                & solarInputCurrent .~ 0
                & dutyCycle .~ 0
                & cpuTime .~ 0
+
+
 
 hamiltonianLoss = undefined

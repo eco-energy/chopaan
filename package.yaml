@@ -75,10 +75,10 @@ dependencies:
 - quickcheck-instances
 - kalman
 - hmatrix
-- concat-classes
-- concat-examples
 - estimator
-
+- cassava
+- streamly-cassava
+- streamly-bytestring
 ghc-options:
 - -Wall
 - -Wcompat
