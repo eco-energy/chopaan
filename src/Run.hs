@@ -27,17 +27,15 @@ run = do
   kmState <- liftIO $ atomically $ initKMS nodes
   kConnM <- liftIO $ atomically $ initKMConn nodes
   _ <- liftIO $ forkIO $ forever $ runMqtt defMQOpts outQueue nodes (mkCallback k)
-  _ <- liftIO $ forkIO $ forever $ do
-      S.mapM_ (\stateMap -> liftIO . atomically $ updateKMAll kmState stateMap (uncurry nmFilter)) $
-        S.trace (\_ -> genTick uiChan) $
-        S.trace (writeCSVRecords "test.csv") $
-        gridS nodes (subStream inQueue)
-      threadDelay 10000000
+  _ <- liftIO $ forkIO $ stream nodes inQueue uiChan kmState
   liftIO $ runTUI k kmState kConnM uiChan
   where
     thingTypeName = "kibbutz-pilot-node"
-
-
+    updateKMIO monitor stateMap = liftIO . atomically $ updateKMAll monitor stateMap (uncurry nmFilter)
+    stream nodes inQueue uiChan kmState = gridS nodes (subStream inQueue) &
+                                          S.trace (\_ -> genTick uiChan) &
+                                          S.trace (writeCSVRecords "test.csv") &
+                                          S.mapM_ (updateKMIO kmState)
 {--
 
 import Proto.NodeMessages ()
