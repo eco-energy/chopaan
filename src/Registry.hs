@@ -90,7 +90,6 @@ type SensorSub = Subscriber NodeT EnergyState
 
 type SensorSM = StreamMap NodeT EnergyState
 
-type MetricsSM = StreamMap NodeT NodeS
 
 data Kibbutz = Kibbutz
   { kname :: Text.Text
@@ -123,8 +122,11 @@ subStream :: forall t m. (IsStream t, MonadAsync m) => SubQueue -> t m (NodeT, E
 subStream sq = asyncly $ S.unfoldrM step ()
   where
     step :: () -> m (Maybe ((NodeT, EnergyState), ()))
-    step _ = liftIO $  (fmap (, ())) <$> (atomically . tryReadTBQueue . runNodeQueue $ sq)
-
+    step _ = liftIO $ wrap <$> (atomically . readTBQueue . runNodeQueue $ sq)
+      where
+        wrap :: (NodeT, EnergyState) -> Maybe ((NodeT, EnergyState), ())
+        wrap = Just . (, ())
+          
 mkCallback :: Kibbutz -> MQ.MessageCallback
 mkCallback Kibbutz { inQueue, msgCount }  = MQ.SimpleCallback $ writer
   where
