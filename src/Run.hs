@@ -4,23 +4,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Run (run) where
 
-import UI (runTUI, mkUIChan, refreshTick)
+import UI (runTUI, mkUIChan, genTick)
 import Mqtt (runMqtt, defMQOpts)
 import Registry (
   Kibbutz(..), getKibbutz, mkCallback
   , initKMS, initKMConn, subStream
   )
 
-import Node (gridS, nmFilter)
+import Node (gridS, nmFilter, writeCSVRecords)
 import Import
 import Control.Concurrent (forkIO)
 
-import Streamly
+import Streamly ()
 import qualified Streamly.Prelude as S
 
-import qualified Data.Time as Time
 import StateMonitor (updateKMAll)
-import Prelude (print)
 
 run :: RIO App ()
 run = do
@@ -28,13 +26,13 @@ run = do
   uiChan <- liftIO $ mkUIChan
   kmState <- liftIO $ atomically $ initKMS nodes
   kConnM <- liftIO $ atomically $ initKMConn nodes
-  _ <- liftIO $ forkIO $ forever $ refreshTick 100 uiChan
   _ <- liftIO $ forkIO $ forever $ runMqtt defMQOpts outQueue nodes (mkCallback k)
-  _ <- liftIO $ forkIO $ do
+  _ <- liftIO $ forkIO $ forever $ do
       S.mapM_ (\stateMap -> liftIO . atomically $ updateKMAll kmState stateMap (uncurry nmFilter)) $
-        S.trace (print) $
+        S.trace (\_ -> genTick uiChan) $
+        S.trace (writeCSVRecords "test.csv") $
         gridS nodes (subStream inQueue)
-      --threadDelay 10000000
+      threadDelay 10000000
   liftIO $ runTUI k kmState kConnM uiChan
   where
     thingTypeName = "kibbutz-pilot-node"
