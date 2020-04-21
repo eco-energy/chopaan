@@ -49,13 +49,10 @@ import Control.Concurrent.STM
 import Streamly
 
 import qualified Streamly.Prelude as S
-import qualified Data.Time as Time 
-
 
 -- Protobuf
 import Data.ProtoLens.Encoding (decodeMessage)
 import Data.ProtoLens (Message(..))
-import Data.ProtoLens.Combinators
 
 import StateMonitor
 import Subscriber (Subscriber, StreamMap)
@@ -255,46 +252,6 @@ duplicateS src = do
 
 
 
-duplicateSN
-  :: forall t m a .
-  MonadAsync m
-  => IsStream t
-  => Monad (t m)
-  => Show a
-  => t m a
-  -> Int
-  -> m [t m a]
-duplicateSN src n = do
-  (writeChan', rCs) <- liftIO $ do
-    chan <- TChan.newBroadcastTChanIO
-    (rChans') <- replicateM n (atomically $ TChan.dupTChan chan)
-    pure (chan, rChans')
-  let
-    (r:rChans) = rCs
-    writes :: t m ()
-    writes = (S.mapM (liftIO . atomically . TChan.writeTChan writeChan') $ src)
-    reads :: TChan.TChan a -> t m a
-    reads c = (fmap (fromJust undefined) $ S.filter (not . isNothing) $ S.repeatM (liftIO $ atomically $ TChan.tryReadTChan c))
-    cs :: [t m a]
-    cs = map reads rChans
-    h = (fmap (fromRight undefined) $ S.filter isRight $ (Left <$> writes) `serial` (Right <$> (S.repeatM (liftIO $ atomically $ TChan.readTChan r))))
-  pure $ (h:cs)
-
-
-duplicateSN'
-  :: MonadAsync m
-  => IsStream t
-  => Monad (t m)
-  => t m a
-  -> Int
-  -> m [t m a]
-duplicateSN' src n = fmap tupleToList (replicateM n (duplicateS src))
-  where
-    tupleToList :: [(a, a)] -> [a]
-    tupleToList ((a,b):xs) = a : b : tupleToList xs
-    tupleToList _          = []
-
-
 {-----------------------------------------------------------------------------
 
                  Monitor Tings
@@ -307,8 +264,6 @@ initKMS ns = initKM ns defNodeS
 
 type KMSensor = KibbutzMonitor NodeT EnergyState
 
-initKSensorM :: [NodeT] -> STM (KMSensor)
-initKSensorM ns = initKM ns zeroMsg
 
 type KConnM = KibbutzMonitor NodeT Int
 
