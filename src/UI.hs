@@ -8,7 +8,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module UI (runTUI, mkUIChan, refreshTick, prepTx, Stake(..)) where
+module UI (runTUI, mkUIChan, prepTx, Stake(..), genTick) where
 
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
@@ -120,10 +120,8 @@ kibbutzEvent s@KibbutzState{..} e =
 mkUIChan :: IO (BChan KibbutzEvents)
 mkUIChan = newBChan 1000
 
-refreshTick :: Int -> BChan KibbutzEvents -> IO ()
-refreshTick d chan = do
-  forever $
-    writeBChan chan StateUpdate >> threadDelay d
+genTick :: BChan KibbutzEvents -> IO ()
+genTick c = writeBChan c StateUpdate
 
 runTUI :: Kibbutz -> KMState -> KConnM -> BChan KibbutzEvents -> IO ()
 runTUI kbtz kmState kConnS uiChan = do
