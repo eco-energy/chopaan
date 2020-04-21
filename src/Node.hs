@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -20,6 +21,7 @@ module Node (
   -- default builders
   , zeroMsg, defNodeS
   , nmFilter
+  , writeCSVRecords
   ) where
 
 import qualified Data.Time as Time
@@ -51,11 +53,15 @@ import Data.Function ((&))
 import Data.Maybe (isJust)
 
 import Data.Csv
-import Data.Vector (fromList)
+import qualified Data.Vector as Vec (fromList)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
 import Data.ByteString.Char8 (pack)
 import Data.Word
 import System.IO
+import System.Directory
+import qualified Data.HashMap.Strict as HM
+
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
@@ -71,6 +77,8 @@ instance (Hashable a) => Hashable (NodeId a) where
   hashWithSalt n (NodeId a) = hashWithSalt n a
 
 
+instance ToField (NodeId a)
+
 -- Episodic Metrics
 
 data Energy a = Energy
@@ -80,7 +88,9 @@ data Energy a = Energy
   , generated :: !a
   } deriving (Eq, Show, Ord, Generic, Functor)
 
-instance (ToField a) => ToRecord (Energy a)
+instance (ToField a) => ToNamedRecord (Energy a)
+
+instance DefaultOrdered (Energy a)
 
 instance Applicative Energy where
   pure v = Energy
@@ -120,7 +130,7 @@ data Power a = Power
   , loadP :: !a }
   deriving (Eq, Ord, Show, Generic, Functor)
 
-instance (ToField a) => ToRecord (Power a)
+instance (ToField a) => ToNamedRecord (Power a)
 
 instance DefaultOrdered (Power a)
 
@@ -155,10 +165,12 @@ data NodeMetrics e p = NodeMetrics
   , _sensorsT :: !EnergyState
   } deriving (Eq, Ord, Generic)
 
+
 --deriving instance Generic EnergyState
-instance ToRecord EnergyState where
-  toRecord es = fromList $
-                map (toField) $
+instance ToNamedRecord EnergyState where
+  toNamedRecord es = HM.fromList $
+                zip names $
+                map (pack . show) $
                 es ^.. ( batteryVoltage
                          <> gridVoltage
                          <> batteryToLoadCurrent
@@ -167,16 +179,36 @@ instance ToRecord EnergyState where
                          <> solarInputCurrent
                          <> dutyCycle
                        )
+                where
+                  names = ["batteryV",
+                           "gridV",
+                           "battery2LoadC",
+                           "battery2GridC",
+                           "grid2BatteryC",
+                           "solarC",
+                           "dutyC"]
 
+
+instance DefaultOrdered EnergyState where
+  headerOrder _ = Vec.fromList $ names
+    where
+      names = ["batteryV",
+                "gridV",
+                "battery2LoadC",
+                "battery2GridC",
+                "grid2BatteryC",
+                "solarC",
+                "dutyC"]
 
 instance ToField Time.UTCTime where
   toField t = pack (show t)
 
-instance (ToField e, ToField p) => ToRecord (NodeMetrics e p) where
-  toRecord (NodeMetrics {..}) = foldl (<>) (fromList [toField _time]) [toRecord _powerT,
-                                                                       toRecord _energyT,
-                                                                       toRecord _sensorsT
-                                                                      ]
+instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
+  toNamedRecord (NodeMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
+    [toNamedRecord _powerT,
+      toNamedRecord _energyT,
+      toNamedRecord _sensorsT
+    ]
 
 instance (Show e, Show p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
@@ -263,8 +295,6 @@ nodeMonitor = NodeMetrics <$> ((fst) <$> tn) <*> powerFold <*> en <*> sensors
     sensors :: FL.Fold m (EnergyState) (EnergyState)
     sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
 
-runNodeMonitor :: forall m t. (MonadAsync m, IsStream t) => t m EnergyState -> t m NodeS
-runNodeMonitor = S.scan nodeMonitor
 
 {--------------------------------------------------------------------------------------------------------------
 
@@ -299,7 +329,7 @@ nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m NodeS
 nodeS = S.postscan nodeMonitor
 
 gridS :: forall t m n . (IsStream t, MonadAsync m, Ord n) => [n] -> t m (n, EnergyState) -> t m (Map.Map n (NodeS))
-gridS ns ss = S.postscan gridMap ss
+gridS ns ss = S.postscan gridMap $ ss
   where
     gridMap = FL.demux nodeMap
       where
@@ -308,21 +338,39 @@ gridS ns ss = S.postscan gridMap ss
 
 newtype TaggedNode n = TaggedNode (n, NodeS) deriving (Generic)
 
-instance (ToField n) => ToRecord (TaggedNode n) where
-  toRecord (TaggedNode (n, ns)) = (fromList [toField n]) <> toRecord ns
+instance (ToField n) => ToNamedRecord (TaggedNode n) where
+  toNamedRecord (TaggedNode (n, ns)) = (HM.fromList [("NodeId", toField n)]) <> toNamedRecord ns
 
+instance DefaultOrdered (TaggedNode n) where
+  headerOrder _ = (Vec.fromList $ ["NodeId", "time"])
+                  <> (headerOrder (undefined :: EnergyState))
+                  <> (headerOrder (undefined :: Power Watts))
+                  <> (headerOrder (undefined :: Energy WattSeconds))
 --instance DefaultOrdered (TaggedNode n) where
 
 --TODO: Generalize This
-writeCSVRecords :: forall t m n a. (ToField n, Ord n, MonadAsync m, IsStream t)
-  => Handle
-  -> t m (Map.Map n (NodeS))
-  ->  FL.Fold m (A.Array Word8) ()
-writeCSVRecords fp gs = FH.writeChunks fp
+
+
+writeCSVRecords :: forall n. (ToField n)
+  => FilePath
+  -> Map.Map n (NodeS)
+  ->  IO ()
+writeCSVRecords fp gs = do
+  fE <- doesFileExist fp
+  let
+    opts = if fE then contOpts else initOpts 
+  withFile fp AppendMode $ (\ho ->do
+      (BSL.hPut ho) $ encodeDefaultOrderedByNameWith opts as)
   where
-    as = S.map ((S.map SBS.toArray) . Csv.encodeDefault . atT) gs
-    atT :: Map.Map n (NodeS) -> t m (TaggedNode n)
-    atT nmap = S.fromList $ TaggedNode <$> Map.toList nmap
+    contOpts = defaultEncodeOptions {
+      encUseCrLf = True,
+      encIncludeHeader = False
+    }
+    initOpts = contOpts { encIncludeHeader = True }
+    --checkFileExists = isFile fp
+    as = atT gs
+    atT :: Map.Map n (NodeS) -> [TaggedNode n]
+    atT nmap = TaggedNode <$> Map.toList nmap
 
 
 {---------------------------------------------------------------------------------------------------------------------
@@ -345,13 +393,9 @@ power es = Power
     p :: Getting Double EnergyState Double -> Getting Double EnergyState Double -> Watts
     p v i = es ^. v * es ^. i
 
-timestamp :: Time.UTCTime -> EnergyState -> Timestamp
-timestamp t es = (Just t', Time.diffUTCTime t' t)
-  where
-    t' = utcTimeNow es 
 
 utcTimeNow :: EnergyState -> Time.UTCTime
-utcTimeNow es = posixSecondsToUTCTime $ fromIntegral $ es ^. cpuTime
+utcTimeNow es = posixSecondsToUTCTime $ ((fromIntegral $ (es ^. cpuTime)) / 1000)
 
 zeroMsg :: EnergyState
 zeroMsg = defMessage
@@ -363,7 +407,3 @@ zeroMsg = defMessage
                & solarInputCurrent .~ 0
                & dutyCycle .~ 0
                & cpuTime .~ 0
-
-
-
-hamiltonianLoss = undefined
