@@ -77,7 +77,8 @@ instance (Hashable a) => Hashable (NodeId a) where
   hashWithSalt n (NodeId a) = hashWithSalt n a
 
 
-instance ToField (NodeId a)
+instance (ToField a) => ToField (NodeId a) where
+  toField (NodeId a) = toField a 
 
 -- Episodic Metrics
 
