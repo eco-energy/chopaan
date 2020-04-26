@@ -38,11 +38,8 @@ import Streamly
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
-import qualified Streamly.FileSystem.Handle as FH
 import qualified Streamly.Csv as Csv
---import qualified Streamly.Internal.FileSystem.File as FH
-import qualified Streamly.External.ByteString as SBS
-import qualified Streamly.Memory.Array as A
+
 
 import Data.ProtoLens (defMessage)
 import Data.ProtoLens.TextFormat
@@ -50,18 +47,17 @@ import Data.ProtoLens.TextFormat
 import Data.Hashable
 import qualified Data.Map.Strict as Map
 import Data.Function ((&))
-import Data.Maybe (isJust)
+import Data.Maybe (fromJust, isNothing, isJust)
 
 import Data.Csv
 import qualified Data.Vector as Vec (fromList)
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.ByteString.Char8 (pack)
-import Data.Word
 import System.IO
 import System.Directory
 import qualified Data.HashMap.Strict as HM
 
+import Control.Monad.State.Lazy
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
@@ -91,7 +87,8 @@ data Energy a = Energy
 
 instance (ToField a) => ToNamedRecord (Energy a)
 
-instance DefaultOrdered (Energy a)
+instance DefaultOrdered (Energy a) where
+  headerOrder _ = Vec.fromList ["txIn", "txOut", "consumed", "generated"]
 
 instance Applicative Energy where
   pure v = Energy
@@ -133,7 +130,8 @@ data Power a = Power
 
 instance (ToField a) => ToNamedRecord (Power a)
 
-instance DefaultOrdered (Power a)
+instance DefaultOrdered (Power a) where
+  headerOrder _ = Vec.fromList ["genP", "tInP", "tOutP", "loadP"]
 
 instance Applicative Power where
   pure v = Power
@@ -347,7 +345,6 @@ instance DefaultOrdered (TaggedNode n) where
                   <> (headerOrder (undefined :: EnergyState))
                   <> (headerOrder (undefined :: Power Watts))
                   <> (headerOrder (undefined :: Energy WattSeconds))
---instance DefaultOrdered (TaggedNode n) where
 
 --TODO: Generalize This
 
@@ -355,23 +352,34 @@ instance DefaultOrdered (TaggedNode n) where
 writeCSVRecords :: forall n. (ToField n)
   => FilePath
   -> Map.Map n (NodeS)
-  ->  IO ()
+  ->  StateT Time.UTCTime IO ()
 writeCSVRecords fp gs = do
-  fE <- doesFileExist fp
+  fE <- liftIO $ doesFileExist fp
+  lastWrite <- get
   let
-    opts = if fE then contOpts else initOpts 
-  withFile fp AppendMode $ (\ho ->do
-      (BSL.hPut ho) $ encodeDefaultOrderedByNameWith opts as)
+    opts = if fE then contOpts else initOpts
+    recs = atT gs lastWrite
+    maxWrite = maxWriteT recs
+  liftIO $ withFile fp AppendMode $ (\ho ->do
+      (BSL.hPut ho) $ encodeDefaultOrderedByNameWith opts recs)
+  put $ maxWrite
   where
     contOpts = defaultEncodeOptions {
       encUseCrLf = True,
       encIncludeHeader = False
     }
     initOpts = contOpts { encIncludeHeader = True }
-    --checkFileExists = isFile fp
-    as = atT gs
-    atT :: Map.Map n (NodeS) -> [TaggedNode n]
-    atT nmap = TaggedNode <$> Map.toList nmap
+    maxWriteT :: [TaggedNode n] -> Time.UTCTime
+    maxWriteT ts = maximum tMlist
+      where
+        tMlist :: [Time.UTCTime]
+        tMlist = map fromJust $ filter isNothing $ (\(TaggedNode(_, NodeMetrics {_time})) -> _time) <$> ts
+    atT :: Map.Map n (NodeS) -> Time.UTCTime -> [TaggedNode n]
+    atT nmap lw = TaggedNode <$> (timeFilter lw $ Map.toList nmap)
+    timeFilter lw = (filter (\(_, NodeMetrics {_time}) -> tf _time))
+      where
+        tf Nothing = False
+        tf (Just t) = t > lw
 
 
 {---------------------------------------------------------------------------------------------------------------------

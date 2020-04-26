@@ -19,6 +19,9 @@ import Streamly ()
 import qualified Streamly.Prelude as S
 
 import StateMonitor (updateKMAll)
+import Control.Monad.State.Lazy (runStateT)
+
+import RIO.Time
 
 run :: RIO App ()
 run = do
@@ -33,9 +36,10 @@ run = do
     thingTypeName = "kibbutz-pilot-node"
     updateKMIO monitor stateMap = liftIO . atomically $ updateKMAll monitor stateMap (uncurry nmFilter)
     stream nodes inQueue uiChan kmState = gridS nodes (subStream inQueue) &
-                                          S.trace (\_ -> genTick uiChan) &
-                                          S.trace (writeCSVRecords "test.csv") &
-                                          S.mapM_ (updateKMIO kmState)
+                                          S.trace (writer) &
+                                          S.mapM_ (\x -> (updateKMIO kmState x) >> (genTick uiChan))
+    writer stateMap = runStateT (writeCSVRecords "test.csv" stateMap) (UTCTime (fromGregorian 1 1 2020) 0) 
+
 {--
 
 import Proto.NodeMessages ()
