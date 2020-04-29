@@ -79,6 +79,7 @@ dependencies:
 - cassava
 - streamly-cassava
 - streamly-bytestring
+- compensated
 ghc-options:
 - -Wall
 - -Wcompat

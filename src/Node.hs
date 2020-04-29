@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE BangPatterns #-}
@@ -22,6 +24,8 @@ module Node (
   , zeroMsg, defNodeS
   , nmFilter
   , writeCSVRecords
+  -- initialization fns
+  , toWattSeconds, toWatts
   ) where
 
 import qualified Data.Time as Time
@@ -57,15 +61,26 @@ import System.IO
 import System.Directory
 import qualified Data.HashMap.Strict as HM
 
+import Numeric.Compensated
 import Control.Monad.State.Lazy
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
 -- Our Scalars
 
-type WattSeconds = Double
+type WattSeconds = Compensated Double
 
-type Watts = Double
+type Watts = Compensated Double
+
+toWatts :: Double -> Watts
+toWatts a = add a 0 compensated
+
+toWattSeconds :: Double -> WattSeconds
+toWattSeconds a = add a 0 compensated
+
+  
+instance ToField (Compensated Double) where
+  toField = toField . uncompensated 
 
 newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Generic)
 
@@ -83,7 +98,17 @@ data Energy a = Energy
   , txOut :: !a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Show, Ord, Generic, Functor)
+  } deriving (Eq, Ord, Generic, Functor)
+
+instance (Show a) => Show (Energy a) where
+  show Energy{..} = "Energy Balance (Wattseconds)" <> nl
+    <> "Generated : " <> (rs generated) <> nl
+    <> "Consumed : " <> (rs consumed) <> nl
+    <> "Incoming : " <> (rs txIn) <> nl
+    <> "Outgoing : " <> (rs txOut) <> nl
+    where
+      nl = "\n"
+      rs = show
 
 instance (ToField a) => ToNamedRecord (Energy a)
 
@@ -104,8 +129,6 @@ instance Applicative Energy where
               , generated = generated f $ generated v
               }
 
-type EnergyBalance = Energy WattSeconds
-
 initEA :: (Num a) => Energy a
 initEA = Energy 0 0 0 0
 
@@ -121,12 +144,26 @@ instance (Num a) => Semigroup (Energy a) where
 instance (Num a) => Monoid (Energy a) where
   mempty = initEA
 
+--instance (Show a) => Show (Energy a) where
+--  show (Energy{..}) = "Energy : "
+
 data Power a = Power
   { genP :: !a
   , tInP :: !a
   , tOutP :: !a
   , loadP :: !a }
-  deriving (Eq, Ord, Show, Generic, Functor)
+  deriving (Eq, Ord, Generic, Functor)
+
+
+instance (Show a) => Show (Power a) where
+  show Power{..} = "Power (Watts)" <> nl
+    <> "Generation : " <> (rs genP) <> nl
+    <> "Load : " <> (rs loadP) <> nl
+    <> "Incoming : " <> (rs tInP) <> nl
+    <> "Outgoing : " <> (rs tOutP) <> nl
+    where
+      nl = "\n"
+      rs = show
 
 instance (ToField a) => ToNamedRecord (Power a)
 
@@ -204,12 +241,12 @@ instance ToField Time.UTCTime where
 
 instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
   toNamedRecord (NodeMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
-    [toNamedRecord _powerT,
+    [ toNamedRecord _powerT,
       toNamedRecord _energyT,
       toNamedRecord _sensorsT
     ]
 
-instance (Show e, Show p) => Show (NodeMetrics e p) where
+instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
     -- <> sep <> ("current stored (Ws): " <> show _stored)
     -- <> sep <> ("current demand (Ws): " <> show _demand)
@@ -256,9 +293,10 @@ timeFold = FL.Fold step' begin' done'
     done' :: Timestamp -> m Timestamp
     done' = pure
 
--- (s -> a -> m s) (m s) (s -> m b)
+
 powerFold :: forall m. (Monad m) => FL.Fold m EnergyState (Power Watts)
 powerFold = FL.Fold (\_ b-> pure $ power b) (pure $ mempty) return 
+
 
 energyFold :: forall m. (Monad m) => FL.Fold m (EnergyState) (Energy WattSeconds)
 energyFold = (FL.Fold step begin end)
@@ -282,10 +320,12 @@ energyFold = (FL.Fold step begin end)
                            , generated = (pToE t genP)}
       where
         Power{..} = p
-    pToE t p' = p' * (realToFrac t)
+    pToE :: (Real t) => t -> Watts -> WattSeconds
+    pToE t p' = (realToFrac t) *^ p'
+
 
 nodeMonitor :: forall m. (Monad m) => FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
-nodeMonitor = NodeMetrics <$> ((fst) <$> tn) <*> powerFold <*> en <*> sensors 
+nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> powerFold <*> en <*> sensors 
   where
     tn :: FL.Fold m (EnergyState) Timestamp
     tn = timeFold
@@ -295,25 +335,13 @@ nodeMonitor = NodeMetrics <$> ((fst) <$> tn) <*> powerFold <*> en <*> sensors
     sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
 
 
+
+
 {--------------------------------------------------------------------------------------------------------------
 
                                           Streams of Folds
 ---------------------------------------------------------------------------------------------------------------}
 
-
-{--
-slice :: (IsStream t, Monad m) => Int -> Int -> t m a -> t m a
-slice i j = (S.take (j - i)) . (S.drop i)
-
-eval :: (IsStream t, Monad m) => (a -> b) -> (FL.Fold m a b) -> Int -> Int -> t m a -> t m b
-eval e f start end = S.map e $ S.scan f $ slice start end 
-
-
-evalAll :: (a -> b) -> FL.Fold m a b -> t m a -> t m b
-evalAll e f x =  eval e f (0) (S.length x) $ x
---}
-
---type Stream a = t m a
 
 energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m (Energy WattSeconds)
 energyS = S.postscan energyFold
@@ -334,6 +362,14 @@ gridS ns ss = S.postscan gridMap $ ss
       where
         nodeMap = Map.fromList $ zip ns $ repeat nodeMonitor 
 
+
+
+
+
+{----------------------------------------------------------
+
+                CSV Conversion
+----------------------------------------------------------}
 
 newtype TaggedNode n = TaggedNode (n, NodeS) deriving (Generic)
 
@@ -400,9 +436,15 @@ power es = Power
     cnsm' = p batteryVoltage batteryToLoadCurrent
     genP' = p batteryVoltage solarInputCurrent
     p :: Getting Double EnergyState Double -> Getting Double EnergyState Double -> Watts
-    p v i = es ^. v * es ^. i
+    p v i = (es ^. i) *^ v'
+      where
+        v' = add (es ^. v) 0 compensated
+
+--errorHandle :: (Num a, Compensable a) =>  a -> a -> Compensated a
+--errorHandle a b = a
 
 
+-- $ converts the millisecond timestamp in the EnergyState to a UTCTime  
 utcTimeNow :: EnergyState -> Time.UTCTime
 utcTimeNow es = posixSecondsToUTCTime $ ((fromIntegral $ (es ^. cpuTime)) / 1000)
 
