@@ -23,6 +23,7 @@ import qualified Brick.Types as T
 import qualified Brick.Widgets.List as L
 import Brick.Types (Padding(..), Widget )
 import Brick.Widgets.Core (strWrap, padTop, str, (<+>), (<=>), hLimit, withAttr)
+import qualified Brick.Widgets.Core as C 
 import qualified Brick.Widgets.Center as C
 import Brick.BChan
 import qualified Brick.Forms as F
@@ -71,15 +72,17 @@ titleAttr = "title"
 
 drawMonitor :: (Show n) => Bool -> Int -> [(NodeT, n)] -> [(NodeT, Int)] -> Widget KibbutzUI
 drawMonitor _ _ nms _ =
-  B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics nms
+  C.vLimitPercent 100 $ B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics nms
   where
     drawNodeMetrics :: Show n => [(NodeT, n)] -> Widget KibbutzUI
-    drawNodeMetrics (nm:nmx) = C.center $ foldl (<=>) (drawNodeMetric nm) $ map drawNodeMetric nmx
+    drawNodeMetrics (n:nm) = (C.hLimitPercent 50) . (C.vLimitPercent 100) $ C.vBox $ map (drawNodeMetric prop) (n:nm)
+      where
+        prop = round ((100 :: Float) / (fromIntegral $ (length nm) + 1))
     drawNodeMetrics [] = C.center $ str "No Monitor Nodes Found!"
-    drawNodeMetric :: Show n => (NodeT, n) -> Widget a
-    drawNodeMetric (n, nm) =
-      B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
-          strWrap (show nm)
+    drawNodeMetric :: Show n => Int -> (NodeT, n) -> Widget a
+    drawNodeMetric p (n, nm) =
+      C.vLimitPercent p  $ B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
+          strWrap $ show nm
 
 
 
