@@ -32,7 +32,7 @@ import Control.Monad (forever, liftM)
 
 import Registry (duplicateS)
 import StateMonitor (initKM, updateKM, readKM)
-
+import Numeric.Compensated
 
 instance Arbitrary EnergyState where
   arbitrary = arbitraryMessage
@@ -58,32 +58,39 @@ spec :: Spec
 spec = do
   describe "This is how we use node streams" $ do
     it "power is a monoid and an applicative" $ do
-      verboseBatch (monoid (undefined :: (Power Int)))
-      verboseBatch (applicative (undefined :: Power (Int, Int, Int)))
+      verboseBatch (monoid (undefined :: (Power Double)))
+      verboseBatch (applicative (undefined :: Power (Double, Double, Double)))
     it "energy is a monoid and an applicative" $ do
-      verboseBatch (monoid (undefined :: (Energy Int)))
-      verboseBatch (applicative (undefined :: Energy (Int, Int, Int)))
+      verboseBatch (monoid (undefined :: (Energy Double)))
+      verboseBatch (applicative (undefined :: Energy (Double, Double, Double)))
     it "a stream at a 1 sec interval with a fixed power has an energy after n steps equivalent to the sum of the powers" $ do
       let
-        len = 102
+        len = 102 :: Int
+        bv = 12
+        gv = 60
+        b2l = 5
+        b2g = 5
+        g2b = 0
+        ic = 10
         initTime = 1581444138
         m :: Int -> EnergyState
         m t = defMessage
-                & batteryVoltage .~ 12
-                & gridVoltage .~ 60
-                & batteryToLoadCurrent .~ 5
-                & batteryToGridCurrent .~ 5
-                & gridToBatteryCurrent .~ 0
-                & solarInputCurrent .~ 10
+                & batteryVoltage .~ bv
+                & gridVoltage .~ gv
+                & batteryToLoadCurrent .~ b2l
+                & batteryToGridCurrent .~ b2g
+                & gridToBatteryCurrent .~ g2b
+                & solarInputCurrent .~ ic
                 & dutyCycle .~ 0
-                & cpuTime .~ (fromIntegral $ (1581444138 + t))
+                & cpuTime .~ (fromIntegral $ (1581444138000 + (t*1000)))
         msgStream :: (IsStream t, Monad m) => t m (EnergyState)
         msgStream = S.map m $ S.enumerateFromTo 0 (len - 1)
         tUTC = posixSecondsToUTCTime initTime
-        expectedP = Power {gen=(12 * 10), tIn=(12 * 0), tOut=(12 * 5), load=(12 * 5)} 
-        expectedE = Energy {txIn=tIn, txOut=tOut, consumed=load, generated=gen}
+        expectedP = Power {genP=(toWatts $ bv * ic), tInP=(toWatts $ bv * g2b), tOutP=(toWatts $ bv * b2g), loadP=(toWatts $ bv * b2l)} 
+        expectedE = Energy {txIn=toE tInP, txOut=toE tOutP, consumed=toE loadP, generated=toE genP}
           where
-            Power{..} = sP
+            toE = toWattSeconds . uncompensated
+            Power{..}= sP
             sP = foldl (<>) expectedP $ replicate (len - 2) expectedP
       (Just expectedS) <- S.last msgStream
       let
@@ -92,7 +99,7 @@ spec = do
             lastConn = (Just $ posixSecondsToUTCTime (initTime + (fromIntegral $ len - 1)))
         a = nodeS msgStream
       pExp <- S.all (\a'-> a' == expectedP) (powerS msgStream)
-      eExp <- S.last $ energyS msgStream
+      eExp <- S.last $ S.trace (print) $ energyS msgStream
       nmExp <- S.last $ a
       lenExp <- S.length a
       pExp  `shouldBe` True
@@ -102,17 +109,17 @@ spec = do
     {--
     it "mapping a gridStream over a KM should be a nice ting" $ do
       let
-        ns :: [NodeId Int]
-        ns = NodeId <$> [1..10 :: Int]
+        ns :: [NodeId Double]
+        ns = NodeId <$> [1..10 :: Double]
         msgStream = S.map m $ S.enumerateFromTo 0 100
-        msgs :: (SerialT IO (NodeId Int, EnergyState))
+        msgs :: (SerialT IO (NodeId Double, EnergyState))
         msgs = (,) <$> (S.fromList ns) <*> msgStream
       sub <- mkSub
       _ <- forkIO $ S.drain (parallely $ adapt $ writeSub sub msgs)
-      smap <- ((subMap ns sub) :: IO (StreamMap (NodeId Int) EnergyState))
+      smap <- ((subMap ns sub) :: IO (StreamMap (NodeId Double) EnergyState))
       km <- atomically $ initKM ns defNodeS
       let
-        gs :: Serial (NodeId Int, NodeS)
+        gs :: Serial (NodeId Double, NodeS)
         gs = gridStream tUTC ns smap
       S.drain $ S.mapM (\(n, s) -> atomically $ updateKM km n s) gs
       endStates <- atomically $ readKM km ns
