@@ -80,6 +80,10 @@ dependencies:
 - streamly-cassava
 - streamly-bytestring
 - compensated
+- distributive
+- linear
+- ad
+
 ghc-options:
 - -Wall
 - -Wcompat
