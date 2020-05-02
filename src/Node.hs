@@ -63,6 +63,8 @@ import qualified Data.HashMap.Strict as HM
 
 import Numeric.Compensated
 import Control.Monad.State.Lazy
+
+
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
@@ -194,7 +196,7 @@ instance (Num a) => Monoid (Power a) where
 
 data NodeMetrics e p = NodeMetrics
   { _time :: !(Maybe Time.UTCTime)
-  -- , _stored :: !e
+  , _battery :: !(Battery e p)
   -- , _demand :: !e
   , _powerT :: !(Power p)
   , _energyT :: !(Energy e)
@@ -228,7 +230,7 @@ instance ToNamedRecord EnergyState where
 instance DefaultOrdered EnergyState where
   headerOrder _ = Vec.fromList $ names
     where
-      names = ["batteryV",
+      names = [ "batteryV",
                 "gridV",
                 "battery2LoadC",
                 "battery2GridC",
@@ -241,14 +243,15 @@ instance ToField Time.UTCTime where
 
 instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
   toNamedRecord (NodeMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
-    [ toNamedRecord _powerT,
+    [ toNamedRecord _battery,
+      toNamedRecord _powerT,
       toNamedRecord _energyT,
       toNamedRecord _sensorsT
     ]
 
 instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
-    -- <> sep <> ("current stored (Ws): " <> show _stored)
+    <> sep <> ("Battery State Estimate: " <> show _battery)
     -- <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
     <> sep <> ("current energy:" <> sep <> show _energyT)
@@ -257,7 +260,7 @@ instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) wher
 
 
 defNodeS :: NodeS
-defNodeS = NodeMetrics Nothing mempty mempty zeroMsg
+defNodeS = NodeMetrics Nothing emptyB mempty mempty zeroMsg
 
 nmFilter :: (NodeId a) -> NodeS -> Bool
 nmFilter _ = isJust . _time 
@@ -269,6 +272,17 @@ instance DefaultOrdered (NodeMetrics p e)
 type Timestamp = (Maybe Time.UTCTime, Time.NominalDiffTime)
 
 
+data Battery e p = Battery
+  { soc :: !e,
+    chargeLim :: !p,
+    dischargeLim :: !p
+  } deriving (Eq, Ord, Show, Generic)
+
+emptyB :: Battery WattSeconds Watts
+emptyB = Battery 0 0 0
+
+instance DefaultOrdered (Battery e p)
+instance (ToField e, ToField p) => ToNamedRecord (Battery e p)
 {----------------------------------------------------------------------------------------------------
 
 
@@ -324,8 +338,20 @@ energyFold = (FL.Fold step begin end)
     pToE t p' = (realToFrac t) *^ p'
 
 
+
+batteryFold :: forall m. (Monad m) => FL.Fold m EnergyState (Battery WattSeconds Watts)
+batteryFold = Battery <$> soc <*> chargeP <*> dischargeP
+  where
+    soc :: FL.Fold m (EnergyState) e
+    soc = undefined
+    chargeP :: FL.Fold m (EnergyState) p
+    chargeP = undefined
+    dischargeP :: FL.Fold m (EnergyState) p
+    dischargeP = undefined
+
+
 nodeMonitor :: forall m. (Monad m) => FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
-nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> powerFold <*> en <*> sensors 
+nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> batteryFold <*> powerFold <*> en <*> sensors 
   where
     tn :: FL.Fold m (EnergyState) Timestamp
     tn = timeFold
@@ -361,10 +387,6 @@ gridS ns ss = S.postscan gridMap $ ss
     gridMap = FL.demux nodeMap
       where
         nodeMap = Map.fromList $ zip ns $ repeat nodeMonitor 
-
-
-
-
 
 {----------------------------------------------------------
 
