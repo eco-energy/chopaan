@@ -37,14 +37,7 @@ import Numeric.AD.Internal.Reverse
 
 -- ESC state equation:
 -- x_k+1 = A(i_k) * x_k + fn(i_k)
--- ESC output equation computes voltage
-
-
--- v_k = OCV(z_k) + M (h_k) + M0 * s_k - sim (R_i i_rk - R0*ik)
-
--- M is the maximun absolute analog hysteresis voltage at the temperature
--- M0 is the instantaneous hysteresis voltage
--- R0 is the pure ohmic resistance
+    
 
 -- hysteresis voltage
 
@@ -55,15 +48,31 @@ data BatteryParams a = BatteryParams
   , ohmicResistance :: !a
   , diffusionResistance :: !a
   , diffusionCapacitance :: !a
+  , maxAbsAnalogHysteresisV :: !a
+  , instantaneousHysteresisV :: !a
   } deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 
--- sensorvector i_k
--- stateVector hysteresisVoltage, diffusionCurrent, soC
-
-
--- The current sensor bias is a part of the state equation
--- the voltage sensor bias is part of the output equation
-
+instance Applicative BatteryParams where
+  pure v = BatteryParams
+      { gamma = v
+      , efficiency = v
+      , chargeCapacity = v
+      , ohmicResistance = v
+      , diffusionResistance = v
+      , diffusionCapacitance = v
+      , maxAbsAnalogHysteresisV = v
+      , instantaneousHysteresisV = v
+      }
+  v1 <*> v2 = BatteryParams
+    { gamma = gamma v1 $ gamma v2
+    , efficiency = efficiency v1 $ efficiency v2
+    , chargeCapacity = chargeCapacity v1 $ chargeCapacity v2
+    , ohmicResistance = ohmicResistance v1 $ ohmicResistance v2
+    , diffusionResistance = diffusionResistance v1 $ diffusionResistance v2
+    , diffusionCapacitance = diffusionCapacitance v1 $ diffusionCapacitance v2
+    , maxAbsAnalogHysteresisV = maxAbsAnalogHysteresisV v1 $ maxAbsAnalogHysteresisV v2
+    , instantaneousHysteresisV = instantaneousHysteresisV v1 $ instantaneousHysteresisV v2
+    }
 
 data StateVector a = StateVector
   { stateSoC :: !a
@@ -111,34 +120,57 @@ instance Distributive SensorVector where
     , sensorCurrent = fmap sensorCurrent f
     }
 
+
+
 processModel :: forall a. (Fractional a, Floating a, Ord a)
   => BatteryParams a -- time since last process model update
   -> a
   -> AugmentState StateVector SensorVector a -- prior (augmented) state
   -> AugmentState StateVector SensorVector a -- posterior (augmented) state
-processModel (b@(BatteryParams{..})) dt (AugmentState state@StateVector{..} sensor@SensorVector{..}) = AugmentState state' $ sensor'
+processModel ((BatteryParams{..})) dt (AugmentState state@StateVector{..} SensorVector{..}) = AugmentState state' $ sensor'
   where
     state' = state
-      { stateSoC = z_next stateSoC dt sensorCurrent 0
+      { stateSoC = z_next stateSoC dt sensorCurrent
       , diffusionCurrent = i_rkn dt diffusionCurrent sensorCurrent
       , hysteresisVoltage = h_kn dt sensorCurrent hysteresisVoltage
       }
     sensor' = (pure 0)
     -- SoC state equation
-    z_next z_prev delT i_k w_k = z_prev - (delT / chargeCapacity) * (i_k + w_k)
+    z_next z_prev delT i_k = z_prev - (delT / chargeCapacity) * (i_k) --  + w_k -> can add a noise parameter
   -- hysteresis voltage equation
     h_kn delT i_k h_kp = (expTerm * h_kp) + ((1 - expTerm) * (sgn i_k))
       where
         expTerm = exp (- (abs (delT * gamma * i_k * efficiency / chargeCapacity)))
-        sgn a
-          | a > 0 = 1
-          | a < 0 = -1
-          | otherwise = 0
     -- diffusion resistance current
-    i_rkn delT i_rkp i_k =  expDiff * i_rkp + ((1 - expDiff) * i_k)
+    i_rkn delT i_rkp i_k =  (expTerm * i_rkp) + ((1 - expTerm) * i_k)
       where
-        expDiff = exp ((- delT) / diffusionResistance * diffusionCapacitance)
+        expTerm = exp ((- delT) / diffusionResistance * diffusionCapacitance)
 
+-- ESC output equation computes voltage
+-- v_k = OCV(z_k) + M (h_k) + M0 * s_k - sim (R_i i_rk - R0*ik)
+-- M is the maximun absolute analog hysteresis voltage at the temperature
+-- M0 is the instantaneous hysteresis voltage
+-- R0 is the pure ohmic resistance
+
+predictedTerminalV :: (Floating a, Ord a) => BatteryParams a -> StateVector a -> SensorVector a -> S.State a a
+predictedTerminalV (BatteryParams{..}) (StateVector{..}) (SensorVector{..}) = do
+  sKp <- S.get
+  let
+    ocv = soCtoOCV stateSoC
+      where
+        soCtoOCV = id
+    hystCompV = (maxAbsAnalogHysteresisV * hysteresisVoltage) + (instantaneousHysteresisV * sK)
+    curCompV =  (diffusionResistance * diffusionCurrent) - (sensorCurrent * ohmicResistance)
+    sK = if ((abs sensorCurrent) > 0) then sgn sensorCurrent else sKp
+  S.put $ sK
+  return $ ocv + hystCompV - curCompV
+
+
+sgn :: (Fractional a, Ord a) => a -> a
+sgn a
+  | a > 0 = 1
+  | a < 0 = -1
+  | otherwise = 0
 
 initCov :: Fractional a => StateVector (StateVector a)
 initCov = s
@@ -166,16 +198,20 @@ type KalmanState m a = S.StateT (a, KalmanFilter StateVector a) m
 runKalmanState :: (Fractional a) => a -> StateVector a -> KalmanState m a b -> m (b, (a, KalmanFilter StateVector a))
 runKalmanState ts stateVec = (flip S.runStateT) (ts, (KalmanFilter stateVec initCov))
 
-runProcessModel :: (Monad m, Floating a, Ord a, Mode a) => BatteryParams a -> a -> StateVector a -> SensorVector a -> SensorVector a -> KalmanState m a ()
-runProcessModel battery dt noise viNoise vi = do
+
+-- The current sensor bias is a part of the state equation
+-- the voltage sensor bias is part of the output equation
+runProcessModel :: (Monad m, Floating a, Ord a) => BatteryParams a -> a -> StateVector a -> SensorVector a -> SensorVector a -> KalmanState m a ()
+runProcessModel battery dt noise sensorNoise sensorReadings = do
   (ts, prior) <- S.get
   let out = augmentProcess baseProcessModel extraState baseProcessUncertainty extraProcessUncertainty prior
   S.put (ts, out) -- KalmanFilter state' p' = (ts, KalmanFilter state' p')
   where
     baseProcessModel = EKFProcess $ processModel (auto <$> battery) (auto dt)
-    extraState = vi
+    extraState = sensorReadings
     baseProcessUncertainty = scaled noise
-    extraProcessUncertainty = scaled viNoise
+    extraProcessUncertainty = scaled sensorNoise
 
 
--- EKFProcess :: (forall s. Reifies s Tape) => state (Reverse s var) -> state (Reverse s var) -> EKFProcess state var
+--runMeasurementModel
+
