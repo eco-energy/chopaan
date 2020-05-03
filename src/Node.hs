@@ -196,7 +196,7 @@ instance (Num a) => Monoid (Power a) where
 
 data NodeMetrics e p = NodeMetrics
   { _time :: !(Maybe Time.UTCTime)
-  , _battery :: !(Battery e p)
+  --, _battery :: !(Battery e p)
   -- , _demand :: !e
   , _powerT :: !(Power p)
   , _energyT :: !(Energy e)
@@ -243,7 +243,7 @@ instance ToField Time.UTCTime where
 
 instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
   toNamedRecord (NodeMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
-    [ toNamedRecord _battery,
+    [ --toNamedRecord _battery,
       toNamedRecord _powerT,
       toNamedRecord _energyT,
       toNamedRecord _sensorsT
@@ -251,7 +251,7 @@ instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
 
 instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
-    <> sep <> ("Battery State Estimate: " <> show _battery)
+    -- <> sep <> ("Battery State Estimate: " <> show _battery)
     -- <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
     <> sep <> ("current energy:" <> sep <> show _energyT)
@@ -260,7 +260,7 @@ instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) wher
 
 
 defNodeS :: NodeS
-defNodeS = NodeMetrics Nothing emptyB mempty mempty zeroMsg
+defNodeS = NodeMetrics Nothing mempty mempty zeroMsg --  emptyB
 
 nmFilter :: (NodeId a) -> NodeS -> Bool
 nmFilter _ = isJust . _time 
@@ -351,7 +351,7 @@ batteryFold = Battery <$> soc <*> chargeP <*> dischargeP
 
 
 nodeMonitor :: forall m. (Monad m) => FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
-nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> batteryFold <*> powerFold <*> en <*> sensors 
+nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> powerFold <*> en <*> sensors --  <*> batteryFold 
   where
     tn :: FL.Fold m (EnergyState) Timestamp
     tn = timeFold
