@@ -75,13 +75,13 @@ drawMonitor _ _ nms _ =
   C.vLimitPercent 100 $ B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics nms
   where
     drawNodeMetrics :: Show n => [(NodeT, n)] -> Widget KibbutzUI
-    drawNodeMetrics (n:nm) = (C.hLimitPercent 50) . (C.vLimitPercent 100) $ C.vBox $ map (drawNodeMetric prop) (n:nm)
+    drawNodeMetrics (n:nm) = C.vBox $ map (drawNodeMetric prop) (n:nm)
       where
         prop = round ((100 :: Float) / (fromIntegral $ (length nm) + 1))
     drawNodeMetrics [] = C.center $ str "No Monitor Nodes Found!"
     drawNodeMetric :: Show n => Int -> (NodeT, n) -> Widget a
     drawNodeMetric p (n, nm) =
-      C.vLimitPercent p  $ B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
+      B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
           strWrap $ show nm
 
 
