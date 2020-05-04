@@ -10,23 +10,24 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Storage where
 
-
 import Numeric.Estimator.KalmanFilter
 import Numeric.Estimator.Augment
-import Numeric.Estimator.Class
-import Numeric.Estimator.Model.Symbolic
+import Numeric.Estimator.Class ()
+import Numeric.Estimator.Model.Symbolic ()
 
 import GHC.Generics (Generic)
 
 --import Control.Lens
 --import Control.Applicative
 import Data.Distributive
-import Data.Foldable
-import Data.Traversable
+import Data.Foldable ()
+import Data.Traversable ()
 import Linear
-import qualified Control.Monad.State.Lazy as S 
+import Control.Monad.State.Lazy 
 import Numeric.AD
-import Numeric.AD.Internal.Reverse
+import Numeric.AD.Internal.Reverse ()
+
+
 -- Two Goals
 -- 1) SoC Estimation
 -- 2) Battery Health Estimatio
@@ -52,6 +53,19 @@ data BatteryParams a = BatteryParams
   , instantaneousHysteresisV :: !a
   } deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 
+
+defBatteryParams :: BatteryParams Double
+defBatteryParams = BatteryParams
+  { gamma = 0
+  , efficiency = 0.8
+  , chargeCapacity = 3000
+  , ohmicResistance = 10
+  , diffusionResistance = 2
+  , diffusionCapacitance = 2
+  , maxAbsAnalogHysteresisV = 3
+  , instantaneousHysteresisV = 3
+  }
+
 instance Applicative BatteryParams where
   pure v = BatteryParams
       { gamma = v
@@ -75,26 +89,26 @@ instance Applicative BatteryParams where
     }
 
 data StateVector a = StateVector
-  { stateSoC :: !a
+  { soC :: !a
   , diffusionCurrent :: !a
   , hysteresisVoltage :: !a
   } deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 
 instance Applicative StateVector where
   pure v = StateVector
-    { stateSoC = v
+    { soC = v
     , diffusionCurrent = v
     , hysteresisVoltage = v
     }
   v1 <*> v2 = StateVector
-              { stateSoC = stateSoC v1 $ stateSoC v2
+              { soC = soC v1 $ soC v2
               , diffusionCurrent = diffusionCurrent v1 $ diffusionCurrent v2
               , hysteresisVoltage = hysteresisVoltage v1 $ hysteresisVoltage v2
               }
 
 instance Distributive StateVector where
   distribute f = StateVector 
-    { stateSoC = fmap stateSoC f
+    { soC = fmap soC f
     , diffusionCurrent = fmap diffusionCurrent f
     , hysteresisVoltage = fmap hysteresisVoltage f
     }
@@ -123,14 +137,14 @@ instance Distributive SensorVector where
 
 
 processModel :: forall a. (Fractional a, Floating a, Ord a)
-  => BatteryParams a -- time since last process model update
-  -> a
+  => BatteryParams a 
+  -> a -- time since last process model update
   -> AugmentState StateVector SensorVector a -- prior (augmented) state
   -> AugmentState StateVector SensorVector a -- posterior (augmented) state
-processModel ((BatteryParams{..})) dt (AugmentState state@StateVector{..} SensorVector{..}) = AugmentState state' $ sensor'
+processModel ((BatteryParams{..})) dt (AugmentState st@StateVector{..} SensorVector{..}) = AugmentState state' $ sensor'
   where
-    state' = state
-      { stateSoC = z_next stateSoC dt sensorCurrent
+    state' = st
+      { soC = z_next soC dt sensorCurrent
       , diffusionCurrent = i_rkn dt diffusionCurrent sensorCurrent
       , hysteresisVoltage = h_kn dt sensorCurrent hysteresisVoltage
       }
@@ -152,17 +166,17 @@ processModel ((BatteryParams{..})) dt (AugmentState state@StateVector{..} Sensor
 -- M0 is the instantaneous hysteresis voltage
 -- R0 is the pure ohmic resistance
 
-predictedTerminalV :: (Floating a, Ord a) => BatteryParams a -> StateVector a -> SensorVector a -> S.State a a
+predictedTerminalV :: (Floating a, Ord a, Monad m) => BatteryParams a -> StateVector a -> SensorVector a -> StateT a m a
 predictedTerminalV (BatteryParams{..}) (StateVector{..}) (SensorVector{..}) = do
-  sKp <- S.get
+  sKp <- get
   let
-    ocv = soCtoOCV stateSoC
+    ocv = soCtoOCV soC
       where
         soCtoOCV = id
     hystCompV = (maxAbsAnalogHysteresisV * hysteresisVoltage) + (instantaneousHysteresisV * sK)
     curCompV =  (diffusionResistance * diffusionCurrent) - (sensorCurrent * ohmicResistance)
     sK = if ((abs sensorCurrent) > 0) then sgn sensorCurrent else sKp
-  S.put $ sK
+  put $ sK
   return $ ocv + hystCompV - curCompV
 
 
@@ -176,42 +190,47 @@ initCov :: Fractional a => StateVector (StateVector a)
 initCov = s
   where
     s = StateVector
-          { stateSoC = pure (1e-6)
+          { soC = pure (1e-6)
           , diffusionCurrent = pure 1e-8
           , hysteresisVoltage = pure 2e-4
           }
 
 
-initDynamic :: forall a. (Floating a) => a -> a -> a -> StateVector a
-initDynamic soc volt cur = (pure (0 :: a))
-  { stateSoC = soc
-  , diffusionCurrent = volt
-  , hysteresisVoltage = cur
-  }
+processNoise :: Fractional a => StateVector a
+processNoise = fmap (^ (2 :: Int)) $ pure (1e-1)
+
+-- Normal distribution independent of timestep
+sensorNoise :: Fractional a => SensorVector a
+sensorNoise = pure 2e-1
+
+initDynamic :: forall a. (Floating a) => StateVector a
+initDynamic = (pure (0 :: a))
 
 
 
 {---------------------------------------- RUNNING THE KALMAN FILTER --------------------------------------}
 
-type KalmanState m a = S.StateT (a, KalmanFilter StateVector a) m
+type KalmanState m a = StateT (a, KalmanFilter StateVector a) m
+
+type KF a = KalmanFilter StateVector a
+
+initKF :: Fractional a => KF a
+initKF = KalmanFilter (pure 0) initCov
 
 runKalmanState :: (Fractional a) => a -> StateVector a -> KalmanState m a b -> m (b, (a, KalmanFilter StateVector a))
-runKalmanState ts stateVec = (flip S.runStateT) (ts, (KalmanFilter stateVec initCov))
+runKalmanState ts stateVec = (flip runStateT) (ts, (KalmanFilter stateVec initCov))
 
 
 -- The current sensor bias is a part of the state equation
 -- the voltage sensor bias is part of the output equation
 runProcessModel :: (Monad m, Floating a, Ord a) => BatteryParams a -> a -> StateVector a -> SensorVector a -> SensorVector a -> KalmanState m a ()
-runProcessModel battery dt noise sensorNoise sensorReadings = do
-  (ts, prior) <- S.get
-  let out = augmentProcess baseProcessModel extraState baseProcessUncertainty extraProcessUncertainty prior
-  S.put (ts, out) -- KalmanFilter state' p' = (ts, KalmanFilter state' p')
+runProcessModel battery dt noise senNoise sensorReadings = do
+  (ts, prior) <- get
+  let posterior = augmentProcess baseProcessModel extraState baseProcessUncertainty extraProcessUncertainty prior
+  put (ts, posterior) -- KalmanFilter state' p' = (ts, KalmanFilter state' p')
   where
     baseProcessModel = EKFProcess $ processModel (auto <$> battery) (auto dt)
     extraState = sensorReadings
     baseProcessUncertainty = scaled noise
-    extraProcessUncertainty = scaled sensorNoise
-
-
---runMeasurementModel
+    extraProcessUncertainty = scaled senNoise
 
