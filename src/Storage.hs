@@ -43,7 +43,7 @@ import Numeric.AD.Internal.Reverse ()
 -- hysteresis voltage
 
 data BatteryParams a = BatteryParams
-  { gamma :: !a
+  { gamma :: !a -- unitless constant γ adjusts how quickly the hysteresis state changes with a change in cell SOC
   , efficiency :: !a
   , chargeCapacity :: !a
   , ohmicResistance :: !a
