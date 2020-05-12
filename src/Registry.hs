@@ -14,7 +14,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Registry (NodeT, HasTopics(..), ThingName
-                , Kibbutz(..), KibbutzEvents(..), getKibbutz, mkCallback, defKName, subStream
+                , Kibbutz(..), KibbutzEvents(..), getKibbutz, mkCallback, subStream
                 , PubQueue, writeToPubQ
                 , NodeQueue(..), initNodeQueue, writeToNodeQueue
                 , KConnM, KMState, KMSensor, initKMS, initKMConn
@@ -142,10 +142,6 @@ mkCallback Kibbutz { inQueue, msgCount }  = MQ.SimpleCallback $ writer
         parsed = ((fromRight zeroMsg) . decodeMessage . toStrict) msg
         toStrict = BS.concat . BL.toChunks
 
-defKName :: KibbutzName
-defKName = Text.pack "kibbutz-pilot-node"
-
-type KibbutzName = Text.Text
 
 
 {--------------------------------------------------------------------------------------------------------
@@ -208,18 +204,6 @@ getThings thingTypeName = do
   runResourceT . runAWST env $ do
     things <- send (Iot.listThings & Iot.ltThingTypeName .~ ttn)
     return $ things ^. Iot.ltrsThings
-
-
-
---registerThing :: (exceptions-0.10.3:Control.Monad.Catch.MonadCatch m, unliftio-core-0.1.2.0:Control.Monad.IO.Unlift.MonadUnliftIO m) => p -> m (a, b)
-registerThing t = do
-  let
-    iiot = iot "execute-api"
-  lgr <- newLogger Trace stdout
-  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot
-  runResourceT . runAWST env $ do
-    (cert, reg) <- undefined (Iot.registrationConfig)
-    return $ (cert, reg) 
 
 
 {-----------------------------------------------------------------------------------------
