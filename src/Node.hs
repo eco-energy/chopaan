@@ -279,13 +279,15 @@ type Timestamp = (Maybe Time.UTCTime, Time.NominalDiffTime)
 
 
 data Battery e p = Battery
-  { soc :: !e,
-    chargeLim :: !p,
-    dischargeLim :: !p
+  { soc :: !e
+  , chargeLim :: !p
+  , dischargeLim :: !p
+  , predictedTermV :: !p
+    
   } deriving (Eq, Ord, Show, Generic)
 
 emptyB :: (Fractional e, Fractional p) => Battery e p
-emptyB = Battery 0 0 0
+emptyB = Battery 0 0 0 0
 
 instance DefaultOrdered (Battery e p)
 instance (ToField e, ToField p) => ToNamedRecord (Battery e p)
@@ -344,31 +346,26 @@ energyFold = (FL.Fold step begin end)
     pToE t p' = (realToFrac t) *^ p'
 
 
-
--- Needed:
--- Battery Params
--- Timestep
--- initial State
--- sensor noise on every step
--- process noise on every step
--- sensor readings
 batteryFold :: forall m. (Monad m) => BatteryParams R -> FL.Fold m EnergyState (Battery R R)
-batteryFold bat = FL.Fold step begin end
+batteryFold bat@BatteryParams{..} = FL.Fold step begin end
   where
-    step :: (Maybe Time.UTCTime, KF R) -> EnergyState -> m (Maybe Time.UTCTime, KF R)
-    step (t, (KalmanFilter currState _)) sensorReadings = ((\(_, b) -> (Just tnow, b)) . snd) <$>
-        (runKalmanState (tdiff t) currState $
+    step :: (Maybe Time.UTCTime, Maybe (KF R)) -> EnergyState -> m (Maybe Time.UTCTime, Maybe (KF R))
+    step (t, kf) sensorReadings = ((\(_, b) -> (Just tnow, Just b)) . snd) <$>
+        (runKalmanState (tdiff t) (cState kf) $
         runProcessModel bat (tdiff t) processNoise sensorNoise $
         toSV sensorReadings)
       where
+        cState (Just (KalmanFilter currState _)) = currState
+        cState Nothing = initDynamic {soC = ocvToSoC bat (sensorTerminalV . toSV $ sensorReadings)}
         tnow = utcTimeNow sensorReadings
         tdiff (Just t') = realToFrac $ Time.diffUTCTime tnow t'
         tdiff Nothing = 0
         
-    begin :: m (Maybe Time.UTCTime, KF R)
-    begin = return $ (Nothing, initKF)
-    end :: (Maybe Time.UTCTime, KF R) -> m (Battery R R)
-    end (_, KalmanFilter (StateVector{..}) _) = return $ (emptyB @R @R) {soc = soC}
+    begin :: m (Maybe Time.UTCTime, Maybe (KF R))
+    begin = return $ (Nothing, Nothing)
+    end :: (Maybe Time.UTCTime, Maybe (KF R)) -> m (Battery R R)
+    end (_, Just (KalmanFilter (StateVector{..}) _)) = return $ (emptyB @R @R) {soc = soC}
+    end (_, Nothing) = return $ emptyB @R @R
     toSV = storageSensors
 
 
