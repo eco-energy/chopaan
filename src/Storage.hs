@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -12,7 +13,7 @@ module Storage where
 
 import Numeric.Estimator.KalmanFilter
 import Numeric.Estimator.Augment
-import Numeric.Estimator.Class ()
+import Numeric.Estimator.Class
 import Numeric.Estimator.Model.Symbolic ()
 
 import GHC.Generics (Generic)
@@ -22,6 +23,7 @@ import GHC.Generics (Generic)
 import Data.Distributive
 import Data.Foldable ()
 import Data.Traversable ()
+import Data.List
 import Linear
 import Control.Monad.State.Lazy 
 import Numeric.AD
@@ -56,15 +58,22 @@ data BatteryParams a = BatteryParams
 
 defBatteryParams :: BatteryParams Double
 defBatteryParams = BatteryParams
-  { gamma = 0
-  , efficiency = 0.8
-  , chargeCapacity = 3000
-  , ohmicResistance = 10
-  , diffusionResistance = 2
-  , diffusionCapacitance = 2
-  , maxAbsAnalogHysteresisV = 3
-  , instantaneousHysteresisV = 3
+  { gamma = 1
+  , efficiency = 0.85
+  , chargeCapacity = 4320000 -- In WattSeconds
+  , ohmicResistance = 0.0035 -- In Ohms
+  , diffusionResistance = 0.003  -- In Ohms
+  , diffusionCapacitance = 50   -- In Farads
+  , maxAbsAnalogHysteresisV = 1.2
+  , instantaneousHysteresisV = 0.8
   }
+
+-- $ Create Battery Parameters at a certain AmpH of capacity
+initBP :: Double -> BatteryParams Double
+initBP cc = defBatteryParams {chargeCapacity = ampHToWS cc}
+  where
+    ampHToWS a = (a * 12) * (60 * 60)
+
 
 instance Applicative BatteryParams where
   pure v = BatteryParams
@@ -134,23 +143,37 @@ instance Distributive SensorVector where
     , sensorCurrent = fmap sensorCurrent f
     }
 
+type ParamType a = (RealFrac a, Floating a, Ord a)
 
 
-processModel :: forall a. (Fractional a, Floating a, Ord a)
+soCtoOCV :: (ParamType a) => BatteryParams a -> a -> a
+soCtoOCV BatteryParams{..} soc = intervals !! index
+  where
+    index = mod (round (soc / chargeCapacity)) 10
+    intervals = [11.61, 11.76, 11.91, 12.06, 12.20, 12.34, 12.47, 12.60, 12.72, 12.83]
+
+ocvToSoC :: (ParamType a) => BatteryParams a -> a -> a
+ocvToSoC BatteryParams{..} v_t = socPercentage * chargeCapacity 
+  where
+    socPercentage = ((*10) . fromIntegral . roundDown) v_t  
+    intervals = [11.61, 11.76, 11.91, 12.06, 12.20, 12.34, 12.47, 12.60, 12.72, 12.83]
+    roundDown v = (length . fst) $ partition (v <) intervals
+
+processModel :: forall a. (ParamType a)
   => BatteryParams a 
   -> a -- time since last process model update
   -> AugmentState StateVector SensorVector a -- prior (augmented) state
   -> AugmentState StateVector SensorVector a -- posterior (augmented) state
-processModel ((BatteryParams{..})) dt (AugmentState st@StateVector{..} SensorVector{..}) = AugmentState state' $ sensor'
+processModel ((bp@BatteryParams{..})) dt (AugmentState st@StateVector{..} sensor@SensorVector{..}) = AugmentState state' $ sensor'
   where
     state' = st
       { soC = z_next soC dt sensorCurrent
       , diffusionCurrent = i_rkn dt diffusionCurrent sensorCurrent
       , hysteresisVoltage = h_kn dt sensorCurrent hysteresisVoltage
       }
-    sensor' = (pure 0)
+    sensor' = sensor {sensorTerminalV = predictedTerminalV bp state' sensor}
     -- SoC state equation
-    z_next z_prev delT i_k = z_prev - (delT / chargeCapacity) * (i_k) --  + w_k -> can add a noise parameter
+    z_next z_prev delT i_k = z_prev - (delT / chargeCapacity) * (i_k)  -- + w_k  -- -> can add a noise parameter
   -- hysteresis voltage equation
     h_kn delT i_k h_kp = (expTerm * h_kp) + ((1 - expTerm) * (sgn i_k))
       where
@@ -166,18 +189,13 @@ processModel ((BatteryParams{..})) dt (AugmentState st@StateVector{..} SensorVec
 -- M0 is the instantaneous hysteresis voltage
 -- R0 is the pure ohmic resistance
 
-predictedTerminalV :: (Floating a, Ord a, Monad m) => BatteryParams a -> StateVector a -> SensorVector a -> StateT a m a
-predictedTerminalV (BatteryParams{..}) (StateVector{..}) (SensorVector{..}) = do
-  sKp <- get
-  let
-    ocv = soCtoOCV soC
-      where
-        soCtoOCV = id
+predictedTerminalV :: (ParamType a) => BatteryParams a -> StateVector a -> SensorVector a -> a
+predictedTerminalV (bp@BatteryParams{..}) (StateVector{..}) (SensorVector{..}) = (ocv + hystCompV - curCompV)
+  where
+    ocv = soCtoOCV bp soC
     hystCompV = (maxAbsAnalogHysteresisV * hysteresisVoltage) + (instantaneousHysteresisV * sK)
     curCompV =  (diffusionResistance * diffusionCurrent) - (sensorCurrent * ohmicResistance)
-    sK = if ((abs sensorCurrent) > 0) then sgn sensorCurrent else sKp
-  put $ sK
-  return $ ocv + hystCompV - curCompV
+    sK = sgn sensorCurrent -- if ((abs sensorCurrent) > 0) then  else sKp
 
 
 sgn :: (Fractional a, Ord a) => a -> a
@@ -186,7 +204,7 @@ sgn a
   | a < 0 = -1
   | otherwise = 0
 
-initCov :: Fractional a => StateVector (StateVector a)
+initCov :: ParamType a => StateVector (StateVector a)
 initCov = s
   where
     s = StateVector
@@ -196,14 +214,14 @@ initCov = s
           }
 
 
-processNoise :: Fractional a => StateVector a
+processNoise :: ParamType a => StateVector a
 processNoise = fmap (^ (2 :: Int)) $ pure (1e-1)
 
 -- Normal distribution independent of timestep
-sensorNoise :: Fractional a => SensorVector a
+sensorNoise :: ParamType a => SensorVector a
 sensorNoise = pure 2e-1
 
-initDynamic :: forall a. (Floating a) => StateVector a
+initDynamic :: forall a. (ParamType a) => StateVector a
 initDynamic = (pure (0 :: a))
 
 
@@ -214,23 +232,49 @@ type KalmanState m a = StateT (a, KalmanFilter StateVector a) m
 
 type KF a = KalmanFilter StateVector a
 
-initKF :: Fractional a => KF a
+initKF :: ParamType a => KF a
 initKF = KalmanFilter (pure 0) initCov
 
-runKalmanState :: (Fractional a) => a -> StateVector a -> KalmanState m a b -> m (b, (a, KalmanFilter StateVector a))
+runKalmanState :: (ParamType a) => a -> StateVector a -> KalmanState m a b -> m (b, (a, KalmanFilter StateVector a))
 runKalmanState ts stateVec = (flip runStateT) (ts, (KalmanFilter stateVec initCov))
 
 
 -- The current sensor bias is a part of the state equation
 -- the voltage sensor bias is part of the output equation
-runProcessModel :: (Monad m, Floating a, Ord a) => BatteryParams a -> a -> StateVector a -> SensorVector a -> SensorVector a -> KalmanState m a ()
+runProcessModel :: (Monad m, ParamType a) => BatteryParams a -> a -> StateVector a -> SensorVector a -> SensorVector a -> KalmanState m a ()
 runProcessModel battery dt noise senNoise sensorReadings = do
   (ts, prior) <- get
-  let posterior = augmentProcess baseProcessModel extraState baseProcessUncertainty extraProcessUncertainty prior
-  put (ts, posterior) -- KalmanFilter state' p' = (ts, KalmanFilter state' p')
+  let procPosterior@(KalmanFilter state' cov') = augmentProcess baseProcessModel extraState baseProcessUncertainty extraProcessUncertainty prior
+  put (ts, procPosterior) -- KalmanFilter state' p' = (ts, KalmanFilter state' p')
   where
     baseProcessModel = EKFProcess $ processModel (auto <$> battery) (auto dt)
     extraState = sensorReadings
     baseProcessUncertainty = scaled noise
     extraProcessUncertainty = scaled senNoise
 
+
+{--
+runMeasurementModel :: (Monad m, ParamType a) => SensorVector a -> SensorVector a -> KalmanState m a (SensorVector (a, a))
+runMeasurementModel noise measurement = sequence $ undefined
+
+{-- measure ::
+   SensorVector (Var t, t)
+-> SensorVector (SensorVector (Var t))
+-> Filter t (State t) (Var t)
+-> (MeasureQuality t obs, Filter t (State t) (Var t))
+
+--}
+
+type VoltageMeasurement a = EKFMeasurement (SensorVector) (SensorVector (SensorVector a))
+
+
+predV :: (ParamType a) => BatteryParams a -> StateVector a -> EKFMeasurement SensorVector a
+predV bp st = measure (a, EKFMeasurement (predictedTerminalV (auto <$> bp))) senNoise
+  where
+    a = undefined
+
+--mModel :: BatteryParams a -> _ -> KF a -> (KalmanInnovation (SensorVector) a, KF a)
+--mModel (bp@BatteryParams{..}) obsCov (prior@(KalmanFilter st stCov)) = measure (predV bp) obsCov prior
+
+
+--}
