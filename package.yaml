@@ -83,6 +83,11 @@ dependencies:
 - distributive
 - linear
 - ad
+- concat-classes
+- concat-examples
+- concat-graphics
+- numeric-limits
+- dhall >= 1.24.0
 
 ghc-options:
 - -Wall

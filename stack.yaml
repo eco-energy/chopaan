@@ -71,8 +71,9 @@ extra-deps:
  - random-fu-multivariate-0.1.2.1@sha256:b8b3adcdb01269480b3d28dae1e9c9a040834b9974c434d6996d3e1545c4d4f7,1439
  - estimator-1.2.0.0@sha256:44c85267299ea1e3eeb3e4eb9f317e4972563c84ba8220924c834a99b9048960,2424
  - streamly-bytestring-0.1.0.1@sha256:aa522c22f992e70d005acbd7d4dba555b6a8b8f43f29cddba16fbeeb39f3e992,2471
-
-# - acme-missiles-0.3
+ - language-glsl-0.3.0@sha256:85c1e7bf2cf5d6e604b7a2899c27e2935033425944db200798e57849e64d4c81,1636
+ - numeric-limits-0.1.0.0@sha256:214bb53112bff315e42c0e9efa4a89e2cc2e9914e6232d923b596f29f9b1afe6,456
+ # - acme-missiles-0.3
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
