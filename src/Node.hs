@@ -29,7 +29,6 @@ module Node (
   ) where
 
 import qualified Data.Time as Time
-import qualified Data.Time.Clock as Time
 import Data.Time.Clock.POSIX
 
 import GHC.Generics (Generic)
@@ -257,19 +256,21 @@ instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
 
 instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
-    <> sep <> ("Battery State Estimate: " <> sep <> show (_battery))
+    <> sep <> ("SoC Percentage: " <> sep <> show (socPercentage _battery))
+    <> sep <> ("Runtime Estimate: " <> sep <> show (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
     -- <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
     <> sep <> ("current energy:" <> sep <> show _energyT)
     <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensorsT)))
-    where sep = "\n"
+    where
+      sep = "\n"
 
 
-defNodeS :: NodeS
-defNodeS = NodeMetrics Nothing mempty mempty zeroMsg  emptyB
+secsToMinutes :: (Num a) => a -> a
+secsToMinutes = (* 60)
 
 nmFilter :: (NodeId a) -> NodeS -> Bool
-nmFilter _ = isJust . _time 
+nmFilter _ = isJust . _time
 
 type NodeS = NodeMetrics WattSeconds Watts
 
@@ -283,14 +284,25 @@ data Battery e p = Battery
   , chargeLim :: !p
   , dischargeLim :: !p
   , predictedTermV :: !p
-    
+  , totalCapacity :: !p
   } deriving (Eq, Ord, Show, Generic)
 
 emptyB :: (Fractional e, Fractional p) => Battery e p
-emptyB = Battery 0 0 0 0
+emptyB = Battery 0 0 0 0 0
 
 instance DefaultOrdered (Battery e p)
 instance (ToField e, ToField p) => ToNamedRecord (Battery e p)
+
+runTime :: Fractional a => Battery a p -> SensorVector a -> a
+runTime Battery{soc} SensorVector{..} = soc / (sensorCurrent * sensorTerminalV) 
+
+socPercentage :: Fractional a => Battery a a -> a
+socPercentage Battery{..} = (soc * 100 / totalCapacity)
+
+defNodeS :: NodeS
+defNodeS = NodeMetrics Nothing mempty mempty zeroMsg  emptyB
+
+
 {----------------------------------------------------------------------------------------------------
 
 
@@ -353,10 +365,10 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
     step (t, kf) sensorReadings = ((\(_, b) -> (Just tnow, Just b)) . snd) <$>
         (runKalmanState (tdiff t) (cState kf) $
         runProcessModel bat (tdiff t) processNoise sensorNoise $
-        toSV sensorReadings)
+        storageSensors sensorReadings)
       where
         cState (Just (KalmanFilter currState _)) = currState
-        cState Nothing = initDynamic {soC = ocvToSoC bat (sensorTerminalV . toSV $ sensorReadings)}
+        cState Nothing = initDynamic {soC = ocvToSoC bat (sensorTerminalV . storageSensors $ sensorReadings)}
         tnow = utcTimeNow sensorReadings
         tdiff (Just t') = realToFrac $ Time.diffUTCTime tnow t'
         tdiff Nothing = 0
@@ -364,9 +376,9 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
     begin :: m (Maybe Time.UTCTime, Maybe (KF R))
     begin = return $ (Nothing, Nothing)
     end :: (Maybe Time.UTCTime, Maybe (KF R)) -> m (Battery R R)
-    end (_, Just (KalmanFilter (StateVector{..}) _)) = return $ (emptyB @R @R) {soc = soC}
+    end (_, Just (KalmanFilter (StateVector{..}) _)) = return $ (emptyB @R @R) { soc = soC
+                                                                               , totalCapacity = chargeCapacity}
     end (_, Nothing) = return $ emptyB @R @R
-    toSV = storageSensors
 
 
 nodeMonitor :: forall m. (Monad m) => FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
