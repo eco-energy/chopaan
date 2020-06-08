@@ -1,6 +1,6 @@
 module UI.Types where
 
-data KibbutzUI = HHListUI | MonitorUI | TxListUI | TxFormUI TXFormField deriving (Eq, Ord, Show)
+data KibbutzUI = HHListUI | MonitorUI | MonitorList | TxListUI | TxFormUI TXFormField deriving (Eq, Ord, Show)
 
 type TxNodeId = Int
 

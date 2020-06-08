@@ -71,16 +71,14 @@ titleAttr = "title"
 
 
 drawMonitor :: (Show n) => Bool -> Int -> [(NodeT, n)] -> [(NodeT, Int)] -> Widget KibbutzUI
-drawMonitor _ _ nms _ =
-  C.vLimitPercent 100 $ B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics nms
+drawMonitor focus _ nms _ =
+  C.vLimitPercent 100 $ B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics (Vec.fromList nms)
   where
-    drawNodeMetrics :: Show n => [(NodeT, n)] -> Widget KibbutzUI
-    drawNodeMetrics (n:nm) = C.vBox $ map (drawNodeMetric prop) (n:nm)
-      where
-        prop = round ((100 :: Float) / (fromIntegral $ (length nm) + 1))
-    drawNodeMetrics [] = C.center $ str "No Monitor Nodes Found!"
-    drawNodeMetric :: Show n => Int -> (NodeT, n) -> Widget a
-    drawNodeMetric p (n, nm) =
+    drawNodeMetrics :: Show n => Vec.Vector (NodeT, n) -> Widget KibbutzUI
+    drawNodeMetrics nx = L.renderList (drawNodeMetric) focus (L.list (MonitorList) (nx) 40)
+    --drawNodeMetrics Vec.empty = C.center $ str "No Monitor Nodes Found!"
+    drawNodeMetric :: Show n => Bool -> (NodeT, n) -> Widget a
+    drawNodeMetric selected (n, nm) =
       B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
           strWrap $ show nm
 
