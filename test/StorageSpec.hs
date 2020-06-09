@@ -3,7 +3,6 @@ module StorageSpec where
 
 import Storage
 import Test.Hspec
-import Test.QuickCheck.Classes
 import Test.QuickCheck.Checkers
 import Test.QuickCheck
 import Numeric.Estimator
@@ -34,6 +33,11 @@ instance (Arbitrary a) => Arbitrary (SensorVector a) where
   
 instance (Eq a) => EqProp (BatteryParams a) where
   a =-= b = eq a b
+
+almostEqual :: (Show a, Eq a, Num a, Ord a) => a -> a -> a -> Expectation
+almostEqual eta a b = do
+  ((abs $ a - b) < eta) `shouldBe` True
+  
 
 
 spec :: Spec
@@ -67,9 +71,17 @@ spec = do
         dt = 1 :: Double
       (_, (a, KalmanFilter state _)) <- runKalmanState dt stateV $ runProcessModel bp dt stateNoiseV sensorNoiseV sensorV
       a `shouldBe` 1
-      stateSoC state `shouldBe` 0 -- z_next is 1 - ((1 / 1) * 1) = 0
+      soC state `shouldBe` 0 -- z_next is 1 - ((1 / 1) * 1) = 0
       hysteresisVoltage state `shouldBe` 1
       diffusionCurrent state `shouldBe` 1
+    it "soC-Ocv Conversion tests " $ do
+      let
+        bp = defBatteryParams{chargeCapacity=10}
+        initOCV = ocvToSoC bp 12.06
+        processModel = undefined
+      almostEqual 0.0005 initOCV (10 * 0.3)
+      
+      
       -- expTerm = exp (- (abs (1 * 1 * 1 * (1 / 1)))) == - e
       -- sgn = sgn 1 == 1
       -- h_kn = (e - 1 - e)
