@@ -508,7 +508,7 @@ power es = Power
 
 -- $ converts the millisecond timestamp in the EnergyState to a UTCTime  
 utcTimeNow :: EnergyState -> Time.UTCTime
-utcTimeNow es = posixSecondsToUTCTime $ ((fromIntegral $ (es ^. cpuTime)) / 1000)
+utcTimeNow es = posixSecondsToUTCTime $ (fromIntegral $ (es ^. cpuTime))
 
 zeroMsg :: EnergyState
 zeroMsg = defMessage

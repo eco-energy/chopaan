@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,7 +14,6 @@ module Storage where
 
 import Numeric.Estimator.KalmanFilter
 import Numeric.Estimator.Augment
-import Numeric.Estimator.Class
 import Numeric.Estimator.Model.Symbolic ()
 
 import GHC.Generics (Generic)
@@ -23,7 +23,6 @@ import GHC.Generics (Generic)
 import Data.Distributive
 import Data.Foldable ()
 import Data.Traversable ()
-import Data.List
 import Linear
 import Control.Monad.State.Lazy 
 import Numeric.AD
@@ -143,7 +142,7 @@ instance Distributive SensorVector where
     , sensorCurrent = fmap sensorCurrent f
     }
 
-type ParamType a = (RealFrac a, Floating a, Ord a)
+type ParamType a = (RealFrac a, Floating a, Ord a, Enum a)
 
 
 soCtoOCV :: (ParamType a) => BatteryParams a -> a -> a
@@ -152,12 +151,16 @@ soCtoOCV BatteryParams{..} soc = intervals !! index
     index = mod (round (soc / chargeCapacity)) 10
     intervals = [11.61, 11.76, 11.91, 12.06, 12.20, 12.34, 12.47, 12.60, 12.72, 12.83]
 
-ocvToSoC :: (ParamType a) => BatteryParams a -> a -> a
-ocvToSoC BatteryParams{..} v_t = socPercentage * chargeCapacity 
+ocvToSoC :: forall a. (ParamType a) => BatteryParams a -> a -> a
+ocvToSoC BatteryParams{..} v_t = socPercentage * chargeCapacity
   where
-    socPercentage = ((*10) . fromIntegral . roundDown) v_t  
-    intervals = [11.61, 11.76, 11.91, 12.06, 12.20, 12.34, 12.47, 12.60, 12.72, 12.83]
-    roundDown v = (length . fst) $ partition (v <) intervals
+    socPercentage :: a
+    socPercentage = roundDown v_t
+    intervals = zip [0.0, 0.1 .. 1.0] [11.61, 11.76, 11.91, 12.06, 12.20, 12.34, 12.47, 12.60, 12.72, 12.83]
+    roundDown v = goTillGreaterThan v intervals
+    goTillGreaterThan _ [] = 1.0
+    goTillGreaterThan v ((i, v'):xs) = if v > v' then (goTillGreaterThan v xs) else i
+
 
 processModel :: forall a. (ParamType a)
   => BatteryParams a 
@@ -167,21 +170,25 @@ processModel :: forall a. (ParamType a)
 processModel ((bp@BatteryParams{..})) dt (AugmentState st@StateVector{..} sensor@SensorVector{..}) = AugmentState state' $ sensor'
   where
     state' = st
-      { soC = z_next soC dt sensorCurrent
-      , diffusionCurrent = i_rkn dt diffusionCurrent sensorCurrent
-      , hysteresisVoltage = h_kn dt sensorCurrent hysteresisVoltage
+      { soC = z_next bp soC dt sensorCurrent
+      , diffusionCurrent = i_rkn bp dt diffusionCurrent sensorCurrent
+      , hysteresisVoltage = h_kn bp dt sensorCurrent hysteresisVoltage
       }
     sensor' = sensor {sensorTerminalV = predictedTerminalV bp state' sensor}
     -- SoC state equation
-    z_next z_prev delT i_k = z_prev - (delT / chargeCapacity) * (i_k)  -- + w_k  -- -> can add a noise parameter
+
+z_next :: Fractional a => BatteryParams a -> a -> a -> a -> a
+z_next BatteryParams{chargeCapacity} z_prev delT i_k = z_prev - (delT / chargeCapacity) * (i_k)  -- + w_k  -- -> can add a noise parameter
   -- hysteresis voltage equation
-    h_kn delT i_k h_kp = (expTerm * h_kp) + ((1 - expTerm) * (sgn i_k))
-      where
-        expTerm = exp (- (abs (delT * gamma * i_k * efficiency / chargeCapacity)))
+h_kn :: (Ord a, Floating a) => BatteryParams a -> a -> a -> a -> a
+h_kn BatteryParams{..} delT i_k h_kp = (expTerm * h_kp) + ((1 - expTerm) * (sgn i_k))
+  where
+    expTerm = exp (- (abs (delT * gamma * i_k * efficiency / chargeCapacity)))
     -- diffusion resistance current
-    i_rkn delT i_rkp i_k =  (expTerm * i_rkp) + ((1 - expTerm) * i_k)
-      where
-        expTerm = exp ((- delT) / diffusionResistance * diffusionCapacitance)
+i_rkn :: Floating a => BatteryParams a -> a -> a -> a -> a
+i_rkn BatteryParams{..} delT i_rkp i_k =  (expTerm * i_rkp) + ((1 - expTerm) * i_k)
+  where
+    expTerm = exp ((- delT) / diffusionResistance * diffusionCapacitance)
 
 -- ESC output equation computes voltage
 -- v_k = OCV(z_k) + M (h_k) + M0 * s_k - sim (R_i i_rk - R0*ik)
