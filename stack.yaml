@@ -73,6 +73,8 @@ extra-deps:
  - streamly-bytestring-0.1.0.1@sha256:aa522c22f992e70d005acbd7d4dba555b6a8b8f43f29cddba16fbeeb39f3e992,2471
  - language-glsl-0.3.0@sha256:85c1e7bf2cf5d6e604b7a2899c27e2935033425944db200798e57849e64d4c81,1636
  - numeric-limits-0.1.0.0@sha256:214bb53112bff315e42c0e9efa4a89e2cc2e9914e6232d923b596f29f9b1afe6,456
+ - total-map-0.1.3@sha256:081b917276323564e6d6ebaaf20c14d8ffc0a260cf3f29113c2577f774a272f1,983
+ - semiring-num-1.6.0.4@sha256:ea73b7ec4980add625dedfe159dbeea9a37aa540a2a9df0f36263455b1654cc1,2943
  # - acme-missiles-0.3
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
