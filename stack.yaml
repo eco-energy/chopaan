@@ -46,14 +46,6 @@ extra-deps:
      - examples
      - graphics
      - hardware
- - git: https://github.com/composewell/streamly
-   commit: 3da70288fe3bb70a83b595365f78319771b50a73
-   subdirs:
-     - .
- - git: https://github.com/litxio/streamly-cassava.git
-   commit: fac477a8d8960c1e10be9f775255e3fdf4d3fb14
- - git: https://github.com/idontgetoutmuch/Kalman
-   commit: 619d57e980d53c43bb1675efb17c73127fa924d0
  - git: https://github.com/eco-energy/mqtt-hs
    commit: 20abb49b9fbde9cab869f6877804f2dfa67d8e84
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
