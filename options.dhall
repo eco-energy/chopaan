@@ -1,7 +1,7 @@
 
 let BatteryType : Type = < LAFlooded | LASealed | LIon >
 
-let TxStart : Type = < Immediately | WithDelay Int >
+{- let TxStart : Type = < Immediately | WithDelay Int > -}
 
 in { logVerbose = True
 , mqttOpts = { connId = "chopaan-pilot-1"
@@ -27,11 +27,11 @@ in { logVerbose = True
            }
   ]
 , kibbutzOpts = { name = "kibbutz-pilot-node" }
-, transactions = { sender = "abcdefghi"
+{- , transactions = { sender = "abcdefghi"
                  , reciever = "abcdefghi"
                  , power = "100"
                  , duration = "60"
                  , repeatFor = 20
                  , start = WithDelay 20
-                 }
+                 } -}
 }

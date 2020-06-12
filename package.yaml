@@ -59,8 +59,6 @@ dependencies:
 - brick
 - vty
 - directory
-- cursor
-- reflection
 - microlens
 - streamly
 - mtl
@@ -68,11 +66,6 @@ dependencies:
 - microlens-th
 - stm-containers
 - hashable
-- hspec
-- QuickCheck
-- checkers
-- proto-lens-arbitrary
-- quickcheck-instances
 - kalman
 - hmatrix
 - estimator
@@ -83,12 +76,11 @@ dependencies:
 - distributive
 - linear
 - ad
-- concat-classes
-- concat-examples
-- concat-graphics
 - numeric-limits
 - dhall >= 1.24.0
 - total-map
+- keys
+- concat-classes
 ghc-options:
 - -Wall
 - -Wcompat

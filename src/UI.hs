@@ -78,9 +78,10 @@ drawMonitor focus _ nms _ =
     drawNodeMetrics nx = L.renderList (drawNodeMetric) focus (L.list (MonitorList) (nx) 40)
     --drawNodeMetrics Vec.empty = C.center $ str "No Monitor Nodes Found!"
     drawNodeMetric :: Show n => Bool -> (NodeT, n) -> Widget a
-    drawNodeMetric selected (n, nm) =
-      B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
+    drawNodeMetric selected (n, nm) = let
+      o = B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
           strWrap $ show nm
+      in o{T.hSize=T.Fixed}
 
 
 

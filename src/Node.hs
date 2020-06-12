@@ -209,28 +209,8 @@ data NodeMetrics e p = NodeMetrics
   , _battery :: !(Battery R R)
   } deriving (Eq, Ord, Generic)
 
-emptyNM = NodeMetrics Nothing 0 mempty mempty zeroMsg mempty
-
-{--
-instance (Num p, Num e) => Semigroup (NodeMetrics e p) where
-  n <> n' = NodeMetrics { _time = max <$> _time n <*> _time n'
-                        , lastTimeDiff = ((lastTimeDiff n) + (lastTimeDiff n')) / 2
-                        , _powerT = (_powerT n) <> (_powerT n')
-                        , _energyT = (_energyT n) <> (_energyT n')
-                        , _sensorsT = (_sensorsT n) <> (_sensorsT n')
-                        , _battery = (_battery n) <> (_battery n') 
-                        }
 
 
-
---deriving instance Generic EnergyState
-instance Semigroup EnergyState where
-  a <> a' = 
-
-
---}
-
---getFields :: EnergyState -> (Word [R])
 instance ToNamedRecord EnergyState where
   toNamedRecord es = HM.fromList $
                 zip names $
@@ -326,12 +306,14 @@ instance (Fractional e, Fractional p, Ord e, Ord p) => Semigroup (Battery e p) w
 instance (Fractional e, Fractional p, Ord e, Ord p) => Monoid (Battery e p) where
   mempty = emptyB
 
-runTime :: Fractional a => Battery a p -> SensorVector a -> a
-runTime Battery{soc} SensorVector{..} = soc / (sensorCurrent * sensorTerminalV)
+runTime :: ParamType a => Battery a p -> SensorVector a -> a
+runTime Battery{soc} SensorVector{..} = soc / ((normC sensorCurrent) * sensorTerminalV)
   where
     normC c
-      | c > 0 = c
+      | c >= 0 = c
       | c < 0 = 0.05
+      | otherwise = error "neither greater nor less than nor equal to zero"
+      
 
 socPercentage :: Fractional a => Battery a a -> a
 socPercentage Battery{..} = (soc * 100 / totalCapacity)
@@ -450,14 +432,14 @@ powerS = S.postscan powerFold
 nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m NodeS
 nodeS = S.postscan nodeMonitor
 
-newtype Grid n s = Grid (TMap.TMap n s) deriving (Show, Generic, Functor, Applicative)
+newtype Grid n s = Grid (Map.Map n s) deriving (Show, Generic, Functor)
 
 type GridS n = Grid n NodeS
 
 gridS :: forall t m n . (IsStream t, MonadAsync m, Ord n) => [n] -> t m (n, EnergyState) -> t m (GridS n)
 gridS ns ss = S.postscan gridMap $ ss
   where
-    gridMap = Grid . (TMap.fromPartial defNodeS) <$> FL.demux nodeMap
+    gridMap = Grid <$> FL.demux nodeMap
       where
         nodeMap = Map.fromList $ zip ns $ repeat nodeMonitor 
 
@@ -482,9 +464,9 @@ instance DefaultOrdered (TaggedNode n) where
 
 writeCSVRecords :: forall n. (ToField n)
   => FilePath
-  -> Map.Map n (NodeS)
+  -> GridS n
   ->  StateT Time.UTCTime IO ()
-writeCSVRecords fp gs = do
+writeCSVRecords fp (Grid gs) = do
   fE <- liftIO $ doesFileExist fp
   lastWrite <- get
   let

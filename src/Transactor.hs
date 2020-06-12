@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Transactor where
 
+import Prelude hiding (zip, zipWith)
 import Registry (writeToPubQ, PubQueue, Message, NodeT, KibbutzEvents)
 import Node (pToE, Watts, WattSeconds, NodeId(..), NodeS, Grid(..), NodeMetrics(..), Power(..), Energy(..), toWattSeconds)
 import qualified Data.Time as Time
@@ -49,7 +50,7 @@ import qualified Streamly.Internal.Data.Fold as FL
 
 import qualified Data.Set as St
 import qualified Data.Map.Strict as M
-
+import Data.Key
 
 type R = Double
 
@@ -256,16 +257,16 @@ transactionFold :: forall m. Monad m => M.Map NodeT (Participant, Watts, Time.Di
 transactionFold participants = FL.Fold step start end
   where
     step :: GridT -> Grid NodeT NodeS -> m (GridT)
-    step (Grid ts) (Grid ma) = return . Grid $ updateTS <$> ts <*> ma 
+    step (Grid ts) (Grid ma) = return . Grid $ zipWith updateTS ts ma 
     start :: m (GridT)
     start = return . Grid $
       (\(px, w, t)-> (px, mempty{ timeRemaining = t
-                          , energyRemaining = pToE w (fromIntegral t)
+                          , energyRemaining = pToE (realToFrac t) w
                           , startLag = 0
                           }))
       <$> participants
     end :: GridT -> m TransactionStatus
-    end (Grid gt) = let
+    end (Grid (gt)) = let
       gridTx = foldl (<>) mempty $ snd <$> gt
       loss = energyDispatched gridTx - energyReceived gridTx
       lossPerWS = loss / (energyDispatched gridTx)
@@ -277,20 +278,23 @@ transactionFold participants = FL.Fold step start end
                            { energyDispatched = e + energyDispatched tx
                            , timeRemaining = timeRemaining tx - lastTimeDiff
                            , energyRemaining = energyRemaining tx - e
-                           , startLag = if hasStarted then 0 else lastTimeDiff
-                           , endLag = if hasEnded && shouldHaveEnded then 0 else lastTimeDiff
+                           , startLag = if hasStarted px then startLag tx else (startLag tx + lastTimeDiff)
+                           , endLag = if hasEnded px && shouldHaveEnded then 0 else lastTimeDiff
                            }
                  Sink -> (mempty @TransactionStatus)
                    { energyReceived = e + energyReceived tx
                    , timeRemaining = timeRemaining tx - lastTimeDiff
                    , energyRemaining = energyRemaining tx - e
-                   , startLag = if hasStarted then 0 else lastTimeDiff
-                   , endLag = if hasEnded && shouldHaveEnded then 0 else lastTimeDiff
+                   , startLag = if hasStarted px then startLag tx else (startLag tx + lastTimeDiff)
+                   , endLag = if not shouldHaveEnded then 0 else (if hasEnded px then endLag tx else endLag tx + lastTimeDiff)
                    }
       in (px, nextTS)
       where
         e :: WattSeconds
-        e = pToE (tOutP _powerT) (fromIntegral lastTimeDiff)
-        hasStarted = (tOutP _powerT) > 0.5
-        hasEnded =  (tOutP _powerT) <= 0 && e > 0.5
+        e = pToE (realToFrac lastTimeDiff) (tOutP _powerT)
+        hasStarted Source = (tOutP _powerT) >= eta
+        hasStarted Sink = (tInP _powerT) >= eta
+        hasEnded Source =  shouldHaveEnded && (tOutP _powerT) <= eta
+        hasEnded Sink = shouldHaveEnded && (tInP _powerT) <= eta
         shouldHaveEnded = (energyRemaining tx - e) <= 0
+        eta = 0.5
