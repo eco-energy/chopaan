@@ -42,7 +42,6 @@ import Streamly
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
-import qualified Streamly.Csv as Csv
 
 
 import Data.ProtoLens (defMessage)
@@ -50,7 +49,6 @@ import Data.ProtoLens.TextFormat
 
 import Data.Hashable
 import qualified Data.Map.Strict as Map
-import qualified Data.TotalMap as TMap
 import Data.Function ((&))
 import Data.Maybe (fromJust, isNothing, isJust)
 

@@ -22,3 +22,6 @@ hoogle:
 
 build:
 	stack build
+
+s2nix:
+	stack-to-nix -o ./nix --stack-yaml=stack.yaml

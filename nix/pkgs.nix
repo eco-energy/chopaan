@@ -21,15 +21,9 @@
         "total-map" = (((hackage.total-map)."0.1.3").revisions)."081b917276323564e6d6ebaaf20c14d8ffc0a260cf3f29113c2577f774a272f1";
         "semiring-num" = (((hackage.semiring-num)."1.6.0.4").revisions)."ea73b7ec4980add625dedfe159dbeea9a37aa540a2a9df0f36263455b1654cc1";
         "key" = (((hackage.key)."0.1.2.0").revisions)."3bdfda94f99b8f2e01498ddf5f704cd84ce93315b532df50420ded94cbf5ba2e";
+        "streamly" = (((hackage.streamly)."0.7.2").revisions)."173a415316e230e2117365dcd0432f1a7992d42c89b79017df57c9f6581205e3";
+        "fusion-plugin-types" = (((hackage.fusion-plugin-types)."0.1.0").revisions)."0f11bbc445ab8ae3dbbb3d5d2ea198bdb1ac020518b7f4f7579035dc89182438";
         chopaan = ./chopaan.nix;
-        concat-inline = ./concat-inline.nix;
-        concat-known = ./concat-known.nix;
-        concat-satisfy = ./concat-satisfy.nix;
-        concat-classes = ./concat-classes.nix;
-        concat-plugin = ./concat-plugin.nix;
-        concat-examples = ./concat-examples.nix;
-        concat-graphics = ./concat-graphics.nix;
-        concat-hardware = ./concat-hardware.nix;
         net-mqtt = ./net-mqtt.nix;
         };
       };

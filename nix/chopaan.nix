@@ -40,7 +40,6 @@
           (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
           (hsPkgs."cassava" or (errorHandler.buildDepError "cassava"))
           (hsPkgs."compensated" or (errorHandler.buildDepError "compensated"))
-          (hsPkgs."concat-classes" or (errorHandler.buildDepError "concat-classes"))
           (hsPkgs."connection" or (errorHandler.buildDepError "connection"))
           (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
           (hsPkgs."convertible" or (errorHandler.buildDepError "convertible"))
@@ -51,7 +50,6 @@
           (hsPkgs."estimator" or (errorHandler.buildDepError "estimator"))
           (hsPkgs."hashable" or (errorHandler.buildDepError "hashable"))
           (hsPkgs."hmatrix" or (errorHandler.buildDepError "hmatrix"))
-          (hsPkgs."kalman" or (errorHandler.buildDepError "kalman"))
           (hsPkgs."keys" or (errorHandler.buildDepError "keys"))
           (hsPkgs."linear" or (errorHandler.buildDepError "linear"))
           (hsPkgs."microlens" or (errorHandler.buildDepError "microlens"))
@@ -67,7 +65,6 @@
           (hsPkgs."stm-containers" or (errorHandler.buildDepError "stm-containers"))
           (hsPkgs."streamly" or (errorHandler.buildDepError "streamly"))
           (hsPkgs."streamly-bytestring" or (errorHandler.buildDepError "streamly-bytestring"))
-          (hsPkgs."streamly-cassava" or (errorHandler.buildDepError "streamly-cassava"))
           (hsPkgs."text" or (errorHandler.buildDepError "text"))
           (hsPkgs."time" or (errorHandler.buildDepError "time"))
           (hsPkgs."time-lens" or (errorHandler.buildDepError "time-lens"))
@@ -98,7 +95,6 @@
             (hsPkgs."cassava" or (errorHandler.buildDepError "cassava"))
             (hsPkgs."chopaan" or (errorHandler.buildDepError "chopaan"))
             (hsPkgs."compensated" or (errorHandler.buildDepError "compensated"))
-            (hsPkgs."concat-classes" or (errorHandler.buildDepError "concat-classes"))
             (hsPkgs."connection" or (errorHandler.buildDepError "connection"))
             (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
             (hsPkgs."convertible" or (errorHandler.buildDepError "convertible"))
@@ -109,7 +105,6 @@
             (hsPkgs."estimator" or (errorHandler.buildDepError "estimator"))
             (hsPkgs."hashable" or (errorHandler.buildDepError "hashable"))
             (hsPkgs."hmatrix" or (errorHandler.buildDepError "hmatrix"))
-            (hsPkgs."kalman" or (errorHandler.buildDepError "kalman"))
             (hsPkgs."keys" or (errorHandler.buildDepError "keys"))
             (hsPkgs."linear" or (errorHandler.buildDepError "linear"))
             (hsPkgs."microlens" or (errorHandler.buildDepError "microlens"))
@@ -126,7 +121,6 @@
             (hsPkgs."stm-containers" or (errorHandler.buildDepError "stm-containers"))
             (hsPkgs."streamly" or (errorHandler.buildDepError "streamly"))
             (hsPkgs."streamly-bytestring" or (errorHandler.buildDepError "streamly-bytestring"))
-            (hsPkgs."streamly-cassava" or (errorHandler.buildDepError "streamly-cassava"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."time" or (errorHandler.buildDepError "time"))
             (hsPkgs."time-lens" or (errorHandler.buildDepError "time-lens"))
@@ -160,7 +154,6 @@
             (hsPkgs."checkers" or (errorHandler.buildDepError "checkers"))
             (hsPkgs."chopaan" or (errorHandler.buildDepError "chopaan"))
             (hsPkgs."compensated" or (errorHandler.buildDepError "compensated"))
-            (hsPkgs."concat-classes" or (errorHandler.buildDepError "concat-classes"))
             (hsPkgs."connection" or (errorHandler.buildDepError "connection"))
             (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
             (hsPkgs."convertible" or (errorHandler.buildDepError "convertible"))
@@ -172,7 +165,6 @@
             (hsPkgs."hashable" or (errorHandler.buildDepError "hashable"))
             (hsPkgs."hmatrix" or (errorHandler.buildDepError "hmatrix"))
             (hsPkgs."hspec" or (errorHandler.buildDepError "hspec"))
-            (hsPkgs."kalman" or (errorHandler.buildDepError "kalman"))
             (hsPkgs."keys" or (errorHandler.buildDepError "keys"))
             (hsPkgs."linear" or (errorHandler.buildDepError "linear"))
             (hsPkgs."microlens" or (errorHandler.buildDepError "microlens"))
@@ -190,7 +182,6 @@
             (hsPkgs."stm-containers" or (errorHandler.buildDepError "stm-containers"))
             (hsPkgs."streamly" or (errorHandler.buildDepError "streamly"))
             (hsPkgs."streamly-bytestring" or (errorHandler.buildDepError "streamly-bytestring"))
-            (hsPkgs."streamly-cassava" or (errorHandler.buildDepError "streamly-cassava"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."time" or (errorHandler.buildDepError "time"))
             (hsPkgs."time-lens" or (errorHandler.buildDepError "time-lens"))
@@ -210,6 +201,6 @@
           };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././.; }) // {
+    } // rec { src = (pkgs.lib).mkDefault ../.; }) // {
     cabal-generator = "hpack";
     }

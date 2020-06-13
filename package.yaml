@@ -66,11 +66,9 @@ dependencies:
 - microlens-th
 - stm-containers
 - hashable
-- kalman
 - hmatrix
 - estimator
 - cassava
-- streamly-cassava
 - streamly-bytestring
 - compensated
 - distributive
@@ -80,7 +78,7 @@ dependencies:
 - dhall >= 1.24.0
 - total-map
 - keys
-- concat-classes
+
 ghc-options:
 - -Wall
 - -Wcompat
