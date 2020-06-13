@@ -32,7 +32,7 @@ run = do
     KibbutzOpts{..} = kibbutzOpts
   k@Kibbutz{..} <- liftIO $ getKibbutz name
   _ <- liftIO $ forkIO $ forever $ runMqtt mqttOpts outQueue nodes (mkCallback k)
-  stream nodes inQueue
+  liftIO $ S.drain (stream nodes inQueue)
   where
     writer stateMap = runStateT (writeCSVRecords "test.csv" stateMap) (UTCTime (fromGregorian 1 1 2020) 0)
     stream nodes inQueue = gridS nodes (subStream inQueue) & S.trace (writer)

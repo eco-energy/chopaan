@@ -69,7 +69,6 @@ dependencies:
 - hmatrix
 - estimator
 - cassava
-- streamly-bytestring
 - compensated
 - distributive
 - linear
