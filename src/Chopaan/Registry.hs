@@ -13,7 +13,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Registry (NodeT, HasTopics(..), ThingName
+module Chopaan.Registry (NodeT, HasTopics(..), ThingName
                 , Kibbutz(..), KibbutzEvents(..), getKibbutz, mkCallback, subStream
                 , PubQueue, writeToPubQ
                 , NodeQueue(..), initNodeQueue, writeToNodeQueue
@@ -21,13 +21,14 @@ module Registry (NodeT, HasTopics(..), ThingName
                 , SensorSM, SensorSub, duplicateS, Message(..)
                 ) where
 
+import Chopaan.Node
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
 import qualified Data.Text as Text
 import GHC.Generics (Generic)
 import Lens.Micro
-
+import Control.Monad.Reader
 
 -- AWS Imports
 import qualified Network.AWS.IoT.ListThings as Iot
@@ -38,7 +39,7 @@ import Data.Either
 import System.IO
 import qualified Network.MQTT.Topic as MQ
 import qualified Network.MQTT.Client as MQ
-import Node
+
 import Proto.NodeMessages
 import qualified Proto.NodeMessages_Fields as NM
 import Data.ProtoLens.Labels()
@@ -54,9 +55,9 @@ import qualified Streamly.Prelude as S
 import Data.ProtoLens.Encoding (decodeMessage)
 import Data.ProtoLens (Message(..))
 
-import StateMonitor
-import Subscriber (Subscriber, StreamMap)
-import Control.Monad.Reader
+import Chopaan.StateMonitor
+import Chopaan.Subscriber (Subscriber, StreamMap)
+
 
 import qualified Control.Concurrent.STM.TChan as TChan
 

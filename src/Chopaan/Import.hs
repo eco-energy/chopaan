@@ -1,8 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-module Import
+module Chopaan.Import
   ( module RIO
-  , module Types
   ) where
 
 import RIO
-import Types

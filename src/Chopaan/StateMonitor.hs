@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
-module StateMonitor where
+module Chopaan.StateMonitor where
 
 import qualified StmContainers.Map as SMap
 

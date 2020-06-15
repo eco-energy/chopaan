@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings#-}
 
-module Mqtt (runMqtt) where
+module Chopaan.Mqtt (runMqtt) where
 
 
 -- Different string modules should be unified under one interface
@@ -34,10 +34,10 @@ import Control.Concurrent (forkIO, threadDelay)
 
 import Control.Concurrent.STM
 
-import Registry (NodeT, HasTopics(..), NodeQueue(..))
+import Chopaan.Registry (NodeT, HasTopics(..), NodeQueue(..))
 
 import Data.ProtoLens (encodeMessage, Message)
-import Types (MQTTOpts(..))
+import Chopaan.Types (MQTTOpts(..))
 
 
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control

@@ -1,14 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Types where
+module Chopaan.Types where
 
 import RIO
 import RIO.Process
 
 import Dhall
 
-import NodeOpts
+import Chopaan.NodeOpts
 
 data MQTTOpts = MQTTOpts
   { connId :: !Text

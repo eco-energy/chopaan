@@ -10,7 +10,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-module Storage where
+module Chopaan.Storage where
 
 import Numeric.Estimator.KalmanFilter
 import Numeric.Estimator.Augment

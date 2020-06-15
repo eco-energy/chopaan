@@ -13,7 +13,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Node (
+module Chopaan.Node (
   -- scans
   gridS, nodeS, energyS, powerS, timeS
   -- folds
@@ -62,10 +62,10 @@ import qualified Data.HashMap.Strict as HM
 
 import Numeric.Compensated
 import Control.Monad.State.Lazy
-
-
-import Storage
 import Numeric.Estimator (KalmanFilter(..))
+
+import Chopaan.Storage
+
 
 ----------------------------------------------------------------------------------
 -- Metric Tracking

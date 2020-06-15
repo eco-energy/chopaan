@@ -9,11 +9,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Transactor where
+module Chopaan.Transactor where
 
 import Prelude hiding (zip, zipWith)
-import Registry (writeToPubQ, PubQueue, Message, NodeT, KibbutzEvents)
-import Node (pToE, Watts, WattSeconds, NodeId(..), NodeS, Grid(..), NodeMetrics(..), Power(..), Energy(..), toWattSeconds)
+import Chopaan.Registry (writeToPubQ, PubQueue, Message, NodeT, KibbutzEvents)
+import Chopaan.Node (pToE, Watts, WattSeconds, NodeId(..), NodeS, Grid(..), NodeMetrics(..), Power(..), Energy(..), toWattSeconds)
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
@@ -32,16 +32,8 @@ import Data.ULID
 
 import GHC.Generics (Generic)
 
-
--- Brick
-import qualified Brick.Forms as F
-import qualified Brick.Types as T
-import qualified Brick.Widgets.List as L
-import Brick.Widgets.Core (strWrap, fill, padBottom, (<+>), vLimit, hLimit)
-
-
 import qualified Data.Vector as Vec
-import UI.Types (TXFormField(..), KibbutzUI(..))
+
 
 import Streamly
 import qualified Streamly.Prelude as S
@@ -144,11 +136,11 @@ prepTx sf ulid tNow leadTime = (txReqs, tx)
 data TransactorS = TransactorS
   { nodes_t :: [NodeT]
   , transactions :: [Transaction]
-  , txForms :: StakeList
+  , txForms :: [Stake]
   } deriving (Generic)
 
 executeTransaction :: TransactorS -> PubQueue -> IO (TransactorS)
-executeTransaction t@TransactorS{..} outQueue = if validateStakeListForTx (unStakeList txForms) then exec else return t
+executeTransaction t@TransactorS{..} outQueue = if validateStakeListForTx txForms then exec else return t
   where
     exec = do
       ulid <- getULID
@@ -158,48 +150,13 @@ executeTransaction t@TransactorS{..} outQueue = if validateStakeListForTx (unSta
       _ <- (mapM (uncurry $ writeToPubQ outQueue) reqs)
       return $ mkTransactor nodes_t $ tx:transactions
       where
-        stakes = unStakeList txForms
+        stakes = txForms
         
 mkTransactor :: [NodeT] -> [Transaction] -> TransactorS
 mkTransactor ns txs = TransactorS ns txs fs
   where
-    fs = stakeList $ mkTForms ns $ map initStake ns
+    fs = map initStake ns
 
-
-type StakeForm = F.Form Stake KibbutzEvents KibbutzUI
-
-type StakeList = L.List KibbutzUI StakeForm
-
-
-stakeList :: [StakeForm] -> StakeList
-stakeList xs = L.list TxListUI (Vec.fromList xs) 1 
-
-unStakeList :: StakeList -> [Stake]
-unStakeList s =  F.formState <$> (Vec.toList . L.listElements $ s)
-
-initStakeList :: StakeList
-initStakeList = stakeList []
-
-addStake :: StakeList -> StakeForm -> StakeList
-addStake xs x = L.listInsert 0 x xs
-
-
-stakeForm :: Int -> NodeT -> Stake -> StakeForm
-stakeForm i n =
-    let
-      selQ = "Household?"
-      hname = (unNodeId n)
-      label s w = padBottom (T.Pad 1) $ (vLimit 2 $ hLimit 25 $ strWrap s <+> fill ' ') <+> w
-    in F.newForm [ label selQ F.@@= F.checkboxField participating (TxFormUI (ParticipatingField i)) hname   
-                 , label "Power" F.@@= F.editShowableField power (TxFormUI (PowerField i))
-                 , label "Duration" F.@@= F.editShowableField duration (TxFormUI (DurationField i))
-                 ]
-
-mkTForms :: [NodeT] -> [Stake] -> [StakeForm]
-mkTForms ns stakes = map (uncurry3 stakeForm) $ zip3 ids ns stakes
-  where
-    uncurry3 f (a, b, c) = f a b c
-    ids = [1,2..]
 
 
 data TransactionStatus = TransactionStatus

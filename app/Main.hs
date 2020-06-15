@@ -12,10 +12,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main (main) where
 
-import Import
-import Run
+import Chopaan.Run
+import RIO
 import RIO.Process
 import Dhall
+import Chopaan.Types
 
 --import qualified Paths_chopaan
 

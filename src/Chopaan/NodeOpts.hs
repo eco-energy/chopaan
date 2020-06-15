@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NodeOpts where
+module Chopaan.NodeOpts where
 
 import Dhall
 

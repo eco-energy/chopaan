@@ -3,11 +3,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ConstraintKinds, ConstrainedClassMethods#-}
-module Run (run) where
+module Chopaan.Run (run) where
 
-import Node (Grid(..), gridS, writeCSVRecords, NodeId(..))
-import Types
-import Import
+import Chopaan.Node (Grid(..), gridS, writeCSVRecords, NodeId(..))
+import Chopaan.Types
+import RIO
 import Control.Concurrent (forkIO)
 
 import Streamly
@@ -17,8 +17,8 @@ import Control.Monad.State.Lazy (runStateT)
 
 import RIO.Time
 
-import Mqtt (runMqtt)
-import Registry (
+import Chopaan.Mqtt (runMqtt)
+import Chopaan.Registry (
   Kibbutz(..), getKibbutz, mkCallback
   , subStream
   )
