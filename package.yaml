@@ -38,7 +38,7 @@ dependencies:
 - rio >= 0.1.8.0
 - amazonka
 - amazonka-iot
-- net-mqtt
+- net-mqtt >= 0.7.0
 - aeson
 - proto-lens
 - text
