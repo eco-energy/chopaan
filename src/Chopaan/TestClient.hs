@@ -2,8 +2,8 @@ module Chopaan.TestClient where
 
 {--
 
-import Proto.NodeMessages ()
-import Proto.NodeMessages_Fields
+import Proto.NodeMessageSchema.NodeMessages ()
+import Proto.NodeMessageSchema.NodeMessages_Fields
 
 import Data.ProtoLens (defMessage)
 import Lens.Micro

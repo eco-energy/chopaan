@@ -39,7 +39,7 @@ import System.IO
 import qualified Network.MQTT.Topic as MQ
 import qualified Network.MQTT.Client as MQ
 
-import Proto.NodeMessages (MeshFrame, EnergyTransactionRequest)
+import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyTransactionRequest)
 import Data.ProtoLens.Labels()
 
 

@@ -18,8 +18,8 @@ import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
 
-import qualified Proto.NodeMessages as NM
-import qualified Proto.NodeMessages_Fields as NM
+import qualified Proto.NodeMessageSchema.NodeMessages as NM
+import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
 
 import Lens.Micro
 

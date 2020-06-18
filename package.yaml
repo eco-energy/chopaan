@@ -6,19 +6,11 @@ author:              Faez Shakil
 maintainer:          faez.shakil@gmail.com
 copyright:           2019 Faez Shakil
 
-custom-setup:
-  dependencies:
-    - base
-    - Cabal
-    - proto-lens-setup
-
-build-tools:
-  proto-lens-protoc:proto-lens-protoc
 
 extra-source-files:
 - README.md
 - ChangeLog.md
-- node_message_schema/NodeMessages.proto
+
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -28,7 +20,6 @@ extra-source-files:
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
 description:         Please see the README on Github at <https://github.com/faezs/chopaan#readme>
-
 
 
 
@@ -84,10 +75,6 @@ ghc-options:
 
 library:
   source-dirs: src
-  generated-exposed-modules:
-    - Proto.NodeMessages
-    - Proto.NodeMessages_Fields
-
 
 executables:
   chopaan-exe:

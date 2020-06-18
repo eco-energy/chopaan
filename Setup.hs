@@ -1,3 +1,3 @@
-import Data.ProtoLens.Setup
+import Distribution.Simple
 
-main = defaultMainGeneratingProtos "node_message_schema"
+main = defaultMain

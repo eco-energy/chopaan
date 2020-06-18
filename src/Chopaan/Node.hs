@@ -33,8 +33,8 @@ import Data.Time.Clock.POSIX
 
 import GHC.Generics (Generic)
 
-import Proto.NodeMessages
-import Proto.NodeMessages_Fields hiding (time)
+import Proto.NodeMessageSchema.NodeMessages
+import Proto.NodeMessageSchema.NodeMessages_Fields hiding (time)
 
 import Lens.Micro
 
