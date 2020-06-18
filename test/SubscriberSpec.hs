@@ -5,7 +5,7 @@
 
 module SubscriberSpec (spec) where
 
-import Subscriber
+import Chopaan.Subscriber
 import Test.Hspec
 import Test.QuickCheck.Classes
 import Test.QuickCheck.Checkers

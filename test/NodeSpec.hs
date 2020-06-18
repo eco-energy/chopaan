@@ -3,7 +3,7 @@
 
 module NodeSpec (spec) where
 
-import Node
+import Chopaan.Node
 import Test.Hspec
 import Test.QuickCheck.Classes
 import Test.QuickCheck.Checkers
@@ -14,8 +14,8 @@ import qualified Streamly.Prelude as S
 import Streamly
 import qualified Streamly.Data.Fold as FL
 
-import Proto.NodeMessages ()
-import Proto.NodeMessages_Fields
+import Proto.NodeMessageSchema.NodeMessages ()
+import Proto.NodeMessageSchema.NodeMessages_Fields
 import Lens.Micro ()
 import Data.ProtoLens.Arbitrary
 
@@ -23,15 +23,14 @@ import Data.ProtoLens (defMessage)
 import Lens.Micro
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import qualified Data.Time as Time
-import Subscriber (subStream, runSubscriber, Subscriber, StreamMap, getStream, writeSub, mkSub, subMap)
+import Chopaan.Subscriber (subStream, runSubscriber, Subscriber, StreamMap, getStream, writeSub, mkSub, subMap)
 
 import Control.Concurrent (threadDelay, forkIO)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (isEmptyTChan, dupTChan)
 import Control.Monad (forever, liftM)
 
-import Registry (duplicateS)
-import StateMonitor (initKM, updateKM, readKM)
+import Chopaan.Registry (duplicateS)
 import Numeric.Compensated
 
 instance Arbitrary EnergyState where

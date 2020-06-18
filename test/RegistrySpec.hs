@@ -5,7 +5,7 @@
 
 module RegistrySpec (spec) where
 
-import Registry
+import Chopaan.Registry
 import Test.Hspec
 import Test.QuickCheck.Classes
 import Test.QuickCheck.Checkers
@@ -21,7 +21,7 @@ import Data.ProtoLens.Arbitrary
 import Lens.Micro
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import qualified Data.Time as Time
-import Node (NodeId(..))
+import Chopaan.Node (NodeId(..))
 import qualified Data.Text as Text
 
 instance Arbitrary ThingName where

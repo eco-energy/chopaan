@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
 module StorageSpec where
 
-import Storage
+import Chopaan.Storage
 import Test.Hspec
 import Test.QuickCheck.Checkers
 import Test.QuickCheck
