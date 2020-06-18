@@ -1,5 +1,7 @@
 gen_schema:
-	git submodule update --remote --merge 
+	git submodule update --remote --merge \
+	&& protoc --plugin=protoc-gen-haskell=`stack exec -- which proto-lens-protoc` \
+	--haskell_out=./src node_message_schema/NodeMessages.proto
 
 mqtt_cert:
 	aws iot create-keys-and-certificate --set-as-active \
