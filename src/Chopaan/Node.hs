@@ -524,9 +524,6 @@ power es = Power
       where
         v' = add (es ^. v) 0 compensated
 
---errorHandle :: (Num a, Compensable a) =>  a -> a -> Compensated a
---errorHandle a b = a
-
 
 -- $ converts the millisecond timestamp in the EnergyState to a UTCTime  
 utcTimeNow :: EnergyState -> Time.UTCTime

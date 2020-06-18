@@ -17,7 +17,6 @@ module Chopaan.Registry (NodeT, HasTopics(..), ThingName
                 , Kibbutz(..), KibbutzEvents(..), getKibbutz, mkCallback, subStream
                 , PubQueue, writeToPubQ
                 , NodeQueue(..), initNodeQueue, writeToNodeQueue
-                , KConnM, KMState, KMSensor, initKMS, initKMConn
                 , SensorSM, SensorSub, duplicateS, Message(..)
                 ) where
 
@@ -40,8 +39,7 @@ import System.IO
 import qualified Network.MQTT.Topic as MQ
 import qualified Network.MQTT.Client as MQ
 
-import Proto.NodeMessages
-import qualified Proto.NodeMessages_Fields as NM
+import Proto.NodeMessages (MeshFrame, EnergyTransactionRequest)
 import Data.ProtoLens.Labels()
 
 
@@ -55,7 +53,6 @@ import qualified Streamly.Prelude as S
 import Data.ProtoLens.Encoding (decodeMessage)
 import Data.ProtoLens (Message(..))
 
-import Chopaan.StateMonitor
 import Chopaan.Subscriber (Subscriber, StreamMap)
 
 
@@ -237,22 +234,3 @@ duplicateS src = do
       (fmap (fromRight undefined) $ S.filter isRight $ (Left <$> writes) `async` (Right <$> reads1), reads2)
   pure $ tp
 
-
-
-{-----------------------------------------------------------------------------
-
-                 Monitor Tings
-------------------------------------------------------------------------------}
-
-type KMState = KibbutzMonitor NodeT NodeS
-
-initKMS :: [NodeT] -> STM (KMState)
-initKMS ns = initKM ns defNodeS
-
-type KMSensor = KibbutzMonitor NodeT EnergyState
-
-
-type KConnM = KibbutzMonitor NodeT Int
-
-initKMConn :: [NodeT] -> STM KConnM
-initKMConn ns = initKM ns 0

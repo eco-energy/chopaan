@@ -12,8 +12,8 @@
 module Chopaan.Transactor where
 
 import Prelude hiding (zip, zipWith)
-import Chopaan.Registry (writeToPubQ, PubQueue, Message, NodeT, KibbutzEvents)
-import Chopaan.Node (pToE, Watts, WattSeconds, NodeId(..), NodeS, Grid(..), NodeMetrics(..), Power(..), Energy(..), toWattSeconds)
+import Chopaan.Registry (writeToPubQ, PubQueue, Message, NodeT)
+import Chopaan.Node (pToE, Watts, WattSeconds, NodeS, Grid(..), NodeMetrics(..), Power(..))
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
@@ -22,8 +22,6 @@ import qualified Proto.NodeMessages as NM
 import qualified Proto.NodeMessages_Fields as NM
 
 import Lens.Micro
-import Lens.Micro.TH (makeLenses)
-
 
 import Data.ProtoLens
 import Data.Convertible
@@ -32,15 +30,10 @@ import Data.ULID
 
 import GHC.Generics (Generic)
 
-import qualified Data.Vector as Vec
 
-
-import Streamly
-import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 
-import qualified Data.Set as St
 import qualified Data.Map.Strict as M
 import Data.Key
 
@@ -98,8 +91,6 @@ data Stake = Stake
   , _duration :: Int
   } deriving (Eq, Ord, Show)
 
-
-makeLenses ''Stake
 
 initStake :: NodeT -> Stake
 initStake n = Stake n False 0 0

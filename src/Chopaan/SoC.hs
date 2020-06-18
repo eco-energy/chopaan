@@ -9,9 +9,9 @@
 {-# LANGUAGE DataKinds #-}
 module Chopaan.SoC where
 
-
+{--
 import GHC.Generics (Generic)
-import Numeric.LinearAlgebra.Static hiding ((<>))
+--import Numeric.LinearAlgebra.Static hiding ((<>))
 --import qualified Numeric.LinearAlgebra as LA
 --import qualified Numeric.LinearAlgebra.Static as LA
 
@@ -24,7 +24,7 @@ import qualified Data.Time as Time
 
 import Control.Monad.State (runStateT, StateT, get, put)
 import Numeric.Estimator
-{--
+
 
 type KalmanState m a = StateT (a, KalmanFilter StateVector a) m
 
@@ -56,7 +56,7 @@ data BatteryState a = BatteryState
 
 states :: (KnownNat n) => i -> t m VI' -> t m (L n 2)
 states = undefined
---}
+
 
 
 {--
@@ -220,3 +220,4 @@ hyst' hp ceff i delT gamma q = h' * hp + (1 - h') * hp
   where
     h' = exp (- abs ((ceff * i * gamma * delT) / q))
     
+--}

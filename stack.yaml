@@ -35,23 +35,10 @@ packages:
 # forks / in-progress versions pinned to a git hash. For example:
 #
 extra-deps:
-# - git: https://github.com/conal/concat.git
-#   commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
-#   subdirs:
-#     - inline
-#     - known
-#     - satisfy
-#     - classes
-#     - plugin
-#     - examples
-#     - graphics
-#     - hardware
- - git: https://github.com/eco-energy/mqtt-hs
-   commit: 20abb49b9fbde9cab869f6877804f2dfa67d8e84
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
  - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
  - amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135
- #- net-mqtt-0.6.2.1@sha256:c1966caaa2b3894f7075450543dcd1f8017db14d06edb927a4f756533bd74398,4131
+ - net-mqtt-0.6.2.3@sha256:3c2201ad7021a07bccd8bb0c64a8450451085ddd03178f2a916e7951d4e7260a,4131
  - ulid-0.2.0.0@sha256:ac415298b0272479909ca576f4444862ae942ed85c7849fa0675e3bf496be6f3,2485
  - crockford-0.2@sha256:6ec593711a20bd4b81a0fc13f3d850d2d890690941d777230fbf980c483e434a,553
  - cursor-0.2.0.0@sha256:9071e1029efc634bab63c8b3fd970bbd133475749ec918138a9e7304b0a7e696,1637

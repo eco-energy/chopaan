@@ -56,15 +56,10 @@ dependencies:
 - ulid
 - convertible
 - time-lens
-- brick
-- vty
 - directory
 - microlens
 - streamly
 - mtl
-- vector
-- microlens-th
-- stm-containers
 - hashable
 - hmatrix
 - estimator
@@ -75,8 +70,8 @@ dependencies:
 - ad
 - numeric-limits
 - dhall >= 1.24.0
-- total-map
 - keys
+- vector
 
 ghc-options:
 - -Wall
