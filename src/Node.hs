@@ -42,7 +42,6 @@ import Streamly
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
-import qualified Streamly.Csv as Csv
 
 
 import Data.ProtoLens (defMessage)
