@@ -46,12 +46,10 @@ extra-deps:
      - examples
      - graphics
      - hardware
- - git: https://github.com/eco-energy/mqtt-hs
-   commit: 20abb49b9fbde9cab869f6877804f2dfa67d8e84
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
  - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
  - amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135
- #- net-mqtt-0.6.2.1@sha256:c1966caaa2b3894f7075450543dcd1f8017db14d06edb927a4f756533bd74398,4131
+ - net-mqtt-0.7.0.1
  - ulid-0.2.0.0@sha256:ac415298b0272479909ca576f4444862ae942ed85c7849fa0675e3bf496be6f3,2485
  - crockford-0.2@sha256:6ec593711a20bd4b81a0fc13f3d850d2d890690941d777230fbf980c483e434a,553
  - cursor-0.2.0.0@sha256:9071e1029efc634bab63c8b3fd970bbd133475749ec918138a9e7304b0a7e696,1637
@@ -68,6 +66,9 @@ extra-deps:
  - total-map-0.1.3@sha256:081b917276323564e6d6ebaaf20c14d8ffc0a260cf3f29113c2577f774a272f1,983
  - semiring-num-1.6.0.4@sha256:ea73b7ec4980add625dedfe159dbeea9a37aa540a2a9df0f36263455b1654cc1,2943
  - key-0.1.2.0@sha256:3bdfda94f99b8f2e01498ddf5f704cd84ce93315b532df50420ded94cbf5ba2e,1767
+ - streamly-0.7.2@sha256:173a415316e230e2117365dcd0432f1a7992d42c89b79017df57c9f6581205e3,27421
+ - fusion-plugin-types-0.1.0@sha256:0f11bbc445ab8ae3dbbb3d5d2ea198bdb1ac020518b7f4f7579035dc89182438,1506
+
 
  # - acme-missiles-0.3
 # - git: https://github.com/commercialhaskell/stack.git
