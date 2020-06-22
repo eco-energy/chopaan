@@ -66,6 +66,8 @@ import Numeric.Estimator (KalmanFilter(..))
 
 import Chopaan.Storage
 
+import Data.Aeson
+
 
 ----------------------------------------------------------------------------------
 -- Metric Tracking
@@ -84,11 +86,16 @@ toWatts a = add a 0 compensated
 toWattSeconds :: Double -> WattSeconds
 toWattSeconds a = add a 0 compensated
 
-  
+newtype NodeMessage = NodeMessage EnergyState deriving (Eq, Ord, Show, Generic)
+
 instance ToField (Compensated Double) where
   toField = toField . uncompensated 
 
-newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Generic)
+instance ToJSON (Compensated Double) where
+  toJSON = toJSON . uncompensated
+
+newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Generic, ToJSON)
+
 
 instance (Hashable a) => Hashable (NodeId a) where
   hashWithSalt n (NodeId a) = hashWithSalt n a
@@ -104,7 +111,7 @@ data Energy a = Energy
   , txOut :: !a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Ord, Generic, Functor)
+  } deriving (Eq, Ord, Generic, Functor, ToJSON)
 
 instance (Show a) => Show (Energy a) where
   show Energy{..} = "Energy Balance (Wattseconds)" <> nl
@@ -158,7 +165,9 @@ data Power a = Power
   , tInP :: !a
   , tOutP :: !a
   , loadP :: !a }
-  deriving (Eq, Ord, Generic, Functor)
+  deriving (Eq, Ord, Generic, Functor, ToJSON)
+
+
 
 
 instance (Show a) => Show (Power a) where
@@ -196,16 +205,14 @@ instance (Num a) => Semigroup (Power a) where
 instance (Num a) => Monoid (Power a) where
   mempty = Power 0 0 0 0
 
---instance (Num a) => VS.V R (Power a) where
 
 data NodeMetrics e p = NodeMetrics
   { _time :: !(Maybe Time.UTCTime)
   , lastTimeDiff :: !Time.DiffTime
   , _powerT :: !(Power p)
   , _energyT :: !(Energy e)
-  , _sensorsT :: !EnergyState
   , _battery :: !(Battery R R)
-  } deriving (Eq, Ord, Generic)
+  } deriving (Eq, Ord, Generic, ToJSON)
 
 
 
@@ -258,11 +265,11 @@ instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
 instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
     <> sep <> ("SoC Percentage: " <> sep <> show (socPercentage _battery))
-    <> sep <> ("Runtime Estimate: " <> sep <> show (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
+--    <> sep <> ("Runtime Estimate: " <> sep <> show (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
     -- <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
     <> sep <> ("current energy:" <> sep <> show _energyT)
-    <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensorsT)))
+--    <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensorsT)))
     where
       sep = "\n"
 
@@ -287,7 +294,7 @@ data Battery e p = Battery
   , chargeLim :: !p
   , dischargeLim :: !p
   , totalCapacity :: !e
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, ToJSON)
 
 emptyB :: (Fractional e, Fractional p) => Battery e p
 emptyB = Battery 0 0 0 0
@@ -317,7 +324,7 @@ socPercentage :: Fractional a => Battery a a -> a
 socPercentage Battery{..} = (soc * 100 / totalCapacity)
 
 defNodeS :: NodeS
-defNodeS = NodeMetrics Nothing 0 mempty mempty zeroMsg mempty
+defNodeS = NodeMetrics Nothing 0 mempty mempty mempty
 
 
 {----------------------------------------------------------------------------------------------------
@@ -400,14 +407,14 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
 
 
 nodeMonitor :: forall m. (Monad m) => FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
-nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> sensors <*> (batteryFold defBatteryParams) 
+nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> (batteryFold defBatteryParams) 
   where
     tn :: FL.Fold m (EnergyState) Timestamp
     tn = timeFold
     en :: FL.Fold m (EnergyState) (Energy WattSeconds)
     en =  energyFold
-    sensors :: FL.Fold m (EnergyState) (EnergyState)
-    sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
+    --sensors :: FL.Fold m (EnergyState) (EnergyState)
+    --sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
 
 
 
@@ -453,7 +460,7 @@ instance (ToField n) => ToNamedRecord (TaggedNode n) where
 
 instance DefaultOrdered (TaggedNode n) where
   headerOrder _ = (Vec.fromList $ ["NodeId", "time"])
-                  <> (headerOrder (undefined :: EnergyState))
+                  -- <> (headerOrder (undefined :: EnergyState))
                   <> (headerOrder (undefined :: Power Watts))
                   <> (headerOrder (undefined :: Energy WattSeconds))
 
