@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -49,7 +50,6 @@ import Data.ProtoLens.TextFormat
 
 import Data.Hashable
 import qualified Data.Map.Strict as Map
-import qualified Data.TotalMap as TMap
 import Data.Function ((&))
 import Data.Maybe (fromJust, isNothing, isJust)
 
@@ -210,9 +210,19 @@ data NodeMetrics e p = NodeMetrics
 
 
 
+esFieldNames :: [Name]
+esFieldNames = ["batteryV",
+                 "gridV",
+                 "battery2LoadC",
+                 "battery2GridC",
+                 "grid2BatteryC",
+                 "solarC",
+                 "dutyC"
+               ]
+
 instance ToNamedRecord EnergyState where
   toNamedRecord es = HM.fromList $
-                zip names $
+                zip esFieldNames $
                 map (pack . show) $
                 es ^.. ( batteryVoltage
                          <> gridVoltage
@@ -221,29 +231,11 @@ instance ToNamedRecord EnergyState where
                          <> gridToBatteryCurrent
                          <> solarInputCurrent
                          <> dutyCycle
-                         -- <> cpuTime
                        )
-                where
-                  names = ["batteryV",
-                           "gridV",
-                           "battery2LoadC",
-                           "battery2GridC",
-                           "grid2BatteryC",
-                           "solarC",
-                           "dutyC"]--,
-                           --"cpuTime"]
 
 
 instance DefaultOrdered EnergyState where
-  headerOrder _ = Vec.fromList $ names
-    where
-      names = [ "batteryV",
-                "gridV",
-                "battery2LoadC",
-                "battery2GridC",
-                "grid2BatteryC",
-                "solarC",
-                "dutyC"]
+  headerOrder _ = Vec.fromList esFieldNames
 
 instance ToField Time.UTCTime where
   toField t = pack (show t)
@@ -252,8 +244,8 @@ instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
   toNamedRecord (NodeMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
     [ toNamedRecord _battery,
       toNamedRecord _powerT,
-      toNamedRecord _energyT --,
-      --toNamedRecord _sensorsT
+      toNamedRecord _energyT,
+      toNamedRecord _sensorsT
     ]
 
 instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
