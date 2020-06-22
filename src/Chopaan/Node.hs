@@ -94,7 +94,10 @@ instance ToField (Compensated Double) where
 instance ToJSON (Compensated Double) where
   toJSON = toJSON . uncompensated
 
-newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Generic, ToJSON)
+instance FromJSON (Compensated Double) where
+  parseJSON b = (\a -> add a 0 compensated) <$> (parseJSON @Double b)
+
+newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Generic, ToJSON, FromJSON)
 
 
 instance (Hashable a) => Hashable (NodeId a) where
@@ -111,7 +114,7 @@ data Energy a = Energy
   , txOut :: !a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Ord, Generic, Functor, ToJSON)
+  } deriving (Eq, Ord, Generic, Functor, ToJSON, FromJSON)
 
 instance (Show a) => Show (Energy a) where
   show Energy{..} = "Energy Balance (Wattseconds)" <> nl
@@ -165,7 +168,7 @@ data Power a = Power
   , tInP :: !a
   , tOutP :: !a
   , loadP :: !a }
-  deriving (Eq, Ord, Generic, Functor, ToJSON)
+  deriving (Eq, Ord, Generic, Functor, ToJSON, FromJSON)
 
 
 
@@ -212,7 +215,7 @@ data NodeMetrics e p = NodeMetrics
   , _powerT :: !(Power p)
   , _energyT :: !(Energy e)
   , _battery :: !(Battery R R)
-  } deriving (Eq, Ord, Generic, ToJSON)
+  } deriving (Eq, Ord, Generic, ToJSON, FromJSON)
 
 
 
@@ -294,7 +297,7 @@ data Battery e p = Battery
   , chargeLim :: !p
   , dischargeLim :: !p
   , totalCapacity :: !e
-  } deriving (Eq, Ord, Show, Generic, ToJSON)
+  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
 
 emptyB :: (Fractional e, Fractional p) => Battery e p
 emptyB = Battery 0 0 0 0
