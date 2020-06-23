@@ -33,7 +33,6 @@ import Graphics.Vty.Input.Events
 
 import Control.Monad.Reader
 import Control.Concurrent.STM
-import Control.Concurrent (threadDelay)
 import GHC.Generics (Generic)
 
 
@@ -42,7 +41,7 @@ import Transactor
 import Registry (Kibbutz(..), KibbutzEvents(..), NodeT, KMState, KConnM)
 import UI.Types
 import StateMonitor (readKM)
-
+import System.IO.Unsafe
 
 
 renderNodeId :: NodeT -> Widget n
@@ -70,15 +69,12 @@ titleAttr :: A.AttrName
 titleAttr = "title"
 
 
-drawMonitor :: (Show n) => Bool -> Int -> [(NodeT, n)] -> [(NodeT, Int)] -> Widget KibbutzUI
+drawMonitor :: Bool -> Int -> CurNodes -> [(NodeT, Int)] -> Widget KibbutzUI
 drawMonitor focus _ nms _ =
-  C.vLimitPercent 100 $ B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ drawNodeMetrics (Vec.fromList nms)
+  C.vLimitPercent 100 $ B.borderWithLabel (withAttr titleAttr $ str "HH Monitor") $ L.renderList drawNodeMetric focus nms
   where
-    drawNodeMetrics :: Show n => Vec.Vector (NodeT, n) -> Widget KibbutzUI
-    drawNodeMetrics nx = L.renderList (drawNodeMetric) focus (L.list (MonitorList) (nx) 40)
-    --drawNodeMetrics Vec.empty = C.center $ str "No Monitor Nodes Found!"
     drawNodeMetric :: Show n => Bool -> (NodeT, n) -> Widget a
-    drawNodeMetric selected (n, nm) = let
+    drawNodeMetric hasFocus (n, nm) = let
       o = B.borderWithLabel (withAttr titleAttr $ renderNodeId n) $
           strWrap $ show nm
       in o{T.hSize=T.Fixed}
@@ -87,36 +83,9 @@ drawMonitor focus _ nms _ =
 
 -- write a metricsheet render function which can be <*>'d over 
 drawKibbutz :: KibbutzState -> [Widget KibbutzUI]
-drawKibbutz KibbutzState { transactor, currentNodeState, currentConnStates, queueEmpty, msgCount' } =
-  [(drawMonitor queueEmpty msgCount' currentNodeState currentConnStates) <+> (drawTransactor True transactor)] 
+drawKibbutz KibbutzState { transactor, currentNodeState, currentConnStates, queueEmpty, msgCount', uiSection } =
+  [(drawMonitor (if uiSection == M then True else False) msgCount' currentNodeState currentConnStates) <+> (drawTransactor (if uiSection == T then True else False) transactor)] 
 
-
--- We have a transactor event handler
-kibbutzEvent :: KibbutzState -> T.BrickEvent KibbutzUI KibbutzEvents -> T.EventM KibbutzUI (T.Next (KibbutzState))
-kibbutzEvent s@KibbutzState{..} e =
-  case e of
-    T.AppEvent (StateUpdate) ->
-      (M.continue =<< (liftIO . stateU $ s))
-    T.VtyEvent vtype ->
-      case vtype of
-        EvKey (KChar 'q') [] -> M.halt s
-        EvKey (KEnter) [] -> M.continue . liftTransactor =<< (liftIO $ executeTransaction transactor $ outQueue kibbutz)
-        _ -> M.continue . liftTransactor =<< handleTransactorEvent transactor e
-    _ -> M.continue s
-    where
-      liftTransactor = (\t-> s{transactor = t})
-      stateU :: KibbutzState -> IO (KibbutzState)
-      stateU s' = su <$> comb
-        where
-          su :: (Bool, CurNodes) -> KibbutzState 
-          su (etq, ns) = s'{queueEmpty = etq,
-                        currentNodeState = ns}
-          comb :: IO (Bool, CurNodes)
-          comb = ((,) <$> emp <*> nsu)
-          emp :: IO Bool
-          emp = (liftIO $ return False)
-          nsu :: IO (CurNodes)
-          nsu =  liftIO $ atomically $ readKM nodeStates (nodes $ kibbutz)
 
 
 mkUIChan :: IO (BChan KibbutzEvents)
@@ -133,8 +102,13 @@ runTUI kbtz kmState kConnS uiChan = do
   _ <- M.customMain initialVty buildVty (Just uiChan) kibbutzApp initialState
   return ()
 
-type CurNodes = [(NodeT, NodeS)]
+type CurNodes = L.List KibbutzUI (NodeT, NodeS)
 type CurConns = [(NodeT, Int)]
+
+data UISection = M | T deriving (Eq, Ord, Show)
+
+switchSection :: KibbutzState -> KibbutzState
+switchSection s@KibbutzState{uiSection} = s{uiSection = if uiSection == M then T else M}
 
 data KibbutzState = KibbutzState
   { kibbutz :: Kibbutz
@@ -147,6 +121,7 @@ data KibbutzState = KibbutzState
   , kbtzTime :: Time.UTCTime
   , queueEmpty :: Bool
   , msgCount' :: Int
+  , uiSection :: UISection
   }
   deriving (Generic)
 
@@ -158,7 +133,44 @@ buildInitialState k kmState kConnS = do
   let
     trxtr = mkTransactor (nodes k) []
     focusR = Focus.focusRing []
-  return $ KibbutzState k kmState kConnS crntNS crntConn trxtr focusR initTime True 0 
+    nodeList = toNodeList crntNS
+  return $ KibbutzState k kmState kConnS nodeList crntConn trxtr focusR initTime True 0 M
+
+
+toNodeList :: [e] -> L.GenericList KibbutzUI Vec.Vector e
+toNodeList ns = L.list (MonitorList) (Vec.fromList ns) 40
+
+-- We have a transactor event handler
+kibbutzEvent :: KibbutzState -> T.BrickEvent KibbutzUI KibbutzEvents -> T.EventM KibbutzUI (T.Next (KibbutzState))
+kibbutzEvent s@KibbutzState{..} e =
+  case e of
+    T.AppEvent (StateUpdate) ->
+      (M.continue =<< (liftIO . stateU $ s))
+    T.VtyEvent vtype ->
+      case vtype of
+        EvKey (KChar 'q') [] -> M.halt s
+        EvKey (KEnter) [] -> M.continue . liftTransactor =<< (liftIO $ executeTransaction transactor $ outQueue kibbutz)
+        EvKey (KChar 'a') [] -> M.continue (switchSection s)
+        _ -> case uiSection of
+          M -> M.continue . (\c -> s{currentNodeState=c}) =<< (L.handleListEvent vtype currentNodeState)
+          T -> M.continue . liftTransactor =<< handleTransactorEvent transactor e
+    _ -> M.continue s
+    where
+      liftTransactor = (\t-> s{transactor = t})
+      stateU :: KibbutzState -> IO (KibbutzState)
+      stateU s' = su <$> comb
+        where
+          su :: (Bool, CurNodes) -> KibbutzState 
+          su (etq, ns) = s'{queueEmpty = etq,
+                            currentNodeState = moveList (L.listSelected currentNodeState) ns}
+          moveList Nothing l = l
+          moveList (Just i) l = L.listMoveTo i l
+          comb :: IO (Bool, CurNodes)
+          comb = ((,) <$> emp <*> nsu)
+          emp :: IO Bool
+          emp = (liftIO $ return False)
+          nsu :: IO (CurNodes)
+          nsu =  liftIO $ toNodeList <$> (atomically $ readKM nodeStates (nodes $ kibbutz))
 
 
 isListEvent :: T.BrickEvent KibbutzUI e -> Bool
@@ -200,9 +212,13 @@ theMap = A.attrMap V.defAttr []{--
 
 
 selectCursor :: KibbutzState -> [T.CursorLocation KibbutzUI] -> Maybe (T.CursorLocation KibbutzUI)
-selectCursor s@KibbutzState{transactor} clocs = case (L.listSelectedElement txForms) of
-  Nothing -> M.showFirstCursor s clocs
-  Just (idx, _) -> safeIdx idx
+selectCursor s@KibbutzState{currentNodeState, transactor, uiSection} clocs =
+  let cur = case uiSection of
+        M -> M.showCursorNamed MonitorList clocs
+        T -> case (L.listSelectedElement txForms) of
+          Nothing -> M.showFirstCursor s clocs
+          Just (idx, _) -> safeIdx idx
+  in cur
   where
     TransactorS{txForms} = transactor
     safeIdx idx = Just $ clocs !! (min ((length clocs) - 1) (max 0 idx))
