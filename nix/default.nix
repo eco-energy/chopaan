@@ -1,13 +1,15 @@
-{ haskellNixSrc ? builtins.fetchTarball https://github.com/input-output-hk/haskell.nix/archive/master.tar.gz
-, nixpkgs ? haskellNixSrc + "/nixpkgs" }:
-
+# default.nix
+{ pkgs ? import <nixpkgs> {} }:
 let
-  pkgs = import nixpkgs (import haskellNixSrc);
+  # Import the Haskell.nix library,
+  haskell = import (builtins.fetchTarball https://github.com/input-output-hk/haskell.nix/archive/master.tar.gz) {
+    inherit pkgs;
+  };
 
-  pkgSet = pkgs.haskell-nix.mkStackPkgSet {
+  pkgSet = pkgs.haskell.mkStackPkgSet {
     stack-pkgs = import ./pkgs.nix;
     pkg-def-extras = [];
-    modules = [];
+    modules = [{}];
   };
 
 in

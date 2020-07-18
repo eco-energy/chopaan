@@ -65,6 +65,7 @@ dependencies:
 - dhall >= 1.24.0
 - keys
 - vector
+- dimensional
 
 ghc-options:
 - -Wall
