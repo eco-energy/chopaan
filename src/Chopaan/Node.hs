@@ -18,31 +18,23 @@ module Chopaan.Node (
   -- folds
   , energyFold, powerFold, timeFold
   -- data constructors
-  , EnergyState, NodeId(..), NodeS, NodeMetrics(..), Energy(..), Power(..), WattSeconds, Watts, Grid(..), pToE
+  {--, NodeSensors, NodeId(..), NodeS, NodeMetrics(..), Energy(..), Power(..), WattSeconds, Watts, Grid(..), pToE
   -- default builders
   , zeroMsg, defNodeS
   , nmFilter
   , writeToCSVRecords
   -- initialization fns
-  , toWattSeconds, toWatts
+  , toWattSeconds, toWatts--}
   ) where
 
 import qualified Data.Time as Time
-import Data.Time.Clock.POSIX
-
 import GHC.Generics (Generic)
-
-
-
-import Lens.Micro
 
 import Streamly
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 
-
-import Data.ProtoLens (defMessage)
 
 import Data.Hashable
 import qualified Data.Map.Strict as Map
@@ -62,6 +54,7 @@ import Control.Monad.State.Lazy
 import Numeric.Estimator (KalmanFilter(..))
 
 import Chopaan.Storage
+import Chopaan.NodeSensors
 
 import Data.Aeson
 
@@ -83,8 +76,6 @@ toWatts a = add a 0 compensated
 toWattSeconds :: Double -> WattSeconds
 toWattSeconds a = add a 0 compensated
 
-newtype NodeMessage = NodeMessage EnergyState deriving (Eq, Ord, Show, Generic)
-
 instance ToField (Compensated Double) where
   toField = toField . uncompensated 
 
@@ -96,10 +87,8 @@ instance FromJSON (Compensated Double) where
 
 newtype NodeId a = NodeId { unNodeId :: a } deriving (Eq, Show, Ord, Generic, ToJSON, FromJSON)
 
-
 instance (Hashable a) => Hashable (NodeId a) where
   hashWithSalt n (NodeId a) = hashWithSalt n a
-
 
 instance (ToField a) => ToField (NodeId a) where
   toField (NodeId a) = toField a 
@@ -160,7 +149,7 @@ instance (Num a) => Monoid (Energy a) where
 --instance (Show a) => Show (Energy a) where
 --  show (Energy{..}) = "Energy : "
 
-data Power a = Power
+data NodePower a = NodePower
   { genP :: !a
   , tInP :: !a
   , tOutP :: !a
@@ -170,8 +159,8 @@ data Power a = Power
 
 
 
-instance (Show a) => Show (Power a) where
-  show Power{..} = "Power (Watts)" <> nl
+instance (Show a) => Show (NodePower a) where
+  show NodePower{..} = "NodePower (Watts)" <> nl
     <> "Generation : " <> rs genP <> nl
     <> "Load : " <> rs loadP <> nl
     <> "Incoming : " <> rs tInP <> nl
@@ -180,43 +169,43 @@ instance (Show a) => Show (Power a) where
       nl = "\n"
       rs = show
 
-instance (ToField a) => ToNamedRecord (Power a)
+instance (ToField a) => ToNamedRecord (NodePower a)
 
-instance DefaultOrdered (Power a) where
+instance DefaultOrdered (NodePower a) where
   headerOrder _ = Vec.fromList ["genP", "tInP", "tOutP", "loadP"]
 
-instance Applicative Power where
-  pure v = Power
+instance Applicative NodePower where
+  pure v = NodePower
     { tInP = v
     , tOutP = v
     , loadP = v
     , genP = v
     }
-  f <*> v = Power
+  f <*> v = NodePower
               { tInP = tInP f $ tInP v
               , tOutP = tOutP f $ tOutP v
               , loadP = loadP f $ loadP v
               , genP = genP f $ genP v
               }
 
-instance (Num a) => Semigroup (Power a) where
+instance (Num a) => Semigroup (NodePower a) where
   p <> p' = (+) <$> p <*> p'
 
-instance (Num a) => Monoid (Power a) where
-  mempty = Power 0 0 0 0
+instance (Num a) => Monoid (NodePower a) where
+  mempty = NodePower 0 0 0 0
 
 
 data NodeMetrics e p = NodeMetrics
   { _time :: !(Maybe Time.UTCTime)
   , lastTimeDiff :: !Time.DiffTime
-  , _powerT :: !(Power p)
+  , _powerT :: !(NodePower p)
   , _energyT :: !(Energy e)
   , _battery :: !(Battery R R)
   } deriving (Eq, Ord, Generic, ToJSON, FromJSON)
 
 
 
-instance ToNamedRecord EnergyState where
+instance ToNamedRecord NodeSensors s where
   toNamedRecord es = HM.fromList $
                 zip names $
                 map (pack . show) $
@@ -240,7 +229,7 @@ instance ToNamedRecord EnergyState where
                            --"cpuTime"]
 
 
-instance DefaultOrdered EnergyState where
+instance DefaultOrdered NodeSensors s where
   headerOrder _ = Vec.fromList $ names
     where
       names = [ "batteryV",
@@ -336,10 +325,10 @@ Folds of type FL.Fold, as functions to the instantatenous values of the system o
 
 -----------------------------------------------------------------------------------------------------}
 
-timeFold :: forall m. Monad m => FL.Fold m EnergyState Timestamp
+timeFold :: forall m. Monad m => FL.Fold m NodeSensors s Timestamp
 timeFold = FL.Fold step' begin' done'
   where
-    step' :: (Timestamp -> EnergyState -> m Timestamp)
+    step' :: (Timestamp -> NodeSensors s -> m Timestamp)
     step' (Nothing, _) cur = pure (Just tn, diffUTC tn tn)
       where
         tn = utcTimeNow cur
@@ -353,15 +342,15 @@ timeFold = FL.Fold step' begin' done'
 
 
 
-powerFold :: forall m. (Monad m) => FL.Fold m EnergyState (Power Watts)
+powerFold :: forall m. (Monad m) => FL.Fold m NodeSensors s (NodePower Watts)
 powerFold = FL.Fold (\_ b-> pure $ power b) (pure mempty) return 
 
 
-energyFold :: forall m. (Monad m) => FL.Fold m EnergyState (Energy WattSeconds)
+energyFold :: forall m. (Monad m) => FL.Fold m NodeSensors s (Energy WattSeconds)
 energyFold = FL.Fold step begin end
   where
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
-    step :: (Energy WattSeconds, Maybe Time.UTCTime) -> EnergyState -> m (Energy WattSeconds, Maybe Time.UTCTime)
+    step :: (Energy WattSeconds, Maybe Time.UTCTime) -> NodeSensors s -> m (Energy WattSeconds, Maybe Time.UTCTime)
     step (esPrev, Just tPrev) cur = pure (esPrev <> eAtT (power cur) (Just tn, diffUTC tn tPrev), Just tn)
       where
         tn = utcTimeNow cur
@@ -372,22 +361,22 @@ energyFold = FL.Fold step begin end
     begin = pure (mempty, Nothing)
     end :: (Energy WattSeconds, Maybe Time.UTCTime) -> m (Energy WattSeconds)
     end = pure . fst
-    eAtT :: Power Watts -> Timestamp -> Energy WattSeconds
+    eAtT :: NodePower Watts -> Timestamp -> Energy WattSeconds
     eAtT p (_, t) = Energy { txIn = pToE t tInP
                            , txOut = pToE t tOutP
                            , consumed = pToE t loadP
                            , generated = pToE t genP
                            }
       where
-        Power{..} = p
+        NodePower{..} = p
 
 pToE :: (Real t) => t -> Watts -> WattSeconds
 pToE t p' = realToFrac t *^ p'
 
-batteryFold :: forall m. (Monad m) => BatteryParams R -> FL.Fold m EnergyState (Battery R R)
+batteryFold :: forall m. (Monad m) => BatteryParams R -> FL.Fold m NodeSensors s (Battery R R)
 batteryFold bat@BatteryParams{..} = FL.Fold step begin end
   where
-    step :: (Maybe Time.UTCTime, Maybe (KF R)) -> EnergyState -> m (Maybe Time.UTCTime, Maybe (KF R))
+    step :: (Maybe Time.UTCTime, Maybe (KF R)) -> NodeSensors s -> m (Maybe Time.UTCTime, Maybe (KF R))
     step (t, kf) sensorReadings = (\(_, b) -> (Just tnow, Just b)) . snd <$>
         (runKalmanState (tdiff t) (cState kf) $
         runProcessModel bat (tdiff t) processNoise sensorNoise $
@@ -407,14 +396,14 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
     end (_, Nothing) = return $ emptyB @R @R
 
 
-nodeMonitor :: forall m. (Monad m) => FL.Fold m EnergyState (NodeMetrics Watts WattSeconds) 
+nodeMonitor :: forall m. (Monad m) => FL.Fold m (NodeSensors s) (NodeMetrics Watts WattSeconds) 
 nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> batteryFold defBatteryParams 
   where
-    tn :: FL.Fold m EnergyState Timestamp
+    tn :: FL.Fold m NodeSensors s Timestamp
     tn = timeFold
-    en :: FL.Fold m EnergyState (Energy WattSeconds)
+    en :: FL.Fold m NodeSensors s (Energy WattSeconds)
     en =  energyFold
-    --sensors :: FL.Fold m (EnergyState) (EnergyState)
+    --sensors :: FL.Fold m (NodeSensors s) (NodeSensors s)
     --sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
 
 
@@ -426,23 +415,23 @@ nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en
 ---------------------------------------------------------------------------------------------------------------}
 
 
-energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m (Energy WattSeconds)
+energyS :: (MonadAsync m, IsStream t) => t m NodeSensors s -> t m (Energy WattSeconds)
 energyS = S.postscan energyFold
 
-timeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
+timeS :: (MonadAsync m, IsStream t) => t m NodeSensors s -> t m Timestamp
 timeS = S.postscan timeFold
 
-powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m (Power Watts)
+powerS :: (MonadAsync m, IsStream t) => t m NodeSensors s -> t m (NodePower Watts)
 powerS = S.postscan powerFold
 
-nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m NodeS
+nodeS :: (MonadAsync m, IsStream t) => t m NodeSensors s -> t m NodeS
 nodeS = S.postscan nodeMonitor
 
 newtype Grid n s = Grid (Map.Map n s) deriving (Show, Generic, Functor)
 
 type GridS n = Grid n NodeS
 
-gridS :: forall t m n . (IsStream t, MonadAsync m, Ord n) => [n] -> t m (n, EnergyState) -> t m (GridS n)
+gridS :: forall t m n . (IsStream t, MonadAsync m, Ord n) => [n] -> t m (n, NodeSensors s) -> t m (GridS n)
 gridS ns = S.postscan gridMap
   where
     gridMap = Grid <$> FL.demux nodeMap
@@ -461,31 +450,10 @@ instance (ToField n) => ToNamedRecord (NamedNode n) where
 
 instance DefaultOrdered (NamedNode n) where
   headerOrder _ = Vec.fromList ["NodeId", "time"]
-                  -- <> (headerOrder (undefined :: EnergyState))
-                  <> headerOrder (undefined :: Power Watts)
+                  -- <> (headerOrder (undefined :: NodeSensors s))
+                  <> headerOrder (undefined :: NodePower Watts)
                   <> headerOrder (undefined :: Energy WattSeconds)
 
---TODO: Generalize This
-
-{--
-initLogFile :: FilePath -> IO ()
-initLogFile = undefined
-
-writeToCSV :: forall n. (ToField n)
-  => NamedNode n
-  -> IO ()
-writeToCSV fp (NamedNode n) = do
-  let
-    opts = if fE then contOpts else initOpts
-  liftIO $ withFile fp AppendMode (\ho ->
-      BSL.hPut ho $ encodeDefaultOrderedByNameWith opts n)
-  where
-    contOpts = defaultEncodeOptions {
-      encUseCrLf = True,
-      encIncludeHeader = False
-    }
-    initOpts = contOpts { encIncludeHeader = True }
---}
 
 {---------------------------------------------------------------------------------------------------------------------
 
@@ -493,7 +461,7 @@ writeToCSV fp (NamedNode n) = do
 ---------------------------------------------------------------------------------------------------------------------}
 
 
-storageSensors :: EnergyState -> SensorVector R
+storageSensors :: NodeSensors s -> SensorVector R
 storageSensors es = SensorVector
   { sensorTerminalV = es ^. batteryVoltage
   , sensorCurrent =  i + o
@@ -502,8 +470,8 @@ storageSensors es = SensorVector
     i = - (es ^. gridToBatteryCurrent + es ^. solarInputCurrent)
     o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
 
-power :: EnergyState -> Power Watts
-power es = Power
+nodePower :: NodeSensors s -> NodePower Watts
+nodePpower es = NodePower
            { tInP = txIn'
            , tOutP = txOut'
            , loadP = cnsm'
@@ -513,26 +481,11 @@ power es = Power
     txOut' = p batteryVoltage batteryToGridCurrent
     cnsm' = p batteryVoltage batteryToLoadCurrent
     genP' = p batteryVoltage solarInputCurrent
-    p :: Getting Double EnergyState Double -> Getting Double EnergyState Double -> Watts
-    p v i = (es ^. i) *^ v'
-      where
-        v' = add (es ^. v) 0 compensated
 
 
--- $ converts the millisecond timestamp in the EnergyState to a UTCTime  
-utcTimeNow :: EnergyState -> Time.UTCTime
+-- $ converts the millisecond timestamp in the NodeSensors s to a UTCTime  
+utcTimeNow :: NodeSensors s -> Time.UTCTime
 utcTimeNow es = posixSecondsToUTCTime $ (fromIntegral $ (es ^. cpuTime))
 
-diffUTC :: Time.UTCTime -> Time.UTCTime -> Time.DiffTime
-diffUTC a b = realToFrac $ Time.diffUTCTime a b
 
-zeroMsg :: EnergyState
-zeroMsg = defMessage
-               & batteryVoltage .~ 0
-               & gridVoltage .~ 0
-               & batteryToLoadCurrent .~ 0
-               & batteryToGridCurrent .~ 0
-               & gridToBatteryCurrent .~ 0
-               & solarInputCurrent .~ 0
-               & dutyCycle .~ 0
-               & cpuTime .~ 0
+
