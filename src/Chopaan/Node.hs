@@ -1,7 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveAnyClass #-}
@@ -23,7 +22,7 @@ module Chopaan.Node (
   -- default builders
   , zeroMsg, defNodeS
   , nmFilter
-  , writeCSVRecords
+  , writeToCSVRecords
   -- initialization fns
   , toWattSeconds, toWatts
   ) where
@@ -33,8 +32,7 @@ import Data.Time.Clock.POSIX
 
 import GHC.Generics (Generic)
 
-import Proto.NodeMessageSchema.NodeMessages
-import Proto.NodeMessageSchema.NodeMessages_Fields hiding (time)
+
 
 import Lens.Micro
 
@@ -45,7 +43,6 @@ import qualified Streamly.Internal.Data.Fold as FL
 
 
 import Data.ProtoLens (defMessage)
-import Data.ProtoLens.TextFormat
 
 import Data.Hashable
 import qualified Data.Map.Strict as Map
@@ -175,10 +172,10 @@ data Power a = Power
 
 instance (Show a) => Show (Power a) where
   show Power{..} = "Power (Watts)" <> nl
-    <> "Generation : " <> (rs genP) <> nl
-    <> "Load : " <> (rs loadP) <> nl
-    <> "Incoming : " <> (rs tInP) <> nl
-    <> "Outgoing : " <> (rs tOutP) <> nl
+    <> "Generation : " <> rs genP <> nl
+    <> "Load : " <> rs loadP <> nl
+    <> "Incoming : " <> rs tInP <> nl
+    <> "Outgoing : " <> rs tOutP <> nl
     where
       nl = "\n"
       rs = show
@@ -258,7 +255,7 @@ instance ToField Time.UTCTime where
   toField t = pack (show t)
 
 instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
-  toNamedRecord (NodeMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
+  toNamedRecord NodeMetrics {..} = foldl HM.union (HM.fromList [("time", toField _time)])
     [ toNamedRecord _battery,
       toNamedRecord _powerT,
       toNamedRecord _energyT --,
@@ -315,7 +312,7 @@ instance (Fractional e, Fractional p, Ord e, Ord p) => Monoid (Battery e p) wher
   mempty = emptyB
 
 runTime :: ParamType a => Battery a p -> SensorVector a -> a
-runTime Battery{soc} SensorVector{..} = soc / ((normC sensorCurrent) * sensorTerminalV)
+runTime Battery{soc} SensorVector{..} = soc / normC sensorCurrent * sensorTerminalV
   where
     normC c
       | c >= 0 = c
@@ -324,7 +321,7 @@ runTime Battery{soc} SensorVector{..} = soc / ((normC sensorCurrent) * sensorTer
       
 
 socPercentage :: Fractional a => Battery a a -> a
-socPercentage Battery{..} = (soc * 100 / totalCapacity)
+socPercentage Battery{..} = soc * 100 / totalCapacity
 
 defNodeS :: NodeS
 defNodeS = NodeMetrics Nothing 0 mempty mempty mempty
@@ -339,14 +336,14 @@ Folds of type FL.Fold, as functions to the instantatenous values of the system o
 
 -----------------------------------------------------------------------------------------------------}
 
-timeFold :: forall m. Monad m => FL.Fold m (EnergyState) Timestamp
+timeFold :: forall m. Monad m => FL.Fold m EnergyState Timestamp
 timeFold = FL.Fold step' begin' done'
   where
     step' :: (Timestamp -> EnergyState -> m Timestamp)
     step' (Nothing, _) cur = pure (Just tn, diffUTC tn tn)
       where
         tn = utcTimeNow cur
-    step' ((Just !prev), _) cur = pure (Just tn, diffUTC tn prev)
+    step' (Just !prev, _) cur = pure (Just tn, diffUTC tn prev)
       where
         tn = utcTimeNow cur
     begin' :: m Timestamp
@@ -357,40 +354,41 @@ timeFold = FL.Fold step' begin' done'
 
 
 powerFold :: forall m. (Monad m) => FL.Fold m EnergyState (Power Watts)
-powerFold = FL.Fold (\_ b-> pure $ power b) (pure $ mempty) return 
+powerFold = FL.Fold (\_ b-> pure $ power b) (pure mempty) return 
 
 
-energyFold :: forall m. (Monad m) => FL.Fold m (EnergyState) (Energy WattSeconds)
-energyFold = (FL.Fold step begin end)
+energyFold :: forall m. (Monad m) => FL.Fold m EnergyState (Energy WattSeconds)
+energyFold = FL.Fold step begin end
   where
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
     step :: (Energy WattSeconds, Maybe Time.UTCTime) -> EnergyState -> m (Energy WattSeconds, Maybe Time.UTCTime)
-    step (esPrev, (Just tPrev)) cur = pure $ ((esPrev <> (eAtT (power cur) (Just tn, diffUTC tn tPrev))), Just tn)
+    step (esPrev, Just tPrev) cur = pure (esPrev <> eAtT (power cur) (Just tn, diffUTC tn tPrev), Just tn)
       where
         tn = utcTimeNow cur
-    step (esPrev, Nothing) cur = pure $ ((esPrev <> (eAtT (power cur) (Just tn, diffUTC tn tn))), Just tn)
+    step (esPrev, Nothing) cur = pure (esPrev <> eAtT (power cur) (Just tn, diffUTC tn tn), Just tn)
       where
         tn = utcTimeNow cur
     begin :: m (Energy WattSeconds, Maybe Time.UTCTime)
-    begin = pure $ (mempty, Nothing)
+    begin = pure (mempty, Nothing)
     end :: (Energy WattSeconds, Maybe Time.UTCTime) -> m (Energy WattSeconds)
     end = pure . fst
-    eAtT :: Power Watts -> Timestamp -> (Energy WattSeconds)
-    eAtT p (_, t) = Energy { txIn = (pToE t tInP)
-                           , txOut = (pToE t tOutP)
-                           , consumed = (pToE t loadP)
-                           , generated = (pToE t genP)}
+    eAtT :: Power Watts -> Timestamp -> Energy WattSeconds
+    eAtT p (_, t) = Energy { txIn = pToE t tInP
+                           , txOut = pToE t tOutP
+                           , consumed = pToE t loadP
+                           , generated = pToE t genP
+                           }
       where
         Power{..} = p
 
 pToE :: (Real t) => t -> Watts -> WattSeconds
-pToE t p' = (realToFrac t) *^ p'
+pToE t p' = realToFrac t *^ p'
 
 batteryFold :: forall m. (Monad m) => BatteryParams R -> FL.Fold m EnergyState (Battery R R)
 batteryFold bat@BatteryParams{..} = FL.Fold step begin end
   where
     step :: (Maybe Time.UTCTime, Maybe (KF R)) -> EnergyState -> m (Maybe Time.UTCTime, Maybe (KF R))
-    step (t, kf) sensorReadings = ((\(_, b) -> (Just tnow, Just b)) . snd) <$>
+    step (t, kf) sensorReadings = (\(_, b) -> (Just tnow, Just b)) . snd <$>
         (runKalmanState (tdiff t) (cState kf) $
         runProcessModel bat (tdiff t) processNoise sensorNoise $
         storageSensors sensorReadings)
@@ -402,19 +400,19 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
         tdiff Nothing = 0
         
     begin :: m (Maybe Time.UTCTime, Maybe (KF R))
-    begin = return $ (Nothing, Nothing)
+    begin = return (Nothing, Nothing)
     end :: (Maybe Time.UTCTime, Maybe (KF R)) -> m (Battery R R)
-    end (_, Just (KalmanFilter (StateVector{..}) _)) = return $ (emptyB @R @R) { soc = soC
+    end (_, Just (KalmanFilter StateVector{..} _)) = return $ (emptyB @R @R) { soc = soC
                                                                                , totalCapacity = chargeCapacity}
     end (_, Nothing) = return $ emptyB @R @R
 
 
-nodeMonitor :: forall m. (Monad m) => FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
-nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> (batteryFold defBatteryParams) 
+nodeMonitor :: forall m. (Monad m) => FL.Fold m EnergyState (NodeMetrics Watts WattSeconds) 
+nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> batteryFold defBatteryParams 
   where
-    tn :: FL.Fold m (EnergyState) Timestamp
+    tn :: FL.Fold m EnergyState Timestamp
     tn = timeFold
-    en :: FL.Fold m (EnergyState) (Energy WattSeconds)
+    en :: FL.Fold m EnergyState (Energy WattSeconds)
     en =  energyFold
     --sensors :: FL.Fold m (EnergyState) (EnergyState)
     --sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
@@ -445,7 +443,7 @@ newtype Grid n s = Grid (Map.Map n s) deriving (Show, Generic, Functor)
 type GridS n = Grid n NodeS
 
 gridS :: forall t m n . (IsStream t, MonadAsync m, Ord n) => [n] -> t m (n, EnergyState) -> t m (GridS n)
-gridS ns ss = S.postscan gridMap $ ss
+gridS ns = S.postscan gridMap
   where
     gridMap = Grid <$> FL.demux nodeMap
       where
@@ -456,52 +454,38 @@ gridS ns ss = S.postscan gridMap $ ss
                 CSV Conversion
 ----------------------------------------------------------}
 
-newtype TaggedNode n = TaggedNode (n, NodeS) deriving (Generic)
+newtype NamedNode n = NamedNode (n, NodeS) deriving (Generic)
 
-instance (ToField n) => ToNamedRecord (TaggedNode n) where
-  toNamedRecord (TaggedNode (n, ns)) = (HM.fromList [("NodeId", toField n)]) <> toNamedRecord ns
+instance (ToField n) => ToNamedRecord (NamedNode n) where
+  toNamedRecord (NamedNode (n, ns)) = HM.fromList [("NodeId", toField n)] <> toNamedRecord ns
 
-instance DefaultOrdered (TaggedNode n) where
-  headerOrder _ = (Vec.fromList $ ["NodeId", "time"])
+instance DefaultOrdered (NamedNode n) where
+  headerOrder _ = Vec.fromList ["NodeId", "time"]
                   -- <> (headerOrder (undefined :: EnergyState))
-                  <> (headerOrder (undefined :: Power Watts))
-                  <> (headerOrder (undefined :: Energy WattSeconds))
+                  <> headerOrder (undefined :: Power Watts)
+                  <> headerOrder (undefined :: Energy WattSeconds)
 
 --TODO: Generalize This
 
+{--
+initLogFile :: FilePath -> IO ()
+initLogFile = undefined
 
-writeCSVRecords :: forall n. (ToField n)
-  => FilePath
-  -> GridS n
-  ->  StateT Time.UTCTime IO ()
-writeCSVRecords fp (Grid gs) = do
-  fE <- liftIO $ doesFileExist fp
-  lastWrite <- get
+writeToCSV :: forall n. (ToField n)
+  => NamedNode n
+  -> IO ()
+writeToCSV fp (NamedNode n) = do
   let
     opts = if fE then contOpts else initOpts
-    recs = atT gs lastWrite
-    maxWrite = maxWriteT recs
-  liftIO $ withFile fp AppendMode $ (\ho ->do
-      (BSL.hPut ho) $ encodeDefaultOrderedByNameWith opts recs)
-  put $ maxWrite
+  liftIO $ withFile fp AppendMode (\ho ->
+      BSL.hPut ho $ encodeDefaultOrderedByNameWith opts n)
   where
     contOpts = defaultEncodeOptions {
       encUseCrLf = True,
       encIncludeHeader = False
     }
     initOpts = contOpts { encIncludeHeader = True }
-    maxWriteT :: [TaggedNode n] -> Time.UTCTime
-    maxWriteT ts = maximum tMlist
-      where
-        tMlist :: [Time.UTCTime]
-        tMlist = map fromJust $ filter isNothing $ (\(TaggedNode(_, NodeMetrics {_time})) -> _time) <$> ts
-    atT :: Map.Map n (NodeS) -> Time.UTCTime -> [TaggedNode n]
-    atT nmap lw = TaggedNode <$> (timeFilter lw $ Map.toList nmap)
-    timeFilter lw = (filter (\(_, NodeMetrics {_time}) -> tf _time))
-      where
-        tf Nothing = False
-        tf (Just t) = t > lw
-
+--}
 
 {---------------------------------------------------------------------------------------------------------------------
 
