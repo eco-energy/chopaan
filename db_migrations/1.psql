@@ -2,20 +2,22 @@
 Version 1 Schema
 */
 
-CREATE ROLE administrator WITH LOGIN PASSWORD 'Arigo' CREATEDB;
+CREATE ROLE administrator WITH LOGIN PASSWORD '$PGPASSWORD' CREATEDB;
 
 CREATE database chopaan;
 
-GRANT ALL PRIVILEGES ON DATABASE chopaan TO administrator; 
+GRANT ALL PRIVILEGES ON DATABASE chopaan TO administrator;
 
 
 /* Timescale initialization */
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 
 CREATE TABLE "users" (
-       id       SERIAL PRIMARY,
-       name     TEXT   NOT NULL,
-       phone    TEXT   NOT NULL
+       id        SERIAL      PRIMARY,
+       name      TEXT        NOT NULL,
+       phone     TEXT        NOT NULL,
+       createdAt TIMESTAMPTZ NOT NULL,
+       updatedAt TIMESTAMPTZ NOT NULL
 )
 
 /* Node Config Table */
@@ -29,7 +31,9 @@ CREATE TABLE "nodes" (
        pvOCV           FLOAT    NOT NULL,
        pvMPPTv         FLOAT    NOT NULL,
        pvMPPTi         FLOAT    NOT NULL,
-       pvPower         FLOAT    NOT NULL
+       pvPower         FLOAT    NOT NULL,
+       createdAt       TIMESTAMPTZ NOT NULL,
+       updatedAt       TIMESTAMPTZ NOT NULL
 );
 
 /* Stream Table */
@@ -55,7 +59,9 @@ CREATE TABLE "kibbutz" (
        id        SERIAL      NOT NULL,
        name      TEXT        NOT NULL,
        nodes     []INTEGER   REFERENCES nodes (id),
-       chopaans  []INTEGER   REFERENCES users (id)
+       chopaans  []INTEGER   REFERENCES users (id),
+       createdAt TIMESTAMPTZ NOT NULL,
+       updatedAt TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE "sessions" (
