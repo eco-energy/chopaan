@@ -8,7 +8,7 @@ import RIO.Process
 
 import Dhall
 
-import Chopaan.NodeOpts
+import Chopaan.Node.NodeOpts
 
 data MQTTOpts = MQTTOpts
   { connId :: !Text

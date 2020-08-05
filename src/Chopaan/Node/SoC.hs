@@ -7,7 +7,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
-module Chopaan.SoC where
+module Chopaan.Node.SoC where
 
 {--
 import GHC.Generics (Generic)

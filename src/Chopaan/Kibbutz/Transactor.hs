@@ -9,7 +9,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Chopaan.Transactor where
+module Chopaan.Kibbutz.Transactor where
 
 import Prelude hiding (zip, zipWith)
 import Chopaan.Registry (writeToPubQ, PubQueue, Message, NodeT)

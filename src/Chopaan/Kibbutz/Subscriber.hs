@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Chopaan.Subscriber where
+module Chopaan.Kibbutz.Subscriber where
 
 import Streamly
 import qualified Streamly.Prelude as S

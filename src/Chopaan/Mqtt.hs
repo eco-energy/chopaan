@@ -34,7 +34,7 @@ import Control.Concurrent (forkIO, threadDelay)
 
 import Control.Concurrent.STM
 
-import Chopaan.Registry (NodeT, HasTopics(..), NodeQueue(..))
+import Chopaan.Kibbutz.Registry (NodeT, HasTopics(..), NodeQueue(..))
 
 import Data.ProtoLens (encodeMessage, Message)
 import Chopaan.Types (MQTTOpts(..))

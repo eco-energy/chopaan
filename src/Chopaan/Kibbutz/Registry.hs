@@ -16,14 +16,14 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Chopaan.Registry (NodeT, HasTopics(..), ThingName
+module Chopaan.Kibbutz.Registry (NodeT, HasTopics(..), ThingName
                 , Kibbutz(..), KibbutzEvents(..), getKibbutz, mkCallback, subStream
                 , PubQueue, writeToPubQ
                 , NodeQueue(..), initNodeQueue, writeToNodeQueue
                 , SensorSM, SensorSub, duplicateS, Message(..)
                 ) where
 
-import Chopaan.Node
+import Chopaan.Node.Node
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
@@ -62,7 +62,7 @@ import qualified Streamly.Internal.Data.Stream.StreamD.Type as STy
 import Data.ProtoLens.Encoding (decodeMessage)
 import Data.ProtoLens (Message(..))
 
-import Chopaan.Subscriber (Subscriber, StreamMap)
+import Chopaan.Kibbutz.Subscriber (Subscriber, StreamMap)
 
 
 import qualified Control.Concurrent.STM.TChan as TChan
