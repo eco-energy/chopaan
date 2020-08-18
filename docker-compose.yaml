@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  timescale:
+    image: chopaan/timescale
+    command: postgres -c shared_preload_libraries=timescaledb
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=administrator
+      - POSTGRES_PASSWORD=mypassword
+    volumes:
+      - ./data:/var/lib/postgresql
+      - ./db_migrations/1.psql:/docker-entrypoint-initdb.d/init.sql
