@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings#-}
 
-module Chopaan.Mqtt (runMqtt) where
+module Chopaan.Comm.Mqtt (runMqtt) where
 
 
 -- Different string modules should be unified under one interface
@@ -34,11 +34,9 @@ import Control.Concurrent (forkIO, threadDelay)
 
 import Control.Concurrent.STM
 
-import Chopaan.Kibbutz.Registry (NodeT, HasTopics(..), NodeQueue(..))
-
 import Data.ProtoLens (encodeMessage, Message)
 import Chopaan.Types (MQTTOpts(..))
-
+import Chopaan.Comm.Comm (Address(..), Dispatch(..), NodeQueue(..))
 
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control
 
@@ -60,7 +58,7 @@ mkTLSSettings cert key caPath hostName name = do
 
 
 -- need reader for creds and logs
-runMqtt :: forall a b. (HasTopics a, Message b) => MQTTOpts -> NodeQueue NodeT b -> [a] -> MQ.MessageCallback -> IO ()
+runMqtt :: forall a b. (Address a, Dispatch b) => MQTTOpts -> NodeQueue a b -> [a] -> MQ.MessageCallback -> IO ()
 runMqtt MQTTOpts{..} outQueue ts msgCB = do
   tlsConf <- mkTLSSettings certPath keyPath caPath mqttURI connId
   let
@@ -91,14 +89,14 @@ runMqtt MQTTOpts{..} outQueue ts msgCB = do
 
     -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
     -- not stateful.
-    pub :: MQ.MQTTClient -> NodeQueue NodeT b -> IO ()
+    pub :: MQ.MQTTClient -> NodeQueue a b -> IO ()
     pub c tv = do
       forever $ pub' =<< (atomically $ do readTBQueue (runNodeQueue tv))
       where
-        pub' :: (NodeT, b) -> IO ()
+        pub' :: (a, b) -> IO ()
         pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >>
           MQ.publish c (topic nId) (encode mf) False
-        topic :: NodeT -> MQ.Topic
+        topic :: a -> MQ.Topic
         topic = controlTopic
         encode :: b -> BL.ByteString
-        encode = BL.fromStrict . encodeMessage
+        encode = BL.fromStrict . encodeMessage . frame

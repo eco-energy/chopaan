@@ -1,11 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ConstraintKinds, ConstrainedClassMethods#-}
 module Chopaan.Run (run) where
 
-import Chopaan.Node (Grid(..), gridS, writeCSVRecords, NodeId(..))
+import Chopaan.Node.Node (Grid(..), gridS, writeCSVRecords)
 import Chopaan.Types
 import RIO
 import Control.Concurrent (forkIO)
@@ -17,11 +16,9 @@ import Control.Monad.State.Lazy (runStateT)
 
 import RIO.Time
 
-import Chopaan.Mqtt (runMqtt)
-import Chopaan.Registry (
-  Kibbutz(..), getKibbutz, mkCallback
-  , subStream
-  )
+import Chopaan.Comm.Mqtt (runMqtt)
+import Chopaan.Comm.Comm (MessageQs(..), initQs, mkCallback, esStream, rtsStream)
+import Chopaan.Kibbutz.Registry (Kibbutz(..), getKibbutz)
 
 
 run :: RIO App ()
@@ -30,9 +27,12 @@ run = do
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
-  k@Kibbutz{..} <- liftIO $ getKibbutz name
-  _ <- liftIO $ forkIO $ forever $ runMqtt mqttOpts outQueue nodes (mkCallback k)
-  liftIO $ S.drain (stream nodes inQueue)
+  Kibbutz{nodes} <- liftIO $ getKibbutz name
+  qs@MessageQs{..} <- liftIO . atomically $ initQs
+  
+  
+  _ <- liftIO $ forkIO $ forever $ runMqtt mqttOpts outbox nodes (mkCallback qs)
+  liftIO $ S.drain (stream nodes stateQ)
   where
     writer stateMap = runStateT (writeCSVRecords "test.csv" stateMap) (UTCTime (fromGregorian 1 1 2020) 0)
-    stream nodes inQueue = gridS nodes (subStream inQueue) & S.trace (writer)
+    stream nodes qs = gridS nodes (esStream qs) & S.trace (writer)

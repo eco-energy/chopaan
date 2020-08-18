@@ -13,6 +13,13 @@ mqtt_cert:
   aws iot register-thing --template-body file://certs/chopaan_template.json --parameters file://certs/params.json
 
 
+db_image:
+	docker build -f Dockerfile.db -t chopaan/timescale .
+
+runDB: db_image
+	docker-compose up
+
+
 dev:
 	stack test --fast --haddock-deps --file-watch
 

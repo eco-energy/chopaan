@@ -66,6 +66,13 @@ dependencies:
 - keys
 - vector
 - dimensional
+- reflex-vty
+- reflex
+- vty
+- algebraic-graphs
+- persistent
+- persistent-postgresql
+- persistent-template
 
 ghc-options:
 - -Wall
