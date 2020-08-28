@@ -35,6 +35,20 @@ packages:
 # forks / in-progress versions pinned to a git hash. For example:
 #
 extra-deps:
+ - git: git@bitbucket.org:ecoenergy/mgenv.git
+   commit: f0ed733555356ddea626e37fb64c08c08eb84470
+ - git: https://github.com/conal/concat.git
+   commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+   subdirs:
+     - inline
+     - known
+     - satisfy
+     - classes
+     - plugin
+     - examples
+     - graphics
+     - hardware
+   # nix-sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
  - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
  - amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135
@@ -62,17 +76,22 @@ extra-deps:
  - ref-tf-0.4.0.2@sha256:69de3550250e0cd69f45d080359cb314a9487c915024349c75b78732bbee9332,1134
  - reflex-0.7.1.0@sha256:6d224466f0daabd44fef0fa559a09151126452bf857aeaa37692bccb259d5c5d,11227
  - constraints-extras-0.3.0.2@sha256:013b8d0392582c6ca068e226718a4fe8be8e22321cc0634f6115505bf377ad26,1853
- - dependent-map-0.3.1.0@sha256:f33391e51264aab38b11d581bb8d2f7c6fc9fcf012bdbb6122708c23b3360b2a,1657
- - dependent-sum-0.6.2.0@sha256:bff37c85b38e768b942f9d81c2465b63a96076f1ba006e35612aa357770807b6,1856
  - monoidal-containers-0.6.0.1@sha256:7d776942659eb4d70d8b8da5d734396374a6eda8b4622df9e61e26b24e9c8e40,2501
  - patch-0.0.3.1@sha256:f14acf2eea8c83be57398106cec549c476577a947a7f856e6aa71dc561d58ca9,2308
  - witherable-0.3.1@sha256:ed3d5bc9eb1c08fa9704d9e143cdf622e1bd80b847cd5ede8c07da7bc7981ab9,1313
- - git: git@bitbucket.org:ecoenergy/mgenv.git
-   commit: f0ed733555356ddea626e37fb64c08c08eb84470
+ - dependent-map-0.3.1.0@sha256:f33391e51264aab38b11d581bb8d2f7c6fc9fcf012bdbb6122708c23b3360b2a,1657
+ - dependent-sum-0.6.2.0@sha256:bff37c85b38e768b942f9d81c2465b63a96076f1ba006e35612aa357770807b6,1856
+ - z3-408.1@sha256:809968ed9329172448a7c89ce327cfa1c9632272d2a2c06211025257100c5c93,4116
 
+   
 # Override default flag values for local packages and extra-deps
-# flags: {}
+flags:
+  concat-examples:
+    smt: True
 
+allow-newer: true
+
+    
 # Extra package databases containing global packages
 # extra-package-dbs: []
 

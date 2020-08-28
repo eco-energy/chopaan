@@ -53,6 +53,7 @@ dependencies:
 - microlens
 - streamly
 - mtl
+- transformers
 - hashable
 - hmatrix
 - estimator
@@ -70,9 +71,12 @@ dependencies:
 - reflex
 - vty
 - algebraic-graphs
-- persistent
-- persistent-postgresql
-- persistent-template
+- katip
+- beam-core
+- beam-postgres
+- concat-classes
+- concat-examples
+- concat-plugin
 
 ghc-options:
 - -Wall

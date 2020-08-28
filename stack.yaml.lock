@@ -5,6 +5,110 @@
 
 packages:
 - completed:
+    subdir: inline
+    name: concat-inline
+    version: 0.1.0.0
+    git: https://github.com/conal/concat.git
+    pantry-tree:
+      size: 319
+      sha256: 54fc1efd925d33e67eddaf121419ebd59f15b775c84d8e381a58832f17680fda
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+  original:
+    subdir: inline
+    git: https://github.com/conal/concat.git
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+- completed:
+    subdir: known
+    name: concat-known
+    version: 0.1.0.0
+    git: https://github.com/conal/concat.git
+    pantry-tree:
+      size: 168
+      sha256: 32bfd2141c47e73bb9f7caea8866a62490913cea7c48eced10dc77f547cec134
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+  original:
+    subdir: known
+    git: https://github.com/conal/concat.git
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+- completed:
+    subdir: satisfy
+    name: concat-satisfy
+    version: 0.1.0.0
+    git: https://github.com/conal/concat.git
+    pantry-tree:
+      size: 374
+      sha256: d346aa66a7ac18fc3290c3fde3498a3511b86147686f152e5d1a1c25d8bc74fa
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+  original:
+    subdir: satisfy
+    git: https://github.com/conal/concat.git
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+- completed:
+    subdir: classes
+    name: concat-classes
+    version: 0.3.0.0
+    git: https://github.com/conal/concat.git
+    pantry-tree:
+      size: 1067
+      sha256: d820c85a5ec00c4a88b07d32b739cc6e3e8242550120b088b5d81c56822bcfed
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+  original:
+    subdir: classes
+    git: https://github.com/conal/concat.git
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+- completed:
+    subdir: plugin
+    name: concat-plugin
+    version: 0.3.0.0
+    git: https://github.com/conal/concat.git
+    pantry-tree:
+      size: 460
+      sha256: b94e28a01445292bf0d04caf4345da7f63570082c20796dadf19e132e231c21c
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+  original:
+    subdir: plugin
+    git: https://github.com/conal/concat.git
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+- completed:
+    subdir: examples
+    name: concat-examples
+    version: 0.3.0.0
+    git: https://github.com/conal/concat.git
+    pantry-tree:
+      size: 9186
+      sha256: 10807fd30c1406e08ac12950ebb6a21bcbaac8381764b74dac9165468383623d
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+  original:
+    subdir: examples
+    git: https://github.com/conal/concat.git
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+- completed:
+    subdir: graphics
+    name: concat-graphics
+    version: 0.1.0.0
+    git: https://github.com/conal/concat.git
+    pantry-tree:
+      size: 641
+      sha256: 9eaf49ce2586bfea4927f415ab3361e562009e2289a5fc3f5c2ea8eb61b56e8b
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+  original:
+    subdir: graphics
+    git: https://github.com/conal/concat.git
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+- completed:
+    subdir: hardware
+    name: concat-hardware
+    version: 0.1.0.0
+    git: https://github.com/conal/concat.git
+    pantry-tree:
+      size: 500
+      sha256: 5a6cd83d166111497d9068e76f929665d2f2081142a86f81f817fa5e69f2c203
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+  original:
+    subdir: hardware
+    git: https://github.com/conal/concat.git
+    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+- completed:
     hackage: amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
     pantry-tree:
       size: 992
@@ -194,20 +298,6 @@ packages:
   original:
     hackage: constraints-extras-0.3.0.2@sha256:013b8d0392582c6ca068e226718a4fe8be8e22321cc0634f6115505bf377ad26,1853
 - completed:
-    hackage: dependent-map-0.3.1.0@sha256:f33391e51264aab38b11d581bb8d2f7c6fc9fcf012bdbb6122708c23b3360b2a,1657
-    pantry-tree:
-      size: 551
-      sha256: e49230ff3bb1ddc9bef79c22b080ec04a5bb7829808d52df910f734d1cffdddc
-  original:
-    hackage: dependent-map-0.3.1.0@sha256:f33391e51264aab38b11d581bb8d2f7c6fc9fcf012bdbb6122708c23b3360b2a,1657
-- completed:
-    hackage: dependent-sum-0.6.2.0@sha256:bff37c85b38e768b942f9d81c2465b63a96076f1ba006e35612aa357770807b6,1856
-    pantry-tree:
-      size: 474
-      sha256: ad3fbed5104f9ee9c8082c9dcc8ade847674e3053572533e8d26ad1a866f1107
-  original:
-    hackage: dependent-sum-0.6.2.0@sha256:bff37c85b38e768b942f9d81c2465b63a96076f1ba006e35612aa357770807b6,1856
-- completed:
     hackage: monoidal-containers-0.6.0.1@sha256:7d776942659eb4d70d8b8da5d734396374a6eda8b4622df9e61e26b24e9c8e40,2501
     pantry-tree:
       size: 569
@@ -228,6 +318,27 @@ packages:
       sha256: 7077f6c0e9e973af2c7f4429bcc3af6d345c19554c1335733faccec35d4c1708
   original:
     hackage: witherable-0.3.1@sha256:ed3d5bc9eb1c08fa9704d9e143cdf622e1bd80b847cd5ede8c07da7bc7981ab9,1313
+- completed:
+    hackage: dependent-map-0.3.1.0@sha256:f33391e51264aab38b11d581bb8d2f7c6fc9fcf012bdbb6122708c23b3360b2a,1657
+    pantry-tree:
+      size: 551
+      sha256: e49230ff3bb1ddc9bef79c22b080ec04a5bb7829808d52df910f734d1cffdddc
+  original:
+    hackage: dependent-map-0.3.1.0@sha256:f33391e51264aab38b11d581bb8d2f7c6fc9fcf012bdbb6122708c23b3360b2a,1657
+- completed:
+    hackage: dependent-sum-0.6.2.0@sha256:bff37c85b38e768b942f9d81c2465b63a96076f1ba006e35612aa357770807b6,1856
+    pantry-tree:
+      size: 474
+      sha256: ad3fbed5104f9ee9c8082c9dcc8ade847674e3053572533e8d26ad1a866f1107
+  original:
+    hackage: dependent-sum-0.6.2.0@sha256:bff37c85b38e768b942f9d81c2465b63a96076f1ba006e35612aa357770807b6,1856
+- completed:
+    hackage: z3-408.1@sha256:809968ed9329172448a7c89ce327cfa1c9632272d2a2c06211025257100c5c93,4116
+    pantry-tree:
+      size: 1475
+      sha256: abb36d87c8790196fada5754fdbcc88eaf8c956ac419aa8544718d15eb3a0ae5
+  original:
+    hackage: z3-408.1@sha256:809968ed9329172448a7c89ce327cfa1c9632272d2a2c06211025257100c5c93,4116
 snapshots:
 - completed:
     size: 524799

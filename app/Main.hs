@@ -18,8 +18,6 @@ import RIO.Process
 import Dhall
 import Chopaan.Types
 
---import qualified Paths_chopaan
-
 main :: IO ()
 main = do
   options <- input auto "./options.dhall" 
