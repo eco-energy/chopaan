@@ -1,10 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Chopaan.Run (run) where
 
-import Chopaan.Node.Node (Grid(..), gridS, writeCSVRecords)
+import Chopaan.Node.Node (gridS, writeCSVRecords)
 import Chopaan.Types
 import RIO
 import Control.Concurrent (forkIO)
@@ -17,9 +17,11 @@ import Control.Monad.State.Lazy (runStateT)
 import RIO.Time
 
 import Chopaan.Comm.Mqtt (runMqtt)
-import Chopaan.Comm.Comm (MessageQs(..), initQs, mkCallback, esStream, rtsStream)
-import Chopaan.Kibbutz.Registry (Kibbutz(..), getKibbutz)
+import Chopaan.Comm.Comm (MessageQs(..), initQs, mkCallback, subStream)
+import Chopaan.Kibbutz.Kibbutz (Kbtz(..), sensorKbtz, logsKbtz, rsKbtz, getNodes, asFRPNetwork)
+import Chopaan.UI.Monitor (monitor)
 
+import Reflex.Vty (mainWidget, VtyWidget)
 
 run :: RIO App ()
 run = do
@@ -27,12 +29,19 @@ run = do
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
-  Kibbutz{nodes} <- liftIO $ getKibbutz name
   qs@MessageQs{..} <- liftIO . atomically $ initQs
-  
-  
-  _ <- liftIO $ forkIO $ forever $ runMqtt mqttOpts outbox nodes (mkCallback qs)
-  liftIO $ S.drain (stream nodes stateQ)
+  nodes <- runReaderT getNodes name
+  sensors <- liftIO $ sensorKbtz @SerialT nodes stateQ
+  runtime <- liftIO $ rsKbtz @SerialT nodes statsQ
+  logs    <- liftIO $ logsKbtz @SerialT nodes logsQ
+  _ <- liftIO $ forkIO $ forever $
+       runMqtt mqttOpts outbox nodes (mkCallback qs)
+  liftIO $ mainWidget $ do
+      s <- asFRPNetwork sensors
+      r <- asFRPNetwork runtime
+      l <- asFRPNetwork logs
+      monitor s r l
   where
     writer stateMap = runStateT (writeCSVRecords "test.csv" stateMap) (UTCTime (fromGregorian 1 1 2020) 0)
-    stream nodes qs = gridS nodes (esStream qs) & S.trace (writer)
+    --app :: IO ()
+    --app = mainWidget $ monitor sensors runtime logs

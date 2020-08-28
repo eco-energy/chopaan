@@ -22,7 +22,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
 
 import Lens.Micro hiding (_Just)
-import Proto.NodeMessageSchema.NodeMessages hiding (Outgoing)
+import Proto.NodeMessageSchema.NodeMessages hiding (Outgoing, Incoming)
 import Proto.NodeMessageSchema.NodeMessages_Fields
 
 import Data.ProtoLens.Labels()
@@ -31,6 +31,7 @@ import Data.ProtoLens
 import Data.ProtoLens.Prism
 
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad ((<=<), (>=>))
 
 import Streamly
 import qualified Streamly.Prelude as S
@@ -66,24 +67,33 @@ instance Dispatch NodeControl where
   unframe = accessNodeControl
 
 
-class Address a where
+class (Ord a) => Address a where
   stateTopic :: a -> MQ.Topic
   controlTopic :: a -> MQ.Topic
+  logTopic :: a -> MQ.Topic
   fromControlTopic :: MQ.Topic -> Maybe a
   fromStateTopic :: MQ.Topic -> Maybe a
+  fromLogTopic :: MQ.Topic -> Maybe a
+
 
 instance Address (NodeMAC) where
   stateTopic = (nameToTopic "/state") . unNodeId
   controlTopic = (nameToTopic "/control" )  . unNodeId
+  logTopic = (nameToTopic "/logs") . unNodeId
   fromControlTopic = topicToNodeId "/control"
   fromStateTopic = topicToNodeId "/state"
+  fromLogTopic = topicToNodeId "/logs"
 
 
 
 {--------------------------------- Queue Implementation -----------------------------------}
 
 
+class (Address n) => Subscribe n a where
+  subscribe :: n -> NodeQueue n a
+
 newtype NodeQueue a b = NodeQueue { runNodeQueue :: TBQueue (a, b) } deriving (Eq, Generic)
+
 
 initNodeQueue :: forall a b. (Address a, Dispatch b) => STM (NodeQueue a b)
 initNodeQueue = do
@@ -97,9 +107,12 @@ type StateQueue n = (Address n) => NodeQueue n EnergyState
 
 type StatsQueue n = (Address n) => NodeQueue n RuntimeStats
 
+type LogQueue n a = (Address n, Dispatch a) => NodeQueue n a
+
 data MessageQs n a = MessageQs
   { stateQ :: StateQueue n
   , statsQ :: StatsQueue n
+  , logsQ  :: LogQueue n a
   , outbox :: PubQueue n a 
   }
 
@@ -107,8 +120,16 @@ data MessageQs n a = MessageQs
 data Incoming a = Incoming a deriving (Functor)
 data Outgoing a = Outgoing a deriving (Functor)
 
-instance (Dispatch a) => Dispatch (Outgoing a)
-instance (Dispatch a) => Dispatch (Incoming a)
+instance (Dispatch a) => Dispatch (Outgoing a) where
+  frame (Outgoing a) = frame a
+  unframe a = Outgoing <$> unframe a
+
+
+instance (Dispatch a) => Dispatch (Incoming a) where
+  frame (Incoming a) = frame a
+  unframe a = Incoming <$> unframe a
+
+  
 instance Dispatch MeshFrame where
   frame = id
   unframe = Just . id
@@ -116,11 +137,11 @@ instance Dispatch MeshFrame where
 
 initMessageQs :: forall n o. (Address n, Dispatch o) => STM (MessageQs n o)
 initMessageQs = do
-  state <- initNodeQueue @n @EnergyState
-  stats <- initNodeQueue @n @RuntimeStats
-  outgoing <- initNodeQueue @n @o
-  return $ MessageQs state stats outgoing
-
+  es <- initNodeQueue @n @EnergyState
+  rs <- initNodeQueue @n @RuntimeStats
+  logs <-  initNodeQueue @n @o
+  out <-  initNodeQueue @n @o
+  return $ MessageQs es rs logs out
 
 initQs = initMessageQs @NodeMAC @MeshFrame
 
@@ -172,14 +193,6 @@ subStream sq = asyncly $ S.unfoldrM step ()
       where
         wrap :: (n, a) -> Maybe ((n, a), ())
         wrap = Just . (, ())
-
-
-rtsStream :: forall t m. (IsStream t, MonadAsync m) => NodeQueue NodeMAC RuntimeStats -> t m (NodeMAC, RuntimeStats)
-rtsStream = subStream @t @m @NodeMAC @RuntimeStats
-
-esStream :: forall t m. (IsStream t, MonadAsync m) => NodeQueue NodeMAC EnergyState -> t m (NodeMAC, EnergyState)
-esStream = subStream @t @m @NodeMAC @EnergyState
-
 
 
 {---------------------------- Utils -------------------------------------}

@@ -11,15 +11,14 @@ module Chopaan.Comm.Mqtt (runMqtt) where
 -- Different string modules should be unified under one interface
 import qualified Data.Text as Text 
 import qualified Data.ByteString.Lazy as BL
---import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 
---import qualified Data.Time as Time
 
 
 import qualified Network.MQTT.Client as MQ
 import qualified Network.MQTT.Topic as MQ ()
-import qualified Network.MQTT.Types as MQTy ()
+import qualified Network.MQTT.Types as MQTy
+
 import Network.Connection
 import Network.TLS
 --import Data.X509.CertificateStore ()
@@ -27,14 +26,14 @@ import Network.TLS
 import Data.Default.Class
 import Network.TLS.Extra.Cipher
 import Network.URI
+
 import Control.Exception (Handler (..), catches)
 import Control.Monad (forever)
 import Control.Concurrent (forkIO, threadDelay)
-
-
 import Control.Concurrent.STM
 
-import Data.ProtoLens (encodeMessage, Message)
+import Data.ProtoLens (encodeMessage)
+
 import Chopaan.Types (MQTTOpts(..))
 import Chopaan.Comm.Comm (Address(..), Dispatch(..), NodeQueue(..))
 
@@ -66,37 +65,38 @@ runMqtt MQTTOpts{..} outQueue ts msgCB = do
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
            , MQ._connID=Text.unpack $ connId
-           --, MQ._port=443
+           , MQ._port=443
            , MQ._msgCB=msgCB
-           , MQ._connectTimeout=180000000000
+           , MQ._connectTimeout=1800000
            , MQ._tlsSettings=tlsConf}
-    topics = zip (map stateTopic ts) $ repeat MQ.subOptions --{MQ._retainHandling=MQTy.DoNotSendOnSubscribe,
-                                                            --MQ._retainAsPublished=False,
-                                                            --MQ._noLocal=True,
-                                                            --MQ._subQoS=MQ.QoS0}
-  -- TODO: Add a logging Error Handler
-  mc <- MQ.connectURI conf uri
-  _ <- forkIO $ forever $ catches (pub mc outQueue) [Handler handler]
-  _ <- mapM (\t -> MQ.subscribe mc [t] []) topics -- [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
-  MQ.waitForClient mc
-  --_ <- forkIO $ forever $  catches (sub mc [head topics]) [Handler (\(ex :: IOException) -> putStrLn $ "IOError: " <> show ex)]
-  where
-    handler :: MQ.MQTTException -> IO ()
-    handler (MQ.Timeout) = putStrLn ("ERROR : Timeout") >> threadDelay 100000
-    handler (MQ.BadData) = putStrLn ("ERROR : BadData") >> threadDelay 100000
-    handler (MQ.Discod d) = putStrLn ("ERROR Discod -> " <> (show d)) >> threadDelay 100000
-    handler (MQ.MQTTException e) = putStrLn ("ERROR :" <> (show e)) >> threadDelay 100000
 
-    -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
+  mc <- MQ.connectURI conf uri
+  _ <- forkIO $ forever $ catches (pub mc outQueue) [Handler errorHandler]
+  _ <- mapM (subscribe mc) ts -- [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
+  MQ.waitForClient mc
+
+
+subscribe :: (Address n) => MQ.MQTTClient -> n -> IO ([Either MQTy.SubErr MQ.QoS])
+subscribe c n = fst <$> MQ.subscribe c [subTopic n] []
+
+subTopic :: (Address n) => n -> (MQ.Topic, MQ.SubOptions)
+subTopic n = (stateTopic n, MQ.subOptions)
+
+-- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
     -- not stateful.
-    pub :: MQ.MQTTClient -> NodeQueue a b -> IO ()
-    pub c tv = do
-      forever $ pub' =<< (atomically $ do readTBQueue (runNodeQueue tv))
-      where
-        pub' :: (a, b) -> IO ()
-        pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >>
-          MQ.publish c (topic nId) (encode mf) False
-        topic :: a -> MQ.Topic
-        topic = controlTopic
-        encode :: b -> BL.ByteString
-        encode = BL.fromStrict . encodeMessage . frame
+pub :: forall a b. (Address a, Dispatch b) => MQ.MQTTClient -> NodeQueue a b -> IO ()
+pub c tv = do
+  forever $ pub' =<< (atomically $ do readTBQueue (runNodeQueue tv))
+    where
+      pub' :: (a, b) -> IO ()
+      pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >>
+        MQ.publish c (controlTopic nId) (encode mf) False
+      encode = BL.fromStrict . encodeMessage . frame
+
+
+
+errorHandler :: MQ.MQTTException -> IO ()
+errorHandler (MQ.Timeout) = putStrLn ("ERROR : Timeout") >> threadDelay 100000
+errorHandler (MQ.BadData) = putStrLn ("ERROR : BadData") >> threadDelay 100000
+errorHandler (MQ.Discod d) = putStrLn ("ERROR Discod -> " <> (show d)) >> threadDelay 100000
+errorHandler (MQ.MQTTException e) = putStrLn ("ERROR :" <> (show e)) >> threadDelay 100000

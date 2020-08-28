@@ -8,7 +8,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
-module Chopaan.Node.NodeSensors (fromNodeMessage, NodeSensors, Power) where
+module Chopaan.Node.NodeSensors (fromNodeMessage, NodeSensors, Power, Energy) where
 
 import qualified Prelude as P
 
