@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 module Chopaan.Utils.StreamsInterop where
 
 import Streamly
@@ -20,7 +22,7 @@ fromEvent = S.unfoldrM unconsE
 --}
 
 -- | streamly to event
-toEvent :: (MonadIO m, R.TriggerEvent t' m) => SerialT m a -> m (R.Event t' a)
+toEvent :: (MonadIO m, R.TriggerEvent t' m') => SerialT m a -> (VtyWidget t' m' (R.Event t' a))
 toEvent s = do
   (e, fire) <- R.newTriggerEvent
   pure $ S.mapM_ (liftIO . void . fire) s
