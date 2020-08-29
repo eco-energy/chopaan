@@ -109,6 +109,28 @@ packages:
     git: https://github.com/conal/concat.git
     commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
 - completed:
+    name: opt-expect
+    version: 0.1.0.0
+    git: https://github.com/faezs/opt-expect.git
+    pantry-tree:
+      size: 2106
+      sha256: 6f6a99e161b8b547fd3a9197edcaa8aa5eccdf296b0833d3c7363423d0ecd542
+    commit: 71be809dd69f89425e1124c34878565a14b33257
+  original:
+    git: https://github.com/faezs/opt-expect.git
+    commit: 71be809dd69f89425e1124c34878565a14b33257
+- completed:
+    name: propagators
+    version: '0'
+    git: https://github.com/ekmett/propagators.git
+    pantry-tree:
+      size: 953
+      sha256: a535b2cead7831fa11a222917504820efb9e3fab4f858dd1fc170cbbfbf5fc32
+    commit: 6de416c68d7970d734dc139079337a20b078e45c
+  original:
+    git: https://github.com/ekmett/propagators.git
+    commit: 6de416c68d7970d734dc139079337a20b078e45c
+- completed:
     hackage: amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
     pantry-tree:
       size: 992
@@ -346,6 +368,41 @@ packages:
       sha256: 39c3c264da0b75b717909693f5ecaf8342761e4da62d6c273ae4fdc5d2011afb
   original:
     hackage: monad-bayes-0.1.1.0@sha256:57d96f530a37a1c8efed0830c7f2bcf86da05d0d53324aebdd5b5aa165d72829,5132
+- completed:
+    hackage: geodetics-0.1.0@sha256:699c10cd8d69222b125d054cdc8e2bcee7cb0558c78fa1b4fa06b2d3ecf29f5c,2387
+    pantry-tree:
+      size: 1086
+      sha256: e1c0342b02b90ed50a0d6529084bc3938a12c6d8ad207248b17a3cdd1199381c
+  original:
+    hackage: geodetics-0.1.0@sha256:699c10cd8d69222b125d054cdc8e2bcee7cb0558c78fa1b4fa06b2d3ecf29f5c,2387
+- completed:
+    hackage: hgeometry-0.9.0.0@sha256:43043574d2ce39c543dfadb629ab3a41fe65d7bf68a1426d8d01312818bc6e4e,9702
+    pantry-tree:
+      size: 7938
+      sha256: 12f4111632cb729bc0033a4091a660fe455a134ece285c6ca735945b9eaba3bc
+  original:
+    hackage: hgeometry-0.9.0.0@sha256:43043574d2ce39c543dfadb629ab3a41fe65d7bf68a1426d8d01312818bc6e4e,9702
+- completed:
+    hackage: hgeometry-combinatorial-0.9.0.0@sha256:a03b48302d8c542ff2ff90ba5d45f2742cc21ed1a676c8fa4870cd461a273354,7367
+    pantry-tree:
+      size: 3029
+      sha256: 34db701f1428f1e64c58b0c1df02228c136f1c7b0321a832c9ba6800b8049078
+  original:
+    hackage: hgeometry-combinatorial-0.9.0.0@sha256:a03b48302d8c542ff2ff90ba5d45f2742cc21ed1a676c8fa4870cd461a273354,7367
+- completed:
+    hackage: fusion-plugin-0.2.1@sha256:f72d7393d2c39909050cae46173e0218bf533a899be05b448ae55f9d4a81be9c,2349
+    pantry-tree:
+      size: 369
+      sha256: 87b912647b1a060b3b6cdf9bdc24b6e8ab9a8847c5333bb3bdd948af513f491f
+  original:
+    hackage: fusion-plugin-0.2.1@sha256:f72d7393d2c39909050cae46173e0218bf533a899be05b448ae55f9d4a81be9c,2349
+- completed:
+    hackage: perfect-vector-shuffle-0.1.1.1@sha256:8656a3f1f491d1d79aba9e0a5dbb08589613202b08c7a9b92570d6bec7390093,3668
+    pantry-tree:
+      size: 422
+      sha256: b80f0796f26f723e7fbfae1c4d134a74732b5eaef3fe8a4d1cb37259ec7f737f
+  original:
+    hackage: perfect-vector-shuffle-0.1.1.1@sha256:8656a3f1f491d1d79aba9e0a5dbb08589613202b08c7a9b92570d6bec7390093,3668
 snapshots:
 - completed:
     size: 524799
