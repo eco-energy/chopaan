@@ -45,7 +45,8 @@ dependencies:
 - containers
 - unordered-containers
 - stm
-- time >= 1.10
+- time
+- time-compat >= 1.9.2.2
 - ulid
 - convertible
 - time-lens
@@ -78,6 +79,8 @@ dependencies:
 - concat-examples
 - concat-plugin
 - monad-bayes
+- mgenv
+- opt-expect
 
 ghc-options:
 - -Wall
