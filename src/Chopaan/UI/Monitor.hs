@@ -36,8 +36,11 @@ data Monitor = Monitor_State
 
 type MonitorC t m = (Reflex t, Adjustable t m, MonadHold t m, MonadFix m, PostBuild t m, MonadNodeId m)
 
-monitor :: (MonitorC t m, Show n, Show a, Show b, Show c)
-  => Map n (Event t a) -> Map n (Event t b) -> Map n (Event t c)
+type EventMap t m n a = MonitorC t m => Map n (Event t a)
+
+
+monitor :: forall t m n a b c. (MonitorC t m, Show n, Show a, Show b, Show c)
+  => EventMap t m n a -> EventMap t m n b -> EventMap t m n c
   -> VtyWidget t m (Event t ())
 monitor sensors runtimeStats logs = do
   inp <- input
