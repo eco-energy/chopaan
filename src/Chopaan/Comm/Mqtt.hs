@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings#-}
 
-module Chopaan.Comm.Mqtt (runMqtt) where
+module Chopaan.Comm.Mqtt (runMqtt, client, pub) where
 
 
 -- Different string modules should be unified under one interface
@@ -58,7 +58,15 @@ mkTLSSettings cert key caPath hostName name = do
 
 -- need reader for creds and logs
 runMqtt :: forall a b. (Address a, Dispatch b) => MQTTOpts -> NodeQueue a b -> [a] -> MQ.MessageCallback -> IO ()
-runMqtt MQTTOpts{..} outQueue ts msgCB = do
+runMqtt opts outQueue ts msgCB = do
+  mc <- client opts msgCB
+  _ <- forkIO $ forever $ catches (pub mc outQueue) [Handler errorHandler]
+  _ <- mapM (subscribe mc) ts -- [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
+  MQ.waitForClient mc
+
+
+client :: MQTTOpts -> MQ.MessageCallback -> IO (MQ.MQTTClient)
+client MQTTOpts{..} msgCB = do
   tlsConf <- mkTLSSettings certPath keyPath caPath mqttURI connId
   let
     (Just uri) = parseURI $ Text.unpack $ mqttURI <> "#" <> connId
@@ -69,12 +77,7 @@ runMqtt MQTTOpts{..} outQueue ts msgCB = do
            , MQ._msgCB=msgCB
            , MQ._connectTimeout=1800000
            , MQ._tlsSettings=tlsConf}
-
-  mc <- MQ.connectURI conf uri
-  _ <- forkIO $ forever $ catches (pub mc outQueue) [Handler errorHandler]
-  _ <- mapM (subscribe mc) ts -- [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
-  MQ.waitForClient mc
-
+  MQ.connectURI conf uri
 
 subscribe :: (Address n) => MQ.MQTTClient -> n -> IO ([Either MQTy.SubErr MQ.QoS])
 subscribe c n = fst <$> MQ.subscribe c [subTopic n] []
