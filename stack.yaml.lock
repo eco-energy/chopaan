@@ -339,6 +339,13 @@ packages:
       sha256: abb36d87c8790196fada5754fdbcc88eaf8c956ac419aa8544718d15eb3a0ae5
   original:
     hackage: z3-408.1@sha256:809968ed9329172448a7c89ce327cfa1c9632272d2a2c06211025257100c5c93,4116
+- completed:
+    hackage: monad-bayes-0.1.1.0@sha256:57d96f530a37a1c8efed0830c7f2bcf86da05d0d53324aebdd5b5aa165d72829,5132
+    pantry-tree:
+      size: 2419
+      sha256: 39c3c264da0b75b717909693f5ecaf8342761e4da62d6c273ae4fdc5d2011afb
+  original:
+    hackage: monad-bayes-0.1.1.0@sha256:57d96f530a37a1c8efed0830c7f2bcf86da05d0d53324aebdd5b5aa165d72829,5132
 snapshots:
 - completed:
     size: 524799
