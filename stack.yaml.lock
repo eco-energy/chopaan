@@ -114,11 +114,11 @@ packages:
     git: https://github.com/faezs/opt-expect.git
     pantry-tree:
       size: 2106
-      sha256: 6f6a99e161b8b547fd3a9197edcaa8aa5eccdf296b0833d3c7363423d0ecd542
-    commit: 71be809dd69f89425e1124c34878565a14b33257
+      sha256: 2e6116b471dc6a17a0e6fd202f443dbdfc249694aa205c9e0a15bad1148a0a8e
+    commit: cdf9e45622d1739816b40765df23506bc74046b6
   original:
     git: https://github.com/faezs/opt-expect.git
-    commit: 71be809dd69f89425e1124c34878565a14b33257
+    commit: cdf9e45622d1739816b40765df23506bc74046b6
 - completed:
     name: propagators
     version: '0'
