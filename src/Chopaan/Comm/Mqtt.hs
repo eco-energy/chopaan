@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings#-}
 
-module Chopaan.Comm.Mqtt (runMqtt, client, pub) where
+module Chopaan.Comm.Mqtt (runMqtt, client, pub, MQ.Topic) where
 
 
 -- Different string modules should be unified under one interface
