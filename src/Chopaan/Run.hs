@@ -1,8 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeApplications, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications, FlexibleContexts, ScopedTypeVariables, RankNTypes #-}
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Chopaan.Run (run) where
+module Chopaan.Run (run, mon) where
 
 import Chopaan.Node.Node (NodeS)
 import Chopaan.Types
@@ -11,12 +11,12 @@ import Control.Concurrent (forkIO)
 
 import Streamly
 import Chopaan.Comm.Mqtt (runMqtt)
-import Chopaan.Comm.Comm (MessageQs(..), initQs, mkCallback)
+import Chopaan.Comm.Comm (Address, MessageQs(..), initQs, mkCallback)
 
 import Chopaan.Kibbutz.Kibbutz (Kbtz(..), sensorKbtz, logsKbtz, rsKbtz, getNodes, asFRPNetwork)
 
-import Chopaan.UI.Monitor (monitor, MonitorC)
-import Chopaan.Node.NodeId (NodeMAC)
+import Chopaan.UI.Base (UIConstraints)
+import Chopaan.UI.Monitor (monitor)
 import Proto.NodeMessageSchema.NodeMessages
 import Reflex.Vty (mainWidget, VtyWidget)
 import Reflex
@@ -35,16 +35,17 @@ run = do
   logs    <- liftIO $ logsKbtz @SerialT nodes logsQ
   _ <- liftIO $ forkIO $ forever $
        runMqtt mqttOpts outbox nodes (mkCallback qs)
-  liftIO $ mainWidget $ mon sensors runtime logs
+  liftIO $ mainWidget $ mon id sensors runtime logs
 
 
-mon :: forall m m' t' t a. (TriggerEvent t' m', MonitorC t' m', MonadAsync m, IsStream t, Show a)
-  => Kbtz t m NodeMAC NodeS
-  -> Kbtz t m NodeMAC RuntimeStats
-  -> Kbtz t m NodeMAC a
+mon :: forall t' t m m' n a. (IsStream t, MonadAsync m, MonadIO m', TriggerEvent t' m', UIConstraints t' m', Address n, Ord n, Show n, Show a)
+  => (forall x. m x -> IO x)
+  -> Kbtz t m n NodeS
+  -> Kbtz t m n RuntimeStats
+  -> Kbtz t m n a
   -> VtyWidget t' m' (Event t' ()) --VtyWidget t' m (Event t' ())
-mon sensors runtime logs = do
-  s <- asFRPNetwork sensors
-  r <- asFRPNetwork runtime
-  l <- asFRPNetwork logs
+mon h sensors runtime logs = do
+  s <- asFRPNetwork h sensors
+  r <- asFRPNetwork h runtime
+  l <- asFRPNetwork h logs
   monitor s r l
