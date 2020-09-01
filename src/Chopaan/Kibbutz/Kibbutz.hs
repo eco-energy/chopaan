@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes #-}
 module Chopaan.Kibbutz.Kibbutz where
 
 import Streamly
@@ -71,8 +71,10 @@ logsKbtz :: forall t m a. (IsStream t, MonadAsync m, Dispatch a)
   -> m (Kbtz t m NodeMAC a)
 logsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @a q) id
 
-asFRPNetwork :: forall t t' m m' n a. (IsStream t, MonadAsync m, R.TriggerEvent t' m') => Kbtz t m n a -> VtyWidget t' m' (Map n (R.Event t' a))
-asFRPNetwork = sequence . (M.map (toEvent . adapt)) . unKibbutz
+asFRPNetwork :: forall t t' m m' n a.
+  (IsStream t, MonadAsync m, R.Reflex t', R.TriggerEvent t' m', MonadIO m', Show a)
+  => (forall x. m x -> IO x) -> Kbtz t m n a -> VtyWidget t' m' (Map n (R.Event t' a))
+asFRPNetwork h = sequence . (M.map (toEvent @t @t' h)) . unKibbutz
 
 
 --asFRPIO = asFRPNetwork @_ @_ @VtyWidget _ IO

@@ -8,20 +8,25 @@ import Data.ProtoLens
 
 import Control.Monad.Bayes.Class
 
-import Chopaan.Node.NodeId
-import Chopaan.Comm.Comm (MessageQs(..), initQs, Address(..), Dispatch(..), mkCallback, writeToPubQ)
-import Chopaan.Comm.Mqtt (client, pub)
+import Chopaan.Kibbutz.Kibbutz (sensorKbtz, kbtz, Kbtz)
+import Chopaan.Comm.Comm (MessageQs(..), initMessageQs, Address(..), Dispatch(..), mkCallback, writeToPubQ)
+import Chopaan.Comm.Mqtt (client, pub, Topic)
 import Chopaan.Types (MQTTOpts(..), Options(..))
 import Chopaan.Utils.Time
-
+import Chopaan.Run (mon)
+import Chopaan.Node.Node (nodeS)
 
 import Proto.NodeMessageSchema.NodeMessages
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as F
 
 import Control.Monad
+import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad.Trans.State
+
+
+import qualified Data.Text as T
 import Data.Time
 import Data.Time.Clock.Compat (NominalDiffTime)
 import Data.Time.LocalTime.Compat (LocalTime, addLocalTime, diffLocalTime)
@@ -29,16 +34,25 @@ import Data.Time.LocalTime.Compat (LocalTime, addLocalTime, diffLocalTime)
 import Physics.Storage
 
 
-import Dhall
-
 import Streamly
 import qualified Streamly.Prelude as S
-import Streamly.Internal.Data.Stream.StreamK (hoist)
-import Env.MonadEnv
-import Chopaan.Kibbutz.Kibbutz (sensorKbtz, kbtz)
 
-nodeStream :: (IsStream t) =>  t MonadEnv EnergyState
-nodeStream = S.map snd $ S.iterateM (nodeStep @MonadEnv) (pure (startDay $ TimeOfDay 0 0 0, defMessage))
+import Env.MonadEnv (MonadEnv, sampleIOE)
+import Reflex.Vty (mainWidget)
+
+
+
+nodeStream :: forall t. (IsStream t) =>  t MonadEnv EnergyState
+nodeStream = constRate 1 $ S.map snd $ S.iterateM (nodeStep @MonadEnv) (pure (startDay $ TimeOfDay 0 0 0, defMessage))
+
+runtimeS :: forall t. (IsStream t) => t MonadEnv RuntimeStats
+runtimeS = forever $ do
+  S.yieldM runtimeDist
+
+logsS :: forall t. (IsStream t) => t MonadEnv MeshFrame
+logsS = forever $ do
+  S.yieldM logsDist
+
 
 nodeStep :: forall m. (MonadSample m) => (LocalTime, EnergyState) -> m (LocalTime, EnergyState)
 nodeStep (t, oldState) = do
@@ -100,18 +114,67 @@ temporalGaussians (start, end) ranges@(r:rs) t = do
   where
     isBetween s e x = x >= s && x <= e  
 
-shift :: forall t. (IsStream t) => (forall a. t MonadEnv a -> t IO a)
-shift = hoist sampleIOE
 
---testKbtz :: forall t. (IsStream t) => _
+
+{------------------------------ Operational Stuff --------------------------------}
+
+
+newtype NodeTest = NodeTest Int deriving (Eq, Ord, Show)
+
+instance Address NodeTest where
+  stateTopic = asTopic "state"
+  controlTopic = asTopic "control"
+  logTopic = asTopic "logs"
+  fromStateTopic = fromTopic "state"
+  fromControlTopic = fromTopic "control"
+  fromLogTopic = fromTopic "logs"
+
+
+asTopic :: T.Text -> NodeTest -> Topic
+asTopic suffix (NodeTest n) = testPrefix <> suffix <> "/"  <> (toText n)
+  where
+    toText :: (Show a) => a -> T.Text
+    toText = T.pack . show
+
+fromTopic :: T.Text -> Topic -> Maybe NodeTest
+fromTopic suffix t = case (isValidTopic t) of
+       False  -> Nothing
+       _ -> Just . NodeTest . read . T.unpack $ n
+  where
+    n = T.replace (suffix <> "/") "" $ T.replace prefix "" t
+    isValidTopic t' = prefix `T.isPrefixOf` t' && suffix `T.isSuffixOf` t'
+    prefix = testPrefix
+
+testPrefix :: T.Text
+testPrefix = "/kibbutz/test/node/"
+
+
+{---------------------------------------------------------------------------------}
+
+
+testKbtz :: forall t a b. (IsStream t, Dispatch a)
+  => [NodeTest] -> (NodeTest -> t MonadEnv a) -> (t MonadEnv a -> t MonadEnv b) -> MonadEnv (Kbtz t MonadEnv NodeTest b)
 testKbtz = kbtz @t @MonadEnv
+
+testNodes :: [NodeTest]
+testNodes = NodeTest <$> [1..]
 
 
 testClient :: IO ()
 testClient = do
+  let
+    nodes = take 100 testNodes
+  sensors <- sampleIOE $ testKbtz @AsyncT nodes (\_ -> nodeStream) (nodeS)
+  runtime <- sampleIOE $ testKbtz @AsyncT nodes (\_ -> runtimeS) (id)
+  logs    <- sampleIOE $ testKbtz @AsyncT nodes (\_ -> logsS) (id)
+  mainWidget $ mon sampleIOE sensors runtime logs
+
+{--
+
   Options{mqttOpts} <- input auto "./options.dhall"
-  qs <- atomically $ initQs
-  mqc <- client (mqttOpts {connId = "simulatedPub"}) (mkCallback qs)
+  qs <- atomically $ initMessageQs
+  mqc <- client (mqttOpts) (mkCallback qs)
   _ <- forkIO $ forever $ pub mqc (outbox qs)
-  forever $ do
-    S.mapM_ (\es -> writeToPubQ (outbox qs) (undefined :: NodeMAC) $ frame es) $ shift nodeStream
+  _ <- forkIO $ forever $ do
+    S.mapM_ (\es -> writeToPubQ (outbox qs) (NodeTest 1) $ frame es) $ sampleStream nodeStream
+--}
