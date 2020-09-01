@@ -16,6 +16,7 @@ import Chopaan.UI.Base
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Fix
 import Control.Monad.NodeId
 import Data.Functor.Misc
@@ -34,8 +35,11 @@ import Reflex.Vty
 data Monitor = Monitor_State
              | Monitor_RuntimeStats
              | Monitor_Logs
-  deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
+data Dispatches = Dispatch_Transactions
+                | Dispatch_NodeConfig
+                | Dispatch_MeshConfig
+  deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
 
 type EventMap t m n a = UIConstraints t m => Map n (Event t a)
@@ -51,24 +55,39 @@ monitor sensors runtimeStats logs = do
           fixed 1 $ text "Select an section."
           fixed 1 $ text "Esc will bring you back here."
           fixed 1 $ text "Ctrl+c to quit."
-        a <- fixed 3 $ textButtonStatic def "Grid State"
-        b <- fixed 3 $ textButtonStatic def "Runtime Stats"
-        c <- fixed 3 $ textButtonStatic def "Debug Logs"
-        return $ leftmost
-          [ Left Monitor_State <$ a
-          , Left Monitor_RuntimeStats <$ b
-          , Left Monitor_Logs <$ c
-          ]
+        stretch $ row $ do
+          (monitoring) <- stretch $ col $ do
+            a <- fixed 3 $ textButtonStatic def "Grid Power States"
+            b <- fixed 3 $ textButtonStatic def "Runtime Stats"
+            c <- fixed 3 $ textButtonStatic def "Node Logs"
+            return $ Left <$> leftmost
+              [ Left Monitor_State <$ a
+              , Left Monitor_RuntimeStats <$ b
+              , Left Monitor_Logs <$ c
+              ]
+          dispatching <- stretch $ col $ do
+            d <- fixed 3 $ textButtonStatic def "Transactor"
+            e <- fixed 3 $ textButtonStatic def "Node Config"
+            f <- fixed 3 $ textButtonStatic def "Mesh Config"
+            return $ Left <$> leftmost
+              [ Right Dispatch_Transactions <$ d
+              , Right Dispatch_NodeConfig <$ e
+              , Right Dispatch_MeshConfig <$ f
+              ]
+          return $ leftmost [monitoring, dispatching]
       escapable w = do
         void w
-        i <- input
+        i <- input 
         return $ fforMaybe i $ \case
           V.EvKey V.KEsc [] -> Just $ Right ()
           _ -> Nothing
   rec out <- networkHold buttons $ ffor (switch (current out)) $ \case
-        Left Monitor_State -> escapable $ thingo sensors
-        Left Monitor_RuntimeStats -> escapable $ thingo runtimeStats
-        Left Monitor_Logs -> escapable $ thingo logs
+        Left (Left Monitor_State) -> escapable $ thingo sensors
+        Left (Left Monitor_RuntimeStats) -> escapable $ thingo runtimeStats
+        Left (Left Monitor_Logs) -> escapable $ thingo logs
+        Left (Right Dispatch_Transactions) -> escapable $ form
+        Left (Right Dispatch_NodeConfig) -> escapable $ form
+        Left (Right Dispatch_MeshConfig) -> escapable $ form
         Right () -> buttons
   return $ fforMaybe inp $ \case
     V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
@@ -92,13 +111,31 @@ thingo tingMap = do
             return (focusMe, r)
   return listOut
 
-aBox :: (Reflex t, MonadHold t m, MonadFix m, PostBuild t m, MonadNodeId m, Show n, Show a)
+aBox :: (UIConstraints t m, Show n, Show a)
   => Behavior t BoxStyle -> (n, Event t a) -> VtyWidget t m ()
 aBox style (n, e) = col $ do
+  dw <- displayWidth
   eb <- hold "Waiting..." $ toText <$> e
-  _ <- fixed 5 $ boxTitle style (toText n) $ display eb
+  _ <- fixed 50 $ row $ do
+    fixed ((\x -> round $ fromIntegral x / (2 :: Float)) <$> dw) $ boxTitle style (toText n) $ scrollableText never eb
   return ()
 
+
+data FormButtons = FormSubmit | FormCancel
+
+form :: (UIConstraints t m) => VtyWidget t m ()
+form = undefined {--do
+  let submit = col $ do
+        fixed 10 $ row $ do
+          submit <- fixed 10 $ textButtonStatic def "Send"
+          return $ FormSubmit <$ submit
+  rec out <- networkHold button $ ffor (switch (current out)) $ \case
+        Left FormSubmit -> do
+          liftIO . putStrLn $ "A"
+          return Just
+        Right () -> text
+  return ()--}
+  
 
 toText :: (Show a) => a -> T.Text
 toText = T.pack . show
