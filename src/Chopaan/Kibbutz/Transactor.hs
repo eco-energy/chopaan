@@ -194,7 +194,6 @@ data Participant = Source | Sink deriving (Eq, Ord, Show)
 
 data Tx' a = Tx'
   { stakez :: [Stake a]
-  , totalEnergy :: WattSeconds
   , totalTime :: Time.DiffTime
   , startTime :: Time.UTCTime
   , endTime :: Time.UTCTime
