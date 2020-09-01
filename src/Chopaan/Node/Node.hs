@@ -5,7 +5,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveAnyClass #-}
+--{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Rank2Types #-}
@@ -14,6 +14,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Chopaan.Node.Node (
   -- scans
   gridS, nodeS, energyS, powerS, timeS
@@ -73,22 +74,30 @@ import Numeric.Estimator (KalmanFilter(..))
 
 -- Our Scalars
 
-type WattSeconds = Compensated Double
+newtype WattSeconds = WS { unWs :: Compensated Double } deriving (Eq, Ord, Num, Fractional, Real, RealFrac)
 
-type Watts = Compensated Double
+newtype Watts = W { unW :: Compensated Double } deriving (Eq, Ord, Num, Fractional, Real, RealFrac)
+
+instance Show WattSeconds where
+  show = show . uncompensated . unWs
+
+instance Show Watts where
+  show = show . uncompensated . unW
 
 type R = Double
 
 toWatts :: Double -> Watts
-toWatts a = add a 0 compensated
+toWatts a = W $ add a 0 compensated
 
 toWattSeconds :: Double -> WattSeconds
-toWattSeconds a = add a 0 compensated
+toWattSeconds a = WS $ add a 0 compensated
 
 
-instance ToField (Compensated Double) where
-  toField = toField . uncompensated 
+instance ToField (Watts) where
+  toField = toField . uncompensated . unW
 
+instance ToField (WattSeconds) where
+  toField = toField . uncompensated . unWs
 
 
 -- Episodic Metrics
@@ -199,6 +208,7 @@ data NodeMetrics e p = NodeMetrics
   , _energyT :: !(Energy e)
   , _sensorsT :: !EnergyState
   , _battery :: !(Battery R R)
+  , _demand :: !e
   } deriving (Eq, Ord, Generic)
 
 
@@ -238,14 +248,15 @@ instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
     [ toNamedRecord _battery,
       toNamedRecord _powerT,
       toNamedRecord _energyT,
-      toNamedRecord _sensorsT
+      toNamedRecord _sensorsT,
+      HM.fromList [("demand", toField _demand)]
     ]
 
 instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
     <> sep <> ("SoC Percentage: " <> sep <> show (socPercentage _battery))
     <> sep <> ("Runtime Estimate: " <> sep <> show (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
-    -- <> sep <> ("current demand (Ws): " <> show _demand)
+    <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
     <> sep <> ("current energy:" <> sep <> show _energyT)
     <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensorsT)))
@@ -261,9 +272,9 @@ secsToMinutes = (* 60)
 nmFilter :: (NodeId a) -> NodeS -> Bool
 nmFilter _ = isJust . _time
 
-type NodeS = NodeMetrics WattSeconds Watts
+type NodeS = NodeMetrics WattSeconds Watts 
 
-instance DefaultOrdered (NodeMetrics p e)
+instance DefaultOrdered (NodeMetrics e p)
 
 type Timestamp = (Maybe Time.UTCTime, Time.DiffTime)
 
@@ -303,7 +314,7 @@ socPercentage :: Fractional a => Battery a a -> a
 socPercentage Battery{..} = (soc * 100 / totalCapacity)
 
 defNodeS :: NodeS
-defNodeS = NodeMetrics Nothing 0 mempty mempty zeroMsg mempty
+defNodeS = NodeMetrics Nothing 0 mempty mempty zeroMsg mempty 0
 
 
 {----------------------------------------------------------------------------------------------------
@@ -360,7 +371,7 @@ energyFold = (FL.Fold step begin end)
         Power{..} = p
 
 pToE :: (Real t) => t -> Watts -> WattSeconds
-pToE t p' = (realToFrac t) *^ p'
+pToE t (W p') = WS $ (realToFrac t) *^ p'
 
 batteryFold :: forall m. (Monad m) => BatteryParams R -> FL.Fold m EnergyState (Battery R R)
 batteryFold bat@BatteryParams{..} = FL.Fold step begin end
@@ -385,8 +396,8 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
     end (_, Nothing) = return $ emptyB @R @R
 
 
-nodeMonitor :: forall m. (Monad m) => FL.Fold m (EnergyState) (NodeMetrics Watts WattSeconds) 
-nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> sensors <*> (batteryFold defBatteryParams) 
+nodeMonitor :: forall m. (Monad m) => FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts) 
+nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> sensors <*> (batteryFold defBatteryParams) <*> demandFold 
   where
     tn :: FL.Fold m (EnergyState) Timestamp
     tn = timeFold
@@ -394,7 +405,10 @@ nodeMonitor = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en
     en =  energyFold
     sensors :: FL.Fold m (EnergyState) (EnergyState)
     sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
-
+    demandFold :: FL.Fold m (EnergyState) WattSeconds
+    demandFold = FL.Fold (\_ nes -> pure (d $ power nes)) (pure 0) pure
+      where
+        d (Power{..}) = pToE (60 * 10) loadP
 
 
 
@@ -506,12 +520,10 @@ power es = Power
     cnsm' = p batteryVoltage batteryToLoadCurrent
     genP' = p batteryVoltage solarInputCurrent
     p :: Getting Double EnergyState Double -> Getting Double EnergyState Double -> Watts
-    p v i = (es ^. i) *^ v'
+    p v i = W $ (es ^. i) *^ v'
       where
         v' = add (es ^. v) 0 compensated
 
---errorHandle :: (Num a, Compensable a) =>  a -> a -> Compensated a
---errorHandle a b = a
 
 
 -- $ converts the millisecond timestamp in the EnergyState to a UTCTime  
