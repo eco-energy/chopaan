@@ -12,6 +12,8 @@
 
 module Chopaan.UI.Monitor where
 
+import Chopaan.UI.Base
+
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
@@ -34,12 +36,12 @@ data Monitor = Monitor_State
              | Monitor_Logs
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
-type MonitorC t m = (Reflex t, Adjustable t m, MonadHold t m, MonadFix m, PostBuild t m, MonadNodeId m)
-
-type EventMap t m n a = MonitorC t m => Map n (Event t a)
 
 
-monitor :: forall t m n a b c. (MonitorC t m, Show n, Show a, Show b, Show c)
+type EventMap t m n a = UIConstraints t m => Map n (Event t a)
+
+
+monitor :: forall t m n a b c. (UIConstraints t m, Ord n, Show n, Show a, Show b, Show c)
   => EventMap t m n a -> EventMap t m n b -> EventMap t m n c
   -> VtyWidget t m (Event t ())
 monitor sensors runtimeStats logs = do
@@ -49,9 +51,9 @@ monitor sensors runtimeStats logs = do
           fixed 1 $ text "Select an section."
           fixed 1 $ text "Esc will bring you back here."
           fixed 1 $ text "Ctrl+c to quit."
-        a <- fixed 5 $ textButtonStatic def "Grid State"
-        b <- fixed 5 $ textButtonStatic def "Runtime Stats"
-        c <- fixed 5 $ textButtonStatic def "Debug Logs"
+        a <- fixed 3 $ textButtonStatic def "Grid State"
+        b <- fixed 3 $ textButtonStatic def "Runtime Stats"
+        c <- fixed 3 $ textButtonStatic def "Debug Logs"
         return $ leftmost
           [ Left Monitor_State <$ a
           , Left Monitor_RuntimeStats <$ b
@@ -73,15 +75,33 @@ monitor sensors runtimeStats logs = do
     _ -> Nothing
 
 
-thingo :: (Reflex t, MonadHold t m, MonadFix m, PostBuild t m, MonadNodeId m, Show n, Show a)
-  => Map n (Event t a) -> VtyWidget t m ()
-thingo m = sequence_ $ Map.mapWithKey (curry scrollingBox) m
+thingo :: (UIConstraints t m, Ord n, Show n, Show a)
+  => Map n (Event t a) -> VtyWidget t m (Dynamic t (Map n ()))
+thingo tingMap = do
+  rec tabNav <- tabNavigation
+      let
+        nav = leftmost [tabNav]
+        tileCfg = def { _tileConfig_constraint = pure $ Constraint_Fixed 10}
+        updates = leftmost [never]
+      listOut <- runLayout (pure Orientation_Column) 10 nav $
+        listHoldWithKey tingMap updates $  \k t -> tile tileCfg $ do
+            click <- void <$> mouseDown V.BLeft
+            pb <- getPostBuild
+            let focusMe = leftmost [click, pb]
+            r <- aBox (constant def) (k, t)
+            return (focusMe, r)
+  return listOut
 
-scrollingBox :: (Reflex t, MonadHold t m, MonadFix m, PostBuild t m, MonadNodeId m, Show n, Show a)
-  => (n, Event t a) -> VtyWidget t m ()
-scrollingBox (n, e) = col $ do
-  eb <- hold "No Event Yet" $ (T.pack . show) <$> e
-  fixed 2 $ text "node: " -- <> T.pack . show $ n
-  _ <- fixed 5 $ boxStatic def $ scrollableText never eb
+aBox :: (Reflex t, MonadHold t m, MonadFix m, PostBuild t m, MonadNodeId m, Show n, Show a)
+  => Behavior t BoxStyle -> (n, Event t a) -> VtyWidget t m ()
+aBox style (n, e) = col $ do
+  eb <- hold "Waiting..." $ toText <$> e
+  _ <- fixed 5 $ boxTitle style (toText n) $ display eb
   return ()
 
+
+toText :: (Show a) => a -> T.Text
+toText = T.pack . show
+
+textWidget :: (Reflex t, Monad m, Show a) => a -> VtyWidget t m ()
+textWidget = display . constant
