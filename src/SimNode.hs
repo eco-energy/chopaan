@@ -8,10 +8,9 @@ import Data.ProtoLens
 
 import Control.Monad.Bayes.Class
 
-import Chopaan.Kibbutz.Kibbutz (sensorKbtz, kbtz, Kbtz)
-import Chopaan.Comm.Comm (MessageQs(..), initMessageQs, Address(..), Dispatch(..), mkCallback, writeToPubQ)
-import Chopaan.Comm.Mqtt (client, pub, Topic)
-import Chopaan.Types (MQTTOpts(..), Options(..))
+import Chopaan.Kibbutz.Kibbutz (kbtz, Kbtz)
+import Chopaan.Comm.Comm (Address(..), Dispatch(..))
+import Chopaan.Comm.Mqtt (Topic)
 import Chopaan.Utils.Time
 import Chopaan.Run (mon)
 import Chopaan.Node.Node (nodeS)
@@ -20,10 +19,8 @@ import Proto.NodeMessageSchema.NodeMessages
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as F
 
 import Control.Monad
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Concurrent
-import Control.Concurrent.STM
-import Control.Monad.Trans.State
 
 
 import qualified Data.Text as T
@@ -31,7 +28,7 @@ import Data.Time
 import Data.Time.Clock.Compat (NominalDiffTime)
 import Data.Time.LocalTime.Compat (LocalTime, addLocalTime, diffLocalTime)
 
-import Physics.Storage
+--import Physics.Storage
 
 
 import Streamly
@@ -41,17 +38,30 @@ import Env.MonadEnv (MonadEnv, sampleIOE)
 import Reflex.Vty (mainWidget)
 
 
+uiDelay :: (MonadIO m) => m ()
+uiDelay = liftIO . threadDelay $ 1000000
+
+
 
 nodeStream :: forall t. (IsStream t) =>  t MonadEnv EnergyState
-nodeStream = constRate 1 $ S.map snd $ S.iterateM (nodeStep @MonadEnv) (pure (startDay $ TimeOfDay 0 0 0, defMessage))
+nodeStream = S.map snd $ S.iterateM (\xs -> do
+                                        uiDelay
+                                        nodeStep @MonadEnv xs) (pure (startDay $ TimeOfDay 0 0 0, defMessage))
 
 runtimeS :: forall t. (IsStream t) => t MonadEnv RuntimeStats
-runtimeS = forever $ do
-  S.yieldM runtimeDist
+runtimeS = runtime
+  where
+    runtime :: t MonadEnv RuntimeStats
+    runtime = forever $ do 
+      S.yieldM runtimeDist
 
 logsS :: forall t. (IsStream t) => t MonadEnv MeshFrame
-logsS = forever $ do
-  S.yieldM logsDist
+logsS = logs
+  where
+    logs :: t MonadEnv MeshFrame
+    logs = forever $ do
+      S.yieldM logsDist
+
 
 
 nodeStep :: forall m. (MonadSample m) => (LocalTime, EnergyState) -> m (LocalTime, EnergyState)
@@ -85,19 +95,23 @@ nodeStep (t, oldState) = do
       True -> normal mu theta
       False -> normal mu' theta'
     daytime :: LocalTime -> Bool
-    daytime t = t' > sunrise && t' < sunset
+    daytime tx = t' > sunrise && t' < sunset
       where
-        t' = localTimeOfDay t
+        t' = localTimeOfDay tx
     (sunrise, sunset) = (TimeOfDay 6 0 0, TimeOfDay 18 0 0)
 
 startDay :: TimeOfDay -> LocalTime
 startDay = LocalTime $ fromGregorian 1 1 2020
     
-runtimeDist :: (MonadSample m) => m RuntimeStats
-runtimeDist = return defMessage 
+runtimeDist :: (MonadSample m, MonadIO m) => m RuntimeStats
+runtimeDist = do
+  uiDelay
+  return defMessage 
 
-logsDist :: (MonadSample m) => m MeshFrame
-logsDist = return defMessage
+logsDist :: (MonadSample m, MonadIO m) => m MeshFrame
+logsDist = do
+  uiDelay
+  return defMessage
 
 
 
@@ -163,10 +177,10 @@ testNodes = NodeTest <$> [1..]
 testClient :: IO ()
 testClient = do
   let
-    nodes = take 100 testNodes
-  sensors <- sampleIOE $ testKbtz @AsyncT nodes (\_ -> nodeStream) (nodeS)
-  runtime <- sampleIOE $ testKbtz @AsyncT nodes (\_ -> runtimeS) (id)
-  logs    <- sampleIOE $ testKbtz @AsyncT nodes (\_ -> logsS) (id)
+    nodes = take 10 testNodes
+  sensors <- sampleIOE $ testKbtz @SerialT nodes (\_ -> nodeStream) (nodeS)
+  runtime <- sampleIOE $ testKbtz @SerialT nodes (\_ -> runtimeS) (id)
+  logs    <- sampleIOE $ testKbtz @SerialT nodes (\_ -> logsS) (id)
   mainWidget $ mon sampleIOE sensors runtime logs
 
 {--
