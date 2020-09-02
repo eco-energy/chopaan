@@ -1,21 +1,18 @@
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RankNTypes #-}
-{-# OPTIONS_GHC -fno-warn-type-defaults #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Chopaan.Kibbutz.Transactor where
 
 import Prelude hiding (zip, zipWith)
+
+import Chopaan.Kibbutz.Kibbutz (Kbtz(..), asMapStream)
 import Chopaan.Comm.Comm (writeToPubQ, Dispatch(..), Address(..), PubQueue)
 import Chopaan.Node.Node (pToE, Watts, WattSeconds, NodeS, Grid(..), NodeMetrics(..), Power(..))
-import Chopaan.Node.NodeId
+
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
@@ -32,38 +29,18 @@ import Data.ULID
 
 import GHC.Generics (Generic)
 
-
+import qualified Streamly.Prelude as S
+import Streamly
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 
 import qualified Data.Map.Strict as M
 import Data.Key
 
+import Chopaan.Utils.Time
+import ConCat.Misc (R)
 
-type R = Double
-
-class (Monad m, Show a) => Transactable m a where
-  price :: a -> R
-  execute :: a -> m a
-  serialize :: (Dispatch b) => a -> b
-
-
-data Tx = Tx
-  { voltage :: R
-  , current :: R
-  , resistance :: R
-  , distance :: R
-  , dt :: Time.NominalDiffTime
-  } deriving (Eq, Ord, Show)
-
-energyT :: Tx -> R
-energyT Tx{..} = effEnergy
-  where
-    pAtV = (voltage**2 / resistance)
-    iAtP = pAtV / voltage
-    lossAtPI = (iAtP**2 * resistance)
-    effPower = pAtV - lossAtPI
-    effEnergy = effPower * (fromIntegral $ round dt)
+type T = Time.NominalDiffTime
 
 mkETR :: R -> Int -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
 mkETR power howLong dir uid stime = defMessage
@@ -83,75 +60,14 @@ mkETR power howLong dir uid stime = defMessage
          c'' :: Int -> Word64
          c'' = convert
 
-newtype Transaction a = Transaction
-  { stakes :: [(a, R, NM.EnergyTransactionRequest)]
-  } deriving (Eq, Ord, Show, Generic)
 
-data Stake a = Stake
-  { _stakingNode :: a
-  , _participating :: Bool
-  , _power :: R
-  , _duration :: Int
-  } deriving (Eq, Ord, Show)
+data Role = Source | Sink deriving (Eq, Ord, Show, Generic)
 
+newtype Tx n = Tx (M.Map n (Role, Watts, Time.DiffTime)) deriving (Eq, Ord, Show, Generic)
 
-initStake :: a -> Stake a
-initStake n = Stake n False 0 0
+newtype TxState n = TxState (M.Map n (Role, TransactionStatus)) deriving (Eq, Ord, Show, Generic)
 
-stakeEnergy :: Stake a -> R
-stakeEnergy Stake {..} = _power * (fromIntegral _duration)
-
-validateStakeListForTx :: [Stake a] -> Bool
-validateStakeListForTx ss = energyBalance == 0 && powerBalance == 0
-  where
-    energyBalance = sum $ map stakeEnergy ss
-    powerBalance = sum $ map _power ss
-
-toTransaction :: [Stake a] -> [NM.EnergyTransactionRequest] -> Transaction a
-toTransaction ss es = Transaction $ map (\(s, e) -> (_stakingNode s, stakeEnergy s, e)) $ zip ss es
-
-toETR :: Stake a -> (a, (Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest))
-toETR Stake {..} = (_stakingNode, msg)
-  where
-    msg = mkETR (abs _power) _duration dir
-    dir = if (_power > 0) then NM.Outgoing else NM.Incoming
-
-prepTx :: [Stake a] -> ULID -> Time.UTCTime -> Time.NominalDiffTime -> ([(a, NM.EnergyTransactionRequest)], Transaction a)
-prepTx sf ulid tNow leadTime = (txReqs, tx)
-  where
-  txId = (Text.pack . show) ulid
-  startTime = Time.addUTCTime leadTime tNow
-  txReqs = map (\(n, et) -> (n, et txId startTime)) etrs
-  tx = toTransaction stakes (map snd txReqs)
-  etrs = map toETR stakes
-  stakes = filter (_participating) sf
-  
-
-data TransactorS a = TransactorS
-  { nodes_t :: [a]
-  , transactions :: [Transaction a]
-  , txForms :: [Stake a]
-  } deriving (Generic)
-
-executeTransaction :: (Address n) => TransactorS n -> PubQueue n NM.EnergyTransactionRequest -> IO (TransactorS n)
-executeTransaction t@TransactorS{..} outQueue = if validateStakeListForTx txForms then exec else return t
-  where
-    exec = do
-      ulid <- getULID
-      startTime <- Time.getCurrentTime
-      let
-        (reqs, tx) = prepTx stakes ulid startTime (60 * 2 :: Time.NominalDiffTime)
-      _ <- (mapM (uncurry $ writeToPubQ outQueue) reqs)
-      return $ mkTransactor nodes_t $ tx:transactions
-      where
-        stakes = txForms
-        
-mkTransactor :: [a] -> [Transaction a] -> TransactorS a
-mkTransactor ns txs = TransactorS ns txs fs
-  where
-    fs = map initStake ns
-
-
+newtype NodeStates n = NodeStates (M.Map n NodeS) deriving (Eq, Ord, Show, Generic)
 
 data TransactionStatus = TransactionStatus
   { energyDispatched :: WattSeconds
@@ -190,38 +106,35 @@ instance Monoid TransactionStatus where
     , endLag = 0
     }
 
-data Participant = Source | Sink deriving (Eq, Ord, Show)
 
-data Tx' a = Tx'
-  { stakez :: [Stake a]
-  , totalTime :: Time.DiffTime
-  , startTime :: Time.UTCTime
-  , endTime :: Time.UTCTime
-  }
 
-type GridT a = Grid a (Participant, TransactionStatus)
+monitorTx :: (MonadAsync m, Address n, Ord n) => Tx n -> Kbtz SerialT m n NodeS -> SerialT m (TransactionStatus)
+monitorTx tx k = S.postscan (transactionFold tx) s
+  where s = NodeStates <$> asMapStream k
 
 -- The state will just be carried across as a TransactionStatus
-transactionFold :: forall m a. (Monad m, Address a, Ord a) => M.Map a (Participant, Watts, Time.DiffTime)
-  -> FL.Fold m (Grid a NodeS) (TransactionStatus)
-transactionFold participants = FL.Fold step start end
+transactionFold :: forall m n. (Monad m, Address n, Ord n) => Tx n
+  -> FL.Fold m (NodeStates n) (TransactionStatus)
+transactionFold (Tx participants) = FL.Fold step start end
   where
-    step :: GridT a -> Grid a NodeS -> m (GridT a)
-    step (Grid ts) (Grid ma) = return . Grid $ zipWith updateTS ts ma 
-    start :: m (GridT a)
-    start = return . Grid $
+    step :: TxState n -> NodeStates n -> m (TxState n)
+    -- Zip instance for Map is defined as intersection with, so we don't need
+    -- to filter the NodeStates.
+    step (TxState ts) (NodeStates ns) = return . TxState $ zipWith updateTS ts ns 
+    start :: m (TxState n)
+    start = return . TxState $
       (\(px, w, t)-> (px, mempty{ timeRemaining = t
                           , energyRemaining = pToE (realToFrac t) w
                           , startLag = 0
                           }))
       <$> participants
-    end :: GridT a -> m TransactionStatus
-    end (Grid (gt)) = let
+    end :: TxState n -> m TransactionStatus
+    end (TxState gt) = let
       gridTx = foldl (<>) mempty $ snd <$> gt
       loss = energyDispatched gridTx - energyReceived gridTx
       lossPerWS = loss / (energyDispatched gridTx)
       in return $ gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
-    updateTS :: (Participant, TransactionStatus) -> NodeS -> (Participant, TransactionStatus)
+    updateTS :: (Role, TransactionStatus) -> NodeS -> (Role, TransactionStatus)
     updateTS (px, tx) NodeMetrics{..} = let
       nextTS = case px of
                  Source -> (mempty @TransactionStatus)

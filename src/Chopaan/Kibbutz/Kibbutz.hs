@@ -53,6 +53,7 @@ kbtz
 kbtz nodes subscribe process = do
   return . Kbtz . M.fromList $ [(n, process s) | n <- nodes, s <- subscribe <$> nodes]
 
+
 sensorKbtz :: forall t m. (IsStream t, MonadAsync m)
   => [NodeMAC]
   -> NodeQueue NodeMAC EnergyState
@@ -90,3 +91,6 @@ getNodes = do
   n <- ask
   ((fmap $ NodeId . fromJust . thingName)
               <$> (liftIO . getThings $ n))
+
+asMapStream :: (IsStream t, MonadAsync m, Monad (t m)) => Kbtz t m n a -> t m (Map n a)
+asMapStream (Kbtz k) = sequence k
