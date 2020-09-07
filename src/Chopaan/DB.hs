@@ -1,18 +1,30 @@
-module Chopaan.DB
-  ( PgQAgg
-  , PgQExpr
-  , module Database.Beam
-  , module Database.Beam.Postgres
-  , module Database.Beam.Postgres.Full
-  , module Database.Beam.Postgres.Syntax
-  , module Database.Beam.Query.Internal
-  ) where
+{-# LANGUAGE Arrows #-}
+{-# LANGUAGE FlexibleContexts #-}
 
-import Database.Beam hiding (insert, runDelete, runInsert, runUpdate)
-import Database.Beam.Postgres
-import Database.Beam.Postgres.Full
-import Database.Beam.Postgres.Syntax
-import Database.Beam.Query.Internal
+module Chopaan.DB where
 
-type PgQExpr = QExpr PgExpressionSyntax
-type PgQAgg = QAgg PgExpressionSyntax
+import           Opaleye (Field, Table(Table),
+                          required, optional, (.==), (.<),
+                          arrangeDeleteSql, arrangeInsertManySql,
+                          arrangeUpdateSql, arrangeInsertManyReturningSql,
+                          runInsertMany,
+                          SqlInt4, SqlFloat8, SqlText, SqlTimestamptz, toFields, sqlUTCTime)
+
+import Database.PostgreSQL.Simple (Connection, connect, ConnectInfo(..))
+
+import Control.Arrow (returnA)
+import Data.Time (Day)
+
+import Chopaan.DB.Streams (insertEnergyState)
+
+
+
+getDbConn :: IO Connection
+getDbConn = connect ConnectInfo
+  { connectHost = "localhost"
+  , connectPort = 5432
+  , connectDatabase = "chopaan"
+  , connectUser = "chopaan"
+  , connectPassword = "opaleye_tutorial"
+  }
+
