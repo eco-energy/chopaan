@@ -63,7 +63,9 @@ mkETR power howLong dir uid stime = defMessage
 
 data Role = Source | Sink deriving (Eq, Ord, Show, Generic)
 
-newtype Tx n = Tx (M.Map n (Role, Watts, Time.DiffTime)) deriving (Eq, Ord, Show, Generic)
+newtype Stake = Stake { unStake :: (Role, Watts, Time.DiffTime) } deriving (Eq, Ord, Show, Generic)
+
+newtype Tx n = Tx (M.Map n Stake) deriving (Eq, Ord, Show, Generic)
 
 newtype TxState n = TxState (M.Map n (Role, TransactionStatus)) deriving (Eq, Ord, Show, Generic)
 
@@ -123,7 +125,7 @@ transactionFold (Tx participants) = FL.Fold step start end
     step (TxState ts) (NodeStates ns) = return . TxState $ zipWith updateTS ts ns 
     start :: m (TxState n)
     start = return . TxState $
-      (\(px, w, t)-> (px, mempty{ timeRemaining = t
+      (\(Stake (px, w, t))-> (px, mempty{ timeRemaining = t
                           , energyRemaining = pToE (realToFrac t) w
                           , startLag = 0
                           }))

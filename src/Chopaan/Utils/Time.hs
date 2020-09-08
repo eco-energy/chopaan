@@ -6,11 +6,23 @@ import Data.Time.LocalTime.Compat
 import Data.Time.Clock.POSIX.Compat
 import Data.Word
 
+
 fromPico :: Pico -> Integer
 fromPico (MkFixed i) = i
 
-
-timeToUIntSeconds :: LocalTime -> Word64
-timeToUIntSeconds = fromInteger . fromPico . nominalDiffTimeToSeconds . utcTimeToPOSIXSeconds . (localTimeToUTC tz)
+asUTC :: LocalTime -> UTCTime
+asUTC = localTimeToUTC tz
   where
     tz = TimeZone (round $ 5.5 * 60) False "PK"
+
+timeToUIntSeconds :: LocalTime -> Word64
+timeToUIntSeconds = fromInteger . (\x -> round $ (realToFrac x) / 10e11) . fromPico . nominalDiffTimeToSeconds . utcTimeToPOSIXSeconds . asUTC
+    
+
+
+-- $ converts the millisecond timestamp in the EnergyState to a UTCTime  
+utcTimeNow :: Word64 -> UTCTime
+utcTimeNow = posixSecondsToUTCTime . fromIntegral
+
+diffUTC :: UTCTime -> UTCTime -> DiffTime
+diffUTC a b = realToFrac $ diffUTCTime a b

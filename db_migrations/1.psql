@@ -24,7 +24,7 @@ CREATE TABLE "users" (
 CREATE TABLE "nodes" (
        id              SERIAL   PRIMARY KEY,
        macaddr         MACADDR  NOT NULL,
-       batteryType     INTEGER  NOT NULL,
+       batteryType     TEXT     NOT NULL,
        batteryMinV     FLOAT    NOT NULL,
        batteryMaxV     FLOAT    NOT NULL,
        batteryAmpHours FLOAT    NOT NULL

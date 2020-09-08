@@ -13,9 +13,11 @@
 module Chopaan.UI.Monitor where
 
 import Chopaan.UI.Base
+import Chopaan.UI.Transactor
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Fix
 import Control.Monad.NodeId
@@ -32,9 +34,11 @@ import Reflex.Network
 import Reflex.Class.Switchable
 import Reflex.Vty
 
+
 data Monitor = Monitor_State
              | Monitor_RuntimeStats
              | Monitor_Logs
+  deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
 data Dispatches = Dispatch_Transactions
                 | Dispatch_NodeConfig
@@ -50,6 +54,7 @@ monitor :: forall t m n a b c. (UIConstraints t m, Ord n, Show n, Show a, Show b
   -> VtyWidget t m (Event t ())
 monitor sensors runtimeStats logs = do
   inp <- input
+  let nodes = Map.keys sensors
   let buttons = col $ do
         fixed 4 $ col $ do
           fixed 1 $ text "Select an section."
@@ -82,10 +87,10 @@ monitor sensors runtimeStats logs = do
           V.EvKey V.KEsc [] -> Just $ Right ()
           _ -> Nothing
   rec out <- networkHold buttons $ ffor (switch (current out)) $ \case
-        Left (Left Monitor_State) -> escapable $ thingo sensors
-        Left (Left Monitor_RuntimeStats) -> escapable $ thingo runtimeStats
-        Left (Left Monitor_Logs) -> escapable $ thingo logs
-        Left (Right Dispatch_Transactions) -> escapable $ form
+        Left (Left Monitor_State) -> escapable $ tabMapView sensors
+        Left (Left Monitor_RuntimeStats) -> escapable $ tabMapView runtimeStats
+        Left (Left Monitor_Logs) -> escapable $ tabMapView logs
+        Left (Right Dispatch_Transactions) -> escapable $ (transactor nodes)
         Left (Right Dispatch_NodeConfig) -> escapable $ form
         Left (Right Dispatch_MeshConfig) -> escapable $ form
         Right () -> buttons
@@ -94,31 +99,39 @@ monitor sensors runtimeStats logs = do
     _ -> Nothing
 
 
-thingo :: (UIConstraints t m, Ord n, Show n, Show a)
+tabMapView :: (UIConstraints t m, Ord n, Show n, Show a)
   => Map n (Event t a) -> VtyWidget t m (Dynamic t (Map n ()))
-thingo tingMap = do
+tabMapView tingMap = do
   rec tabNav <- tabNavigation
       let
         nav = leftmost [tabNav]
-        tileCfg = def { _tileConfig_constraint = pure $ Constraint_Fixed 10}
-        updates = leftmost [never]
-      listOut <- runLayout (pure Orientation_Column) 10 nav $
-        listHoldWithKey tingMap updates $  \k t -> tile tileCfg $ do
-            click <- void <$> mouseDown V.BLeft
-            pb <- getPostBuild
-            let focusMe = leftmost [click, pb]
-            r <- aBox (constant def) (k, t)
-            return (focusMe, r)
+        tileCfg = def { _tileConfig_constraint = pure $ Constraint_Min 30}
+        updates = leftmost []
+      listOut <- runLayout (pure Orientation_Row) 0 nav $ do
+        listHoldWithKey tingMap updates $ \k v -> tile tileCfg $ do
+          click <- void <$> mouseDown V.BLeft
+          pb <- getPostBuild
+          let focusMe = leftmost [click, pb]
+          r <- (aBox (k, v))
+          return (focusMe, r)
   return listOut
 
 aBox :: (UIConstraints t m, Show n, Show a)
-  => Behavior t BoxStyle -> (n, Event t a) -> VtyWidget t m ()
-aBox style (n, e) = col $ do
-  dw <- displayWidth
-  eb <- hold "Waiting..." $ toText <$> e
-  _ <- fixed 50 $ row $ do
-    fixed ((\x -> round $ fromIntegral x / (2 :: Float)) <$> dw) $ boxTitle style (toText n) $ scrollableText never eb
+  => (n, Event t a) -> VtyWidget t m ()
+aBox (n, e) = do
+  f <- focus
+  _ <- col $ do
+    dw <- displayWidth
+    dh <- displayHeight
+    eb <- hold "Waiting..." $ toText <$> e
+    fixed dh $ row $ do
+      fixed dw $ boxTitle (current $ border <$> f) (toText n) $ richText (def) eb
   return ()
+  where
+    div' = (\x -> round $ fromIntegral x / (2 :: Float))
+    border x = case x of
+                 True -> doubleBoxStyle
+                 False -> singleBoxStyle
 
 
 data FormButtons = FormSubmit | FormCancel
@@ -140,5 +153,39 @@ form = undefined {--do
 toText :: (Show a) => a -> T.Text
 toText = T.pack . show
 
+
 textWidget :: (Reflex t, Monad m, Show a) => a -> VtyWidget t m ()
 textWidget = display . constant
+
+{--
+scrollableList
+  :: forall t m a. (Reflex t, MonadHold t m, MonadFix m)
+  => Event t Int
+  -- number of elements to scroll by
+  -> [VtyWidget t m a]
+  -- list of widget elements
+  -> VtyWidget t m (Behavior t (Int, Int))
+scrollableList scrollBy ws = do
+  dw <- displayWidth
+  let imgs = wrap <$> (constant ws) <*> current dw
+  kup <- key V.KUp
+  kdown <- key V.KDown
+  m <- mouseScroll
+  let requestedScroll :: Event t Int
+      requestedScroll = leftmost
+        [ 1 <$ kdown
+        , (-1) <$ kup
+        , ffor m $ \case
+            ScrollDirection_Up -> (-1)
+            ScrollDirection_Down -> (1)
+        , scrollBy
+        ]
+      updateLine maxN delta ix = min (max 0 (ix + delta)) maxN
+  lineIndex :: Dynamic t Int <- foldDyn (\(maxN, delta) ix -> updateLine (maxN - 1) delta ix) 0 $
+    attach (length <$> imgs) requestedScroll
+  tellImages $ fmap ((:[]) . V.vertCat) $ drop <$> current lineIndex <*> imgs
+  return $ (,) <$> ((+) <$> current lineIndex <*> pure 1) <*> (length <$> imgs)
+  where
+    wrap :: [VtyWidget t m a] -> Int -> [V.Image]
+    wrap x maxWidth = concatMap (fmap)
+--}

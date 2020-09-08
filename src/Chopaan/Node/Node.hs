@@ -67,8 +67,10 @@ import Control.Monad.State.Lazy
 
 import Chopaan.Node.NodeId
 import Chopaan.Node.Storage
+import Chopaan.Utils.Time
 import Numeric.Estimator (KalmanFilter(..))
 
+import Text.Printf
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
@@ -79,10 +81,10 @@ newtype WattSeconds = WS { unWs :: Compensated Double } deriving (Eq, Ord, Num, 
 newtype Watts = W { unW :: Compensated Double } deriving (Eq, Ord, Num, Fractional, Real, RealFrac)
 
 instance Show WattSeconds where
-  show = show . uncompensated . unWs
+  show = (printf ("%.2g")) . uncompensated . unWs
 
 instance Show Watts where
-  show = show . uncompensated . unW
+  show = (printf ("%.2g")) . uncompensated . unW
 
 type R = Double
 
@@ -252,10 +254,12 @@ instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
       HM.fromList [("demand", toField _demand)]
     ]
 
+showDec = (printf ("%.2g"))
+
 instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
-    <> sep <> ("SoC Percentage: " <> sep <> show (socPercentage _battery))
-    <> sep <> ("Runtime Estimate: " <> sep <> show (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
+    <> sep <> ("SoC Percentage: " <> sep <> showDec (socPercentage _battery))
+    <> sep <> ("Runtime Estimate: " <> sep <> showDec (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
     <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
     <> sep <> ("current energy:" <> sep <> show _energyT)
@@ -332,10 +336,10 @@ timeFold = FL.Fold step' begin' done'
     step' :: (Timestamp -> EnergyState -> m Timestamp)
     step' (Nothing, _) cur = pure (Just tn, diffUTC tn tn)
       where
-        tn = utcTimeNow cur
+        tn = utcTimeES cur
     step' ((Just !prev), _) cur = pure (Just tn, diffUTC tn prev)
       where
-        tn = utcTimeNow cur
+        tn = utcTimeES cur
     begin' :: m Timestamp
     begin' = pure (Nothing, 0)
     done' :: Timestamp -> m Timestamp
@@ -354,10 +358,10 @@ energyFold = (FL.Fold step begin end)
     step :: (Energy WattSeconds, Maybe Time.UTCTime) -> EnergyState -> m (Energy WattSeconds, Maybe Time.UTCTime)
     step (esPrev, (Just tPrev)) cur = pure $ ((esPrev <> (eAtT (power cur) (Just tn, diffUTC tn tPrev))), Just tn)
       where
-        tn = utcTimeNow cur
+        tn = utcTimeES cur
     step (esPrev, Nothing) cur = pure $ ((esPrev <> (eAtT (power cur) (Just tn, diffUTC tn tn))), Just tn)
       where
-        tn = utcTimeNow cur
+        tn = utcTimeES cur
     begin :: m (Energy WattSeconds, Maybe Time.UTCTime)
     begin = pure $ (mempty, Nothing)
     end :: (Energy WattSeconds, Maybe Time.UTCTime) -> m (Energy WattSeconds)
@@ -384,7 +388,7 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
       where
         cState (Just (KalmanFilter currState _)) = currState
         cState Nothing = initDynamic {soC = ocvToSoC bat (sensorTerminalV . storageSensors $ sensorReadings)}
-        tnow = utcTimeNow sensorReadings
+        tnow = utcTimeES sensorReadings
         tdiff (Just t') = realToFrac $ Time.diffUTCTime tnow t'
         tdiff Nothing = 0
         
@@ -524,14 +528,10 @@ power es = Power
       where
         v' = add (es ^. v) 0 compensated
 
+utcTimeES :: EnergyState -> Time.UTCTime
+utcTimeES = utcTimeNow . (^. cpuTime)
 
 
--- $ converts the millisecond timestamp in the EnergyState to a UTCTime  
-utcTimeNow :: EnergyState -> Time.UTCTime
-utcTimeNow es = posixSecondsToUTCTime $ (fromIntegral $ (es ^. cpuTime))
-
-diffUTC :: Time.UTCTime -> Time.UTCTime -> Time.DiffTime
-diffUTC a b = realToFrac $ Time.diffUTCTime a b
 
 zeroMsg :: EnergyState
 zeroMsg = defMessage
