@@ -82,6 +82,11 @@ batteryVoltage ::
                   Data.ProtoLens.Field.HasField s "batteryVoltage" a) =>
                  Lens.Family2.LensLike' f s a
 batteryVoltage = Data.ProtoLens.Field.field @"batteryVoltage"
+child ::
+      forall f s a .
+        (Prelude.Functor f, Data.ProtoLens.Field.HasField s "child" a) =>
+        Lens.Family2.LensLike' f s a
+child = Data.ProtoLens.Field.field @"child"
 connectedChildren ::
                   forall f s a .
                     (Prelude.Functor f,
@@ -152,6 +157,24 @@ dutyCycle ::
              Data.ProtoLens.Field.HasField s "dutyCycle" a) =>
             Lens.Family2.LensLike' f s a
 dutyCycle = Data.ProtoLens.Field.field @"dutyCycle"
+endpoint ::
+         forall f s a .
+           (Prelude.Functor f,
+            Data.ProtoLens.Field.HasField s "endpoint" a) =>
+           Lens.Family2.LensLike' f s a
+endpoint = Data.ProtoLens.Field.field @"endpoint"
+forceUpdate ::
+            forall f s a .
+              (Prelude.Functor f,
+               Data.ProtoLens.Field.HasField s "forceUpdate" a) =>
+              Lens.Family2.LensLike' f s a
+forceUpdate = Data.ProtoLens.Field.field @"forceUpdate"
+forcedActions ::
+              forall f s a .
+                (Prelude.Functor f,
+                 Data.ProtoLens.Field.HasField s "forcedActions" a) =>
+                Lens.Family2.LensLike' f s a
+forcedActions = Data.ProtoLens.Field.field @"forcedActions"
 gridToBatteryCurrent ::
                      forall f s a .
                        (Prelude.Functor f,
@@ -186,6 +209,13 @@ macAddress ::
               Data.ProtoLens.Field.HasField s "macAddress" a) =>
              Lens.Family2.LensLike' f s a
 macAddress = Data.ProtoLens.Field.field @"macAddress"
+maxChildNodesPerLayer ::
+                      forall f s a .
+                        (Prelude.Functor f,
+                         Data.ProtoLens.Field.HasField s "maxChildNodesPerLayer" a) =>
+                        Lens.Family2.LensLike' f s a
+maxChildNodesPerLayer
+  = Data.ProtoLens.Field.field @"maxChildNodesPerLayer"
 maxV ::
      forall f s a .
        (Prelude.Functor f, Data.ProtoLens.Field.HasField s "maxV" a) =>
@@ -197,18 +227,61 @@ maybe'battery ::
                  Data.ProtoLens.Field.HasField s "maybe'battery" a) =>
                 Lens.Family2.LensLike' f s a
 maybe'battery = Data.ProtoLens.Field.field @"maybe'battery"
+maybe'child ::
+            forall f s a .
+              (Prelude.Functor f,
+               Data.ProtoLens.Field.HasField s "maybe'child" a) =>
+              Lens.Family2.LensLike' f s a
+maybe'child = Data.ProtoLens.Field.field @"maybe'child"
 maybe'control ::
               forall f s a .
                 (Prelude.Functor f,
                  Data.ProtoLens.Field.HasField s "maybe'control" a) =>
                 Lens.Family2.LensLike' f s a
 maybe'control = Data.ProtoLens.Field.field @"maybe'control"
+maybe'forcedActions ::
+                    forall f s a .
+                      (Prelude.Functor f,
+                       Data.ProtoLens.Field.HasField s "maybe'forcedActions" a) =>
+                      Lens.Family2.LensLike' f s a
+maybe'forcedActions
+  = Data.ProtoLens.Field.field @"maybe'forcedActions"
 maybe'hw ::
          forall f s a .
            (Prelude.Functor f,
             Data.ProtoLens.Field.HasField s "maybe'hw" a) =>
            Lens.Family2.LensLike' f s a
 maybe'hw = Data.ProtoLens.Field.field @"maybe'hw"
+maybe'meshConf ::
+               forall f s a .
+                 (Prelude.Functor f,
+                  Data.ProtoLens.Field.HasField s "maybe'meshConf" a) =>
+                 Lens.Family2.LensLike' f s a
+maybe'meshConf = Data.ProtoLens.Field.field @"maybe'meshConf"
+maybe'meshversion ::
+                  forall f s a .
+                    (Prelude.Functor f,
+                     Data.ProtoLens.Field.HasField s "maybe'meshversion" a) =>
+                    Lens.Family2.LensLike' f s a
+maybe'meshversion = Data.ProtoLens.Field.field @"maybe'meshversion"
+maybe'otaConf ::
+              forall f s a .
+                (Prelude.Functor f,
+                 Data.ProtoLens.Field.HasField s "maybe'otaConf" a) =>
+                Lens.Family2.LensLike' f s a
+maybe'otaConf = Data.ProtoLens.Field.field @"maybe'otaConf"
+maybe'otastatus ::
+                forall f s a .
+                  (Prelude.Functor f,
+                   Data.ProtoLens.Field.HasField s "maybe'otastatus" a) =>
+                  Lens.Family2.LensLike' f s a
+maybe'otastatus = Data.ProtoLens.Field.field @"maybe'otastatus"
+maybe'parent ::
+             forall f s a .
+               (Prelude.Functor f,
+                Data.ProtoLens.Field.HasField s "maybe'parent" a) =>
+               Lens.Family2.LensLike' f s a
+maybe'parent = Data.ProtoLens.Field.field @"maybe'parent"
 maybe'payload ::
               forall f s a .
                 (Prelude.Functor f,
@@ -246,12 +319,94 @@ maybe'transactionStatus ::
                           Lens.Family2.LensLike' f s a
 maybe'transactionStatus
   = Data.ProtoLens.Field.field @"maybe'transactionStatus"
+meshConf ::
+         forall f s a .
+           (Prelude.Functor f,
+            Data.ProtoLens.Field.HasField s "meshConf" a) =>
+           Lens.Family2.LensLike' f s a
+meshConf = Data.ProtoLens.Field.field @"meshConf"
+meshName ::
+         forall f s a .
+           (Prelude.Functor f,
+            Data.ProtoLens.Field.HasField s "meshName" a) =>
+           Lens.Family2.LensLike' f s a
+meshName = Data.ProtoLens.Field.field @"meshName"
+meshParentStrength ::
+                   forall f s a .
+                     (Prelude.Functor f,
+                      Data.ProtoLens.Field.HasField s "meshParentStrength" a) =>
+                     Lens.Family2.LensLike' f s a
+meshParentStrength
+  = Data.ProtoLens.Field.field @"meshParentStrength"
+meshPwd ::
+        forall f s a .
+          (Prelude.Functor f, Data.ProtoLens.Field.HasField s "meshPwd" a) =>
+          Lens.Family2.LensLike' f s a
+meshPwd = Data.ProtoLens.Field.field @"meshPwd"
+meshversion ::
+            forall f s a .
+              (Prelude.Functor f,
+               Data.ProtoLens.Field.HasField s "meshversion" a) =>
+              Lens.Family2.LensLike' f s a
+meshversion = Data.ProtoLens.Field.field @"meshversion"
 minFreeHeap ::
             forall f s a .
               (Prelude.Functor f,
                Data.ProtoLens.Field.HasField s "minFreeHeap" a) =>
               Lens.Family2.LensLike' f s a
 minFreeHeap = Data.ProtoLens.Field.field @"minFreeHeap"
+mqttBroker ::
+           forall f s a .
+             (Prelude.Functor f,
+              Data.ProtoLens.Field.HasField s "mqttBroker" a) =>
+             Lens.Family2.LensLike' f s a
+mqttBroker = Data.ProtoLens.Field.field @"mqttBroker"
+needsRecon ::
+           forall f s a .
+             (Prelude.Functor f,
+              Data.ProtoLens.Field.HasField s "needsRecon" a) =>
+             Lens.Family2.LensLike' f s a
+needsRecon = Data.ProtoLens.Field.field @"needsRecon"
+nodeMac ::
+        forall f s a .
+          (Prelude.Functor f, Data.ProtoLens.Field.HasField s "nodeMac" a) =>
+          Lens.Family2.LensLike' f s a
+nodeMac = Data.ProtoLens.Field.field @"nodeMac"
+otaConf ::
+        forall f s a .
+          (Prelude.Functor f, Data.ProtoLens.Field.HasField s "otaConf" a) =>
+          Lens.Family2.LensLike' f s a
+otaConf = Data.ProtoLens.Field.field @"otaConf"
+otastatus ::
+          forall f s a .
+            (Prelude.Functor f,
+             Data.ProtoLens.Field.HasField s "otastatus" a) =>
+            Lens.Family2.LensLike' f s a
+otastatus = Data.ProtoLens.Field.field @"otastatus"
+parenJoiningRssi ::
+                 forall f s a .
+                   (Prelude.Functor f,
+                    Data.ProtoLens.Field.HasField s "parenJoiningRssi" a) =>
+                   Lens.Family2.LensLike' f s a
+parenJoiningRssi = Data.ProtoLens.Field.field @"parenJoiningRssi"
+parent ::
+       forall f s a .
+         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "parent" a) =>
+         Lens.Family2.LensLike' f s a
+parent = Data.ProtoLens.Field.field @"parent"
+parentRssiThreshold ::
+                    forall f s a .
+                      (Prelude.Functor f,
+                       Data.ProtoLens.Field.HasField s "parentRssiThreshold" a) =>
+                      Lens.Family2.LensLike' f s a
+parentRssiThreshold
+  = Data.ProtoLens.Field.field @"parentRssiThreshold"
+parentversion ::
+              forall f s a .
+                (Prelude.Functor f,
+                 Data.ProtoLens.Field.HasField s "parentversion" a) =>
+                Lens.Family2.LensLike' f s a
+parentversion = Data.ProtoLens.Field.field @"parentversion"
 powerInWatts ::
              forall f s a .
                (Prelude.Functor f,
@@ -264,6 +419,12 @@ ratedPower ::
               Data.ProtoLens.Field.HasField s "ratedPower" a) =>
              Lens.Family2.LensLike' f s a
 ratedPower = Data.ProtoLens.Field.field @"ratedPower"
+restartEsp ::
+           forall f s a .
+             (Prelude.Functor f,
+              Data.ProtoLens.Field.HasField s "restartEsp" a) =>
+             Lens.Family2.LensLike' f s a
+restartEsp = Data.ProtoLens.Field.field @"restartEsp"
 rtStats ::
         forall f s a .
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "rtStats" a) =>
@@ -313,6 +474,18 @@ time ::
        (Prelude.Functor f, Data.ProtoLens.Field.HasField s "time" a) =>
        Lens.Family2.LensLike' f s a
 time = Data.ProtoLens.Field.field @"time"
+timeOfDay ::
+          forall f s a .
+            (Prelude.Functor f,
+             Data.ProtoLens.Field.HasField s "timeOfDay" a) =>
+            Lens.Family2.LensLike' f s a
+timeOfDay = Data.ProtoLens.Field.field @"timeOfDay"
+timeOfLastUpdate ::
+                 forall f s a .
+                   (Prelude.Functor f,
+                    Data.ProtoLens.Field.HasField s "timeOfLastUpdate" a) =>
+                   Lens.Family2.LensLike' f s a
+timeOfLastUpdate = Data.ProtoLens.Field.field @"timeOfLastUpdate"
 transaction ::
             forall f s a .
               (Prelude.Functor f,
@@ -330,6 +503,12 @@ type' ::
         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "type'" a) =>
         Lens.Family2.LensLike' f s a
 type' = Data.ProtoLens.Field.field @"type'"
+updateStatus ::
+             forall f s a .
+               (Prelude.Functor f,
+                Data.ProtoLens.Field.HasField s "updateStatus" a) =>
+               Lens.Family2.LensLike' f s a
+updateStatus = Data.ProtoLens.Field.field @"updateStatus"
 uuid ::
      forall f s a .
        (Prelude.Functor f, Data.ProtoLens.Field.HasField s "uuid" a) =>
@@ -345,6 +524,11 @@ vOC ::
       (Prelude.Functor f, Data.ProtoLens.Field.HasField s "vOC" a) =>
       Lens.Family2.LensLike' f s a
 vOC = Data.ProtoLens.Field.field @"vOC"
+version ::
+        forall f s a .
+          (Prelude.Functor f, Data.ProtoLens.Field.HasField s "version" a) =>
+          Lens.Family2.LensLike' f s a
+version = Data.ProtoLens.Field.field @"version"
 wattSecondsTransacted ::
                       forall f s a .
                         (Prelude.Functor f,
@@ -352,9 +536,20 @@ wattSecondsTransacted ::
                         Lens.Family2.LensLike' f s a
 wattSecondsTransacted
   = Data.ProtoLens.Field.field @"wattSecondsTransacted"
+wifiPwd ::
+        forall f s a .
+          (Prelude.Functor f, Data.ProtoLens.Field.HasField s "wifiPwd" a) =>
+          Lens.Family2.LensLike' f s a
+wifiPwd = Data.ProtoLens.Field.field @"wifiPwd"
 wifiStrength ::
              forall f s a .
                (Prelude.Functor f,
                 Data.ProtoLens.Field.HasField s "wifiStrength" a) =>
                Lens.Family2.LensLike' f s a
 wifiStrength = Data.ProtoLens.Field.field @"wifiStrength"
+wifiUname ::
+          forall f s a .
+            (Prelude.Functor f,
+             Data.ProtoLens.Field.HasField s "wifiUname" a) =>
+            Lens.Family2.LensLike' f s a
+wifiUname = Data.ProtoLens.Field.field @"wifiUname"

@@ -28,6 +28,7 @@ description:         Please see the README on Github at <https://github.com/faez
 dependencies:
 - base >= 4.11 && < 10
 - proto-lens-runtime
+- proto-lens-protoc
 - rio >= 0.1.8.0
 - amazonka
 - amazonka-iot
@@ -83,6 +84,7 @@ dependencies:
 - mgenv
 - opt-expect
 
+
 ghc-options:
 - -Wall
 - -Wcompat
@@ -94,7 +96,9 @@ ghc-options:
 
 library:
   source-dirs: src
+build-tools-depends: proto-lens-protoc:proto-lens-protoc
 
+  
 executables:
   chopaan-exe:
     main:                Main.hs
