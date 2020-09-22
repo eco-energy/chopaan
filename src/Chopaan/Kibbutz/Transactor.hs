@@ -67,9 +67,28 @@ newtype Stake = Stake { unStake :: (Role, Watts, Time.DiffTime) } deriving (Eq, 
 
 newtype Tx n = Tx (M.Map n Stake) deriving (Eq, Ord, Show, Generic)
 
+instance (Ord n) => Semigroup (Tx n) where
+  (Tx m) <> (Tx m') = Tx (m <> m')
+
+instance (Ord n) => Monoid (Tx n) where
+  mempty = Tx mempty
+
 newtype TxState n = TxState (M.Map n (Role, TransactionStatus)) deriving (Eq, Ord, Show, Generic)
 
+instance (Ord n) => Semigroup (TxState n) where
+  (TxState m) <> (TxState m') = TxState (m <> m')
+
+instance (Ord n) => Monoid (TxState n) where
+  mempty = TxState mempty
+
 newtype NodeStates n = NodeStates (M.Map n NodeS) deriving (Eq, Ord, Show, Generic)
+
+instance (Ord n) => Semigroup (NodeStates n) where
+  (NodeStates m) <> (NodeStates m') = NodeStates (m <> m')
+
+instance (Ord n) => Monoid (NodeStates n) where
+  mempty = NodeStates mempty
+
 
 data TransactionStatus = TransactionStatus
   { energyDispatched :: WattSeconds
@@ -163,3 +182,15 @@ transactionFold (Tx participants) = FL.Fold step start end
         hasEnded Sink = shouldHaveEnded && (tInP _powerT) <= eta
         shouldHaveEnded = (energyRemaining tx - e) <= 0
         eta = 0.5
+
+
+
+transactionPlanner :: forall m n. (Monad m, Address n, Ord n) => [n] -> FL.Fold m (NodeStates n) (Tx n)
+transactionPlanner ns = FL.Fold step start end
+  where
+    step ::  Tx n -> NodeStates n -> m (Tx n)
+    step = undefined
+    start :: m (Tx n)
+    start = undefined
+    end :: Tx n -> m (Tx n)
+    end = return
