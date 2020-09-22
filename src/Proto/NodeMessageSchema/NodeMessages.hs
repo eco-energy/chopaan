@@ -498,6 +498,8 @@ instance Control.DeepSeq.NFData BatteryParameters'BatteryType where
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.dutyCycle' @:: Lens' EnergyState Prelude.Double@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.cpuTime' @:: Lens' EnergyState Data.Word.Word64@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.status' @:: Lens' EnergyState StreamState@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.gridCurrent' @:: Lens' EnergyState Prelude.Double@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.solarVoltage' @:: Lens' EnergyState Prelude.Double@
  -}
 data EnergyState = EnergyState{_EnergyState'batteryVoltage ::
                                !Prelude.Double,
@@ -510,6 +512,8 @@ data EnergyState = EnergyState{_EnergyState'batteryVoltage ::
                                _EnergyState'dutyCycle :: !Prelude.Double,
                                _EnergyState'cpuTime :: !Data.Word.Word64,
                                _EnergyState'status :: !StreamState,
+                               _EnergyState'gridCurrent :: !Prelude.Double,
+                               _EnergyState'solarVoltage :: !Prelude.Double,
                                _EnergyState'_unknownFields :: !Data.ProtoLens.FieldSet}
                      deriving (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show EnergyState where
@@ -591,6 +595,20 @@ instance Data.ProtoLens.Field.HasField EnergyState "status"
           = (Lens.Family2.Unchecked.lens _EnergyState'status
                (\ x__ y__ -> x__{_EnergyState'status = y__}))
               Prelude.. Prelude.id
+instance Data.ProtoLens.Field.HasField EnergyState "gridCurrent"
+           (Prelude.Double)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _EnergyState'gridCurrent
+               (\ x__ y__ -> x__{_EnergyState'gridCurrent = y__}))
+              Prelude.. Prelude.id
+instance Data.ProtoLens.Field.HasField EnergyState "solarVoltage"
+           (Prelude.Double)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _EnergyState'solarVoltage
+               (\ x__ y__ -> x__{_EnergyState'solarVoltage = y__}))
+              Prelude.. Prelude.id
 instance Data.ProtoLens.Message EnergyState where
         messageName _ = Data.Text.pack "EnergyState"
         fieldsByTag
@@ -664,6 +682,20 @@ instance Data.ProtoLens.Message EnergyState where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Optional
                          (Data.ProtoLens.Field.field @"status"))
                       :: Data.ProtoLens.FieldDescriptor EnergyState
+                gridCurrent__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "gridCurrent"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.DoubleField ::
+                         Data.ProtoLens.FieldTypeDescriptor Prelude.Double)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Optional
+                         (Data.ProtoLens.Field.field @"gridCurrent"))
+                      :: Data.ProtoLens.FieldDescriptor EnergyState
+                solarVoltage__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "solarVoltage"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.DoubleField ::
+                         Data.ProtoLens.FieldTypeDescriptor Prelude.Double)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Optional
+                         (Data.ProtoLens.Field.field @"solarVoltage"))
+                      :: Data.ProtoLens.FieldDescriptor EnergyState
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, batteryVoltage__field_descriptor),
@@ -675,7 +707,9 @@ instance Data.ProtoLens.Message EnergyState where
                  (Data.ProtoLens.Tag 7, temperature__field_descriptor),
                  (Data.ProtoLens.Tag 8, dutyCycle__field_descriptor),
                  (Data.ProtoLens.Tag 9, cpuTime__field_descriptor),
-                 (Data.ProtoLens.Tag 10, status__field_descriptor)]
+                 (Data.ProtoLens.Tag 10, status__field_descriptor),
+                 (Data.ProtoLens.Tag 11, gridCurrent__field_descriptor),
+                 (Data.ProtoLens.Tag 12, solarVoltage__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _EnergyState'_unknownFields
               (\ x__ y__ -> x__{_EnergyState'_unknownFields = y__})
@@ -691,6 +725,8 @@ instance Data.ProtoLens.Message EnergyState where
                         _EnergyState'dutyCycle = Data.ProtoLens.fieldDefault,
                         _EnergyState'cpuTime = Data.ProtoLens.fieldDefault,
                         _EnergyState'status = Data.ProtoLens.fieldDefault,
+                        _EnergyState'gridCurrent = Data.ProtoLens.fieldDefault,
+                        _EnergyState'solarVoltage = Data.ProtoLens.fieldDefault,
                         _EnergyState'_unknownFields = ([])}
         parseMessage
           = let loop ::
@@ -798,6 +834,24 @@ instance Data.ProtoLens.Message EnergyState where
                                                 Data.ProtoLens.Encoding.Bytes.<?> "status"
                                          loop
                                            (Lens.Family2.set (Data.ProtoLens.Field.field @"status")
+                                              y
+                                              x)
+                                89 -> do y <- (Prelude.fmap
+                                                 Data.ProtoLens.Encoding.Bytes.wordToDouble
+                                                 Data.ProtoLens.Encoding.Bytes.getFixed64)
+                                                Data.ProtoLens.Encoding.Bytes.<?> "gridCurrent"
+                                         loop
+                                           (Lens.Family2.set
+                                              (Data.ProtoLens.Field.field @"gridCurrent")
+                                              y
+                                              x)
+                                97 -> do y <- (Prelude.fmap
+                                                 Data.ProtoLens.Encoding.Bytes.wordToDouble
+                                                 Data.ProtoLens.Encoding.Bytes.getFixed64)
+                                                Data.ProtoLens.Encoding.Bytes.<?> "solarVoltage"
+                                         loop
+                                           (Lens.Family2.set
+                                              (Data.ProtoLens.Field.field @"solarVoltage")
                                               y
                                               x)
                                 wire -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
@@ -920,8 +974,33 @@ instance Data.ProtoLens.Message EnergyState where
                                            Prelude.. Prelude.fromEnum)
                                           _v)
                                    Data.Monoid.<>
-                                   Data.ProtoLens.Encoding.Wire.buildFieldSet
-                                     (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+                                   (let _v
+                                          = Lens.Family2.view
+                                              (Data.ProtoLens.Field.field @"gridCurrent")
+                                              _x
+                                      in
+                                      if (_v) Prelude.== Data.ProtoLens.fieldDefault then
+                                        Data.Monoid.mempty else
+                                        (Data.ProtoLens.Encoding.Bytes.putVarInt 89) Data.Monoid.<>
+                                          ((Data.ProtoLens.Encoding.Bytes.putFixed64) Prelude..
+                                             Data.ProtoLens.Encoding.Bytes.doubleToWord)
+                                            _v)
+                                     Data.Monoid.<>
+                                     (let _v
+                                            = Lens.Family2.view
+                                                (Data.ProtoLens.Field.field @"solarVoltage")
+                                                _x
+                                        in
+                                        if (_v) Prelude.== Data.ProtoLens.fieldDefault then
+                                          Data.Monoid.mempty else
+                                          (Data.ProtoLens.Encoding.Bytes.putVarInt 97)
+                                            Data.Monoid.<>
+                                            ((Data.ProtoLens.Encoding.Bytes.putFixed64) Prelude..
+                                               Data.ProtoLens.Encoding.Bytes.doubleToWord)
+                                              _v)
+                                       Data.Monoid.<>
+                                       Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                         (Lens.Family2.view Data.ProtoLens.unknownFields _x))
 instance Control.DeepSeq.NFData EnergyState where
         rnf
           = (\ x__ ->
@@ -936,7 +1015,11 @@ instance Control.DeepSeq.NFData EnergyState where
                                       (Control.DeepSeq.deepseq (_EnergyState'dutyCycle x__)
                                          (Control.DeepSeq.deepseq (_EnergyState'cpuTime x__)
                                             (Control.DeepSeq.deepseq (_EnergyState'status x__)
-                                               (()))))))))))))
+                                               (Control.DeepSeq.deepseq
+                                                  (_EnergyState'gridCurrent x__)
+                                                  (Control.DeepSeq.deepseq
+                                                     (_EnergyState'solarVoltage x__)
+                                                     (()))))))))))))))
 {- | Fields :
 
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.uuid' @:: Lens' EnergyTransactionRequest Data.Text.Text@

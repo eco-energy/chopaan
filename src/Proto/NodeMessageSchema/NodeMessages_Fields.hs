@@ -175,6 +175,12 @@ forcedActions ::
                  Data.ProtoLens.Field.HasField s "forcedActions" a) =>
                 Lens.Family2.LensLike' f s a
 forcedActions = Data.ProtoLens.Field.field @"forcedActions"
+gridCurrent ::
+            forall f s a .
+              (Prelude.Functor f,
+               Data.ProtoLens.Field.HasField s "gridCurrent" a) =>
+              Lens.Family2.LensLike' f s a
+gridCurrent = Data.ProtoLens.Field.field @"gridCurrent"
 gridToBatteryCurrent ::
                      forall f s a .
                        (Prelude.Functor f,
@@ -448,6 +454,12 @@ solarInputCurrent ::
                      Data.ProtoLens.Field.HasField s "solarInputCurrent" a) =>
                     Lens.Family2.LensLike' f s a
 solarInputCurrent = Data.ProtoLens.Field.field @"solarInputCurrent"
+solarVoltage ::
+             forall f s a .
+               (Prelude.Functor f,
+                Data.ProtoLens.Field.HasField s "solarVoltage" a) =>
+               Lens.Family2.LensLike' f s a
+solarVoltage = Data.ProtoLens.Field.field @"solarVoltage"
 start ::
       forall f s a .
         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "start" a) =>
