@@ -68,6 +68,7 @@ dependencies:
 - dhall >= 1.24.0
 - keys
 - vector
+- vector-sized
 - dimensional
 - reflex-vty
 - reflex
@@ -83,7 +84,7 @@ dependencies:
 - monad-bayes
 - mgenv
 - opt-expect
-
+- ghc-prim
 
 ghc-options:
 - -Wall
@@ -93,12 +94,14 @@ ghc-options:
 - -Wincomplete-uni-patterns
 - -Wpartial-fields
 - -Wredundant-constraints
+- -fplugin=ConCat.Plugin
+- -O2
 
 library:
   source-dirs: src
 build-tools-depends: proto-lens-protoc:proto-lens-protoc
 
-  
+
 executables:
   chopaan-exe:
     main:                Main.hs
@@ -126,7 +129,9 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-
+    - -fplugin=ConCat.Plugin
+    - -O2
+    
 tests:
   chopaan-test:
     main:                Spec.hs
@@ -142,3 +147,5 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -fplugin=ConCat.Plugin
+    - -O2
