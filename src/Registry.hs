@@ -141,15 +141,20 @@ mkCallback Kibbutz { inQueue, msgCount }  = MQ.SimpleCallback $ writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
+      --print parsed
       atomically $ do
-        writeTBQueue (runNodeQueue inQueue) (nodeId, parsed)
+        writeTBQueue (runNodeQueue inQueue) (nodeId, fromMeshFrame parsed)
         modifyTVar' msgCount (\a -> a + 1)
       where
         nodeId :: NodeT
         nodeId = (fromJust . fromStateTopic) t
-        parsed :: EnergyState
-        parsed = ((fromRight zeroMsg) . decodeMessage . toStrict) msg
+        parsed :: MeshFrame
+        parsed = ((fromRight . toMeshFrame' $ zeroMsg) . decodeMessage . toStrict) msg
         toStrict = BS.concat . BL.toChunks
+        fromMeshFrame :: MeshFrame -> EnergyState
+        fromMeshFrame m = fromJust $ m ^? NM.maybe'payload . _Just . _MeshFrame'State
+        toMeshFrame' :: EnergyState -> MeshFrame
+        toMeshFrame' etr = defMessage & #state .~ etr
 
 
 
