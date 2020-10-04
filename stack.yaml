@@ -95,6 +95,8 @@ extra-deps:
  - hgeometry-combinatorial-0.9.0.0@sha256:a03b48302d8c542ff2ff90ba5d45f2742cc21ed1a676c8fa4870cd461a273354,7367
  - fusion-plugin-0.2.1@sha256:f72d7393d2c39909050cae46173e0218bf533a899be05b448ae55f9d4a81be9c,2349
  - perfect-vector-shuffle-0.1.1.1@sha256:8656a3f1f491d1d79aba9e0a5dbb08589613202b08c7a9b92570d6bec7390093,3668
+ - servant-websockets-2.0.0@sha256:6e9e3600bced90fd52ed3d1bf632205cb21479075b20d6637153cc4567000234,2253
+
 # Override default flag values for local packages and extra-deps
 flags:
   concat-examples:
