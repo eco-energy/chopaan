@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -fplugin-opt=ConCat.Plugin:showResiduals #-}
 
 module Chopaan.Kibbutz.Allocate where
-
+{--
 import Control.Monad ((>=>))
 import ConCat.SMT
 import ConCat.Misc
@@ -78,4 +78,5 @@ solution = solveAscending $ toCcc predicate
 
 runSolution :: IO ()
 runSolution = print $ solution @10
+--}
 --}

@@ -12,10 +12,9 @@
 
 # import nixpkgs with overlays
 , pkgs ? import nixpkgsSrc nixpkgsArgs
-}: let
-  pkgSet = pkgs.haskell-nix.mkStackPkgSet {
-    stack-pkgs = import ./nix/pkgs.nix;
-    pkg-def-extras = [];
-    modules = [];
+}: pkgs.haskell-nix.project {
+  src = pkgs.haskell-nix.haskellLib.cleanGit {
+    name = "chopaan";
+    src = ./.;
   };
-in pkgSet.config.hsPkgs
+}
