@@ -59,8 +59,8 @@ instance G.GenBuses (EnergyF) where
 --instance (KnownNat n) => EvalE (Vector n Double)
 
 -- MOVE THIS INSTANCE DEC TO CONCAT
-instance EvalE (EnergyF) where
-  evalE = undefined
+--instance EvalE (EnergyF) where
+--  evalE = undefined
 
 
 type Reward = Double
