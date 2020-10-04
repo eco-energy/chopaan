@@ -54,7 +54,7 @@ import qualified Data.Map.Strict as Map
 import Data.Function ((&))
 import Data.Maybe (fromJust, isNothing, isJust)
 
-import Data.Csv
+import Data.Csv hiding ((.:))
 import qualified Data.Vector as Vec (fromList)
 import qualified Data.ByteString.Lazy as BSL
 import Data.ByteString.Char8 (pack)
@@ -241,11 +241,25 @@ instance (ToJSON e, ToJSON p) => ToJSON (NodeMetrics e p)
 --instance (FromJSON e, FromJSON p) => FromJSON (NodeMetrics e p)
 
 instance ToJSON (EnergyState) where
-  toJSON a = object $ zipWith (A..=) esFieldNamesJSON (fieldAccessors a)
+  toJSON a = object $ zipWith (A..=) esFieldNamesJSON (fieldAccessorsJSON a)
   toEncoding = messageToEncoding
 
---instance FromJSON (EnergyState) where
---  parseJSON = undefined
+instance FromJSON (EnergyState) where
+  parseJSON (Object v) = do
+    bv <- v .: "batteryV"
+    gv <- v .: "gridV"
+    b2l <- v .: "battery2LoadC"
+    b2g <- v .: "battery2GridC"
+    g2b <- v .: "grid2BatteryC"
+    si <- v .: "solarC"
+    return $ defMessage
+                         & batteryVoltage .~ bv
+                         & gridVoltage .~ gv
+                         & batteryToLoadCurrent .~ b2l
+                         & batteryToGridCurrent .~ b2g
+                         & gridToBatteryCurrent .~ g2b
+                         & solarInputCurrent .~ si
+  parseJSON _ = mempty
 
 
 esFieldNamesJSON = ["batteryV",
@@ -253,9 +267,16 @@ esFieldNamesJSON = ["batteryV",
                      "battery2LoadC",
                      "battery2GridC",
                      "grid2BatteryC",
-                     "solarC",
-                     "dutyC"
+                     "solarC"
                    ]
+
+fieldAccessorsJSON es = es ^.. ( batteryVoltage
+                          <> gridVoltage
+                          <> batteryToLoadCurrent
+                          <> batteryToGridCurrent
+                          <> gridToBatteryCurrent
+                          <> solarInputCurrent
+                        )
 
 esFieldNamesCSV :: [Name]
 esFieldNamesCSV = ["batteryV",
@@ -266,7 +287,7 @@ esFieldNamesCSV = ["batteryV",
                    "solarC",
                    "dutyC"
                   ]
-fieldAccessors es = es ^.. ( batteryVoltage
+fieldAccessorsCSV es = es ^.. ( batteryVoltage
                           <> gridVoltage
                           <> batteryToLoadCurrent
                           <> batteryToGridCurrent
@@ -279,7 +300,7 @@ instance ToNamedRecord EnergyState where
   toNamedRecord es = HM.fromList $
                 zip esFieldNamesCSV $
                 map (pack . show) $
-                fieldAccessors es
+                fieldAccessorsCSV es
 
 
 instance DefaultOrdered EnergyState where
