@@ -48,7 +48,7 @@ import qualified Streamly.Internal.Data.Fold as FL
 
 import Data.ProtoLens (defMessage)
 import Data.ProtoLens.TextFormat
-
+import Chopaan.Utils.JSON
 
 import qualified Data.Map.Strict as Map
 import Data.Function ((&))
@@ -68,6 +68,8 @@ import Control.Monad.State.Lazy
 import Chopaan.Node.NodeId
 import Chopaan.Node.Storage
 import Chopaan.Utils.Time
+import Data.Aeson hiding (encode, decode)
+import qualified Data.Aeson as A
 import Numeric.Estimator (KalmanFilter(..))
 
 import Text.Printf
@@ -76,9 +78,9 @@ import Text.Printf
 
 -- Our Scalars
 
-newtype WattSeconds = WS { unWs :: Compensated Double } deriving (Eq, Ord, Num, Fractional, Real, RealFrac)
+newtype WattSeconds = WS { unWs :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
 
-newtype Watts = W { unW :: Compensated Double } deriving (Eq, Ord, Num, Fractional, Real, RealFrac)
+newtype Watts = W { unW :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
 
 instance Show WattSeconds where
   show = (printf ("%.2g")) . uncompensated . unWs
@@ -101,6 +103,18 @@ instance ToField (Watts) where
 instance ToField (WattSeconds) where
   toField = toField . uncompensated . unWs
 
+instance ToJSON WattSeconds where
+  toJSON = toJSON . uncompensated . unWs
+
+instance ToJSON Watts where
+  toJSON = toJSON . uncompensated . unW
+
+instance FromJSON WattSeconds where
+  parseJSON x = toWattSeconds <$> (A.parseJSON x)
+
+instance FromJSON Watts where
+  parseJSON x = toWatts <$> (A.parseJSON x)
+
 
 -- Episodic Metrics
 
@@ -110,6 +124,10 @@ data Energy a = Energy
   , consumed :: !a
   , generated :: !a
   } deriving (Eq, Ord, Generic, Functor)
+
+instance (ToJSON a) => ToJSON (Energy a)
+instance (FromJSON a) => FromJSON (Energy a)
+
 
 instance (Show a) => Show (Energy a) where
   show Energy{..} = "Energy" <> nl
@@ -176,6 +194,9 @@ instance (Show a) => Show (Power a) where
       nl = "\n"
       rs = show
 
+instance (ToJSON a) => ToJSON (Power a)
+instance (FromJSON a) => FromJSON (Power a)
+
 instance (ToField a) => ToNamedRecord (Power a)
 
 instance DefaultOrdered (Power a) where
@@ -215,32 +236,54 @@ data NodeMetrics e p = NodeMetrics
 
 
 
-esFieldNames :: [Name]
-esFieldNames = ["batteryV",
-                 "gridV",
-                 "battery2LoadC",
-                 "battery2GridC",
-                 "grid2BatteryC",
-                 "solarC",
-                 "dutyC"
-               ]
+
+instance (ToJSON e, ToJSON p) => ToJSON (NodeMetrics e p)
+--instance (FromJSON e, FromJSON p) => FromJSON (NodeMetrics e p)
+
+instance ToJSON (EnergyState) where
+  toJSON a = object $ zipWith (A..=) esFieldNamesJSON (fieldAccessors a)
+  toEncoding = messageToEncoding
+
+--instance FromJSON (EnergyState) where
+--  parseJSON = undefined
+
+
+esFieldNamesJSON = ["batteryV",
+                     "gridV",
+                     "battery2LoadC",
+                     "battery2GridC",
+                     "grid2BatteryC",
+                     "solarC",
+                     "dutyC"
+                   ]
+
+esFieldNamesCSV :: [Name]
+esFieldNamesCSV = ["batteryV",
+                   "gridV",
+                   "battery2LoadC",
+                   "battery2GridC",
+                   "grid2BatteryC",
+                   "solarC",
+                   "dutyC"
+                  ]
+fieldAccessors es = es ^.. ( batteryVoltage
+                          <> gridVoltage
+                          <> batteryToLoadCurrent
+                          <> batteryToGridCurrent
+                          <> gridToBatteryCurrent
+                          <> solarInputCurrent
+                          <> dutyCycle
+                        )
 
 instance ToNamedRecord EnergyState where
   toNamedRecord es = HM.fromList $
-                zip esFieldNames $
+                zip esFieldNamesCSV $
                 map (pack . show) $
-                es ^.. ( batteryVoltage
-                         <> gridVoltage
-                         <> batteryToLoadCurrent
-                         <> batteryToGridCurrent
-                         <> gridToBatteryCurrent
-                         <> solarInputCurrent
-                         <> dutyCycle
-                       )
+                fieldAccessors es
 
 
 instance DefaultOrdered EnergyState where
-  headerOrder _ = Vec.fromList esFieldNames
+  headerOrder _ = Vec.fromList esFieldNamesCSV
 
 instance ToField Time.UTCTime where
   toField t = pack (show t)
@@ -267,9 +310,6 @@ instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) wher
     where
       sep = "\n"
 
-
-  
-
 secsToMinutes :: (Num a) => a -> a
 secsToMinutes = (* 60)
 
@@ -289,6 +329,9 @@ data Battery e p = Battery
   , dischargeLim :: !p
   , totalCapacity :: !e
   } deriving (Eq, Ord, Show, Generic)
+
+instance (ToJSON e, ToJSON p) => ToJSON (Battery e p)
+instance (FromJSON e, FromJSON p) => FromJSON (Battery e p)
 
 emptyB :: (Fractional e, Fractional p) => Battery e p
 emptyB = Battery 0 0 0 0
