@@ -35,3 +35,6 @@ fromEvent e = S.unfoldrM iterOverEvent e
       case h of
         Nothing -> return $ Nothing
         Just he -> return $ Just (he, ex)
+
+inIO :: forall t m a. (IsStream t, Monad m) => (forall b. m b -> IO b) -> t m a -> t IO a
+inIO f s = hoist f s
