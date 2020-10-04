@@ -1,17 +1,22 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ExplicitForAll, TypeApplications, ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators, DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 module SimNode where
 
 import Lens.Micro
 import Data.ProtoLens
 
+import GHC.Generics
 import Control.Monad.Bayes.Class
 
-import Chopaan.Kibbutz.Kibbutz (kbtz, Kbtz)
+
+import Chopaan.Kibbutz.Kibbutz (kbtz, Kbtz, asStream)
 import Chopaan.Comm.Comm (Address(..), Dispatch(..))
 import Chopaan.Comm.Mqtt (Topic)
 import Chopaan.Utils.Time
+import Chopaan.Utils.StreamsInterop (inIO)
 import Chopaan.Run (mon)
 import Chopaan.Node.Node (nodeS)
 
@@ -27,6 +32,7 @@ import qualified Data.Text as T
 import Data.Time
 import Data.Time.Clock.Compat (NominalDiffTime)
 import Data.Time.LocalTime.Compat (LocalTime, addLocalTime, diffLocalTime)
+import Data.Aeson
 
 --import Physics.Storage
 
@@ -37,6 +43,12 @@ import qualified Streamly.Prelude as S
 import Env.MonadEnv (MonadEnv, sampleIOE)
 import Reflex.Vty (mainWidget)
 
+import Servant.API.WebSocket (WebSocket)
+import Network.Wai              (Application)
+import Network.Wai.Handler.Warp (run)
+import Network.WebSockets       (Connection, withPingThread, sendTextData)
+import Servant                  ((:>), Proxy (..), Server, serve)
+import Data.Aeson (ToJSON, FromJSON, encode)
 
 uiDelay :: (MonadIO m) => m ()
 uiDelay = liftIO . threadDelay $ 1000000
@@ -133,7 +145,10 @@ temporalGaussians (start, end) ranges@(r:rs) t = do
 {------------------------------ Operational Stuff --------------------------------}
 
 
-newtype NodeTest = NodeTest Int deriving (Eq, Ord, Show)
+newtype NodeTest = NodeTest Int deriving (Eq, Ord, Show, Generic)
+
+instance ToJSON NodeTest
+instance FromJSON NodeTest
 
 instance Address NodeTest where
   stateTopic = asTopic "state"
@@ -173,6 +188,29 @@ testKbtz = kbtz @t @MonadEnv
 testNodes :: [NodeTest]
 testNodes = NodeTest <$> [1..]
 
+
+type KbtzApi = "stream" :> WebSocket
+
+server :: (ToJSON a) => (SerialT IO a) -> Server WebSocket
+server s = streamData
+ where
+  streamData :: (MonadIO m) => Connection -> m ()
+  streamData c = do
+    liftIO $ withPingThread c 10 (return ()) $ (liftIO . S.mapM_ (sendTextData c . encode) $ s)
+
+
+startApp :: IO ()
+startApp = do
+  sensors <- sampleIOE $ testKbtz @SerialT (take 10 testNodes) (\_ -> nodeStream) (nodeS)
+  let s = inIO sampleIOE $ asStream sensors
+  putStrLn "Starting server on http://localhost:8080"
+  run 8080 (app s)
+
+app :: (ToJSON a) => (SerialT IO a) -> Application
+app s = serve api (server s)
+
+api :: Proxy WebSocket
+api = Proxy
 
 testClient :: IO ()
 testClient = do
