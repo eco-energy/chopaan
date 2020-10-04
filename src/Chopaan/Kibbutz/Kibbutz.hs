@@ -94,3 +94,10 @@ getNodes = do
 
 asMapStream :: (IsStream t, MonadAsync m, Monad (t m)) => Kbtz t m n a -> t m (Map n a)
 asMapStream (Kbtz k) = sequence k
+
+asStream :: forall t m n a. (IsStream t, MonadAsync m, Monad (t m)) => Kbtz t m n a -> t m (n, a)
+asStream (Kbtz k) = M.foldlWithKey' (nodeTagMerge) (S.fromList []) k
+  where
+    nodeTagMerge :: t m (n, a) -> n -> t m a -> t m (n, a)
+    nodeTagMerge c key s = (S.map (\x -> (key, x)) s) <> c
+
