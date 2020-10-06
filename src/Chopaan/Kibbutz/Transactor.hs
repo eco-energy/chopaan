@@ -41,6 +41,7 @@ import Data.Key
 import qualified Data.List as L
 
 import Chopaan.Utils.Time
+import Chopaan.Kibbutz.LinOpt
 import ConCat.Misc (R)
 
 import Data.SBV
@@ -202,7 +203,7 @@ transactionFold (Tx participants) = FL.Fold step start end
 
 
 
-transactionPlanner :: forall m n. (Monad m, Address n, Ord n) => [n] -> FL.Fold m (NodeStates n) (Tx n)
+transactionPlanner :: forall m n. (Monad m, Show n, Address n, Ord n) => [n] -> FL.Fold m (NodeStates n) (Tx n)
 transactionPlanner ns = FL.Fold step start end
   where
     step ::  Tx n -> NodeStates n -> m (Tx n)
@@ -212,7 +213,11 @@ transactionPlanner ns = FL.Fold step start end
         storage = M.toAscList $ fmap (\n -> toWattSeconds $ (totalCapacity . _battery $ n) * (soc . _battery $ n)) nodes
         d = zipWith (\(i, c) (_, s) -> (i, c - s)) consumption storage
         (sources, sinks) = L.partition (\x -> snd x > 0) d
-        x = undefined sources sinks
+        better f ss = uncurry f $ unzip $ (\(x, y) -> (x, fromWattSeconds y)) <$> ss
+        schedule = solveTP
+          (better mkSources sources)
+          (better mkSinks sinks)
+          [[1 |_ <- [1..length sources]] | _ <- [1..length sinks]]
         toSourceStake t (i, e) = Stake (Source, (e2p t e), t)
         toSinkStake t (i, e) = Stake (Sink, (- e2p t e), t)
         e2p :: Time.DiffTime -> WattSeconds -> Watts
