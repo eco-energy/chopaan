@@ -21,13 +21,13 @@ module Chopaan.Node.Node (
   -- folds
   , energyFold, powerFold, timeFold
   -- data constructors
-  , EnergyState, NodeS, NodeMetrics(..), Energy(..), Power(..), WattSeconds, Watts, Grid(..), pToE
+  , EnergyState, NodeS, NodeMetrics(..), Energy(..), Power(..), WattSeconds, Watts, Grid(..), pToE, Battery(..)
   -- default builders
   , zeroMsg, defNodeS
   , nmFilter
   , writeCSVRecords
   -- initialization fns
-  , toWattSeconds, toWatts
+  , toWattSeconds, toWatts, fromWattSeconds, fromWatts
   ) where
 
 import qualified Data.Time as Time
@@ -83,12 +83,18 @@ newtype WattSeconds = WS { unWs :: Compensated Double } deriving (Eq, Ord, Num, 
 newtype Watts = W { unW :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
 
 instance Show WattSeconds where
-  show = (printf ("%.2g")) . uncompensated . unWs
+  show = (printf ("%.2g")) . fromWattSeconds
 
 instance Show Watts where
-  show = (printf ("%.2g")) . uncompensated . unW
+  show = (printf ("%.2g")) . fromWatts
 
 type R = Double
+
+fromWatts :: Watts -> Double
+fromWatts = uncompensated . unW
+
+fromWattSeconds :: WattSeconds -> Double
+fromWattSeconds = uncompensated . unWs
 
 toWatts :: Double -> Watts
 toWatts a = W $ add a 0 compensated
@@ -322,8 +328,8 @@ showDec = (printf ("%.2g"))
 
 instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
   show NodeMetrics{..} = ("last connection: " <> show _time)
-    <> sep <> ("SoC Percentage: " <> sep <> showDec (socPercentage _battery))
-    <> sep <> ("Runtime Estimate: " <> sep <> showDec (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
+    <> sep <> ("battery energy stored (Ws): " <> sep <> showDec (socPercentage _battery * totalCapacity _battery))
+    <> sep <> ("runtime estimate :" <> sep <> showDec (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
     <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
     <> sep <> ("current energy:" <> sep <> show _energyT)

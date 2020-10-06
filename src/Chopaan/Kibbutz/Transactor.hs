@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NamedFieldPuns, OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -9,9 +9,11 @@ module Chopaan.Kibbutz.Transactor where
 
 import Prelude hiding (zip, zipWith)
 
+import Control.Monad.IO.Class
+
 import Chopaan.Kibbutz.Kibbutz (Kbtz(..), asMapStream)
 import Chopaan.Comm.Comm (writeToPubQ, Dispatch(..), Address(..), PubQueue)
-import Chopaan.Node.Node (pToE, Watts, WattSeconds, NodeS, Grid(..), NodeMetrics(..), Power(..))
+import Chopaan.Node.Node (pToE, toWattSeconds, toWatts, fromWattSeconds, fromWatts, Watts, WattSeconds, NodeS, Grid(..), NodeMetrics(..), Power(..), Battery(..))
 
 import qualified Data.Time as Time
 import qualified Data.Text as Text
@@ -36,29 +38,40 @@ import qualified Streamly.Internal.Data.Fold as FL
 
 import qualified Data.Map.Strict as M
 import Data.Key
+import qualified Data.List as L
 
 import Chopaan.Utils.Time
 import ConCat.Misc (R)
 
+import Data.SBV
+
 type T = Time.NominalDiffTime
 
-mkETR :: R -> Int -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
+mkETR :: Watts -> Time.DiffTime -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
 mkETR power howLong dir uid stime = defMessage
          & NM.uuid .~ uid
          & NM.start .~ (utcToWord64 stime)
-         & NM.powerInWatts .~ power
-         & NM.durationInSeconds .~ (d' howLong)
+         & NM.powerInWatts .~ (fromWatts power)
+         & NM.durationInSeconds .~ (timeToWord howLong)
          & NM.direction .~ dir
-   where
-     d' :: Int -> Word64
-     d' = convert
-     utcToWord64 :: Time.UTCTime -> Word64
-     utcToWord64 = c'' . c'
-       where
-         c' :: Time.UTCTime -> Int
-         c' = convert
-         c'' :: Int -> Word64
-         c'' = convert
+  where
+    timeToWord :: Time.DiffTime -> Word64
+    timeToWord = c'' . (round @Time.DiffTime @Int)
+    utcToWord64 :: Time.UTCTime -> Word64
+    utcToWord64 = c'' . c'
+      where
+        c' :: Time.UTCTime -> Int
+        c' = convert
+    c'' :: Int -> Word64
+    c'' = convert
+
+
+
+fromStake :: Time.UTCTime -> Stake -> NM.EnergyTransactionRequest
+fromStake now (Stake (role, watts, duration)) = mkETR watts duration (toPDir role) "" now
+  where
+    toPDir Source = NM.Outgoing
+    toPDir Sink = NM.Incoming
 
 
 data Role = Source | Sink deriving (Eq, Ord, Show, Generic)
@@ -127,11 +140,15 @@ instance Monoid TransactionStatus where
     , endLag = 0
     }
 
+toNodeStates :: (MonadAsync m, Address n, Ord n) => Kbtz SerialT m n NodeS -> SerialT m (NodeStates n)
+toNodeStates k = NodeStates <$> asMapStream k
 
+
+planTx :: (MonadAsync m, Address n, Ord n) => [n] -> Kbtz SerialT m n NodeS -> SerialT m (Tx n)
+planTx ns k = S.postscan (transactionPlanner ns) $ toNodeStates k
 
 monitorTx :: (MonadAsync m, Address n, Ord n) => Tx n -> Kbtz SerialT m n NodeS -> SerialT m (TransactionStatus)
-monitorTx tx k = S.postscan (transactionFold tx) s
-  where s = NodeStates <$> asMapStream k
+monitorTx tx k = S.postscan (transactionFold tx) $ toNodeStates k
 
 -- The state will just be carried across as a TransactionStatus
 transactionFold :: forall m n. (Monad m, Address n, Ord n) => Tx n
@@ -189,8 +206,30 @@ transactionPlanner :: forall m n. (Monad m, Address n, Ord n) => [n] -> FL.Fold 
 transactionPlanner ns = FL.Fold step start end
   where
     step ::  Tx n -> NodeStates n -> m (Tx n)
-    step = undefined
+    step (Tx participants) (NodeStates nodes) = undefined
+      where
+        consumption = M.toAscList $ fmap _demand nodes
+        storage = M.toAscList $ fmap (\n -> toWattSeconds $ (totalCapacity . _battery $ n) * (soc . _battery $ n)) nodes
+        d = zipWith (\(i, c) (_, s) -> (i, c - s)) consumption storage
+        (sources, sinks) = L.partition (\x -> snd x > 0) d
+        x = undefined sources sinks
+        toSourceStake t (i, e) = Stake (Source, (e2p t e), t)
+        toSinkStake t (i, e) = Stake (Sink, (- e2p t e), t)
+        e2p :: Time.DiffTime -> WattSeconds -> Watts
+        e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
     start :: m (Tx n)
-    start = undefined
+    start = pure mempty
     end :: Tx n -> m (Tx n)
-    end = return
+    end = pure
+
+{--
+linearSolve :: (MonadIO m, Ord n) => [(n, WattSeconds)] -> [(n, WattSeconds)] -> m ([(n, Stake)])
+linearSolve sources sinks = liftIO $ do
+  let transportVars = [[sReal $ tName i j | i <- [1..length sources]] | j <- [1..length sinks]]
+  let costs = [[1 | _ <- sources] | _ <- sinks]
+  demandConstraints <- mapM constrain [((foldl (+) 0 xs) .<= (fromWS . snd $ sinks ! j)) | (j, xs) <- zip [0..length sinks - 1] transportVars]
+  return []
+  where
+    tName i j = ("x_" <> (show i) <> "_" <> (show j))
+    fromWS = pure . realToFrac . fromWattSeconds
+--}

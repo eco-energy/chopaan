@@ -91,6 +91,7 @@ dependencies:
 - warp
 - websockets
 - servant-server
+- sbv
 
 ghc-options:
 - -Wall
