@@ -215,7 +215,7 @@ api = Proxy
 testClient :: IO ()
 testClient = do
   let
-    nodes = take 10 testNodes
+    nodes = take 4 testNodes
   sensors <- sampleIOE $ testKbtz @SerialT nodes (\_ -> nodeStream) (nodeS)
   runtime <- sampleIOE $ testKbtz @SerialT nodes (\_ -> runtimeS) (id)
   logs    <- sampleIOE $ testKbtz @SerialT nodes (\_ -> logsS) (id)

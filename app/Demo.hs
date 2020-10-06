@@ -5,4 +5,4 @@ import SimNode
 
 main = do
   --runSolution
-  startApp
+  testClient
