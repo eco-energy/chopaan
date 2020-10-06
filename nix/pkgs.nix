@@ -2,6 +2,7 @@
   extras = hackage:
     {
       packages = {
+        "net-mqtt" = (((hackage.net-mqtt)."0.7.0.1").revisions).default;
         "amazonka" = (((hackage.amazonka)."1.6.1").revisions)."d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476";
         "amazonka-iot" = (((hackage.amazonka-iot)."1.6.1").revisions)."b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4";
         "amazonka-core" = (((hackage.amazonka-core)."1.6.1").revisions)."9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698";
@@ -23,10 +24,48 @@
         "key" = (((hackage.key)."0.1.2.0").revisions)."3bdfda94f99b8f2e01498ddf5f704cd84ce93315b532df50420ded94cbf5ba2e";
         "streamly" = (((hackage.streamly)."0.7.2").revisions)."173a415316e230e2117365dcd0432f1a7992d42c89b79017df57c9f6581205e3";
         "fusion-plugin-types" = (((hackage.fusion-plugin-types)."0.1.0").revisions)."0f11bbc445ab8ae3dbbb3d5d2ea198bdb1ac020518b7f4f7579035dc89182438";
+        "reflex-vty" = (((hackage.reflex-vty)."0.1.4.0").revisions)."46dcb043c39532e85c08e7098ac2e1237d5f7d018183b3f758f5ef87e06f51d4";
+        "bimap" = (((hackage.bimap)."0.3.3").revisions)."232518c0410990665b9c8677eb9318ee355c001d58945ddcbedec3baa30b4160";
+        "ref-tf" = (((hackage.ref-tf)."0.4.0.2").revisions)."69de3550250e0cd69f45d080359cb314a9487c915024349c75b78732bbee9332";
+        "reflex" = (((hackage.reflex)."0.7.1.0").revisions)."6d224466f0daabd44fef0fa559a09151126452bf857aeaa37692bccb259d5c5d";
+        "constraints-extras" = (((hackage.constraints-extras)."0.3.0.2").revisions)."013b8d0392582c6ca068e226718a4fe8be8e22321cc0634f6115505bf377ad26";
+        "monoidal-containers" = (((hackage.monoidal-containers)."0.6.0.1").revisions)."7d776942659eb4d70d8b8da5d734396374a6eda8b4622df9e61e26b24e9c8e40";
+        "patch" = (((hackage.patch)."0.0.3.1").revisions)."f14acf2eea8c83be57398106cec549c476577a947a7f856e6aa71dc561d58ca9";
+        "witherable" = (((hackage.witherable)."0.3.1").revisions)."ed3d5bc9eb1c08fa9704d9e143cdf622e1bd80b847cd5ede8c07da7bc7981ab9";
+        "dependent-map" = (((hackage.dependent-map)."0.3.1.0").revisions)."f33391e51264aab38b11d581bb8d2f7c6fc9fcf012bdbb6122708c23b3360b2a";
+        "dependent-sum" = (((hackage.dependent-sum)."0.6.2.0").revisions)."bff37c85b38e768b942f9d81c2465b63a96076f1ba006e35612aa357770807b6";
+        "monad-bayes" = (((hackage.monad-bayes)."0.1.1.0").revisions)."57d96f530a37a1c8efed0830c7f2bcf86da05d0d53324aebdd5b5aa165d72829";
+        "geodetics" = (((hackage.geodetics)."0.1.0").revisions)."699c10cd8d69222b125d054cdc8e2bcee7cb0558c78fa1b4fa06b2d3ecf29f5c";
+        "hgeometry" = (((hackage.hgeometry)."0.9.0.0").revisions)."43043574d2ce39c543dfadb629ab3a41fe65d7bf68a1426d8d01312818bc6e4e";
+        "hgeometry-combinatorial" = (((hackage.hgeometry-combinatorial)."0.9.0.0").revisions)."a03b48302d8c542ff2ff90ba5d45f2742cc21ed1a676c8fa4870cd461a273354";
+        "fusion-plugin" = (((hackage.fusion-plugin)."0.2.1").revisions)."f72d7393d2c39909050cae46173e0218bf533a899be05b448ae55f9d4a81be9c";
+        "perfect-vector-shuffle" = (((hackage.perfect-vector-shuffle)."0.1.1.1").revisions)."8656a3f1f491d1d79aba9e0a5dbb08589613202b08c7a9b92570d6bec7390093";
+        "servant-websockets" = (((hackage.servant-websockets)."2.0.0").revisions)."6e9e3600bced90fd52ed3d1bf632205cb21479075b20d6637153cc4567000234";
         chopaan = ./chopaan.nix;
-        net-mqtt = ./net-mqtt.nix;
+        mgenv = ./mgenv.nix;
+        concat-inline = ./concat-inline.nix;
+        concat-known = ./concat-known.nix;
+        concat-satisfy = ./concat-satisfy.nix;
+        concat-classes = ./concat-classes.nix;
+        concat-plugin = ./concat-plugin.nix;
+        concat-examples = ./concat-examples.nix;
+        concat-graphics = ./concat-graphics.nix;
+        concat-hardware = ./concat-hardware.nix;
+        opt-expect = ./opt-expect.nix;
+        lCirc = ./lCirc.nix;
+        propagators = ./propagators.nix;
         };
       };
   resolver = "lts-14.17";
-  modules = [ ({ lib, ... }: { packages = {}; }) { packages = {}; } ];
+  modules = [
+    ({ lib, ... }:
+      {
+        packages = {
+          "concat-examples" = {
+            flags = { "smt" = lib.mkOverride 900 false; };
+            };
+          };
+        })
+    { packages = {}; }
+    ];
   }

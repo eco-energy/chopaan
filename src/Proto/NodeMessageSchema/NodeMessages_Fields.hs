@@ -521,6 +521,11 @@ updateStatus ::
                 Data.ProtoLens.Field.HasField s "updateStatus" a) =>
                Lens.Family2.LensLike' f s a
 updateStatus = Data.ProtoLens.Field.field @"updateStatus"
+uptime ::
+       forall f s a .
+         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "uptime" a) =>
+         Lens.Family2.LensLike' f s a
+uptime = Data.ProtoLens.Field.field @"uptime"
 uuid ::
      forall f s a .
        (Prelude.Functor f, Data.ProtoLens.Field.HasField s "uuid" a) =>

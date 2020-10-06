@@ -1,0 +1,82 @@
+{-# LANGUAGE TypeApplications, MultiParamTypeClasses, FlexibleInstances #-}
+module Chopaan.Kibbutz.LinOpt where
+
+import Control.Arrow ((&&&))
+import Data.SBV
+import qualified Data.Map.Strict as M
+import Data.List
+
+newtype Sources n = Sources { unSource :: [(n, Double)] } deriving (Eq, Ord, Show)
+
+newtype Sinks n = Sinks { unSink :: [(n, Double)] } deriving (Eq, Ord, Show)
+
+type NSources = Sources String
+type NSinks = Sinks String
+
+instance Semigroup (Sources n) where
+  (Sources a) <> (Sources b) = Sources (a <> b)
+
+instance Semigroup (Sinks n) where
+  (Sinks a) <> (Sinks b) = Sinks (a <> b)
+
+instance Monoid (Sources n) where
+  mempty = Sources []
+
+instance Monoid (Sinks n) where
+  mempty = Sinks []
+  
+class NamedF a n where
+  getVals :: a n -> [Double]
+  getNames :: a n -> [n]
+
+instance (Show n) => NamedF Sources n where
+  getVals = (snd <$>) . unSource
+  getNames = (fst <$>) . unSource
+
+instance (Show n) => NamedF Sinks n where
+  getVals = (snd <$>) . unSink
+  getNames = (fst <$>) . unSink
+
+mkSources :: Show n => [n] -> [Double] -> Sources n
+mkSources ns vs = Sources $ zip ns vs
+
+mkSinks :: Show n => [n] -> [Double] -> Sinks n
+mkSinks ns vs = Sinks $ zip ns vs
+
+solveTP :: Show n => Sources n -> Sinks n -> [[Double]] -> IO (M.Map String Double)
+solveTP ss ds cs = do
+  (LexicographicResult sol) <- optimize Lexicographic $ transportProblem ss ds cs
+  let dict = getModelDictionary sol
+      (ns, cvs) = unzip $ M.toAscList dict
+      vs ys = case (parseCVs @Double) ys of
+                Just (a, rs) -> (a:vs rs)
+                Nothing -> []
+      vs' = vs cvs
+      d' = M.fromList $ zip ns vs'
+  return d'
+
+transportProblem :: Show n => Sources n -> Sinks n -> [[Double]] -> Goal
+transportProblem ss ds cs = do
+  vars <- txVars
+  mapM_ (\(xs, t) -> constrain $ sum xs .>= t) $ zip vars (fromDouble <$> (getVals ds))
+  mapM_ (\(xs, t) -> constrain $ sum xs .<= t) $ zip (transpose vars) (fromDouble <$> (getVals ss))
+  minimize "goal" $ sum $ (fmap sum) $ hadmard vars (fmap (fmap fromDouble) cs)
+  where
+    txVars :: Symbolic [[SReal]]
+    txVars = sequence . (fmap sequence) $ [[sReal $ tName i j
+                                           |i <- getNames ss]
+                                          | j <- getNames ds]
+    fromDouble :: Double -> SReal
+    fromDouble = realToFrac
+    hadmard :: (Num a) => [[a]] -> [[a]] -> [[a]]
+    hadmard as bs = fmap (\(xs, ys) -> fmap (\(x, y) -> x * y) $ zip xs ys) $ zip as bs
+
+tName :: Show a => a -> a -> String
+tName i j = ("x_" <> (show i) <> "_" <> (show j))
+
+fromName :: String -> (String, String)
+fromName ('x':'_':next) = let
+  f = takeWhile (\x -> x /= '_') next
+  s = drop (length f + 1) next
+  in (f, s)
+fromName (_) = error "This Should ONLY Be Called for a tName"

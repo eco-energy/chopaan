@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -fplugin-opt=ConCat.Plugin:showResiduals #-}
 
 module Chopaan.Kibbutz.Allocate where
-
+{--
 import Control.Monad ((>=>))
 import ConCat.SMT
 import ConCat.Misc
@@ -59,8 +59,8 @@ instance G.GenBuses (EnergyF) where
 --instance (KnownNat n) => EvalE (Vector n Double)
 
 -- MOVE THIS INSTANCE DEC TO CONCAT
-instance EvalE (EnergyF) where
-  evalE = undefined
+--instance EvalE (EnergyF) where
+--  evalE = undefined
 
 
 type Reward = Double
@@ -78,4 +78,5 @@ solution = solveAscending $ toCcc predicate
 
 runSolution :: IO ()
 runSolution = print $ solution @10
+--}
 --}

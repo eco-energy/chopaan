@@ -85,6 +85,13 @@ dependencies:
 - mgenv
 - opt-expect
 - ghc-prim
+- servant-websockets
+- base64-bytestring
+- wai
+- warp
+- websockets
+- servant-server
+- sbv
 
 ghc-options:
 - -Wall

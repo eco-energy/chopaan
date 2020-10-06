@@ -3981,6 +3981,7 @@ instance Control.DeepSeq.NFData ReconciliationParent where
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.wifiStrength' @:: Lens' RuntimeStats Data.Word.Word32@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.meshParentStrength' @:: Lens' RuntimeStats Data.Word.Word32@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.version' @:: Lens' RuntimeStats Data.Text.Text@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.uptime' @:: Lens' RuntimeStats Data.Word.Word64@
  -}
 data RuntimeStats = RuntimeStats{_RuntimeStats'minFreeHeap ::
                                  !Data.Word.Word32,
@@ -3991,6 +3992,7 @@ data RuntimeStats = RuntimeStats{_RuntimeStats'minFreeHeap ::
                                  _RuntimeStats'wifiStrength :: !Data.Word.Word32,
                                  _RuntimeStats'meshParentStrength :: !Data.Word.Word32,
                                  _RuntimeStats'version :: !Data.Text.Text,
+                                 _RuntimeStats'uptime :: !Data.Word.Word64,
                                  _RuntimeStats'_unknownFields :: !Data.ProtoLens.FieldSet}
                       deriving (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show RuntimeStats where
@@ -4058,6 +4060,13 @@ instance Data.ProtoLens.Field.HasField RuntimeStats "version"
           = (Lens.Family2.Unchecked.lens _RuntimeStats'version
                (\ x__ y__ -> x__{_RuntimeStats'version = y__}))
               Prelude.. Prelude.id
+instance Data.ProtoLens.Field.HasField RuntimeStats "uptime"
+           (Data.Word.Word64)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _RuntimeStats'uptime
+               (\ x__ y__ -> x__{_RuntimeStats'uptime = y__}))
+              Prelude.. Prelude.id
 instance Data.ProtoLens.Message RuntimeStats where
         messageName _ = Data.Text.pack "RuntimeStats"
         fieldsByTag
@@ -4117,6 +4126,13 @@ instance Data.ProtoLens.Message RuntimeStats where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Optional
                          (Data.ProtoLens.Field.field @"version"))
                       :: Data.ProtoLens.FieldDescriptor RuntimeStats
+                uptime__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "uptime"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt64Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word64)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Optional
+                         (Data.ProtoLens.Field.field @"uptime"))
+                      :: Data.ProtoLens.FieldDescriptor RuntimeStats
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, minFreeHeap__field_descriptor),
@@ -4126,7 +4142,8 @@ instance Data.ProtoLens.Message RuntimeStats where
                  (Data.ProtoLens.Tag 5, connectedChildren__field_descriptor),
                  (Data.ProtoLens.Tag 6, wifiStrength__field_descriptor),
                  (Data.ProtoLens.Tag 7, meshParentStrength__field_descriptor),
-                 (Data.ProtoLens.Tag 8, version__field_descriptor)]
+                 (Data.ProtoLens.Tag 8, version__field_descriptor),
+                 (Data.ProtoLens.Tag 9, uptime__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _RuntimeStats'_unknownFields
               (\ x__ y__ -> x__{_RuntimeStats'_unknownFields = y__})
@@ -4140,6 +4157,7 @@ instance Data.ProtoLens.Message RuntimeStats where
                          _RuntimeStats'wifiStrength = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'meshParentStrength = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'version = Data.ProtoLens.fieldDefault,
+                         _RuntimeStats'uptime = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'_unknownFields = ([])}
         parseMessage
           = let loop ::
@@ -4227,6 +4245,12 @@ instance Data.ProtoLens.Message RuntimeStats where
                                                 Data.ProtoLens.Encoding.Bytes.<?> "version"
                                          loop
                                            (Lens.Family2.set (Data.ProtoLens.Field.field @"version")
+                                              y
+                                              x)
+                                72 -> do y <- (Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                                Data.ProtoLens.Encoding.Bytes.<?> "uptime"
+                                         loop
+                                           (Lens.Family2.set (Data.ProtoLens.Field.field @"uptime")
                                               y
                                               x)
                                 wire -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
@@ -4330,8 +4354,16 @@ instance Data.ProtoLens.Message RuntimeStats where
                                        Prelude.. Data.Text.Encoding.encodeUtf8)
                                       _v)
                                Data.Monoid.<>
-                               Data.ProtoLens.Encoding.Wire.buildFieldSet
-                                 (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+                               (let _v
+                                      = Lens.Family2.view (Data.ProtoLens.Field.field @"uptime") _x
+                                  in
+                                  if (_v) Prelude.== Data.ProtoLens.fieldDefault then
+                                    Data.Monoid.mempty else
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt 72) Data.Monoid.<>
+                                      Data.ProtoLens.Encoding.Bytes.putVarInt _v)
+                                 Data.Monoid.<>
+                                 Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                   (Lens.Family2.view Data.ProtoLens.unknownFields _x))
 instance Control.DeepSeq.NFData RuntimeStats where
         rnf
           = (\ x__ ->
@@ -4344,7 +4376,8 @@ instance Control.DeepSeq.NFData RuntimeStats where
                                 (Control.DeepSeq.deepseq (_RuntimeStats'wifiStrength x__)
                                    (Control.DeepSeq.deepseq (_RuntimeStats'meshParentStrength x__)
                                       (Control.DeepSeq.deepseq (_RuntimeStats'version x__)
-                                         (()))))))))))
+                                         (Control.DeepSeq.deepseq (_RuntimeStats'uptime x__)
+                                            (())))))))))))
 {- | Fields :
 
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.version' @:: Lens' SetVersion Data.Text.Text@
