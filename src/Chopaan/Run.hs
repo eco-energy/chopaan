@@ -13,6 +13,7 @@ import Chopaan.Comm.Mqtt (runMqtt)
 import Chopaan.Comm.Comm (MessageQs(..), initQs, mkCallback)
 
 import Chopaan.Kibbutz.Kibbutz (sensorKbtz, logsKbtz, rsKbtz, getNodes)
+import Chopaan.Kibbutz.Transactor (monitorTx, planTx)
 
 import Chopaan.UI (mon)
 
