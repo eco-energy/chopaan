@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, RankNTypes #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Chopaan.Kibbutz.Transactor where
 
@@ -12,12 +12,13 @@ import Prelude hiding (zip, zipWith)
 import Control.Monad.IO.Class
 
 import Chopaan.Kibbutz.Kibbutz (Kbtz(..), asMapStream)
-import Chopaan.Comm.Comm (Address(..))
+import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue, writeToPubQ)
 import Chopaan.Node.Node (pToE, toWattSeconds, toWatts, fromWattSeconds, fromWatts, Watts, WattSeconds, NodeS, NodeMetrics(..), Power(..), Battery(..))
 
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
+import Data.Maybe (isNothing, fromJust)
 
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
@@ -65,10 +66,11 @@ mkETR power howLong dir uid stime = defMessage
     c'' = convert
 
 
-fromStake :: (MonadIO m) => Time.UTCTime -> Stake -> m (NM.EnergyTransactionRequest)
-fromStake now (Stake (role, watts, duration)) = do
+fromStake :: (MonadIO m) => Stake -> m (NM.EnergyTransactionRequest)
+fromStake (Stake (role, watts, duration)) = do
   uid <- liftIO $ getULID
-  return $ mkETR watts duration (toPDir role) (Text.pack . show $ uid) now
+  t0 <- liftIO $ Time.getCurrentTime
+  return $ mkETR watts duration (toPDir role) (Text.pack . show $ uid) t0
   where
     toPDir Source = NM.Outgoing
     toPDir Sink = NM.Incoming
@@ -139,15 +141,26 @@ instance Monoid TransactionStatus where
     , endLag = 0
     }
 
-toNodeStates :: (MonadAsync m, Address n, Ord n) => Kbtz SerialT m n NodeS -> SerialT m (NodeStates n)
+toNodeStates :: (Monad m, Address n, Ord n, IsStream t, Monad (t m)) => Kbtz t m n NodeS -> t m (NodeStates n)
 toNodeStates k = NodeStates <$> asMapStream k
 
-planTx :: (MonadAsync m, Address n, Ord n, Show n) => Time.DiffTime -> Kbtz SerialT m n NodeS -> SerialT m (Maybe (Tx n))
-planTx horizon k = S.intervalsOf (realToFrac horizon) FL.last $ S.postscan (transactionPlanner horizon) $ toNodeStates k -- apply intervals of to t m NodeS instead of t m (Tx n)
+planTx :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m)) => Time.DiffTime -> Kbtz t m n NodeS -> t m (Tx n)
+planTx horizon k = S.postscan (transactionPlanner horizon) $ S.map (fromJust) $ S.filter (isNothing) $ S.intervalsOf (realToFrac horizon) FL.last $ toNodeStates k -- apply intervals of to t m NodeS instead of t m (Tx n)
 
-monitorTx :: (MonadAsync m, Address n, Ord n) => Tx n -> Kbtz SerialT m n NodeS -> SerialT m (TransactionStatus)
+monitorTx :: (Monad m, Address n, Ord n, IsStream t, Monad (t m)) => Tx n -> Kbtz t m n NodeS -> t m (TransactionStatus)
 monitorTx tx k = S.postscan (transactionFold tx) $ toNodeStates k
 
+
+runTransactor :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m)) => (PubQueue n NM.EnergyTransactionRequest) -> Time.DiffTime -> Kbtz t m n NodeS -> (t m TransactionStatus, t m (Tx n))
+runTransactor q horizon k = (statuses, txs)
+  where
+    txs = S.trace (dispatchTx q) $ planTx horizon k
+    statuses = S.concatMap (flip monitorTx $ k) txs 
+
+dispatchTx :: (MonadIO m, Address n) => (PubQueue n NM.EnergyTransactionRequest) -> Tx n -> m ()
+dispatchTx q (Tx tx) = do
+  c <- traverse (liftIO . fromStake) tx
+  liftIO $ mapM_ (uncurry $ writeToPubQ q) $ M.toList c
 
 -- The state will just be carried across as a TransactionStatus
 transactionFold :: forall m n. (Monad m, Address n, Ord n) => Tx n

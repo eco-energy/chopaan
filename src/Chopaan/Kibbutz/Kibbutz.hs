@@ -92,7 +92,7 @@ getNodes = do
   ((fmap $ NodeId . fromJust . thingName)
               <$> (liftIO . getThings $ n))
 
-asMapStream :: (IsStream t, MonadAsync m, Monad (t m)) => Kbtz t m n a -> t m (Map n a)
+asMapStream :: (IsStream t, Monad m, Monad (t m)) => Kbtz t m n a -> t m (Map n a)
 asMapStream (Kbtz k) = sequence k
 
 asStream :: forall t m n a. (IsStream t, MonadAsync m, Monad (t m)) => Kbtz t m n a -> t m (n, a)
