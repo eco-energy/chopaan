@@ -12,8 +12,8 @@ import Prelude hiding (zip, zipWith)
 import Control.Monad.IO.Class
 
 import Chopaan.Kibbutz.Kibbutz (Kbtz(..), asMapStream)
-import Chopaan.Comm.Comm (writeToPubQ, Dispatch(..), Address(..), PubQueue)
-import Chopaan.Node.Node (pToE, toWattSeconds, toWatts, fromWattSeconds, fromWatts, Watts, WattSeconds, NodeS, Grid(..), NodeMetrics(..), Power(..), Battery(..))
+import Chopaan.Comm.Comm (Address(..))
+import Chopaan.Node.Node (pToE, toWattSeconds, toWatts, fromWattSeconds, fromWatts, Watts, WattSeconds, NodeS, NodeMetrics(..), Power(..), Battery(..))
 
 import qualified Data.Time as Time
 import qualified Data.Text as Text
@@ -40,9 +40,7 @@ import qualified Data.Map.Strict as M
 import Data.Key
 import qualified Data.List as L
 
-import Chopaan.Utils.Time
 import Chopaan.Kibbutz.LinOpt
-import ConCat.Misc (R)
 
 import Data.SBV
 
@@ -67,9 +65,10 @@ mkETR power howLong dir uid stime = defMessage
     c'' = convert
 
 
-
-fromStake :: Time.UTCTime -> Stake -> NM.EnergyTransactionRequest
-fromStake now (Stake (role, watts, duration)) = mkETR watts duration (toPDir role) "" now
+fromStake :: (MonadIO m) => Time.UTCTime -> Stake -> m (NM.EnergyTransactionRequest)
+fromStake now (Stake (role, watts, duration)) = do
+  uid <- liftIO $ getULID
+  return $ mkETR watts duration (toPDir role) (Text.pack . show $ uid) now
   where
     toPDir Source = NM.Outgoing
     toPDir Sink = NM.Incoming
@@ -102,7 +101,6 @@ instance (Ord n) => Semigroup (NodeStates n) where
 
 instance (Ord n) => Monoid (NodeStates n) where
   mempty = NodeStates mempty
-
 
 data TransactionStatus = TransactionStatus
   { energyDispatched :: WattSeconds
@@ -144,12 +142,12 @@ instance Monoid TransactionStatus where
 toNodeStates :: (MonadAsync m, Address n, Ord n) => Kbtz SerialT m n NodeS -> SerialT m (NodeStates n)
 toNodeStates k = NodeStates <$> asMapStream k
 
-
-planTx :: (MonadAsync m, Address n, Ord n) => [n] -> Kbtz SerialT m n NodeS -> SerialT m (Tx n)
-planTx ns k = S.postscan (transactionPlanner ns) $ toNodeStates k
+planTx :: (MonadAsync m, Address n, Ord n, Show n) => Time.DiffTime -> Kbtz SerialT m n NodeS -> SerialT m (Maybe (Tx n))
+planTx horizon k = S.intervalsOf (realToFrac horizon) FL.last $ S.postscan (transactionPlanner horizon) $ toNodeStates k -- apply intervals of to t m NodeS instead of t m (Tx n)
 
 monitorTx :: (MonadAsync m, Address n, Ord n) => Tx n -> Kbtz SerialT m n NodeS -> SerialT m (TransactionStatus)
 monitorTx tx k = S.postscan (transactionFold tx) $ toNodeStates k
+
 
 -- The state will just be carried across as a TransactionStatus
 transactionFold :: forall m n. (Monad m, Address n, Ord n) => Tx n
@@ -163,7 +161,7 @@ transactionFold (Tx participants) = FL.Fold step start end
     start :: m (TxState n)
     start = return . TxState $
       (\(Stake (px, w, t))-> (px, mempty{ timeRemaining = t
-                          , energyRemaining = pToE (realToFrac t) w
+                          , energyRemaining = (pToE @Double) (realToFrac t) w
                           , startLag = 0
                           }))
       <$> participants
@@ -193,7 +191,7 @@ transactionFold (Tx participants) = FL.Fold step start end
       in (px, nextTS)
       where
         e :: WattSeconds
-        e = pToE (realToFrac lastTimeDiff) (tOutP _powerT)
+        e = (pToE @Double) (realToFrac lastTimeDiff) (tOutP _powerT)
         hasStarted Source = (tOutP _powerT) >= eta
         hasStarted Sink = (tInP _powerT) >= eta
         hasEnded Source =  shouldHaveEnded && (tOutP _powerT) <= eta
@@ -201,40 +199,53 @@ transactionFold (Tx participants) = FL.Fold step start end
         shouldHaveEnded = (energyRemaining tx - e) <= 0
         eta = 0.5
 
-
-
-transactionPlanner :: forall m n. (Monad m, Show n, Address n, Ord n) => [n] -> FL.Fold m (NodeStates n) (Tx n)
-transactionPlanner ns = FL.Fold step start end
+transactionPlanner :: forall m n. (MonadIO m, Show n, Address n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (Tx n)
+transactionPlanner timeHorizon = FL.Fold step start end
   where
     step ::  Tx n -> NodeStates n -> m (Tx n)
-    step (Tx participants) (NodeStates nodes) = undefined
+    step (Tx _) (NodeStates nodes) = schedule
       where
         consumption = M.toAscList $ fmap _demand nodes
         storage = M.toAscList $ fmap (\n -> toWattSeconds $ (totalCapacity . _battery $ n) * (soc . _battery $ n)) nodes
         d = zipWith (\(i, c) (_, s) -> (i, c - s)) consumption storage
         (sources, sinks) = L.partition (\x -> snd x > 0) d
         better f ss = uncurry f $ unzip $ (\(x, y) -> (x, fromWattSeconds y)) <$> ss
-        schedule = solveTP
+        schedule :: m (Tx n)
+        schedule = solveTP timeHorizon
           (better mkSources sources)
           (better mkSinks sinks)
-          [[1 |_ <- [1..length sources]] | _ <- [1..length sinks]]
-        toSourceStake t (i, e) = Stake (Source, (e2p t e), t)
-        toSinkStake t (i, e) = Stake (Sink, (- e2p t e), t)
-        e2p :: Time.DiffTime -> WattSeconds -> Watts
-        e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
+          [[1 |_ <- [1..length sources]] | _ <- [1..length sinks]]        
     start :: m (Tx n)
     start = pure mempty
     end :: Tx n -> m (Tx n)
     end = pure
 
-{--
-linearSolve :: (MonadIO m, Ord n) => [(n, WattSeconds)] -> [(n, WattSeconds)] -> m ([(n, Stake)])
-linearSolve sources sinks = liftIO $ do
-  let transportVars = [[sReal $ tName i j | i <- [1..length sources]] | j <- [1..length sinks]]
-  let costs = [[1 | _ <- sources] | _ <- sinks]
-  demandConstraints <- mapM constrain [((foldl (+) 0 xs) .<= (fromWS . snd $ sinks ! j)) | (j, xs) <- zip [0..length sinks - 1] transportVars]
-  return []
+solveTP :: forall m n. (MonadIO m, Ord n, Show n) => Time.DiffTime -> Sources n -> Sinks n -> [[Double]] -> m (Tx n)
+solveTP timeHorizon sources sinks cs = liftIO $ do
+  (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs
+  let dict = getModelDictionary sol
+      (ns, cvs) = unzip $ M.toAscList dict
+      vs' :: M.Map String Double
+      vs' = M.fromAscList $ zip ns (parseToDoubles cvs)
+      toTransferMat :: M.Map String Double -> [[Double]]
+      toTransferMat m = (zipWith (zipWith (+))) ((fmap (fmap (* (-1)))) . L.transpose $ x') x'
+        where
+          x' = [[zeroIfNone $ M.lookup (tName i j) m | i <- getNames sources] | j <- getNames sinks]
+      transferMat = toTransferMat vs'
+      sourceTransmit = (toWattSeconds . abs) <$> (fmap sum $ L.transpose transferMat)
+      sinkReceive = (toWattSeconds . abs) <$> (fmap sum $ transferMat)
+      asSources = toSourceStake timeHorizon <$> (zip (getNames sources) sourceTransmit)
+      asSinks = toSinkStake timeHorizon <$> (zip (getNames sinks) sinkReceive)
+  return . Tx . M.fromList $ (filter isZeroStake asSources) <> (filter isZeroStake asSinks)
   where
-    tName i j = ("x_" <> (show i) <> "_" <> (show j))
-    fromWS = pure . realToFrac . fromWattSeconds
---}
+  isZeroStake (_, (Stake (_, a, t))) = a > 0 && t > 0 
+  zeroIfNone Nothing = 0
+  zeroIfNone (Just a) = a
+  parseToDoubles ys = case (parseCVs @Double) ys of
+                Just (a, rs) -> (a:parseToDoubles rs)
+                Nothing -> []
+  toSourceStake t (i, e) = (i, Stake (Source, (e2p t e), t))
+  toSinkStake t (i, e) = (i, Stake (Sink, (- e2p t e), t))
+
+e2p :: Time.DiffTime -> WattSeconds -> Watts
+e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)

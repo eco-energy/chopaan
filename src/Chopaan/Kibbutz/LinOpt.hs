@@ -1,10 +1,9 @@
 {-# LANGUAGE TypeApplications, MultiParamTypeClasses, FlexibleInstances #-}
 module Chopaan.Kibbutz.LinOpt where
 
-import Control.Arrow ((&&&))
 import Data.SBV
-import qualified Data.Map.Strict as M
 import Data.List
+
 
 newtype Sources n = Sources { unSource :: [(n, Double)] } deriving (Eq, Ord, Show)
 
@@ -42,18 +41,6 @@ mkSources ns vs = Sources $ zip ns vs
 
 mkSinks :: Show n => [n] -> [Double] -> Sinks n
 mkSinks ns vs = Sinks $ zip ns vs
-
-solveTP :: Show n => Sources n -> Sinks n -> [[Double]] -> IO (M.Map String Double)
-solveTP ss ds cs = do
-  (LexicographicResult sol) <- optimize Lexicographic $ transportProblem ss ds cs
-  let dict = getModelDictionary sol
-      (ns, cvs) = unzip $ M.toAscList dict
-      vs ys = case (parseCVs @Double) ys of
-                Just (a, rs) -> (a:vs rs)
-                Nothing -> []
-      vs' = vs cvs
-      d' = M.fromList $ zip ns vs'
-  return d'
 
 transportProblem :: Show n => Sources n -> Sinks n -> [[Double]] -> Goal
 transportProblem ss ds cs = do
