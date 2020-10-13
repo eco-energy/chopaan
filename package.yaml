@@ -53,7 +53,7 @@ dependencies:
 - time-lens
 - directory
 - microlens
-- streamly
+- streamly >= 0.7.0 && < 0.7.1
 - mtl
 - transformers
 - hashable
