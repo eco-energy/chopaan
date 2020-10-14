@@ -161,18 +161,18 @@ mkCallback (MessageQs { stateQ, statsQ })  = MQ.SimpleCallback $ writer
     writer _ t msg _ = do
       case nodeId of
         Nothing -> print $ "MQTT Topic Decode error: " <> (show t)
-        (Just nId) ->
+        (Just n) ->
           case parsed of
             (Left err) -> print err
-            (Right mf) -> do
-              (safeWrite @n @EnergyState) nId mf stateQ accessEnergyState
-              (safeWrite @n @RuntimeStats) nId mf statsQ accessRTS
+            (Right mf) -> case (accessEnergyState mf) of
+              (Just a) -> (safeWrite @n @EnergyState) stateQ n a
+              Nothing -> case (accessRTS mf) of
+                (Just a) -> (safeWrite @n @RuntimeStats) statsQ n a
+                Nothing -> return ()
       where
-        safeWrite :: forall n a. (Address n, Dispatch a) => n -> MeshFrame -> NodeQueue n a -> (MeshFrame -> Maybe a) -> IO ()
-        safeWrite nId mf q reader = case reader mf of
-          Just m -> atomically $ do
-            writeTBQueue (runNodeQueue q) (nId, m)
-          Nothing -> return ()
+        safeWrite :: forall n a. (Address n, Dispatch a) => NodeQueue n a -> n -> a -> IO ()
+        safeWrite q n a = atomically $ do
+            writeTBQueue (runNodeQueue q) (n, a)
         nodeId :: Maybe n
         nodeId = fromStateTopic $ t
         parsed :: Either String MeshFrame
