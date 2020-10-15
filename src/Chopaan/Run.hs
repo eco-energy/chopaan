@@ -47,6 +47,5 @@ monitorRS = do
   qs@MessageQs{..} <- liftIO . atomically $ initQs
   nodes <- runReaderT getNodes name
   runtime <- liftIO $ rsKbtz @SerialT nodes statsQ
-  _ <- liftIO $ forkIO $ forever $
+  liftIO $ forever $
        runMqtt mqttOpts outbox nodes (mkCallback qs)
-  liftIO $ S.mapM_ (\(n, a) -> print $ (show n) <> (show a)) $ asStream runtime

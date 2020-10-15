@@ -117,8 +117,8 @@ data MessageQs n a = MessageQs
   }
 
 
-data Incoming a = Incoming a deriving (Functor)
-data Outgoing a = Outgoing a deriving (Functor)
+data Incoming a = Incoming a deriving (Functor, Eq, Ord, Show)
+data Outgoing a = Outgoing a deriving (Functor, Eq, Ord, Show)
 
 instance (Dispatch a) => Dispatch (Outgoing a) where
   frame (Outgoing a) = frame a
