@@ -42,7 +42,7 @@ import Chopaan.Kibbutz.AWS.Things
 
 {--------------------- Type Classes for message conversion and addressing --------------------------}
 
-class Dispatch a where
+class (Show a) => Dispatch a where
   frame :: a -> MeshFrame
   unframe :: MeshFrame -> Maybe a
 
@@ -67,7 +67,7 @@ instance Dispatch NodeControl where
   unframe = accessNodeControl
 
 
-class (Ord a) => Address a where
+class (Ord a, Show a) => Address a where
   stateTopic :: a -> MQ.Topic
   controlTopic :: a -> MQ.Topic
   logTopic :: a -> MQ.Topic
@@ -171,8 +171,10 @@ mkCallback (MessageQs { stateQ, statsQ })  = MQ.SimpleCallback $ writer
                 Nothing -> return ()
       where
         safeWrite :: forall n a. (Address n, Dispatch a) => NodeQueue n a -> n -> a -> IO ()
-        safeWrite q n a = atomically $ do
-            writeTBQueue (runNodeQueue q) (n, a)
+        safeWrite q n a = do
+          print n
+          print a
+          atomically $ writeTBQueue (runNodeQueue q) (n, a)
         nodeId :: Maybe n
         nodeId = fromStateTopic $ t
         parsed :: Either String MeshFrame

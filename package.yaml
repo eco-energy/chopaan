@@ -123,6 +123,20 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+  rts-monitor-exe:
+    main:                RTS.hs
+    source-dirs:         app
+    dependencies:
+    - chopaan
+    - optparse-simple
+    - base
+    other-modules:
+    - Paths_chopaan
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+  
   chopaan-demo-exe:
     main:                Demo.hs
     source-dirs:         app

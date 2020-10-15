@@ -118,7 +118,15 @@ startDay = LocalTime $ fromGregorian 1 1 2020
 runtimeDist :: (MonadSample m, MonadIO m) => m RuntimeStats
 runtimeDist = do
   uiDelay
-  return defMessage 
+  return $ defMessage
+    & F.minFreeHeap .~ 10
+    & F.currentFreeHeap .~ 10
+    & F.cpuUtilization .~ 10
+    & F.isRoot .~ False
+    & F.connectedChildren .~ 10
+    & F.wifiStrength .~ 10
+    & F.version .~ "1000"
+    & F.uptime .~ 1000
 
 logsDist :: (MonadSample m, MonadIO m) => m MeshFrame
 logsDist = do
