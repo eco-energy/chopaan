@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ExplicitForAll, TypeApplications, ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators, DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, RecordWildCards #-}
 module SimNode where
 
 import Lens.Micro
@@ -11,9 +11,9 @@ import Data.ProtoLens
 import GHC.Generics
 import Control.Monad.Bayes.Class
 
-
+import Chopaan.Kibbutz.Transactor (runTransactor)
 import Chopaan.Kibbutz.Kibbutz (kbtz, Kbtz, asStream)
-import Chopaan.Comm.Comm (Address(..), Dispatch(..))
+import Chopaan.Comm.Comm (Address(..), Dispatch(..), initNodeQueue, MessageQs(..))
 import Chopaan.Comm.Mqtt (Topic)
 import Chopaan.Utils.Time
 import Chopaan.Utils.StreamsInterop (inIO)
@@ -33,7 +33,7 @@ import Data.Time
 import Data.Time.Clock.Compat (NominalDiffTime)
 import Data.Time.LocalTime.Compat (LocalTime, addLocalTime, diffLocalTime)
 import Data.Aeson
-
+import Control.Concurrent.STM (atomically)
 --import Physics.Storage
 
 
@@ -214,19 +214,11 @@ api = Proxy
 
 testClient :: IO ()
 testClient = do
+  outbox <- atomically $ initNodeQueue @NodeTest @MeshFrame
   let
     nodes = take 4 testNodes
-  sensors <- sampleIOE $ testKbtz @SerialT nodes (\_ -> nodeStream) (nodeS)
-  runtime <- sampleIOE $ testKbtz @SerialT nodes (\_ -> runtimeS) (id)
-  logs    <- sampleIOE $ testKbtz @SerialT nodes (\_ -> logsS) (id)
-  mainWidget $ mon sampleIOE sensors runtime logs
-
-{--
-
-  Options{mqttOpts} <- input auto "./options.dhall"
-  qs <- atomically $ initMessageQs
-  mqc <- client (mqttOpts) (mkCallback qs)
-  _ <- forkIO $ forever $ pub mqc (outbox qs)
-  _ <- forkIO $ forever $ do
-    S.mapM_ (\es -> writeToPubQ (outbox qs) (NodeTest 1) $ frame es) $ sampleStream nodeStream
---}
+  sensors <- sampleIOE $ testKbtz @SerialT nodes (const nodeStream) nodeS
+  runtime <- sampleIOE $ testKbtz @SerialT nodes (const runtimeS) id
+  logs    <- sampleIOE $ testKbtz @SerialT nodes (const logsS) id
+  (txMonitor, txs) <- sampleIOE $ runTransactor outbox (60*5) sensors
+  mainWidget $ mon sampleIOE sensors runtime logs txs txMonitor

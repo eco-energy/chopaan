@@ -34,6 +34,7 @@ import Reflex.Network
 import Reflex.Class.Switchable
 import Reflex.Vty
 
+import Chopaan.Kibbutz.Transactor (Tx(..), TransactionStatus(..))
 
 data Monitor = Monitor_State
              | Monitor_RuntimeStats
@@ -50,9 +51,9 @@ type EventMap t m n a = UIConstraints t m => Map n (Event t a)
 
 
 monitor :: forall t m n a b c. (UIConstraints t m, Ord n, Show n, Show a, Show b, Show c)
-  => EventMap t m n a -> EventMap t m n b -> EventMap t m n c
+  => EventMap t m n a -> EventMap t m n b -> EventMap t m n c -> Dynamic t (Tx n) -> Dynamic t TransactionStatus
   -> VtyWidget t m (Event t ())
-monitor sensors runtimeStats logs = do
+monitor sensors runtimeStats logs txs txStatuses = do
   inp <- input
   let nodes = Map.keys sensors
   let buttons = col $ do
@@ -90,7 +91,7 @@ monitor sensors runtimeStats logs = do
         Left (Left Monitor_State) -> escapable $ tabMapView sensors
         Left (Left Monitor_RuntimeStats) -> escapable $ tabMapView runtimeStats
         Left (Left Monitor_Logs) -> escapable $ tabMapView logs
-        Left (Right Dispatch_Transactions) -> escapable $ (transactor nodes)
+        Left (Right Dispatch_Transactions) -> escapable $ (transactor txs txStatuses)
         Left (Right Dispatch_NodeConfig) -> escapable $ form
         Left (Right Dispatch_MeshConfig) -> escapable $ form
         Right () -> buttons

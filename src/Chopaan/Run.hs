@@ -9,11 +9,12 @@ import RIO
 import Control.Concurrent (forkIO)
 
 import Streamly
+import qualified Streamly.Prelude as S
 import Chopaan.Comm.Mqtt (runMqtt)
 import Chopaan.Comm.Comm (MessageQs(..), initQs, mkCallback)
 
-import Chopaan.Kibbutz.Kibbutz (sensorKbtz, logsKbtz, rsKbtz, getNodes)
-import Chopaan.Kibbutz.Transactor (monitorTx, planTx)
+import Chopaan.Kibbutz.Kibbutz (sensorKbtz, logsKbtz, rsKbtz, getNodes, asMapStream)
+import Chopaan.Kibbutz.Transactor (runTransactor)
 
 import Chopaan.UI (mon)
 
@@ -31,8 +32,17 @@ run = do
   sensors <- liftIO $ sensorKbtz @SerialT nodes stateQ
   runtime <- liftIO $ rsKbtz @SerialT nodes statsQ
   logs    <- liftIO $ logsKbtz @SerialT nodes logsQ
+  (txMonitor, txs) <- liftIO $ runTransactor outbox (60*5) sensors
+  liftIO $ printer $ asMapStream sensors
+  liftIO $ printer $ asMapStream runtime
+  liftIO $ printer $ asMapStream logs
+  liftIO $ printer txMonitor
+  liftIO $ S.mapM_ print txs
+  where
+    printer :: (Show a) => Serial a -> IO ()
+    printer s = (forkIO . (S.mapM_ print) $ s) >> return ()
+  {--
   _ <- liftIO $ forkIO $ forever $
        runMqtt mqttOpts outbox nodes (mkCallback qs)
-  liftIO $ mainWidget $ mon id sensors runtime logs
-
-
+  liftIO $ mainWidget $ mon id sensors runtime logs txs txMonitor
+--}

@@ -3,8 +3,10 @@
 module Chopaan.UI (mon) where
 
 import Chopaan.Kibbutz.Kibbutz (Kbtz, asFRPNetwork)
+import Chopaan.Kibbutz.Transactor (Tx(..), TransactionStatus(..))
 import Chopaan.Comm.Comm (Address, Dispatch)
 
+import Chopaan.Utils.StreamsInterop (toDynamic)
 import Chopaan.UI.Base
 import Chopaan.UI.Monitor
 import Chopaan.Node.Node (NodeS)
@@ -23,9 +25,13 @@ mon :: forall t' t m m' n a. (IsStream t, MonadAsync m, MonadIO m', TriggerEvent
   -> Kbtz t m n NodeS
   -> Kbtz t m n RuntimeStats
   -> Kbtz t m n a
+  -> t m (Tx n)
+  -> t m (TransactionStatus)
   -> VtyWidget t' m' (Event t' ()) --VtyWidget t' m (Event t' ())
-mon h sensors runtime logs = do
+mon h sensors runtime logs txs txStatuses = do
   s <- asFRPNetwork h sensors
   r <- asFRPNetwork h runtime
   l <- asFRPNetwork h logs
-  monitor s r l
+  tx <- toDynamic h txs
+  txStatus <- toDynamic h txStatuses
+  monitor s r l tx txStatus

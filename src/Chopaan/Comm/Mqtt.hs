@@ -21,9 +21,11 @@ import qualified Network.MQTT.Types as MQTy
 
 import Network.Connection
 import Network.TLS
---import Data.X509.CertificateStore ()
---import Data.X509.Validation (validateDefault)
+import Data.X509.CertificateStore (readCertificateStore)
+import Data.X509.Validation (validateDefault)
+
 import Data.Default.Class
+import Data.Maybe (fromJust)
 import Network.TLS.Extra.Cipher
 import Network.URI
 
@@ -44,10 +46,10 @@ import Chopaan.Comm.Comm (Address(..), Dispatch(..), NodeQueue(..))
 mkTLSSettings :: FilePath -> FilePath -> FilePath -> Text.Text -> Text.Text -> IO TLSSettings
 mkTLSSettings cert key caPath hostName name = do
   creds <- either (error "Client Certificate Not Found") Just <$> credentialLoadX509 cert key
-  --caCreds <- fromJust (error "CA Certificate Not Found") (readCertificateStore caPath)
+  caCreds <- fromJust (error "CA Certificate Not Found") (readCertificateStore caPath)
   let
     hooks = def { onCertificateRequest = \_ -> return creds
-                , onServerCertificate = \_ a b c -> return [] --validateDefault caCreds a b c
+                , onServerCertificate = \_ a b c -> validateDefault caCreds a b c
                 }
     clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
                   { clientHooks=hooks

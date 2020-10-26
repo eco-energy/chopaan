@@ -25,6 +25,11 @@ toEvent h s = do
   _ <- liftIO . forkIO . S.drain $ S.mapM (void . fire) $ (hoist h) . adapt $ s
   return e
 
+toDynamic ::  forall t t' m m'. (R.MonadHold t' m', StoRConstraints t t' m m')
+        => (forall a. m a -> IO a) -> (forall a. (Monoid a, Show a) => t m a -> m' (R.Dynamic t' a))
+toDynamic h s = R.holdDyn mempty =<< (toEvent h s)
+
+
 fromEvent :: forall t t' m. (RtoSConstraints t t' m) => (forall a. R.Event t' a -> t m a) 
 fromEvent e = S.unfoldrM iterOverEvent e
   where

@@ -5,7 +5,7 @@
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Chopaan.Kibbutz.Transactor where
+module Chopaan.Kibbutz.Transactor (runTransactor, Stake(..), Tx(..), Role(..), TransactionStatus(..)) where
 
 import Prelude hiding (zip, zipWith)
 
@@ -151,16 +151,23 @@ monitorTx :: (Monad m, Address n, Ord n, IsStream t, Monad (t m)) => Tx n -> Kbt
 monitorTx tx k = S.postscan (transactionFold tx) $ toNodeStates k
 
 
-runTransactor :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m)) => (PubQueue n NM.EnergyTransactionRequest) -> Time.DiffTime -> Kbtz t m n NodeS -> (t m TransactionStatus, t m (Tx n))
-runTransactor q horizon k = (statuses, txs)
+runTransactor :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m))
+  => (PubQueue n NM.MeshFrame)
+  -> Time.DiffTime
+  -> Kbtz t m n NodeS
+  -> m (t m TransactionStatus, t m (Tx n))
+runTransactor q horizon k = return (statuses, txs)
   where
     txs = S.trace (dispatchTx q) $ planTx horizon k
     statuses = S.concatMap (flip monitorTx $ k) txs 
 
-dispatchTx :: (MonadIO m, Address n) => (PubQueue n NM.EnergyTransactionRequest) -> Tx n -> m ()
+dispatchTx :: (MonadIO m, Address n)
+  => (PubQueue n NM.MeshFrame)
+  -> Tx n
+  -> m ()
 dispatchTx q (Tx tx) = do
   c <- traverse (liftIO . fromStake) tx
-  liftIO $ mapM_ (uncurry $ writeToPubQ q) $ M.toList c
+  liftIO $ mapM_ (uncurry $ writeToPubQ q) $ M.toList $ frame <$> c
 
 -- The state will just be carried across as a TransactionStatus
 transactionFold :: forall m n. (Monad m, Address n, Ord n) => Tx n

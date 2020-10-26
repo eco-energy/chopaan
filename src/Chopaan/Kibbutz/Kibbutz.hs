@@ -100,4 +100,3 @@ asStream (Kbtz k) = M.foldlWithKey' (nodeTagMerge) (S.fromList []) k
   where
     nodeTagMerge :: t m (n, a) -> n -> t m a -> t m (n, a)
     nodeTagMerge c key s = (S.map (\x -> (key, x)) s) <> c
-

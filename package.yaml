@@ -106,7 +106,6 @@ ghc-options:
 
 library:
   source-dirs: src
-build-tools-depends: proto-lens-protoc:proto-lens-protoc
 
 
 executables:
