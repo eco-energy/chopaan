@@ -1,0 +1,238 @@
+cabal-version: 2.0
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: c1d3a546e769d6a0be18b05e9d0bfa3740373658280c7630207ec9689be54871
+
+name:           chopaan
+version:        0.1.0.0
+description:    Please see the README on Github at <https://github.com/faezs/chopaan#readme>
+homepage:       https://github.com/faezs/chopaan#readme
+bug-reports:    https://github.com/faezs/chopaan/issues
+author:         Faez Shakil
+maintainer:     faez.shakil@gmail.com
+copyright:      2019 Faez Shakil
+license:        BSD3
+license-file:   LICENSE
+build-type:     Custom
+extra-source-files:
+    README.md
+    ChangeLog.md
+    node_message_schema/NodeMessages.proto
+
+source-repository head
+  type: git
+  location: https://github.com/faezs/chopaan
+
+custom-setup
+  setup-depends:
+      Cabal
+    , base
+    , proto-lens-setup
+
+library
+  exposed-modules:
+      Import
+      Mqtt
+      Node
+      NodeOpts
+      Registry
+      Run
+      SoC
+      StateMonitor
+      Storage
+      Subscriber
+      Transactor
+      Types
+      UI
+      UI.Types
+      Proto.NodeMessages
+      Proto.NodeMessages_Fields
+  other-modules:
+      Paths_chopaan
+  autogen-modules:
+      Proto.NodeMessages
+      Proto.NodeMessages_Fields
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+  build-tool-depends:
+      proto-lens-protoc:proto-lens-protoc
+  build-depends:
+      ad
+    , aeson
+    , amazonka
+    , amazonka-iot
+    , base >=4.11 && <10
+    , brick
+    , bytestring
+    , cassava
+    , compensated
+    , concat-classes
+    , connection
+    , containers
+    , convertible
+    , data-default-class
+    , dhall >=1.24.0
+    , directory
+    , distributive
+    , estimator
+    , hashable
+    , hmatrix
+    , keys
+    , linear
+    , microlens
+    , microlens-th
+    , mtl
+    , net-mqtt
+    , network-uri
+    , numeric-limits
+    , proto-lens
+    , proto-lens-runtime
+    , rio >=0.1.8.0
+    , stm
+    , stm-containers
+    , streamly
+    , text
+    , time
+    , time-lens
+    , tls
+    , total-map
+    , ulid
+    , unordered-containers
+    , vector
+    , vty
+    , x509-store
+    , x509-validation
+  default-language: Haskell2010
+
+executable chopaan-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_chopaan
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-tool-depends:
+      proto-lens-protoc:proto-lens-protoc
+  build-depends:
+      ad
+    , aeson
+    , amazonka
+    , amazonka-iot
+    , base
+    , brick
+    , bytestring
+    , cassava
+    , chopaan
+    , compensated
+    , concat-classes
+    , connection
+    , containers
+    , convertible
+    , data-default-class
+    , dhall >=1.24.0
+    , directory
+    , distributive
+    , estimator
+    , hashable
+    , hmatrix
+    , keys
+    , linear
+    , microlens
+    , microlens-th
+    , mtl
+    , net-mqtt
+    , network-uri
+    , numeric-limits
+    , optparse-simple
+    , proto-lens
+    , proto-lens-runtime
+    , rio >=0.1.8.0
+    , stm
+    , stm-containers
+    , streamly
+    , text
+    , time
+    , time-lens
+    , tls
+    , total-map
+    , ulid
+    , unordered-containers
+    , vector
+    , vty
+    , x509-store
+    , x509-validation
+  default-language: Haskell2010
+
+test-suite chopaan-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      KMSpec
+      NodeSpec
+      RegistrySpec
+      StorageSpec
+      SubscriberSpec
+      TransactorSpec
+      Paths_chopaan
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-tool-depends:
+      proto-lens-protoc:proto-lens-protoc
+  build-depends:
+      QuickCheck
+    , ad
+    , aeson
+    , amazonka
+    , amazonka-iot
+    , base >=4.11 && <10
+    , brick
+    , bytestring
+    , cassava
+    , checkers
+    , chopaan
+    , compensated
+    , concat-classes
+    , connection
+    , containers
+    , convertible
+    , data-default-class
+    , dhall >=1.24.0
+    , directory
+    , distributive
+    , estimator
+    , hashable
+    , hmatrix
+    , hspec
+    , keys
+    , linear
+    , microlens
+    , microlens-th
+    , mtl
+    , net-mqtt
+    , network-uri
+    , numeric-limits
+    , proto-lens
+    , proto-lens-arbitrary
+    , proto-lens-runtime
+    , quickcheck-instances
+    , rio >=0.1.8.0
+    , stm
+    , stm-containers
+    , streamly
+    , text
+    , time
+    , time-lens
+    , tls
+    , total-map
+    , ulid
+    , unordered-containers
+    , vector
+    , vty
+    , x509-store
+    , x509-validation
+  default-language: Haskell2010
