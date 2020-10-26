@@ -33,16 +33,17 @@ run = do
   runtime <- liftIO $ rsKbtz @SerialT nodes statsQ
   logs    <- liftIO $ logsKbtz @SerialT nodes logsQ
   (txMonitor, txs) <- liftIO $ runTransactor outbox (60*5) sensors
-  liftIO $ printer $ asMapStream sensors
-  liftIO $ printer $ asMapStream runtime
-  liftIO $ printer $ asMapStream logs
-  liftIO $ printer txMonitor
-  liftIO $ S.mapM_ print txs
+  _ <- liftIO $ forkIO $ forever $
+       runMqtt mqttOpts outbox nodes (mkCallback qs)
+  liftIO $ mainWidget $ mon id sensors runtime logs txs txMonitor
   where
     printer :: (Show a) => Serial a -> IO ()
     printer s = (forkIO . (S.mapM_ print) $ s) >> return ()
   {--
-  _ <- liftIO $ forkIO $ forever $
-       runMqtt mqttOpts outbox nodes (mkCallback qs)
-  liftIO $ mainWidget $ mon id sensors runtime logs txs txMonitor
+  
 --}
+{--liftIO $ printer $ asMapStream sensors
+  liftIO $ printer $ asMapStream runtime
+  liftIO $ printer $ asMapStream logs
+  liftIO $ printer txMonitor
+  liftIO $ S.mapM_ print txs--}

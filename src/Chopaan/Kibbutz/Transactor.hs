@@ -5,7 +5,7 @@
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Chopaan.Kibbutz.Transactor (runTransactor, Stake(..), Tx(..), Role(..), TransactionStatus(..)) where
+module Chopaan.Kibbutz.Transactor (runTransactor, Stake(..), Tx(..), Role(..), TransactionStatus(..), mkStake, dispatchTx) where
 
 import Prelude hiding (zip, zipWith)
 
@@ -79,6 +79,9 @@ fromStake (Stake (role, watts, duration)) = do
 data Role = Source | Sink deriving (Eq, Ord, Show, Generic)
 
 newtype Stake = Stake { unStake :: (Role, Watts, Time.DiffTime) } deriving (Eq, Ord, Show, Generic)
+
+mkStake :: Role -> Double -> Int -> Stake
+mkStake r p t = Stake (r, toWatts p, fromIntegral t)
 
 newtype Tx n = Tx (M.Map n Stake) deriving (Eq, Ord, Show, Generic)
 

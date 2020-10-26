@@ -46,10 +46,10 @@ import Chopaan.Comm.Comm (Address(..), Dispatch(..), NodeQueue(..))
 mkTLSSettings :: FilePath -> FilePath -> FilePath -> Text.Text -> Text.Text -> IO TLSSettings
 mkTLSSettings cert key caPath hostName name = do
   creds <- either (error "Client Certificate Not Found") Just <$> credentialLoadX509 cert key
-  caCreds <- fromJust (error "CA Certificate Not Found") (readCertificateStore caPath)
+  --caCreds <- fromJust (error "CA Certificate Not Found") (readCertificateStore caPath)
   let
     hooks = def { onCertificateRequest = \_ -> return creds
-                , onServerCertificate = \_ a b c -> validateDefault caCreds a b c
+                , onServerCertificate = \_ _ _ _ -> mempty -- validateDefault caCreds a b c
                 }
     clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
                   { clientHooks=hooks

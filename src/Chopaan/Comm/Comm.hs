@@ -154,6 +154,9 @@ writeToPubQ p n et = do
   atomically $ writeTBQueue (runNodeQueue p) (n, et)
 
 
+trivialCB :: MQ.MessageCallback
+trivialCB = MQ.SimpleCallback (\_ _ _ _ -> return ())
+
 mkCallback :: forall n a. (Address n, Dispatch a) => MessageQs n a -> MQ.MessageCallback
 mkCallback (MessageQs { stateQ, statsQ })  = MQ.SimpleCallback $ writer
   where
