@@ -29,17 +29,20 @@ run = do
     KibbutzOpts{..} = kibbutzOpts
   qs@MessageQs{..} <- liftIO . atomically $ initQs
   nodes <- runReaderT getNodes name
+  _ <- liftIO $ forkIO $ forever $
+       runMqtt mqttOpts outbox nodes (mkCallback qs)
   sensors <- liftIO $ sensorKbtz @SerialT nodes stateQ
   runtime <- liftIO $ rsKbtz @SerialT nodes statsQ
   logs    <- liftIO $ logsKbtz @SerialT nodes logsQ
   (txMonitor, txs) <- liftIO $ runTransactor outbox (60*5) sensors
-  _ <- liftIO $ forkIO $ forever $
-       runMqtt mqttOpts outbox nodes (mkCallback qs)
+  --liftIO $ forkIO $ S.drain $ S.trace (writeToDB DBConf) sensors
   liftIO $ mainWidget $ mon id sensors runtime logs txs txMonitor
-  where
-    printer :: (Show a) => Serial a -> IO ()
-    printer s = (forkIO . (S.mapM_ print) $ s) >> return ()
-  {--
+
+data DBConf = DBConf
+
+writeToDB :: DBConf -> a -> IO ()
+writeToDB = undefined
+{--
   
 --}
 {--liftIO $ printer $ asMapStream sensors
