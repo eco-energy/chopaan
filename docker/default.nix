@@ -1,18 +1,17 @@
-with import <nixpkgs> {};
+{
+  sources ? import (../nix/sources.nix)
+, pkgs ? import sources.nixpkgs {}
+, chopaan ? import (../default.nix) {} 
+}:
 
-let chopaan = import ../default.nix ;
-in
-  {
-  chopaanAppImage = dockerTools.buildImage {
-                  name = "chopaan-image";
-                  contents = [ chopaan ];
-
-                  config = {
-                    Cmd = [ "chopaan-exe" ];
-                    ExposedPorts = {
-                    "8883/tcp" = {};
-                    };
-                  };
-               };
-  }
-
+pkgs.dockerTools.buildImage {
+    name = "chopaan-0";
+    contents = [ chopaan.chopaan.components.exes.chopaan-exe ];
+    
+    config = {
+      Cmd = [ "chopaan-exe" ];
+      ExposedPorts = {
+        "8883/tcp" = {};
+      };
+    };
+}
