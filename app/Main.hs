@@ -15,12 +15,15 @@ module Main (main) where
 import Chopaan.Run
 import RIO
 import RIO.Process
+import qualified RIO.Text as T
 import Dhall
 import Chopaan.Types
+import Paths_chopaan
 
 main :: IO ()
 main = do
-  options <- input auto "./options.dhall" 
+  optsPath <- getDataFileName "options.dhall"
+  options <- input auto $ T.pack optsPath 
   lo <- logOptionsHandle stderr (logVerbose options)
   pc <- mkDefaultProcessContext
   withLogFunc lo $ \lf ->
