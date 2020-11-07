@@ -1,5 +1,5 @@
 {
-  sources ? import (../nix/sources.nix)
+  sources ? import (./sources.nix)
 , pkgs ? import sources.nixpkgs {}
 , chopaan ? import (../default.nix) {} 
 }:
