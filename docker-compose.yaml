@@ -1,8 +1,10 @@
 version: '3'
-<<<<<<< HEAD
 
 services:
   timescale:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.db 
     image: chopaan/timescale
     command: postgres -c shared_preload_libraries=timescaledb
     ports:
@@ -13,17 +15,16 @@ services:
     volumes:
       - ./data:/var/lib/postgresql
       - ./db_migrations/1.psql:/docker-entrypoint-initdb.d/init.sql
-=======
-services:
   chopaan:
     build:
       context: .
       args:
         - BINARY_PATH
     image: dosti/chopaan
+    depends_on:
+      - timescale
     environment:
       - LOCAL_USER_ID=${LOCAL_USER_ID}
     ports:
       - 3000:3000
     #command: /opt/chopaan/chopaan
->>>>>>> bd5e081... the required
