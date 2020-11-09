@@ -23,7 +23,15 @@ import Paths_chopaan
 main :: IO ()
 main = do
   optsPath <- getDataFileName "options.dhall"
-  options <- input auto $ T.pack optsPath 
+  caCert <- getDataFileName "certs/ca.cert"
+  cert <- getDataFileName "certs/chopaan.cert.pem"
+  key <- getDataFileName "certs/chopaan.private.key.pem"
+  fileOptions@Options{mqttOpts} <- input auto $ T.pack optsPath
+  let options = fileOptions{
+        mqttOpts=mqttOpts{ certPath = cert
+                         , keyPath = key
+                         , caPath = caCert }
+        }
   lo <- logOptionsHandle stderr (logVerbose options)
   pc <- mkDefaultProcessContext
   withLogFunc lo $ \lf ->

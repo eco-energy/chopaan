@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 35f92de4cbaa11c38c1774f44e3918b2005aecc551a494063b4cb854ddd85de1
+-- hash: 77d05bc59cee5d1d8cc99122056f4d669974b55d5a1a6b956291f1e31e506088
 
 name:           chopaan
 version:        0.1.0.0
@@ -22,6 +22,9 @@ extra-source-files:
     ChangeLog.md
 data-files:
     options.dhall
+    certs/chopaan.cert.pem
+    certs/chopaan.private.key.pem
+    certs/ca.cert.pem
 
 source-repository head
   type: git
@@ -31,6 +34,7 @@ library
   exposed-modules:
       Chopaan.Comm.Comm
       Chopaan.Comm.Mqtt
+      Chopaan.Comm.Serve
       Chopaan.DB
       Chopaan.DB.DB
       Chopaan.DB.Nodes

@@ -12,7 +12,10 @@ extra-source-files:
 - ChangeLog.md
 
 data-files:
-  options.dhall
+ - options.dhall
+ - certs/chopaan.cert.pem
+ - certs/chopaan.private.key.pem
+ - certs/ca.cert.pem
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
