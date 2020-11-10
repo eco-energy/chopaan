@@ -6,23 +6,23 @@ let
 in
   { machine = { config, pkgs, resources, ... }: {
       deployment = {
-        #targetEnv = "ec2";
-        targetEnv = "virtualbox";
+        targetEnv = "ec2";
+        #targetEnv = "virtualbox";
         #virtualbox.headless = true;
-        virtualbox.memorySize = 1024;
-        virtualbox.vcpu = 1;
-        #ec2 = {
-        #  inherit accessKeyId region;
+        #virtualbox.memorySize = 1024;
+        #virtualbox.vcpu = 1;
+        ec2 = {
+          inherit accessKeyId region;
 
-        #  instanceType = "t3.nano";
+          instanceType = "t3.nano";
 
-        #  keyPair = resources.ec2KeyPairs.chopaan-key-pair;
+          keyPair = resources.ec2KeyPairs.chopaan-key-pair;
 
-        #  securityGroups = [
-        #    resources.ec2SecurityGroups."http"
-        #    resources.ec2SecurityGroups."ssh"
-        #  ];
-        #};
+          securityGroups = [
+            resources.ec2SecurityGroups."http"
+            resources.ec2SecurityGroups."ssh"
+          ];
+        };
       };
 
       networking.firewall.allowedTCPPorts = [ 80 ];
@@ -62,25 +62,25 @@ in
       };
     };
 
-    #resources = {
-    #  ec2KeyPairs.chopaan-key-pair = { inherit region accessKeyId; };
+    resources = {
+      ec2KeyPairs.chopaan-key-pair = { inherit region accessKeyId; };
 
-    #  ec2SecurityGroups = {
-    #    "http" = {
-    #      inherit accessKeyId region;
+      ec2SecurityGroups = {
+        "http" = {
+          inherit accessKeyId region;
 
-    #      rules = [
-    #        { fromPort = 80; toPort = 80; sourceIp = "0.0.0.0/0"; }
-    #      ];
-    #    };
+          rules = [
+            { fromPort = 80; toPort = 80; sourceIp = "0.0.0.0/0"; }
+          ];
+        };
 
-    #    "ssh" = {
-    #      inherit accessKeyId region;
+        "ssh" = {
+          inherit accessKeyId region;
 
-    #      rules = [
-    #        { fromPort = 22; toPort = 22; sourceIp = "0.0.0.0/0"; }
-    #      ];
-    #    };
-    #  };
-    #};
+          rules = [
+            { fromPort = 22; toPort = 22; sourceIp = "0.0.0.0/0"; }
+          ];
+        };
+      };
+    };
   }
