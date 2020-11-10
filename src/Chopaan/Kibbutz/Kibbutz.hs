@@ -49,27 +49,26 @@ kbtz
   => [n]
   -> (n -> t m b)
   -> (t m b -> t m a)
-  -> m (Kbtz t m n a)
-kbtz nodes subscribe process = do
-  return . Kbtz . M.fromList $ [(n, process s) | n <- nodes, s <- subscribe <$> nodes]
+  -> Kbtz t m n a
+kbtz nodes subscribe process = Kbtz . M.fromList $ [(n, process s) | n <- nodes, s <- subscribe <$> nodes]
 
 
 sensorKbtz :: forall t m. (IsStream t, MonadAsync m)
   => [NodeMAC]
   -> NodeQueue NodeMAC EnergyState
-  -> m (Kbtz t m NodeMAC NodeS)
+  -> Kbtz t m NodeMAC NodeS
 sensorKbtz ns q = kbtz ns (sub @t @m @NodeMAC @EnergyState q) nodeS
 
 rsKbtz :: forall t m. (IsStream t, MonadAsync m)
   => [NodeMAC]
   -> NodeQueue NodeMAC RuntimeStats
-  -> m (Kbtz t m NodeMAC RuntimeStats)
+  -> Kbtz t m NodeMAC RuntimeStats
 rsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @RuntimeStats q) id
 
 logsKbtz :: forall t m a. (IsStream t, MonadAsync m, Dispatch a)
   => [NodeMAC]
   -> NodeQueue NodeMAC a
-  -> m (Kbtz t m NodeMAC a)
+  -> Kbtz t m NodeMAC a
 logsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @a q) id
 
 asFRPNetwork :: forall t t' m m' n a.
@@ -95,7 +94,7 @@ getNodes = do
 asMapStream :: (IsStream t, Monad m, Monad (t m)) => Kbtz t m n a -> t m (Map n a)
 asMapStream (Kbtz k) = sequence k
 
-asStream :: forall t m n a. (IsStream t, MonadAsync m, Monad (t m)) => Kbtz t m n a -> t m (n, a)
+asStream :: forall t m n a. (IsStream t, MonadAsync m) => Kbtz t m n a -> t m (n, a)
 asStream (Kbtz k) = M.foldlWithKey' (nodeTagMerge) (S.fromList []) k
   where
     nodeTagMerge :: t m (n, a) -> n -> t m a -> t m (n, a)

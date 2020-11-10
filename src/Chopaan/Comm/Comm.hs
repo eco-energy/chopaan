@@ -112,7 +112,6 @@ type LogQueue n a = (Address n, Dispatch a) => NodeQueue n a
 data MessageQs n a = MessageQs
   { stateQ :: StateQueue n
   , statsQ :: StatsQueue n
-  , logsQ  :: LogQueue n a
   , outbox :: PubQueue n a 
   }
 
@@ -139,9 +138,8 @@ initMessageQs :: forall n o. (Address n, Dispatch o) => STM (MessageQs n o)
 initMessageQs = do
   es <- initNodeQueue @n @EnergyState
   rs <- initNodeQueue @n @RuntimeStats
-  logs <-  initNodeQueue @n @o
   out <-  initNodeQueue @n @o
-  return $ MessageQs es rs logs out
+  return $ MessageQs es rs out
 
 initQs = initMessageQs @NodeMAC @MeshFrame
 
