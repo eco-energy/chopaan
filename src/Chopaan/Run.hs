@@ -5,7 +5,7 @@
 module Chopaan.Run (run, mon) where
 
 import Chopaan.Types
-import RIO
+import RIO hiding (view)
 import Control.Concurrent (forkIO)
 
 import Streamly
@@ -18,7 +18,7 @@ import Chopaan.Kibbutz.Transactor (runTransactor)
 
 import Chopaan.UI (mon)
 
-{--
+
 import           Shpadoinkle                 (Html, JSM)
 import           Shpadoinkle.Backend.ParDiff (runParDiff)
 import           Shpadoinkle.Html
@@ -40,7 +40,7 @@ mainUI :: IO ()
 mainUI = do
   putStrLn "\nHappy point of view on https://localhost:8080\n"
   runJSorWarp 8080 app
---}
+
 
 
 
@@ -58,8 +58,8 @@ run = do
     sensors = sensorKbtz @SerialT nodes stateQ
     runtime = rsKbtz @SerialT @IO nodes statsQ
   (txMonitor, txs) <- liftIO $ runTransactor outbox (60*5) sensors
-  return ()
-  --liftIO $ mainIO
+  --return ()
+  liftIO $ mainUI
   --liftIO $ forkIO $ S.drain $ S.trace (writeToDB DBConf) sensors
   --liftIO $ mainWidget $ mon id sensors runtime logs txs txMonitor
 
