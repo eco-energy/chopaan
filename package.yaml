@@ -97,7 +97,7 @@ dependencies:
 - sbv
 - Shpadoinkle
 - Shpadoinkle-backend-pardiff
-#- Shpadoinkle-html
+- Shpadoinkle-html
 
 
 ghc-options:

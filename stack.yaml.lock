@@ -459,27 +459,6 @@ packages:
       sha256: a08eab2f15d6be431d00cd31a8b87a7e5ce87f203aad06916f9af0c673ec8a7d
   original:
     hackage: warp-3.2.28@sha256:b32fb8fed7ace4bd206fd897c388c00cdb915ec7e34ee61dc6397d518d9e651c,11186
-- completed:
-    hackage: Shpadoinkle-0.2.0.0@sha256:337cfa6b2a50ddfd755105e6f2fc50df073dba8e6cff16c0f0152b3c14c2b9c1,1575
-    pantry-tree:
-      size: 511
-      sha256: fe007d9fd0c31442d175888d121b77a86bffdf9acf56c8cea77aac9bfea33959
-  original:
-    hackage: Shpadoinkle-0.2.0.0
-- completed:
-    hackage: Shpadoinkle-backend-pardiff-0.2.0.0@sha256:e08aa8e9f24e26d830c835cf220525d6ef05397c183d2367bb0bec54b2e0de08,1821
-    pantry-tree:
-      size: 348
-      sha256: 4874b5a5d2fa29161489de5f90bddc29f038c4ea34b90ceb28764353a54113c6
-  original:
-    hackage: Shpadoinkle-backend-pardiff-0.2.0.0
-- completed:
-    hackage: Shpadoinkle-html-0.1.0.0@sha256:016bf71c6e0063f2ee47300c4a9a61d19bc8736ee6ee221fd7884c436fc8b423,1800
-    pantry-tree:
-      size: 806
-      sha256: 21c6d31f4f63b0387fee83f91068de0c81f884d5b2c7fdbdabe27d3ddfab4079
-  original:
-    hackage: Shpadoinkle-html-0.1.0.0
 snapshots:
 - completed:
     size: 524799

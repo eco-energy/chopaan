@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4141851f43d2a0e93569c9f03a46ace8b9dba161434db7d90601a1792b5ea316
+-- hash: 91aa60121ac0fcc458cd163f90e6dad24c2beb46b43b1fcb4424726ef61cb097
 
 name:           chopaan
 version:        0.1.0.0
@@ -72,6 +72,7 @@ library
   build-depends:
       Shpadoinkle
     , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
     , ad
     , aeson
     , algebraic-graphs
@@ -150,6 +151,7 @@ executable chopaan-demo-exe
   build-depends:
       Shpadoinkle
     , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
     , ad
     , aeson
     , algebraic-graphs
@@ -230,6 +232,7 @@ executable chopaan-exe
   build-depends:
       Shpadoinkle
     , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
     , ad
     , aeson
     , algebraic-graphs
@@ -310,6 +313,7 @@ executable tx-test-exe
   build-depends:
       Shpadoinkle
     , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
     , ad
     , aeson
     , algebraic-graphs
@@ -398,6 +402,7 @@ test-suite chopaan-test
       QuickCheck
     , Shpadoinkle
     , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
     , ad
     , aeson
     , algebraic-graphs
