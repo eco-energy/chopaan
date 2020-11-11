@@ -95,6 +95,10 @@ dependencies:
 - websockets
 - servant-server
 - sbv
+- Shpadoinkle
+- Shpadoinkle-backend-pardiff
+#- Shpadoinkle-html
+
 
 ghc-options:
 - -Wall

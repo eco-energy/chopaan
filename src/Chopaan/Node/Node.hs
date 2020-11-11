@@ -241,8 +241,6 @@ data NodeMetrics e p = NodeMetrics
   } deriving (Eq, Ord, Generic)
 
 
-
-
 instance (ToJSON e, ToJSON p) => ToJSON (NodeMetrics e p)
 --instance (FromJSON e, FromJSON p) => FromJSON (NodeMetrics e p)
 

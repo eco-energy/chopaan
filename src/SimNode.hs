@@ -182,7 +182,7 @@ testPrefix = "/kibbutz/test/node/"
 
 
 testKbtz :: forall t a b. (IsStream t, Dispatch a)
-  => [NodeTest] -> (NodeTest -> t MonadEnv a) -> (t MonadEnv a -> t MonadEnv b) -> MonadEnv (Kbtz t MonadEnv NodeTest b)
+  => [NodeTest] -> (NodeTest -> t MonadEnv a) -> (t MonadEnv a -> t MonadEnv b) -> Kbtz t MonadEnv NodeTest b
 testKbtz = kbtz @t @MonadEnv
 
 testNodes :: [NodeTest]
@@ -201,7 +201,7 @@ server s = streamData
 
 startApp :: IO ()
 startApp = do
-  sensors <- sampleIOE $ testKbtz @SerialT (take 10 testNodes) (\_ -> nodeStream) (nodeS)
+  let sensors = testKbtz @SerialT (take 10 testNodes) (\_ -> nodeStream) (nodeS)
   let s = inIO sampleIOE $ asStream sensors
   putStrLn "Starting server on http://localhost:8080"
   run 8080 (app s)
@@ -217,8 +217,8 @@ testClient = do
   outbox <- atomically $ initNodeQueue @NodeTest @MeshFrame
   let
     nodes = take 4 testNodes
-  sensors <- sampleIOE $ testKbtz @SerialT nodes (const nodeStream) nodeS
-  runtime <- sampleIOE $ testKbtz @SerialT nodes (const runtimeS) id
-  logs    <- sampleIOE $ testKbtz @SerialT nodes (const logsS) id
+    sensors = testKbtz @SerialT nodes (const nodeStream) nodeS
+    runtime = testKbtz @SerialT nodes (const runtimeS) id
   (txMonitor, txs) <- sampleIOE $ runTransactor outbox (60*5) sensors
-  mainWidget $ mon sampleIOE sensors runtime logs txs txMonitor
+  return $ ()
+  --mainWidget $ mon sampleIOE sensors runtime undefined txs txMonitor

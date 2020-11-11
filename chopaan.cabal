@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 77d05bc59cee5d1d8cc99122056f4d669974b55d5a1a6b956291f1e31e506088
+-- hash: 4141851f43d2a0e93569c9f03a46ace8b9dba161434db7d90601a1792b5ea316
 
 name:           chopaan
 version:        0.1.0.0
@@ -34,7 +34,6 @@ library
   exposed-modules:
       Chopaan.Comm.Comm
       Chopaan.Comm.Mqtt
-      Chopaan.Comm.Serve
       Chopaan.DB
       Chopaan.DB.DB
       Chopaan.DB.Nodes
@@ -71,7 +70,9 @@ library
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2
   build-depends:
-      ad
+      Shpadoinkle
+    , Shpadoinkle-backend-pardiff
+    , ad
     , aeson
     , algebraic-graphs
     , amazonka
@@ -147,7 +148,9 @@ executable chopaan-demo-exe
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
   build-depends:
-      ad
+      Shpadoinkle
+    , Shpadoinkle-backend-pardiff
+    , ad
     , aeson
     , algebraic-graphs
     , amazonka
@@ -225,7 +228,9 @@ executable chopaan-exe
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      ad
+      Shpadoinkle
+    , Shpadoinkle-backend-pardiff
+    , ad
     , aeson
     , algebraic-graphs
     , amazonka
@@ -303,7 +308,9 @@ executable tx-test-exe
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
   build-depends:
-      ad
+      Shpadoinkle
+    , Shpadoinkle-backend-pardiff
+    , ad
     , aeson
     , algebraic-graphs
     , amazonka
@@ -389,6 +396,8 @@ test-suite chopaan-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
   build-depends:
       QuickCheck
+    , Shpadoinkle
+    , Shpadoinkle-backend-pardiff
     , ad
     , aeson
     , algebraic-graphs

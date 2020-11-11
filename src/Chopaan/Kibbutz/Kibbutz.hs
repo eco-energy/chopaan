@@ -1,6 +1,7 @@
 {-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes #-}
 module Chopaan.Kibbutz.Kibbutz where
 
+import Prelude hiding (zipWith)
 import Streamly
 import qualified Streamly.Prelude as S
 
@@ -8,7 +9,9 @@ import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Map.Strict as M
 import Data.Map.Strict (Map)
+import Data.Key
 
+import Control.Applicative (liftA2)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Trans.Reader
 
@@ -44,6 +47,18 @@ newtype Kbtz (t :: (* -> *) -> * -> *) (m :: * -> *) n a = Kbtz {
 instance (IsStream t, Monad m) => Functor (Kbtz t m n) where
   fmap f (Kbtz m) = Kbtz $ fmap (S.map f) m
 
+instance (Ord n) => Semigroup (Kbtz t m n a) where
+  (Kbtz a) <> (Kbtz b) = Kbtz (a <> b)
+
+instance (Ord n) => Monoid (Kbtz t m n a) where
+  mempty = Kbtz mempty
+
+instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n) where
+  pure a = Kbtz $ M.singleton mempty (S.yield a)
+  (Kbtz a) <*> (Kbtz b) = Kbtz $ zipWith (<*>) a b
+
+
+
 kbtz
   :: (IsStream t, MonadAsync m, Address n, Dispatch b)
   => [n]
@@ -64,12 +79,6 @@ rsKbtz :: forall t m. (IsStream t, MonadAsync m)
   -> NodeQueue NodeMAC RuntimeStats
   -> Kbtz t m NodeMAC RuntimeStats
 rsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @RuntimeStats q) id
-
-logsKbtz :: forall t m a. (IsStream t, MonadAsync m, Dispatch a)
-  => [NodeMAC]
-  -> NodeQueue NodeMAC a
-  -> Kbtz t m NodeMAC a
-logsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @a q) id
 
 asFRPNetwork :: forall t t' m m' n a.
   (IsStream t, MonadAsync m, R.Reflex t', R.TriggerEvent t' m', MonadIO m', Show a)
