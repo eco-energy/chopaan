@@ -22,16 +22,7 @@ import Paths_chopaan
 
 main :: IO ()
 main = do
-  optsPath <- getDataFileName "options.dhall"
-  caCert <- getDataFileName "certs/ca.cert"
-  cert <- getDataFileName "certs/chopaan.cert.pem"
-  key <- getDataFileName "certs/chopaan.private.key.pem"
-  fileOptions@Options{mqttOpts} <- input auto $ T.pack optsPath
-  let options = fileOptions{
-        mqttOpts=mqttOpts{ certPath = cert
-                         , keyPath = key
-                         , caPath = caCert }
-        }
+  options <- getOptions
   lo <- logOptionsHandle stderr (logVerbose options)
   pc <- mkDefaultProcessContext
   withLogFunc lo $ \lf ->
@@ -41,3 +32,16 @@ main = do
           , appOptions = options
           }
      in runRIO app run
+
+getOptions :: IO (Options)
+getOptions = do
+  optsPath <- getDataFileName "options.dhall"
+  caCert <- getDataFileName "certs/ca.cert"
+  cert <- getDataFileName "certs/chopaan.cert.pem"
+  key <- getDataFileName "certs/chopaan.private.key.pem"
+  fileOptions@Options{mqttOpts} <- input auto $ T.pack optsPath
+  return $ fileOptions{
+        mqttOpts=mqttOpts{ certPath = cert
+                         , keyPath = key
+                         , caPath = caCert }
+        }
