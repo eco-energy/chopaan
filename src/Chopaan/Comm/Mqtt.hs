@@ -63,7 +63,8 @@ runMqtt :: forall a b. (Address a, Dispatch b) => MQTTOpts -> NodeQueue a b -> [
 runMqtt opts outQueue ts msgCB = do
   mc <- client opts msgCB
   _ <- forkIO $ forever $ catches (pub mc outQueue) [Handler errorHandler]
-  _ <- mapM (subscribe mc) ts -- [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
+  connStatus <- mapM (subscribe mc) ts -- [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
+  --print connStatus
   MQ.waitForClient mc
 
 
@@ -77,12 +78,12 @@ client MQTTOpts{..} msgCB = do
            , MQ._connID=Text.unpack $ connId
            , MQ._port=443
            , MQ._msgCB=msgCB
-           , MQ._connectTimeout=1800000
+           , MQ._connectTimeout=18000000
            , MQ._tlsSettings=tlsConf}
   MQ.connectURI conf uri
 
-subscribe :: (Address n) => MQ.MQTTClient -> n -> IO ([Either MQTy.SubErr MQ.QoS])
-subscribe c n = fst <$> MQ.subscribe c [subTopic n] []
+subscribe :: (Address n) => MQ.MQTTClient -> n -> IO (Either MQTy.SubErr MQ.QoS)
+subscribe c n = head <$> (fst <$> MQ.subscribe c [subTopic n] [])
 
 subTopic :: (Address n) => n -> (MQ.Topic, MQ.SubOptions)
 subTopic n = (stateTopic n, MQ.subOptions)

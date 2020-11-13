@@ -24,7 +24,7 @@ import qualified Data.ByteString as BS
 import Lens.Micro hiding (_Just)
 import Proto.NodeMessageSchema.NodeMessages hiding (Outgoing, Incoming)
 import Proto.NodeMessageSchema.NodeMessages_Fields
-
+import Data.ProtoLens.TextFormat
 import Data.ProtoLens.Labels()
 
 import Data.ProtoLens
@@ -45,6 +45,7 @@ import Chopaan.Kibbutz.AWS.Things
 class Dispatch a where
   frame :: a -> MeshFrame
   unframe :: MeshFrame -> Maybe a
+
 
 instance Dispatch EnergyState where
   frame es = defMessage & maybe'payload .~ (_Just # _MeshFrame'State # es) 
@@ -143,8 +144,8 @@ initMessageQs = do
 
 initQs = initMessageQs @NodeMAC @MeshFrame
 
-writeToNodeQueue :: (Address a, Dispatch b) => NodeQueue a b -> a -> b -> IO ()
-writeToNodeQueue q n m = do
+writeToNodeQ :: forall a b. (Address a, Dispatch b) => NodeQueue a b -> a -> b -> IO ()
+writeToNodeQ q n m = do
   atomically $ writeTBQueue (runNodeQueue q) (n, m)
 
 writeToPubQ :: (Address n, Dispatch a) => PubQueue n a -> n -> a -> IO ()
@@ -164,16 +165,13 @@ mkCallback (MessageQs { stateQ, statsQ })  = MQ.SimpleCallback $ writer
         Nothing -> print $ "MQTT Topic Decode error: " <> (show t)
         (Just n) ->
           case parsed of
-            (Left err) -> print err
+            (Left err) -> error err
             (Right mf) -> case (accessEnergyState mf) of
-              (Just a) -> (safeWrite @n @EnergyState) stateQ n a
+              (Just a) ->  writeToNodeQ @_ @EnergyState stateQ n a -- print ("GOT ENERGY STATE:\n" <> showMessage a) >>
               Nothing -> case (accessRTS mf) of
-                (Just a) -> (safeWrite @n @RuntimeStats) statsQ n a
-                Nothing -> return ()
+                (Just a) -> writeToNodeQ @_ @RuntimeStats statsQ n a -- print ("GOT RTS:\n" <> showMessage a) >>
+                Nothing -> print ("Not RTS AND NOT ES" <> showMessage mf) >> return ()
       where
-        safeWrite :: forall n a. (Address n, Dispatch a) => NodeQueue n a -> n -> a -> IO ()
-        safeWrite q n a = atomically $ do
-            writeTBQueue (runNodeQueue q) (n, a)
         nodeId :: Maybe n
         nodeId = fromStateTopic $ t
         parsed :: Either String MeshFrame
@@ -186,14 +184,20 @@ class (Address n, Dispatch a) => Comm n a where
 
 {------------------------- Streaming from Queues ---------------------------}
 
-subStream :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a) => NodeQueue n a -> t m (n, a)
-subStream sq = asyncly $ S.unfoldrM step ()
+subStream :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a) => n -> NodeQueue n a -> t m (Maybe a)
+subStream n sq = asyncly $ S.unfoldrM step ()
   where
-    step :: () -> m (Maybe ((n, a), ()))
-    step _ = liftIO $ wrap <$> (atomically . readTBQueue . runNodeQueue $ sq)
-      where
-        wrap :: (n, a) -> Maybe ((n, a), ())
-        wrap = Just . (, ())
+    step :: () -> m (Maybe (Maybe a, ()))
+    step _ = liftIO $ do
+      v <- (atomically $ do
+               (n', v) <- readTBQueue . runNodeQueue $ sq
+               case n' == n of
+                 True -> return $ Just v
+                 False -> do
+                   unGetTBQueue (runNodeQueue sq) (n', v)
+                   return $ Nothing
+           )
+      return $ Just (v, ())
 
 
 {---------------------------- Utils -------------------------------------}
