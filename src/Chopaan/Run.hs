@@ -10,39 +10,18 @@ import Control.Concurrent (forkIO)
 
 import Streamly
 import qualified Streamly.Prelude as S
-import Chopaan.Comm.Mqtt (runMqtt)
-import Chopaan.Comm.Comm (MessageQs(..), initQs, mkCallback)
 
-import Chopaan.Kibbutz.Kibbutz (sensorKbtz, rsKbtz, getNodes, asMapStream)
+import Chopaan.Comm.Mqtt (runMqtt)
+import Chopaan.Comm.Comm (MessageQs(..), initQs, mkCallback, runNodeQueue, subStream)
+
+import Chopaan.Kibbutz.Kibbutz (sensorKbtz, rsKbtz, getNodes, asStream, monitor, sub)
 import Chopaan.Kibbutz.Transactor (runTransactor)
 
 import Chopaan.UI (mon)
+import qualified System.Remote.Monitoring as EKG
+import qualified System.Metrics as EKG
 
-
-import           Shpadoinkle                 (Html, JSM)
-import           Shpadoinkle.Backend.ParDiff (runParDiff)
-import           Shpadoinkle.Html
-import           Shpadoinkle.Run             (live, runJSorWarp, simple)
-
-
-view :: () -> Html m ()
-view _ = "hello world"
-
-app :: JSM ()
-app = simple runParDiff () view getBody
-
-
-devUI :: IO ()
-devUI = live 8080 app
-
-
-mainUI :: IO ()
-mainUI = do
-  putStrLn "\nHappy point of view on https://localhost:8080\n"
-  runJSorWarp 8080 app
-
-
-
+import Control.Concurrent.STM.TBQueue
 
 run :: RIO App ()
 run = do
@@ -54,27 +33,14 @@ run = do
   nodes <- runReaderT getNodes name
   _ <- liftIO $ forkIO $ forever $
        runMqtt mqttOpts outbox nodes (mkCallback qs)
+  --let s = subStream @SerialT @IO stateQ
+  --let s1 = sub state
+  --liftIO $ S.drain $ S.mapM print s    
+  sensorStore <- liftIO $ EKG.newStore
   let 
-    sensors = sensorKbtz @SerialT nodes stateQ
+    sensors' = sensorKbtz @SerialT @IO nodes stateQ
     runtime = rsKbtz @SerialT @IO nodes statsQ
+  sensors <- liftIO $ monitor sensorStore sensors'
   (txMonitor, txs) <- liftIO $ runTransactor outbox (60*5) sensors
-  --return ()
-  liftIO $ mainUI
-  --liftIO $ forkIO $ S.drain $ S.trace (writeToDB DBConf) sensors
-  --liftIO $ mainWidget $ mon id sensors runtime logs txs txMonitor
-
-
-
-
-data DBConf = DBConf
-
-writeToDB :: DBConf -> a -> IO ()
-writeToDB = undefined
-{--
-  
---}
-{--liftIO $ printer $ asMapStream sensors
-  liftIO $ printer $ asMapStream runtime
-  liftIO $ printer $ asMapStream logs
-  liftIO $ printer txMonitor
-  liftIO $ S.mapM_ print txs--}
+  ser <- liftIO $ EKG.forkServerWith sensorStore "localhost" 8000
+  liftIO $ S.drain $ asStream sensors

@@ -25,12 +25,15 @@ module Chopaan.Node.Node (
   -- default builders
   , zeroMsg, defNodeS
   , nmFilter
-  , writeCSVRecords
   -- initialization fns
   , toWattSeconds, toWatts, fromWattSeconds, fromWatts
+  , registerNodeG, updateNodeG, NodeGauge
   ) where
 
+
 import qualified Data.Time as Time
+import qualified Data.Text as T
+import Data.Int
 import Data.Time.Clock.POSIX
 
 import GHC.Generics (Generic)
@@ -73,10 +76,13 @@ import qualified Data.Aeson as A
 import Numeric.Estimator (KalmanFilter(..))
 
 import Text.Printf
+import qualified System.Metrics.Gauge as G
+import System.Metrics
 ----------------------------------------------------------------------------------
 -- Metric Tracking
 
 -- Our Scalars
+
 
 newtype WattSeconds = WS { unWs :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
 
@@ -518,6 +524,7 @@ gridS ns ss = S.postscan gridMap $ ss
                 CSV Conversion
 ----------------------------------------------------------}
 
+-- Identified node type for monitoring
 newtype TaggedNode n = TaggedNode (n, NodeS) deriving (Generic)
 
 instance (ToField n) => ToNamedRecord (TaggedNode n) where
@@ -529,41 +536,42 @@ instance DefaultOrdered (TaggedNode n) where
                   <> (headerOrder (undefined :: Power Watts))
                   <> (headerOrder (undefined :: Energy WattSeconds))
 
---TODO: Generalize This
 
+{----------------------------------------------------------
 
-writeCSVRecords :: forall n. (ToField n)
-  => FilePath
-  -> GridS n
-  ->  StateT Time.UTCTime IO ()
-writeCSVRecords fp (Grid gs) = do
-  fE <- liftIO $ doesFileExist fp
-  lastWrite <- get
-  let
-    opts = if fE then contOpts else initOpts
-    recs = atT gs lastWrite
-    maxWrite = maxWriteT recs
-  liftIO $ withFile fp AppendMode $ (\ho ->do
-      (BSL.hPut ho) $ encodeDefaultOrderedByNameWith opts recs)
-  put $ maxWrite
+                EKG Gauge
+----------------------------------------------------------}
+
+data NodeGauge = NodeGauge
+  { inG :: G.Gauge
+  , outG :: G.Gauge
+  , generatedG :: G.Gauge
+  , consumedG :: G.Gauge
+  }
+
+registerNodeG :: (MonadIO m, Show n) => Store -> n -> m NodeGauge
+registerNodeG store node = do
+  i <- nGauge "input"
+  o <- nGauge "output"
+  g <- nGauge "generated"
+  c <- nGauge "consumed"
+  return $ NodeGauge i o g c
   where
-    contOpts = defaultEncodeOptions {
-      encUseCrLf = True,
-      encIncludeHeader = False
-    }
-    initOpts = contOpts { encIncludeHeader = True }
-    maxWriteT :: [TaggedNode n] -> Time.UTCTime
-    maxWriteT ts = maximum tMlist
-      where
-        tMlist :: [Time.UTCTime]
-        tMlist = map fromJust $ filter isNothing $ (\(TaggedNode(_, NodeMetrics {_time})) -> _time) <$> ts
-    atT :: Map.Map n (NodeS) -> Time.UTCTime -> [TaggedNode n]
-    atT nmap lw = TaggedNode <$> (timeFilter lw $ Map.toList nmap)
-    timeFilter lw = (filter (\(_, NodeMetrics {_time}) -> tf _time))
-      where
-        tf Nothing = False
-        tf (Just t) = t > lw
+    nGauge metric = liftIO $ createGauge (withName metric) store  
+    withName :: T.Text -> T.Text
+    withName metric = (T.pack . show $ node) <> "." <> (metric)
 
+  
+updateNodeG :: forall m p e. (MonadIO m, RealFrac p) => NodeGauge -> NodeMetrics e p -> m ()
+updateNodeG NodeGauge{..} NodeMetrics{_powerT} = do
+  setG inG  tInP
+  setG outG tOutP
+  setG generatedG genP
+  setG consumedG loadP
+  where
+    setG g v = liftIO $ G.set g (readVal v) 
+    readVal :: (Power p -> p) -> Int64
+    readVal f = fromIntegral . floor . f $ _powerT
 
 {---------------------------------------------------------------------------------------------------------------------
 

@@ -5,7 +5,7 @@ import Prelude hiding (zipWith)
 import Streamly
 import qualified Streamly.Prelude as S
 
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isNothing, isJust)
 import Data.Text (Text)
 import qualified Data.Map.Strict as M
 import Data.Map.Strict (Map)
@@ -22,6 +22,9 @@ import Chopaan.Comm.Comm ( Address
                          )
 import Chopaan.Node.Node ( nodeS
                          , NodeS
+                         , registerNodeG
+                         , updateNodeG
+                         , NodeGauge
                          )
 import Chopaan.Node.NodeId ( NodeMAC
                            , NodeId(..)
@@ -36,7 +39,10 @@ import Proto.NodeMessageSchema.NodeMessages ( RuntimeStats
 import Chopaan.Utils.StreamsInterop (toEvent)
 import qualified Reflex as R
 import Reflex.Vty (VtyWidget)
---data Kbtz
+import qualified System.Metrics.Gauge as G
+import qualified System.Metrics as EKG
+
+
 
 type KbtzId = Text
 
@@ -80,19 +86,24 @@ rsKbtz :: forall t m. (IsStream t, MonadAsync m)
   -> Kbtz t m NodeMAC RuntimeStats
 rsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @RuntimeStats q) id
 
+nodes :: Kbtz t m n a -> [n]
+nodes = M.keys . unKibbutz
+
 asFRPNetwork :: forall t t' m m' n a.
   (IsStream t, MonadAsync m, R.Reflex t', R.TriggerEvent t' m', MonadIO m', Show a)
   => (forall x. m x -> IO x) -> Kbtz t m n a -> VtyWidget t' m' (Map n (R.Event t' a))
 asFRPNetwork h = sequence . (M.map (toEvent @t @t' h)) . unKibbutz
 
-
---asFRPIO = asFRPNetwork @_ @_ @VtyWidget _ IO
+traceKbtz :: (IsStream t, MonadAsync m) => (n -> a -> m ())
+          -> Kbtz t m n a
+          -> Kbtz t m n a
+traceKbtz act (Kbtz k) = Kbtz $ M.mapWithKey (\k stream -> S.trace (act k) stream) k
 
 sub :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a)
   => NodeQueue n a
   -> n
   -> t m a
-sub q t = S.map snd $ S.filter (\x -> fst x == t) $ subStream @t @m @n @a q
+sub q n = S.map fromJust $ S.filter (isJust) {-- $ S.trace (liftIO . print)--} $ subStream @t @m @n @a n q 
 
 getNodes :: (MonadIO m) => ReaderT KbtzId m [NodeMAC]
 getNodes = do
@@ -108,3 +119,23 @@ asStream (Kbtz k) = M.foldlWithKey' (nodeTagMerge) (S.fromList []) k
   where
     nodeTagMerge :: t m (n, a) -> n -> t m a -> t m (n, a)
     nodeTagMerge c key s = (S.map (\x -> (key, x)) s) <> c
+
+
+logNode :: (MonadIO m, Show n, Show a) => n -> a -> m ()
+logNode k v = liftIO . print $ "Node: "
+                       <> show k
+                       <> "\n" <> show v
+logKbtz :: (IsStream t, MonadAsync m, Show n, Show a) => Kbtz t m n a -> Kbtz t m n a 
+logKbtz = traceKbtz logNode
+
+-- $ Create a store for the kbtz, and NodeGauges for each node, then map the update across
+gauge :: forall t m n. (IsStream t, MonadAsync m, Ord n, Show n) => EKG.Store -> Kbtz t m n NodeS -> m (Kbtz t m n NodeS)
+gauge store kb@(Kbtz km) = do
+  gs <- kbtzGauges
+  return $ traceKbtz (\k s -> updateNodeG (gs M.! k) s) kb 
+  where
+    kbtzGauges :: m (Map n NodeGauge)
+    kbtzGauges = sequence $ M.mapWithKey (\k _ -> registerNodeG store k) km 
+
+monitor :: (IsStream t, MonadAsync m, Ord n, Show n) => EKG.Store -> Kbtz t m n NodeS -> m (Kbtz t m n NodeS)
+monitor store = (gauge store) . logKbtz

@@ -41,7 +41,7 @@ data Options = Options
   , mqttOpts :: !MQTTOpts
   , nodeOpts :: ![NodeConfig]
   , kibbutzOpts :: KibbutzOpts
-  } deriving (Generic)
+  } deriving (Generic, Show)
 
 instance Interpret Options
 
