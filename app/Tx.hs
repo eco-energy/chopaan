@@ -14,10 +14,10 @@ import Control.Monad
 import Proto.NodeMessageSchema.NodeMessages
 
 srcs :: [NodeMAC]
-srcs = NodeId <$> [ "7c:9e:bd:f6:59:08"
+srcs = NodeId <$> [ "7c:9e:bd:f6:5a:08"
                   , "7c:9e:bd:f5:c6:cc"
-                  , "7c:9e:bd:f5:07:c8"
-                  , "7c:9e:bd:f6:42:68"
+                  --, "7c:9e:bd:f5:07:c8"
+                  --, "7c:9e:bd:f6:42:68"
                   ]
 
 
@@ -32,29 +32,46 @@ main = do
 
 
 delay :: Int
-delay = 1000*1000 * 60 * 1
+delay = oneSec * (t + 10)
 
+oneSec = 1000*1000 
 
 loop :: [NodeMAC] -> [Tx NodeMAC]
-loop addrs = fmap (txAtT addrs) stakeLL  
+loop addrs = fmap (txAtT addrs) $ stakeLL addrs
   
 txAtT :: [NodeMAC] -> [Stake] -> Tx NodeMAC
 txAtT addrs stakes = Tx $ Map.fromList $ zip addrs stakes
 
-stakeLL :: [[Stake]]
-stakeLL = fmap (\(i, s) -> case mod @Int i 2 of
-                   0 -> s
-                   _ -> switchStakePolarity <$> s
-               ) $ zip [1..] $ repeat stakeL
+stakeLL :: [NodeMAC] -> [[Stake]]
+stakeLL ns = fmap (\(i, s) -> case mod @Int i 2 of
+                      0 -> s
+                      _ -> switchStakePolarity <$> s
+                  ) $ zip [1..] $ repeat $ stakeL ns
 
-stakeL :: [Stake]
-stakeL = [mkStake Source p t, mkStake Sink p t, mkStake Source p t, mkStake Sink p t ]
+stakeL :: [NodeMAC] -> [Stake]
+stakeL ns = [mkStake (getRole i) p t | (i, _) <- zip [1..] ns]
   where
-    p = 50 :: Double
+    p = 60 :: Double
+    getRole :: Int -> Role
+    getRole i
+      | mod i 2 == 0 = Source
+      | otherwise = Sink
 
-t = 60 * 2
+t = 60 * 1
 
 
 switchStakePolarity :: Stake -> Stake
 switchStakePolarity (Stake (Source, p, t)) = Stake (Sink, p, t)
 switchStakePolarity (Stake (Sink, p, t)) = Stake (Source, p, t)
+
+
+testMACs = (NodeId "7c:9e:bd:f5:07:c8")
+
+testConvEff1 :: NodeMAC -> [Tx NodeMAC]
+testConvEff1 f = (\p -> Tx $ Map.fromList [ (f, mkStake Source p t) ])
+                                              --, (s, mkStake Sink p t)
+                                              --]
+                            <$> powers
+  where
+    powers = [10,20..120]
+    t = 60
