@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 91aa60121ac0fcc458cd163f90e6dad24c2beb46b43b1fcb4424726ef61cb097
+-- hash: ff7d9b433121ee7ad2bd14a66f91db1ba698be97f8342c6b4ff8aade825cc044
 
 name:           chopaan
 version:        0.1.0.0
@@ -94,6 +94,8 @@ library
     , dimensional
     , directory
     , distributive
+    , ekg
+    , ekg-core
     , estimator
     , ghc-prim
     , hashable
@@ -174,6 +176,8 @@ executable chopaan-demo-exe
     , dimensional
     , directory
     , distributive
+    , ekg
+    , ekg-core
     , estimator
     , ghc-prim
     , hashable
@@ -228,7 +232,7 @@ executable chopaan-exe
       Paths_chopaan
   hs-source-dirs:
       app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts "-with-rtsopts=-N -T"
   build-depends:
       Shpadoinkle
     , Shpadoinkle-backend-pardiff
@@ -255,6 +259,8 @@ executable chopaan-exe
     , dimensional
     , directory
     , distributive
+    , ekg
+    , ekg-core
     , estimator
     , ghc-prim
     , hashable
@@ -336,6 +342,8 @@ executable tx-test-exe
     , dimensional
     , directory
     , distributive
+    , ekg
+    , ekg-core
     , estimator
     , ghc-prim
     , hashable
@@ -388,6 +396,7 @@ test-suite chopaan-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      MqttTest
       NodeSpec
       RegistrySpec
       StorageSpec
@@ -426,6 +435,8 @@ test-suite chopaan-test
     , dimensional
     , directory
     , distributive
+    , ekg
+    , ekg-core
     , estimator
     , ghc-prim
     , hashable

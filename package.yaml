@@ -98,7 +98,8 @@ dependencies:
 - Shpadoinkle
 - Shpadoinkle-backend-pardiff
 - Shpadoinkle-html
-
+- ekg
+- ekg-core
 
 ghc-options:
 - -Wall
@@ -126,9 +127,9 @@ executables:
     other-modules:
     - Paths_chopaan
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+      - -threaded
+      - -rtsopts
+      - ! '"-with-rtsopts=-N -T"'
   chopaan-demo-exe:
     main:                Demo.hs
     source-dirs:         app
