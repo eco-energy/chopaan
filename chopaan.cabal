@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ff7d9b433121ee7ad2bd14a66f91db1ba698be97f8342c6b4ff8aade825cc044
+-- hash: a0307bb671cbb381eda24670e8038effc622af34db62f28bfee365b65f057d22
 
 name:           chopaan
 version:        0.1.0.0
@@ -64,6 +64,7 @@ library
       Proto.NodeMessageSchema.NodeMessages
       Proto.NodeMessageSchema.NodeMessages_Fields
       SimNode
+      TxModel
   other-modules:
       Paths_chopaan
   hs-source-dirs:
@@ -396,6 +397,8 @@ test-suite chopaan-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Common
+      KbtzSpec
       MqttTest
       NodeSpec
       RegistrySpec
@@ -461,6 +464,7 @@ test-suite chopaan-test
     , proto-lens-protoc
     , proto-lens-runtime
     , quickcheck-instances
+    , quickspec
     , reflex
     , reflex-vty
     , rio >=0.1.8.0

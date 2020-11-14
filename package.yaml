@@ -172,6 +172,7 @@ tests:
     - checkers
     - proto-lens-arbitrary
     - quickcheck-instances
+    - quickspec
     ghc-options:
     - -threaded
     - -rtsopts
