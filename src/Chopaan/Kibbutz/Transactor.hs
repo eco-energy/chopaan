@@ -11,7 +11,7 @@ import Prelude hiding (zip, zipWith)
 
 import Control.Monad.IO.Class
 
-import Chopaan.Kibbutz.Kibbutz (Kbtz(..), asMapStream)
+import Chopaan.Kibbutz.Kibbutz (Kbtz(..), mapStream)
 import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue, writeToPubQ)
 import Chopaan.Node.Node (pToE, toWattSeconds, toWatts, fromWattSeconds, fromWatts, Watts, WattSeconds, NodeS, NodeMetrics(..), Power(..), Battery(..))
 
@@ -44,6 +44,8 @@ import qualified Data.List as L
 import Chopaan.Kibbutz.LinOpt
 
 import Data.SBV
+
+import ConCat.Misc (R)
 
 type T = Time.NominalDiffTime
 
@@ -145,7 +147,7 @@ instance Monoid TransactionStatus where
     }
 
 toNodeStates :: (Monad m, Address n, Ord n, IsStream t, Monad (t m)) => Kbtz t m n NodeS -> t m (NodeStates n)
-toNodeStates k = NodeStates <$> asMapStream k
+toNodeStates k = NodeStates <$> mapStream k
 
 planTx :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m)) => Time.DiffTime -> Kbtz t m n NodeS -> t m (Tx n)
 planTx horizon k = S.postscan (transactionPlanner horizon) $ S.map (fromJust) $ S.filter (isNothing) $ S.intervalsOf (realToFrac horizon) FL.last $ toNodeStates k -- apply intervals of to t m NodeS instead of t m (Tx n)
@@ -243,32 +245,46 @@ transactionPlanner timeHorizon = FL.Fold step start end
     end :: Tx n -> m (Tx n)
     end = pure
 
-solveTP :: forall m n. (MonadIO m, Ord n, Show n) => Time.DiffTime -> Sources n -> Sinks n -> [[Double]] -> m (Tx n)
-solveTP timeHorizon sources sinks cs = liftIO $ do
-  (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs
-  let dict = getModelDictionary sol
-      (ns, cvs) = unzip $ M.toAscList dict
-      vs' :: M.Map String Double
-      vs' = M.fromAscList $ zip ns (parseToDoubles cvs)
-      toTransferMat :: M.Map String Double -> [[Double]]
-      toTransferMat m = (zipWith (zipWith (+))) ((fmap (fmap (* (-1)))) . L.transpose $ x') x'
-        where
-          x' = [[zeroIfNone $ M.lookup (tName i j) m | i <- getNames sources] | j <- getNames sinks]
-      transferMat = toTransferMat vs'
-      sourceTransmit = (toWattSeconds . abs) <$> (fmap sum $ L.transpose transferMat)
-      sinkReceive = (toWattSeconds . abs) <$> (fmap sum $ transferMat)
-      asSources = toSourceStake timeHorizon <$> (zip (getNames sources) sourceTransmit)
-      asSinks = toSinkStake timeHorizon <$> (zip (getNames sinks) sinkReceive)
-  return . Tx . M.fromList $ (filter isZeroStake asSources) <> (filter isZeroStake asSinks)
-  where
-  isZeroStake (_, (Stake (_, a, t))) = a > 0 && t > 0 
-  zeroIfNone Nothing = 0
-  zeroIfNone (Just a) = a
-  parseToDoubles ys = case (parseCVs @Double) ys of
-                Just (a, rs) -> (a:parseToDoubles rs)
-                Nothing -> []
-  toSourceStake t (i, e) = (i, Stake (Source, (e2p t e), t))
-  toSinkStake t (i, e) = (i, Stake (Sink, (- e2p t e), t))
+data TxPlan n = ValidPlan (Tx n) R | Wait
 
-e2p :: Time.DiffTime -> WattSeconds -> Watts
-e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
+solveTP :: forall m n. (MonadIO m, Ord n, Show n) => Time.DiffTime -> Sources n -> Sinks n -> [[Double]] -> m (TxPlan n)
+solveTP timeHorizon sources sinks cs = do
+  liftIO $ do
+    (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs
+    let dict = getModelDictionary sol
+    print ("Plan:\n" <> dict)
+    return $ if not . modelExists $ sol then Wait else do
+      let
+          (ns, cvs) = unzip $ M.toAscList dict
+          vs' :: M.Map String Double
+          vs' = M.fromAscList $ zip ns (parseToDoubles cvs)
+          toTransferMat :: M.Map String Double -> [[Double]]
+          toTransferMat m = (zipWith (zipWith (+))) ((fmap (fmap (* (-1)))) . L.transpose $ x') x'
+            where
+              x' = [[zeroIfNone $ M.lookup (tName i j) m | i <- getNames sources] | j <- getNames sinks]
+          transferMat = toTransferMat vs'
+          sourceTransmit = (toWattSeconds . abs) <$> (fmap sum $ L.transpose transferMat)
+          sinkReceive = (toWattSeconds . abs) <$> (fmap sum $ transferMat)
+          asSources = toSourceStake timeHorizon <$> (zip (getNames sources) sourceTransmit)
+          asSinks = toSinkStake timeHorizon <$> (zip (getNames sinks) sinkReceive)
+      --print ("Plan Made: " <> show dict)
+      return . ValidPlan . Tx . M.fromList $ (filter isZeroStake asSources) <> (filter isZeroStake asSinks)  
+    where
+      isZeroStake (_, (Stake (_, a, t))) = a > 0 && t > 0 
+      zeroIfNone Nothing = 0
+      zeroIfNone (Just a) = a
+      parseToDoubles ys = case (parseCVs @Double) ys of
+        Just (a, rs) -> (a:parseToDoubles rs)
+        Nothing -> []
+      toSourceStake t (i, e) = (i, Stake (Source, (e2p t e), t))
+      toSinkStake t (i, e) = (i, Stake (Sink, (- e2p t e), t))
+      e2p :: Time.DiffTime -> WattSeconds -> Watts
+      e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
+
+isValidPlan :: [a] -> Bool
+isValidPlan plan = length plan > 0
+
+
+--planSoCDelta :: TxPlan n -> Kbtz t m n NodeS -> Kbtz t m n WattSeconds 
+--planSoCDelta Wait k = 0
+--planSoCDelta (ValidPlan xs cost) k = fmap toWattSeconds cost
