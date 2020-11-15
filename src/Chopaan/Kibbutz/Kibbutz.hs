@@ -66,11 +66,11 @@ instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n)
 
 type KbtzConn t m n a = (IsStream t, MonadAsync m, Address n)
 
-drainK :: KbtzConn t m n a => Kbtz t m n a -> m ()
-drainK = S.drain . serially . asStream
+runKbtz :: KbtzConn t m n a => Kbtz t m n a -> m ()
+runKbtz = S.drain . parallely . adapt . asStream
 
 kbtz
-  :: (KbtzConn t m n a, Dispatch b)
+  :: (KbtzConn t m n a)
   => [n]
   -> (n -> t m b)
   -> (t m b -> t m a)
