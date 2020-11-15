@@ -5,7 +5,14 @@
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Chopaan.Kibbutz.Transactor (runTransactor, Stake(..), Tx(..), Role(..), TransactionStatus(..), mkStake, dispatchTx) where
+module Chopaan.Kibbutz.Transactor ( runTransactor
+                                  , Stake(..)
+                                  , Tx(..)
+                                  , Role(..)
+                                  , TransactionStatus(..)
+                                  , mkStake
+                                  , dispatchTx
+                                  ) where
 
 import Prelude hiding (zip, zipWith)
 
@@ -228,14 +235,17 @@ transactionPlanner :: forall m n. (MonadIO m, Show n, Address n, Ord n) => Time.
 transactionPlanner timeHorizon = FL.Fold step start end
   where
     step ::  Tx n -> NodeStates n -> m (Tx n)
-    step (Tx _) (NodeStates nodes) = schedule
+    step (Tx _) (NodeStates nodes) = do
+      s <- schedule
+      let (ValidPlan sc c) = s
+      return $ sc
       where
         consumption = M.toAscList $ fmap _demand nodes
         storage = M.toAscList $ fmap (\n -> toWattSeconds $ (totalCapacity . _battery $ n) * (soc . _battery $ n)) nodes
         d = zipWith (\(i, c) (_, s) -> (i, c - s)) consumption storage
         (sources, sinks) = L.partition (\x -> snd x > 0) d
         better f ss = uncurry f $ unzip $ (\(x, y) -> (x, fromWattSeconds y)) <$> ss
-        schedule :: m (Tx n)
+        schedule :: m (TxPlan n)
         schedule = solveTP timeHorizon
           (better mkSources sources)
           (better mkSinks sinks)
@@ -252,8 +262,8 @@ solveTP timeHorizon sources sinks cs = do
   liftIO $ do
     (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs
     let dict = getModelDictionary sol
-    print ("Plan:\n" <> dict)
-    return $ if not . modelExists $ sol then Wait else do
+    print $ "Plan:\n" <> (show dict)
+    if not . modelExists $ sol then return Wait else do
       let
           (ns, cvs) = unzip $ M.toAscList dict
           vs' :: M.Map String Double
@@ -268,7 +278,7 @@ solveTP timeHorizon sources sinks cs = do
           asSources = toSourceStake timeHorizon <$> (zip (getNames sources) sourceTransmit)
           asSinks = toSinkStake timeHorizon <$> (zip (getNames sinks) sinkReceive)
       --print ("Plan Made: " <> show dict)
-      return . ValidPlan . Tx . M.fromList $ (filter isZeroStake asSources) <> (filter isZeroStake asSinks)  
+      return . (flip ValidPlan 0) . Tx . M.fromList $ (filter isZeroStake asSources) <> (filter isZeroStake asSinks)  
     where
       isZeroStake (_, (Stake (_, a, t))) = a > 0 && t > 0 
       zeroIfNone Nothing = 0
@@ -283,6 +293,9 @@ solveTP timeHorizon sources sinks cs = do
 
 isValidPlan :: [a] -> Bool
 isValidPlan plan = length plan > 0
+
+
+
 
 
 --planSoCDelta :: TxPlan n -> Kbtz t m n NodeS -> Kbtz t m n WattSeconds 
