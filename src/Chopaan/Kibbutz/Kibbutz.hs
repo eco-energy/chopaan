@@ -50,6 +50,9 @@ newtype Kbtz (t :: (* -> *) -> * -> *) (m :: * -> *) n a = Kbtz {
   unKibbutz :: Map n (t m a)
 }
 
+nodes :: Kbtz t m n a -> [n]
+nodes = M.keys . unKibbutz
+
 instance (IsStream t, Monad m) => Functor (Kbtz t m n) where
   fmap f (Kbtz m) = Kbtz $ fmap (S.map f) m
 
@@ -67,7 +70,7 @@ instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n)
 type KbtzConn t m n a = (IsStream t, MonadAsync m, Address n)
 
 runKbtz :: KbtzConn t m n a => Kbtz t m n a -> m ()
-runKbtz = S.drain . parallely . adapt . asStream
+runKbtz = S.drain . aheadly . adapt . asStream
 
 kbtz
   :: (KbtzConn t m n a)
@@ -80,38 +83,15 @@ kbtz nodes subscribe process = Kbtz . M.fromList $ [(n, process s) | n <- nodes,
 
 sensorKbtz :: forall t m. (IsStream t, MonadAsync m)
   => [NodeMAC]
-  -> NodeQueue NodeMAC EnergyState
+  -> Map NodeMAC (NodeQueue NodeMAC EnergyState)
   -> Kbtz t m NodeMAC NodeS
 sensorKbtz ns q = kbtz ns (sub @t @m @NodeMAC @EnergyState q) nodeS
 
 rsKbtz :: forall t m. (IsStream t, MonadAsync m)
   => [NodeMAC]
-  -> NodeQueue NodeMAC RuntimeStats
+  -> Map NodeMAC (NodeQueue NodeMAC RuntimeStats)
   -> Kbtz t m NodeMAC RuntimeStats
 rsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @RuntimeStats q) id
-
-nodes :: Kbtz t m n a -> [n]
-nodes = M.keys . unKibbutz
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 asFRPNetwork :: forall t t' m m' n a.
   (IsStream t, MonadAsync m, R.Reflex t', R.TriggerEvent t' m', MonadIO m', Show a)
@@ -124,10 +104,10 @@ traceKbtz :: (IsStream t, MonadAsync m) => (n -> a -> m ())
 traceKbtz act (Kbtz k) = Kbtz $ M.mapWithKey (\k stream -> S.trace (act k) stream) k
 
 sub :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a)
-  => NodeQueue n a
+  => Map n (NodeQueue n a)
   -> n
   -> t m a
-sub q n = S.map fromJust $ S.filter (isJust) {-- $ S.trace (liftIO . print)--} $ subStream @t @m @n @a n q 
+sub qs n = subStream @t @m @n @a n (qs M.! n) 
 
 getNodes :: (MonadIO m) => ReaderT KbtzId m [NodeMAC]
 getNodes = do
@@ -162,13 +142,13 @@ class Gauged a where
 instance Gauged NodeGauge
 
 -- $ Create a store for the kbtz, and NodeGauges for each node, then map the update across
-gauge :: forall t m n a b. (IsStream t, MonadAsync m, Ord n, Show n, Gauged b) => m (Map n b) -> (b -> a -> m ()) -> EKG.Store -> Kbtz t m n a -> m (Kbtz t m n a)
-gauge mkGauge fn store kb@(Kbtz km) = do
-  gs <- mkGauge
+gauge :: forall t m n a b. (IsStream t, MonadAsync m, Ord n, Show n, Gauged b) => EKG.Store -> (EKG.Store -> m (Map n b)) -> (b -> a -> m ()) -> Kbtz t m n a -> m (Kbtz t m n a)
+gauge store mkGauge fn kb@(Kbtz km) = do
+  gs <- mkGauge store
   return $ traceKbtz (\k s -> fn (gs M.! k) s) kb 
 
-kbtzGauge :: (MonadAsync m, Show n) => EKG.Store -> Map n (t m NodeS) -> m (Map n NodeGauge)
-kbtzGauge store km = sequence $ M.mapWithKey (\k _ -> registerNodeG store k) km 
+kbtzGauge :: (MonadAsync m, Show n) => Map n (t m NodeS) -> EKG.Store -> m (Map n NodeGauge)
+kbtzGauge km store = sequence $ M.mapWithKey (\k _ -> registerNodeG store k) km 
 
 monitor :: (IsStream t, MonadAsync m, Ord n, Show n) => EKG.Store -> Kbtz t m n NodeS -> m (Kbtz t m n NodeS)
-monitor store k@(Kbtz km) = gauge (kbtzGauge store km) updateNodeG store k >>= (pure . logKbtz)
+monitor store k@(Kbtz km) = gauge store (kbtzGauge km) updateNodeG k >>= (pure . logKbtz)
