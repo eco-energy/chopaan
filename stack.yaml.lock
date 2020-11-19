@@ -459,6 +459,20 @@ packages:
       sha256: a08eab2f15d6be431d00cd31a8b87a7e5ce87f203aad06916f9af0c673ec8a7d
   original:
     hackage: warp-3.2.28@sha256:b32fb8fed7ace4bd206fd897c388c00cdb915ec7e34ee61dc6397d518d9e651c,11186
+- completed:
+    hackage: twee-lib-2.2@sha256:9fe9327505d8f450a94f2fc9eea74b292901b7992d520aa1dd4f0410fbe0e594,2112
+    pantry-tree:
+      size: 1487
+      sha256: 0356be78a4720251536932d2253f75eb1f97b26c61260e566b5e8e05642d5349
+  original:
+    hackage: twee-lib-2.2@sha256:9fe9327505d8f450a94f2fc9eea74b292901b7992d520aa1dd4f0410fbe0e594,2112
+- completed:
+    hackage: quickspec-2.1.5@sha256:1d1cc020fa9075cb5fafd4056fe1d930d5763b954fa8200e57ce6aba057544b2,3557
+    pantry-tree:
+      size: 3032
+      sha256: 36e7cd88a0fe800a0b0ea216c0c3ea96db02e25fd34ef53653f6d5008730476c
+  original:
+    hackage: quickspec-2.1.5@sha256:1d1cc020fa9075cb5fafd4056fe1d930d5763b954fa8200e57ce6aba057544b2,3557
 snapshots:
 - completed:
     size: 524799

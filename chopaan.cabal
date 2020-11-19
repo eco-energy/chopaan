@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a0307bb671cbb381eda24670e8038effc622af34db62f28bfee365b65f057d22
+-- hash: 2f5792f8154c4c2b9995125e1460a4ba7816067ba6459ff42a33aaef7794271d
 
 name:           chopaan
 version:        0.1.0.0
@@ -233,7 +233,7 @@ executable chopaan-exe
       Paths_chopaan
   hs-source-dirs:
       app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts "-with-rtsopts=-N -T"
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-T
   build-depends:
       Shpadoinkle
     , Shpadoinkle-backend-pardiff
