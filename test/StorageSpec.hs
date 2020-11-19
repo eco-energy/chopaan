@@ -1,11 +1,9 @@
 {-# LANGUAGE TypeApplications #-}
 module StorageSpec where
 
-import Chopaan.Storage
-import Test.Hspec
-import Test.QuickCheck.Checkers
-import Test.QuickCheck
+import Chopaan.Node.Storage
 import Numeric.Estimator
+import Common
 
 instance (Arbitrary a) => Arbitrary (BatteryParams a) where
   arbitrary = BatteryParams
@@ -33,10 +31,6 @@ instance (Arbitrary a) => Arbitrary (SensorVector a) where
   
 instance (Eq a) => EqProp (BatteryParams a) where
   a =-= b = eq a b
-
-almostEqual :: (Show a, Eq a, Num a, Ord a) => a -> a -> a -> Expectation
-almostEqual eta a b = do
-  ((abs $ a - b) < eta) `shouldBe` True
   
 
 

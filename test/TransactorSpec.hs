@@ -16,6 +16,7 @@ import Chopaan.Node (NodeId(..))
 import Lens.Micro
 import Proto.NodeMessageSchema.NodeMessages_Fields as NM
 
+import Test.QuickSpec
 
 
 spec :: Spec

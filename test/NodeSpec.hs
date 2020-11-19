@@ -3,7 +3,7 @@
 
 module NodeSpec (spec) where
 
-import Chopaan.Node
+import Chopaan.Node.Node
 import Test.Hspec
 import Test.QuickCheck.Classes
 import Test.QuickCheck.Checkers
@@ -17,24 +17,24 @@ import qualified Streamly.Data.Fold as FL
 import Proto.NodeMessageSchema.NodeMessages ()
 import Proto.NodeMessageSchema.NodeMessages_Fields
 import Lens.Micro ()
-import Data.ProtoLens.Arbitrary
+--import Data.ProtoLens.Arbitrary
 
 import Data.ProtoLens (defMessage)
 import Lens.Micro
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import qualified Data.Time as Time
-import Chopaan.Subscriber (subStream, runSubscriber, Subscriber, StreamMap, getStream, writeSub, mkSub, subMap)
+--import Chopaan.Subscriber (subStream, runSubscriber, Subscriber, StreamMap, getStream, writeSub, mkSub, subMap)
 
 import Control.Concurrent (threadDelay, forkIO)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (isEmptyTChan, dupTChan)
 import Control.Monad (forever, liftM)
 
-import Chopaan.Registry (duplicateS)
+--import Chopaan.Registry (duplicateS)
 import Numeric.Compensated
 
-instance Arbitrary EnergyState where
-  arbitrary = arbitraryMessage
+--instance Arbitrary EnergyState where
+--  arbitrary = arbitraryMessage
 
 instance (Arbitrary a) => Arbitrary (Power a) where
   arbitrary = Power <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary 

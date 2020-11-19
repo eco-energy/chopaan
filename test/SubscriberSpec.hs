@@ -5,7 +5,7 @@
 
 module SubscriberSpec (spec) where
 
-import Chopaan.Subscriber
+import Chopaan.Kibbutz.Subscriber
 import Test.Hspec
 import Test.QuickCheck.Classes
 import Test.QuickCheck.Checkers
@@ -47,12 +47,13 @@ spec = do
       forkIO $ S.drain $ writeSub sub writer
       smap <- subMap ns sub
       let
-        fstream :: Serial Int
-        fstream = getStream smap (head ns)
+        f:g:h:i:j:[] = getStream smap <$> ns
         -- foldrM :: Monad m => (a -> mb -> mb) -> m b -> SerialT m a -> m b
-      a <- S.toList $ S.scan FL.sum (S.take 5 fstream)
+      a <- S.toList $ S.scan FL.sum (S.take 5 f)
+      b <- S.toList $ S.scan FL.sum (S.take 5 g)
       --let (Just (a, rest)) = h
       a `shouldBe` ([0, 5, 15, 30, 50, 75 :: Int])
+      b `shouldBe` ([])
 {--
 it "StreamMap is a functor" $ do
 verboseBatch (functor  (undefined :: StreamMap SerialT IO Int (Int, Int, Int)) )
