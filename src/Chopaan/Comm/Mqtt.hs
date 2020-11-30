@@ -37,7 +37,10 @@ import Control.Concurrent.STM
 import Data.ProtoLens (encodeMessage)
 
 import Chopaan.Types (MQTTOpts(..))
-import Chopaan.Comm.Comm (Address(..), Dispatch(..), NodeQueue(..))
+import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue)
+import Chopaan.Comm.Queues (NodeQueue(..))
+import Proto.NodeMessageSchema.NodeMessages (MeshFrame)
+
 
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control
 
@@ -59,12 +62,12 @@ mkTLSSettings cert key caPath hostName name = do
 
 
 -- need reader for creds and logs
-runMqtt :: forall a b. (Address a, Dispatch b) => MQTTOpts -> NodeQueue a b -> [a] -> MQ.MessageCallback -> IO ()
+runMqtt :: forall a. (Address a) => MQTTOpts -> PubQueue -> [a] -> MQ.MessageCallback -> IO ()
 runMqtt opts outQueue ts msgCB = do
   mc <- client opts msgCB
   _ <- forkIO $ forever $ catches (pub mc outQueue) [Handler errorHandler]
-  connStatus <- mapM (subscribe mc) ts -- [("/kibbutz/node/240ac4c662ac/state", MQ.subOptions)]
-  --print connStatus
+  connStatus <- mapM (subscribe mc) ts
+  print connStatus
   MQ.waitForClient mc
 
 
@@ -90,14 +93,14 @@ subTopic n = (stateTopic n, MQ.subOptions)
 
 -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
     -- not stateful.
-pub :: forall a b. (Address a, Dispatch b) => MQ.MQTTClient -> NodeQueue a b -> IO ()
+pub :: MQ.MQTTClient -> PubQueue -> IO ()
 pub c tv = do
   forever $ pub' =<< (atomically $ do readTBQueue (runNodeQueue tv))
     where
-      pub' :: (a, b) -> IO ()
-      pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ topic nId)) >>
-        MQ.publish c (controlTopic nId) (encode mf) False
-      encode = BL.fromStrict . encodeMessage . frame
+      pub' :: (MQ.Topic, MeshFrame) -> IO ()
+      pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ nId)) >>
+        MQ.publish c nId (encode mf) False
+      encode = BL.fromStrict . encodeMessage
 
 
 

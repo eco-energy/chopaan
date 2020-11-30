@@ -12,35 +12,33 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Chopaan.Comm.Comm where
 
-import GHC.Generics
--- STM
-import Control.Concurrent.STM
-
 import qualified Network.MQTT.Topic as MQ
 import qualified Network.MQTT.Client as MQ
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
+import Data.Hashable
 
 import Lens.Micro hiding (_Just)
 import Proto.NodeMessageSchema.NodeMessages hiding (Outgoing, Incoming)
 import Proto.NodeMessageSchema.NodeMessages_Fields
 import Data.ProtoLens.TextFormat
 import Data.ProtoLens.Labels()
-import Data.Map.Strict as M
-
 
 import Data.ProtoLens
 import Data.ProtoLens.Prism
 
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad ((<=<), (>=>))
+import Control.Concurrent.STM
 
 import Streamly
 import qualified Streamly.Prelude as S
 
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.AWS.Things
+import Chopaan.Comm.Queues
+import qualified Control.Concurrent.Chan.Unagi as UC
 
+import Data.Text (Text)
 
 {--------------------- Type Classes for message conversion and addressing --------------------------}
 
@@ -58,7 +56,7 @@ instance Dispatch RuntimeStats where
   unframe = accessRTS
 
 instance Dispatch EnergyTransactionRequest where
-  frame etr = defMessage & maybe'payload .~ (_Just # _MeshFrame'Transaction # etr) 
+  frame etr = defMessage & maybe'payload .~ (_Just # _MeshFrame'NodeTxRequest # etr) 
   unframe = accessETR
 
 instance Dispatch HardwareConfig where
@@ -69,14 +67,21 @@ instance Dispatch NodeControl where
   frame nc = defMessage & maybe'payload .~ (_Just # _MeshFrame'Control # nc)
   unframe = accessNodeControl
 
+instance Dispatch Transaction where
+  frame tx = defMessage & maybe'payload .~ (_Just # _MeshFrame'Transaction # tx) 
+  unframe = accessTx
 
-class (Ord a) => Address a where
+
+class (Ord a, Hashable a) => Address a where
   stateTopic :: a -> MQ.Topic
   controlTopic :: a -> MQ.Topic
   logTopic :: a -> MQ.Topic
   fromControlTopic :: MQ.Topic -> Maybe a
   fromStateTopic :: MQ.Topic -> Maybe a
   fromLogTopic :: MQ.Topic -> Maybe a
+  toRemoteId :: a -> Text
+  rootTopic :: a -> MQ.Topic
+
 
 
 instance Address (NodeMAC) where
@@ -86,37 +91,55 @@ instance Address (NodeMAC) where
   fromControlTopic = topicToNodeId "/control"
   fromStateTopic = topicToNodeId "/state"
   fromLogTopic = topicToNodeId "/logs"
-
+  toRemoteId = unNodeId
+  rootTopic _ = "/kibbutz/node/root"
 
 
 {--------------------------------- Queue Implementation -----------------------------------}
+
+type PubQueue = NodeQueue MQ.Topic MeshFrame
+
+newtype WriteChan n a = WriteChan (UC.InChan (n, a))
+
+type StateChan n = (Address n) => WriteChan n EnergyState
+
+type StatsChan n = (Address n) => WriteChan n RuntimeStats
+
+writeChan :: WriteChan n a -> n -> a -> IO ()
+writeChan (WriteChan w) = curry $ UC.writeChan w
+
+data MessageQs n = MessageQs
+  { stateChan :: StateChan n
+  , statsChan :: StatsChan n
+  , outbox :: PubQueue
+  }
+
+
+initPubQ :: STM (PubQueue)
+initPubQ = initNodeQueue @MQ.Topic @MeshFrame
+
+initQs :: [NodeMAC] -> IO (MessageQs NodeMAC)
+initQs = initMessageQs @NodeMAC
+
+initMessageQs :: forall n. (Address n, Show n) => [n] -> IO (MessageQs n)
+initMessageQs ns = do 
+  (es, _) <- UC.newChan -- @n @EnergyState ns
+  (rs, _) <- UC.newChan -- @n @RuntimeStats ns
+  --nullConsumer es'
+  --nullConsumer rs'
+  out <-  atomically $ initPubQ
+  return $ MessageQs (WriteChan es) (WriteChan rs) out
+  where
+    nullConsumer ic = S.mapM_ (print) $ S.repeatM (UC.readChan ic)
+
+writeToPubQ :: (Dispatch a) => PubQueue -> MQ.Topic -> a -> IO ()
+writeToPubQ p n et = do
+  atomically $ writeNodeQ p n (frame et)
 
 
 class (Address n) => Subscribe n a where
   subscribe :: n -> NodeQueue n a
 
-newtype NodeQueue a b = NodeQueue { runNodeQueue :: TBQueue (a, b) } deriving (Eq, Generic)
-
-
-initNodeQueue :: forall a b. (Address a, Dispatch b) => STM (NodeQueue a b)
-initNodeQueue = do
-  n <- newTBQueue 10
-  return $ NodeQueue n
-
-
-type PubQueue n a = (Address n, Dispatch a) => NodeQueue n a
-
-type StateQueues n = (Address n) => M.Map n (NodeQueue n EnergyState)
-
-type StatsQueues n = (Address n) => M.Map n (NodeQueue n RuntimeStats)
-
-
-data MessageQs n a = MessageQs
-  { stateQs :: StateQueues n
-  , statsQs :: StatsQueues n
-  , outbox :: PubQueue n a 
-  }
-  
 
 data Incoming a = Incoming a deriving (Functor)
 data Outgoing a = Outgoing a deriving (Functor)
@@ -135,30 +158,12 @@ instance Dispatch MeshFrame where
   frame = id
   unframe = Just . id
 
-initMessageQs :: forall n o. (Address n, Dispatch o) => [n] -> STM (MessageQs n o)
-initMessageQs ns = do
-  es <- sequence $ M.fromList $ [(n, initNodeQueue @n @EnergyState) | n <- ns]
-  rs <- sequence $ M.fromList $ [(n, initNodeQueue @n @RuntimeStats) | n <- ns] -- initNodeQueue @n @RuntimeStats <$> ns
-  out <-  initNodeQueue @n @o
-  return $ MessageQs es rs out
-
-initQs = initMessageQs @NodeMAC @MeshFrame
-
-writeToNodeQ :: forall a b. (Address a, Dispatch b) => NodeQueue a b -> a -> b -> IO ()
-writeToNodeQ q n m = do
-  atomically $ writeTBQueue (runNodeQueue q) (n, m)
-
-
-writeToPubQ :: (Address n, Dispatch a) => PubQueue n a -> n -> a -> IO ()
-writeToPubQ p n et = do
-  atomically $ writeTBQueue (runNodeQueue p) (n, et)
-
 
 trivialCB :: MQ.MessageCallback
 trivialCB = MQ.SimpleCallback (\_ _ _ _ -> return ())
 
-mkCallback :: forall n a. (Address n, Dispatch a) => MessageQs n a -> MQ.MessageCallback
-mkCallback (MessageQs { stateQs, statsQs })  = MQ.SimpleCallback $ writer
+mkCallback :: forall n. (Address n) => MessageQs n -> MQ.MessageCallback
+mkCallback (MessageQs { stateChan, statsChan })  = MQ.SimpleCallback $ writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
@@ -168,9 +173,9 @@ mkCallback (MessageQs { stateQs, statsQs })  = MQ.SimpleCallback $ writer
           case parsed of
             (Left err) -> error err
             (Right mf) -> case (accessEnergyState mf) of
-              (Just a) ->  writeToNodeQ @_ @EnergyState (stateQs M.! n) n a -- print ("GOT ENERGY STATE:\n" <> showMessage a) >>
+              (Just a) ->  writeChan stateChan n a
               Nothing -> case (accessRTS mf) of
-                (Just a) -> writeToNodeQ @_ @RuntimeStats (statsQs M.! n) n a -- print ("GOT RTS:\n" <> showMessage a) >>
+                (Just a) -> writeChan statsChan n a
                 Nothing -> print ("Not RTS AND NOT ES" <> showMessage mf) >> return ()
       where
         nodeId :: Maybe n
@@ -185,8 +190,12 @@ class (Address n, Dispatch a) => Comm n a where
 
 {------------------------- Streaming from Queues ---------------------------}
 
-subStream :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a) => n -> NodeQueue n a -> t m a
-subStream n sq = S.map snd $ S.repeatM $ liftIO $ (atomically $ readTBQueue . runNodeQueue $ sq)
+subStream :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a) => n -> WriteChan n a -> m (t m a)
+subStream n (WriteChan wc) = do
+  rc <- liftIO . UC.dupChan $ wc
+  return $ S.map snd
+    $ S.filter (\(n', _) -> n' == n)
+    $ S.repeatM . liftIO $ UC.readChan rc
 
 
 {---------------------------- Utils -------------------------------------}
@@ -197,7 +206,7 @@ accessEnergyState :: MeshFrame -> Maybe EnergyState
 accessEnergyState m = fromPayload m _MeshFrame'State
                       
 accessETR :: MeshFrame -> Maybe EnergyTransactionRequest
-accessETR m = fromPayload m _MeshFrame'Transaction
+accessETR m = fromPayload m _MeshFrame'NodeTxRequest
 
 accessRTS :: MeshFrame -> Maybe RuntimeStats
 accessRTS m = fromPayload m _MeshFrame'RtStats
@@ -207,3 +216,6 @@ accessHWConf m = fromPayload m _MeshFrame'Hw
 
 accessNodeControl :: MeshFrame -> Maybe NodeControl
 accessNodeControl m = fromPayload m _MeshFrame'Control
+
+accessTx :: MeshFrame -> Maybe Transaction
+accessTx m = fromPayload m _MeshFrame'Transaction
