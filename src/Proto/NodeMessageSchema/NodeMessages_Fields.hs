@@ -163,6 +163,11 @@ endpoint ::
             Data.ProtoLens.Field.HasField s "endpoint" a) =>
            Lens.Family2.LensLike' f s a
 endpoint = Data.ProtoLens.Field.field @"endpoint"
+etrs ::
+     forall f s a .
+       (Prelude.Functor f, Data.ProtoLens.Field.HasField s "etrs" a) =>
+       Lens.Family2.LensLike' f s a
+etrs = Data.ProtoLens.Field.field @"etrs"
 forceUpdate ::
             forall f s a .
               (Prelude.Functor f,
@@ -209,6 +214,11 @@ isRoot ::
          (Prelude.Functor f, Data.ProtoLens.Field.HasField s "isRoot" a) =>
          Lens.Family2.LensLike' f s a
 isRoot = Data.ProtoLens.Field.field @"isRoot"
+key ::
+    forall f s a .
+      (Prelude.Functor f, Data.ProtoLens.Field.HasField s "key" a) =>
+      Lens.Family2.LensLike' f s a
+key = Data.ProtoLens.Field.field @"key"
 macAddress ::
            forall f s a .
              (Prelude.Functor f,
@@ -270,6 +280,13 @@ maybe'meshversion ::
                      Data.ProtoLens.Field.HasField s "maybe'meshversion" a) =>
                     Lens.Family2.LensLike' f s a
 maybe'meshversion = Data.ProtoLens.Field.field @"maybe'meshversion"
+maybe'nodeTxRequest ::
+                    forall f s a .
+                      (Prelude.Functor f,
+                       Data.ProtoLens.Field.HasField s "maybe'nodeTxRequest" a) =>
+                      Lens.Family2.LensLike' f s a
+maybe'nodeTxRequest
+  = Data.ProtoLens.Field.field @"maybe'nodeTxRequest"
 maybe'otaConf ::
               forall f s a .
                 (Prelude.Functor f,
@@ -325,6 +342,12 @@ maybe'transactionStatus ::
                           Lens.Family2.LensLike' f s a
 maybe'transactionStatus
   = Data.ProtoLens.Field.field @"maybe'transactionStatus"
+maybe'value ::
+            forall f s a .
+              (Prelude.Functor f,
+               Data.ProtoLens.Field.HasField s "maybe'value" a) =>
+              Lens.Family2.LensLike' f s a
+maybe'value = Data.ProtoLens.Field.field @"maybe'value"
 meshConf ::
          forall f s a .
            (Prelude.Functor f,
@@ -378,6 +401,12 @@ nodeMac ::
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "nodeMac" a) =>
           Lens.Family2.LensLike' f s a
 nodeMac = Data.ProtoLens.Field.field @"nodeMac"
+nodeTxRequest ::
+              forall f s a .
+                (Prelude.Functor f,
+                 Data.ProtoLens.Field.HasField s "nodeTxRequest" a) =>
+                Lens.Family2.LensLike' f s a
+nodeTxRequest = Data.ProtoLens.Field.field @"nodeTxRequest"
 otaConf ::
         forall f s a .
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "otaConf" a) =>
@@ -541,6 +570,11 @@ vOC ::
       (Prelude.Functor f, Data.ProtoLens.Field.HasField s "vOC" a) =>
       Lens.Family2.LensLike' f s a
 vOC = Data.ProtoLens.Field.field @"vOC"
+value ::
+      forall f s a .
+        (Prelude.Functor f, Data.ProtoLens.Field.HasField s "value" a) =>
+        Lens.Family2.LensLike' f s a
+value = Data.ProtoLens.Field.field @"value"
 version ::
         forall f s a .
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "version" a) =>

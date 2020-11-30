@@ -56,30 +56,27 @@ import ConCat.Misc (R)
 
 type T = Time.NominalDiffTime
 
-mkETR :: Watts -> Time.DiffTime -> NM.PDirection -> Text.Text -> Time.UTCTime -> NM.EnergyTransactionRequest
-mkETR power howLong dir uid stime = defMessage
-         & NM.uuid .~ uid
-         & NM.start .~ (utcToWord64 stime)
+mkETR :: Watts -> Time.DiffTime -> NM.PDirection -> NM.EnergyTransactionRequest
+mkETR power howLong dir = defMessage
          & NM.powerInWatts .~ (fromWatts power)
          & NM.durationInSeconds .~ (timeToWord howLong)
          & NM.direction .~ dir
   where
     timeToWord :: Time.DiffTime -> Word64
-    timeToWord = c'' . (round @Time.DiffTime @Int)
+    timeToWord = (convert @Int @Word64) . (round @Time.DiffTime @Int)
+
+
+mkTxDispatch :: (Address n) => Text.Text -> Time.UTCTime -> Tx n -> NM.Transaction
+mkTxDispatch uid stime (Tx txns) = defMessage
+                         & NM.uuid .~ uid
+                         & NM.start .~ (utcToWord64 stime)
+                         & NM.etrs .~ (M.mapKeys (toRemoteId) $ fromStake <$> txns) 
+  where
     utcToWord64 :: Time.UTCTime -> Word64
-    utcToWord64 = c'' . c'
-      where
-        c' :: Time.UTCTime -> Int
-        c' = convert
-    c'' :: Int -> Word64
-    c'' = convert
+    utcToWord64 = (convert @Int @Word64) . (convert @Time.UTCTime @Int)
 
-
-fromStake :: (MonadIO m) => Stake -> m (NM.EnergyTransactionRequest)
-fromStake (Stake (role, watts, duration)) = do
-  uid <- liftIO $ getULID
-  t0 <- liftIO $ Time.getCurrentTime
-  return $ mkETR watts duration (toPDir role) (Text.pack . show $ uid) t0
+fromStake :: Stake -> NM.EnergyTransactionRequest
+fromStake (Stake (role, watts, duration)) = mkETR watts duration (toPDir role)
   where
     toPDir Source = NM.Outgoing
     toPDir Sink = NM.Incoming
@@ -164,7 +161,7 @@ monitorTx tx k = S.postscan (transactionFold tx) $ toNodeStates k
 
 
 runTransactor :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m))
-  => (PubQueue n NM.MeshFrame)
+  => PubQueue
   -> Time.DiffTime
   -> Kbtz t m n NodeS
   -> m (t m TransactionStatus, t m (Tx n))
@@ -173,13 +170,16 @@ runTransactor q horizon k = return (statuses, txs)
     txs = S.trace (dispatchTx q) $ planTx horizon k
     statuses = S.concatMap (flip monitorTx $ k) txs 
 
-dispatchTx :: (MonadIO m, Address n)
-  => (PubQueue n NM.MeshFrame)
+dispatchTx :: forall m n. (MonadIO m, Address n)
+  => PubQueue
   -> Tx n
   -> m ()
-dispatchTx q (Tx tx) = do
-  c <- traverse (liftIO . fromStake) tx
-  liftIO $ mapM_ (uncurry $ writeToPubQ q) $ M.toList $ frame <$> c
+dispatchTx q tx = do
+  uid <- liftIO $ (Text.pack . show) <$> getULID
+  t0 <- liftIO $ Time.getCurrentTime
+  let txDispatch = mkTxDispatch uid t0 tx
+  liftIO $ (writeToPubQ q) (rootTopic @n (undefined)) $ frame txDispatch
+
 
 -- The state will just be carried across as a TransactionStatus
 transactionFold :: forall m n. (Monad m, Address n, Ord n) => Tx n
