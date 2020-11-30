@@ -12,8 +12,9 @@ import GHC.Generics
 import Control.Monad.Bayes.Class
 
 import Chopaan.Kibbutz.Transactor (runTransactor)
-import Chopaan.Kibbutz.Kibbutz (kbtz, Kbtz, asStream)
-import Chopaan.Comm.Comm (Address(..), Dispatch(..), initNodeQueue, MessageQs(..))
+import Chopaan.Kibbutz.Kibbutz (kbtz, Kbtz, taggedS)
+import Chopaan.Comm.Comm (Address(..), Dispatch(..), MessageQs(..))
+import Chopaan.Comm.Queues (initNodeQueue)
 import Chopaan.Comm.Mqtt (Topic)
 import Chopaan.Utils.Time
 import Chopaan.Utils.StreamsInterop (inIO)
@@ -33,6 +34,8 @@ import Data.Time
 import Data.Time.Clock.Compat (NominalDiffTime)
 import Data.Time.LocalTime.Compat (LocalTime, addLocalTime, diffLocalTime)
 import Data.Aeson
+import Data.Hashable
+
 import Control.Concurrent.STM (atomically)
 --import Physics.Storage
 
@@ -147,6 +150,7 @@ temporalGaussians (start, end) ranges@(r:rs) t = do
 
 newtype NodeTest = NodeTest Int deriving (Eq, Ord, Show, Generic)
 
+instance Hashable NodeTest
 instance ToJSON NodeTest
 instance FromJSON NodeTest
 
@@ -182,8 +186,8 @@ testPrefix = "/kibbutz/test/node/"
 
 
 testKbtz :: forall t a b. (IsStream t, Dispatch a)
-  => [NodeTest] -> (NodeTest -> t MonadEnv a) -> (t MonadEnv a -> t MonadEnv b) -> Kbtz t MonadEnv NodeTest b
-testKbtz = kbtz @t @MonadEnv
+  => [NodeTest] -> (NodeTest -> t MonadEnv a) -> (t MonadEnv a -> t MonadEnv b) ->  (Kbtz t MonadEnv NodeTest b)
+testKbtz = undefined -- kbtz @t @MonadEnv
 
 testNodes :: [NodeTest]
 testNodes = NodeTest <$> [1..]
@@ -202,7 +206,7 @@ server s = streamData
 startApp :: IO ()
 startApp = do
   let sensors = testKbtz @SerialT (take 10 testNodes) (\_ -> nodeStream) (nodeS)
-  let s = inIO sampleIOE $ asStream sensors
+  let s = inIO sampleIOE $ taggedS sensors
   putStrLn "Starting server on http://localhost:8080"
   run 8080 (app s)
 
@@ -213,7 +217,8 @@ api :: Proxy WebSocket
 api = Proxy
 
 testClient :: IO ()
-testClient = do
+testClient = undefined
+{--
   outbox <- atomically $ initNodeQueue @NodeTest @MeshFrame
   let
     nodes = take 4 testNodes
@@ -222,3 +227,4 @@ testClient = do
   (txMonitor, txs) <- sampleIOE $ runTransactor outbox (60*5) sensors
   return $ ()
   --mainWidget $ mon sampleIOE sensors runtime undefined txs txMonitor
+--}
