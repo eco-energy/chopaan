@@ -17,9 +17,10 @@ import Control.Monad.Trans.Reader
 
 import Chopaan.Comm.Comm ( Address
                          , Dispatch
-                         , NodeQueue
                          , subStream
+                         , WriteChan
                          )
+
 import Chopaan.Node.Node ( nodeS
                          , NodeS
                          , registerNodeG
@@ -69,28 +70,33 @@ instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n)
 
 type KbtzConn t m n a = (IsStream t, MonadAsync m, Address n)
 
-runKbtz :: KbtzConn t m n a => Kbtz t m n a -> m ()
-runKbtz = S.drain . aheadly . adapt . asStream
+runKbtz :: forall t m n a. KbtzConn t m n a => Kbtz t m n a -> m ()
+runKbtz = S.drain . adapt . unify
+  where
+    unify :: Kbtz t m n a -> t m a
+    unify (Kbtz m) = M.foldl' (parallel) (S.nil) m
 
 kbtz
   :: (KbtzConn t m n a)
   => [n]
-  -> (n -> t m b)
+  -> (n -> m (t m b))
   -> (t m b -> t m a)
-  -> Kbtz t m n a
-kbtz nodes subscribe process = Kbtz . M.fromList $ [(n, process s) | n <- nodes, s <- subscribe <$> nodes]
+  -> m (Kbtz t m n a)
+kbtz ns subscribe process = do
+  ss <- mapM subscribe ns
+  return $ Kbtz . M.fromList $ [(n, process s) | n <- ns, s <- ss]
 
 
 sensorKbtz :: forall t m. (IsStream t, MonadAsync m)
   => [NodeMAC]
-  -> Map NodeMAC (NodeQueue NodeMAC EnergyState)
-  -> Kbtz t m NodeMAC NodeS
+  -> WriteChan NodeMAC EnergyState
+  -> m (Kbtz t m NodeMAC NodeS)
 sensorKbtz ns q = kbtz ns (sub @t @m @NodeMAC @EnergyState q) nodeS
 
 rsKbtz :: forall t m. (IsStream t, MonadAsync m)
   => [NodeMAC]
-  -> Map NodeMAC (NodeQueue NodeMAC RuntimeStats)
-  -> Kbtz t m NodeMAC RuntimeStats
+  -> WriteChan NodeMAC RuntimeStats
+  -> m (Kbtz t m NodeMAC RuntimeStats)
 rsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @RuntimeStats q) id
 
 asFRPNetwork :: forall t t' m m' n a.
@@ -104,10 +110,10 @@ traceKbtz :: (IsStream t, MonadAsync m) => (n -> a -> m ())
 traceKbtz act (Kbtz k) = Kbtz $ M.mapWithKey (\k stream -> S.trace (act k) stream) k
 
 sub :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a)
-  => Map n (NodeQueue n a)
+  => WriteChan n a
   -> n
-  -> t m a
-sub qs n = subStream @t @m @n @a n (qs M.! n) 
+  -> m (t m a)
+sub = flip (subStream @t @m @n @a) 
 
 getNodes :: (MonadIO m) => ReaderT KbtzId m [NodeMAC]
 getNodes = do
@@ -118,8 +124,8 @@ getNodes = do
 mapStream :: (IsStream t, Monad m, Monad (t m)) => Kbtz t m n a -> t m (Map n a)
 mapStream (Kbtz k) = sequence k
 
-asStream :: forall t m n a. (IsStream t, MonadAsync m) => Kbtz t m n a -> t m (n, a)
-asStream (Kbtz k) = M.foldlWithKey' (nodeTagMerge) (S.fromList []) k
+taggedS :: forall t m n a. (IsStream t, MonadAsync m) => Kbtz t m n a -> t m (n, a)
+taggedS (Kbtz k) = M.foldlWithKey' (nodeTagMerge) (S.fromList []) k
   where
     nodeTagMerge :: t m (n, a) -> n -> t m a -> t m (n, a)
     nodeTagMerge c key s = (S.map (\x -> (key, x)) s) <> c
