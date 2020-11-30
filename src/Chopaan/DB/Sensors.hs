@@ -1,4 +1,4 @@
-module Chopaan.DB.Streams where
+module Chopaan.DB.Sensors where
 
 import           Opaleye (Field, Table(Table),
                           required, optional, (.==), (.<),
@@ -9,7 +9,7 @@ import Database.PostgreSQL.Simple (Connection)
 
 import Lens.Micro
 import Control.Monad (void)
-import Data.Profunctor.Product (p9)
+import Data.Profunctor.Product (p10)
 
 import Proto.NodeMessageSchema.NodeMessages (EnergyState)
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as F
@@ -19,8 +19,9 @@ import Chopaan.Utils.Time (utcTimeNow)
 
 
 type Ins = ( Field SqlInt4
-           , Field SqlText
            , Field SqlTimestamptz
+           , Field SqlFloat8
+           , Field SqlFloat8
            , Field SqlFloat8
            , Field SqlFloat8
            , Field SqlFloat8
@@ -29,8 +30,9 @@ type Ins = ( Field SqlInt4
            , Field SqlFloat8)
 
 type Outs = ( Field SqlInt4
-            , Field SqlText
             , Field SqlTimestamptz
+            , Field SqlFloat8
+            , Field SqlFloat8
             , Field SqlFloat8
             , Field SqlFloat8
             , Field SqlFloat8
@@ -38,16 +40,17 @@ type Outs = ( Field SqlInt4
             , Field SqlFloat8
             , Field SqlFloat8)
 
-streamsTable :: Table Ins Outs
-streamsTable = Table "streams" (p9 ( required "node_id"
-                                   , required "macaddr"
-                                   , required "time"
-                                   , required "battery_voltage"
-                                   , required "grid_voltage"
-                                   , required "load_battery_current"
-                                   , required "grid_battery_current"
-                                   , required "generation_current"
-                                   , required "temperature"
+sensorsTable :: Table Ins Outs
+sensorsTable = Table "sensors" (p10 ( required "node_id"
+                                    , required "node_time"
+                                    , required "battery_voltage"
+                                    , required "grid_voltage"
+                                    , required "solar_voltage"
+                                    , required "load_battery_current"
+                                    , required "grid_battery_current"
+                                    , required "grid_relay_current"
+                                    , required "generation_current"
+                                    , required "temperature"
                                    ))
 
 
@@ -58,16 +61,17 @@ insertEnergyState conn n es =
   where
     fromES :: Ins
     fromES = ( 1
-             , toFields . unNodeId $ n
              , sqlUTCTime . utcTimeNow  $ es ^. F.cpuTime
              , toFields $ es ^. F.batteryVoltage
              , toFields $ es ^. F.gridVoltage
+             , toFields $ es ^. F.solarVoltage
              , toFields $ es ^. F.batteryToLoadCurrent
              , toFields $ es ^. F.batteryToGridCurrent
+             , toFields $ es ^. F.gridCurrent
              , toFields $ es ^. F.solarInputCurrent
              , toFields $ es ^. F.temperature
              )
-    ins = Insert { iTable = streamsTable
+    ins = Insert { iTable = sensorsTable
                  , iRows = [fromES]
                  
                  }
