@@ -10,6 +10,24 @@ import Dhall
 
 import Chopaan.Node.NodeOpts
 
+data DBOpts = DBOpts
+  { host :: !Text
+  , port :: !Word16
+  , database :: !Text
+  , user :: !Text
+  , password :: !Text
+  } deriving (Eq, Ord, Show, Generic)
+
+
+defDBOpts :: DBOpts
+defDBOpts = DBOpts
+  { host = "localhost"
+  , port = 5432
+  , database = "chopaan"
+  , user = "chopaan"
+  , password = "3423dssgSSS$%@!!01G"
+  }
+
 data MQTTOpts = MQTTOpts
   { connId :: !Text
   , mqttURI :: !Text
@@ -17,6 +35,7 @@ data MQTTOpts = MQTTOpts
   , keyPath :: !FilePath
   , caPath :: !FilePath
   } deriving (Eq, Ord, Show, Generic)
+
 
 defMQOpts :: MQTTOpts
 defMQOpts = MQTTOpts
@@ -40,7 +59,7 @@ data Options = Options
   { logVerbose :: !Bool
   , mqttOpts :: !MQTTOpts
   , nodeOpts :: ![NodeConfig]
-  , kibbutzOpts :: KibbutzOpts
+  , kibbutzOpts :: !KibbutzOpts
   } deriving (Generic, Show)
 
 instance Interpret Options
