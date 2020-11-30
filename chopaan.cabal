@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2f5792f8154c4c2b9995125e1460a4ba7816067ba6459ff42a33aaef7794271d
+-- hash: f363499b359e5710d5d79d967f76c6c7cc1666f1df31934d333bd7384cbe2966
 
 name:           chopaan
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
   exposed-modules:
       Chopaan.Comm.Comm
       Chopaan.Comm.Mqtt
+      Chopaan.Comm.Queues
       Chopaan.DB
       Chopaan.DB.DB
       Chopaan.DB.Nodes
@@ -133,6 +134,7 @@ library
     , tls
     , transformers
     , ulid
+    , unagi-chan
     , unordered-containers
     , vector
     , vector-sized
@@ -216,6 +218,7 @@ executable chopaan-demo-exe
     , tls
     , transformers
     , ulid
+    , unagi-chan
     , unordered-containers
     , vector
     , vector-sized
@@ -233,7 +236,7 @@ executable chopaan-exe
       Paths_chopaan
   hs-source-dirs:
       app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-T
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -eventlog -rtsopts -with-rtsopts=-N -with-rtsopts=-T
   build-depends:
       Shpadoinkle
     , Shpadoinkle-backend-pardiff
@@ -299,6 +302,7 @@ executable chopaan-exe
     , tls
     , transformers
     , ulid
+    , unagi-chan
     , unordered-containers
     , vector
     , vector-sized
@@ -382,6 +386,7 @@ executable tx-test-exe
     , tls
     , transformers
     , ulid
+    , unagi-chan
     , unordered-containers
     , vector
     , vector-sized
@@ -480,6 +485,7 @@ test-suite chopaan-test
     , tls
     , transformers
     , ulid
+    , unagi-chan
     , unordered-containers
     , vector
     , vector-sized

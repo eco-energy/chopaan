@@ -36,6 +36,7 @@ dependencies:
 - amazonka
 - amazonka-iot
 - net-mqtt >= 0.7.0
+- unagi-chan
 - aeson
 - proto-lens
 - text
@@ -128,8 +129,10 @@ executables:
     - Paths_chopaan
     ghc-options:
       - -threaded
+      - -eventlog
       - -rtsopts
-      - ! '"-with-rtsopts=-N -T"'
+      - -with-rtsopts=-N
+      - -with-rtsopts=-T
   chopaan-demo-exe:
     main:                Demo.hs
     source-dirs:         app
