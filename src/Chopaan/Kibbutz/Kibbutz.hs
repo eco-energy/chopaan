@@ -64,7 +64,7 @@ instance (Ord n) => Monoid (Kbtz t m n a) where
   mempty = Kbtz mempty
 
 instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n) where
-  pure a = Kbtz $ M.singleton mempty (S.yield a)
+  pure a = Kbtz $ M.singleton mempty (pure a)
   (Kbtz a) <*> (Kbtz b) = Kbtz $ zipWith (<*>) a b
 
 
@@ -74,10 +74,11 @@ runKbtz :: forall t m n a. KbtzConn t m n a => Kbtz t m n a -> m ()
 runKbtz = S.drain . adapt . unify
   where
     unify :: Kbtz t m n a -> t m a
-    unify (Kbtz m) = M.foldl' (parallel) (S.nil) m
+    unify = (M.foldl' parallel mempty) . unKibbutz
 
-kbtz
-  :: (KbtzConn t m n a)
+kbtz ::
+  forall t m n a b.
+  (KbtzConn t m n a)
   => [n]
   -> (n -> m (t m b))
   -> (t m b -> t m a)
