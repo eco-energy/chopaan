@@ -6,6 +6,7 @@ module Chopaan.Run (run, mon) where
 
 import Chopaan.Types
 import RIO hiding (view, async)
+import qualified Data.Text as Text
 import Control.Concurrent (forkIO)
 
 import Streamly
@@ -26,7 +27,8 @@ import Chopaan.Kibbutz.Transactor (runTransactor)
 import Chopaan.UI (mon)
 import qualified System.Remote.Monitoring as EKG
 import qualified System.Metrics as EKG
-
+import Chopaan.DB
+import Chopaan.DB.Sensors
 
 {-- TESTING --}
 
@@ -45,25 +47,29 @@ run = do
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
-  nodes <- runReaderT getNodes name
+  nodes <- runReaderT getNodes name -- return $ testNodes -- 
   liftIO $ print nodes
+  dbConn <- liftIO $ getDbConn dbOpts
   qs@MessageQs{..} <- liftIO $ initQs nodes
   _ <- liftIO $ forkIO $ forever $
        runMqtt mqttOpts outbox nodes (mkCallback qs)
-  _ <- liftIO . forkIO $ testPub nodes outbox 
-  sensorStore <- liftIO $ EKG.newStore
+  --_ <- liftIO . forkIO $ testPub nodes outbox 
   sensors' <- liftIO $ sensorKbtz @SerialT @IO nodes stateChan
   runtime <- liftIO $ rsKbtz @SerialT @IO nodes statsChan
-  --liftIO $ runKbtz @SerialT $ logKbtz sensors'
-  sensors <- liftIO $ monitor sensorStore sensors'
-  (txMonitor, txs) <- liftIO $ runTransactor outbox (60*5) sensors
-  liftIO $ EKG.registerGcMetrics sensorStore
-  _ <- liftIO $ EKG.forkServerWith sensorStore "localhost" 8000
+  liftIO $ runKbtz @SerialT $ logKbtz sensors'
+  --sensorStore <- liftIO $ EKG.newStore
+  --sensors <- liftIO $ monitor sensorStore sensors'
+  --(txMonitor, txs) <- liftIO $ runTransactor outbox (60*5) sensors
+  --liftIO $ EKG.registerGcMetrics sensorStore
+  --_ <- liftIO $ EKG.forkServerWith sensorStore "localhost" 8000
   --liftIO $ forkIO $ runKbtz $ logKbtz runtime
-  liftIO $ runKbtz sensors
+  --liftIO $ runKbtz sensors
 
 
-
+testNodes :: [NodeMAC]
+testNodes = take 5 $ NodeId <$> [Text.pack $ [a] <> [b] <> [c] <> [d]
+                       | a <- "acdsdfsv", b <- "casdaf"
+                       , c <- "asdsad", d <- "asdasda"]
 
 testPub :: [NodeMAC] -> PubQueue -> IO ()
 testPub ns q = S.mapM_ (uncurry $ writeToPubQ q) $ constRate 1 $ asTopicDispatch <$> (simNodeES ns)

@@ -52,7 +52,7 @@ type Outs = (Field SqlInt4 -- Id, auto-inserted
 nodeTable :: Table Ins Outs
 nodeTable = Table "nodes" (p12 ( optional "id"
                                , required "macaddr"
-                               , required  "batteryType"
+                               , required "batteryType"
                                , required "batteryMinV"
                                , required "batteryMaxV"
                                , required "batteryAmpHours"
@@ -88,3 +88,7 @@ insertNode conn n hw = do
           , sqlUTCTime t
           )
     f2d = realToFrac @Float @Double
+
+
+--getNode :: Connection -> IO (Node)
+--getNode = proc 

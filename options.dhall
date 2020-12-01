@@ -1,19 +1,21 @@
 
 let BatteryType : Type = < LAFlooded | LASealed | LIon >
 
-{- let TxStart : Type = < Immediately | WithDelay Int > -}
 
-in { logVerbose = True
-, mqttOpts = { connId = "chopaan-pilot-1"
+in
+
+{ logVerbose = True
+
+, mqttOpts = { connId = "chopaan-monitor"
              , mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
              , certPath = "certs/chopaan.cert.pem"
              , keyPath = "certs/chopaan.private.key.pem"
              , caPath = "certs/ca.cert.pem"
              }
-, nodeOpts = [
+, nodeOpts = [ 
            { macAddress = "abcdefghi"
-           , battery = [{
-               _type = BatteryType.LAFlooded
+           , battery = [
+             { _type = BatteryType.LAFlooded
              , cutOffVoltage = 11.5
              , maxV = 13.0
              , ampHours = 150.0
@@ -27,11 +29,10 @@ in { logVerbose = True
            }
   ]
 , kibbutzOpts = { name = "kibbutz-pilot-node" }
-{- , transactions = { sender = "abcdefghi"
-                 , reciever = "abcdefghi"
-                 , power = "100"
-                 , duration = "60"
-                 , repeatFor = 20
-                 , start = WithDelay 20
-                 } -}
+, dbOpts = { host = "localhost"
+           , port = Natural/toInteger 5432
+           , database = "chopaan"
+           , user = "chopaan"
+           , password = "testPassword" --"3423dssgSSS$%@!!01G"
+           }
 }

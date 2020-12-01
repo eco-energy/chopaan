@@ -12,21 +12,13 @@ import Chopaan.Node.NodeOpts
 
 data DBOpts = DBOpts
   { host :: !Text
-  , port :: !Word16
+  , port :: !Integer
   , database :: !Text
   , user :: !Text
   , password :: !Text
   } deriving (Eq, Ord, Show, Generic)
 
-
-defDBOpts :: DBOpts
-defDBOpts = DBOpts
-  { host = "localhost"
-  , port = 5432
-  , database = "chopaan"
-  , user = "chopaan"
-  , password = "3423dssgSSS$%@!!01G"
-  }
+instance Interpret DBOpts
 
 data MQTTOpts = MQTTOpts
   { connId :: !Text
@@ -35,16 +27,6 @@ data MQTTOpts = MQTTOpts
   , keyPath :: !FilePath
   , caPath :: !FilePath
   } deriving (Eq, Ord, Show, Generic)
-
-
-defMQOpts :: MQTTOpts
-defMQOpts = MQTTOpts
-  { connId = "chopaan-pilot-1"
-  , mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
-  , certPath = "certs/chopaan.cert.pem"
-  , keyPath = "certs/chopaan.private.key.pem"
-  , caPath = "certs/ca.cert.pem"
-  }
 
 data KibbutzOpts = KibbutzOpts
   { name :: !Text
@@ -60,10 +42,10 @@ data Options = Options
   , mqttOpts :: !MQTTOpts
   , nodeOpts :: ![NodeConfig]
   , kibbutzOpts :: !KibbutzOpts
+  , dbOpts :: !DBOpts
   } deriving (Generic, Show)
 
 instance Interpret Options
-
 
 data App = App
   { appLogFunc :: !LogFunc

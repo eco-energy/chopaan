@@ -16,14 +16,14 @@ import Control.Arrow (returnA)
 import Data.Time (Day)
 
 import Chopaan.DB.Sensors (insertEnergyState)
-import Chopaan.Types (DBOpts(..), defDBOpts)
+import Chopaan.Types (DBOpts(..))
 
 import RIO.Text (unpack)
 
 getDbConn :: DBOpts -> IO Connection
 getDbConn DBOpts{..} = connect ConnectInfo
   { connectHost = unpack host
-  , connectPort = port
+  , connectPort = fromIntegral port
   , connectDatabase = unpack database
   , connectUser = unpack user
   , connectPassword = unpack password
