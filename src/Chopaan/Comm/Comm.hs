@@ -29,6 +29,7 @@ import Data.ProtoLens.Prism
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent.STM
+import Control.Concurrent (forkIO)
 
 import Streamly
 import qualified Streamly.Prelude as S
@@ -123,14 +124,15 @@ initQs = initMessageQs @NodeMAC
 
 initMessageQs :: forall n. (Address n, Show n) => [n] -> IO (MessageQs n)
 initMessageQs ns = do 
-  (es, _) <- UC.newChan -- @n @EnergyState ns
-  (rs, _) <- UC.newChan -- @n @RuntimeStats ns
-  --nullConsumer es'
-  --nullConsumer rs'
+  (es, esR) <- UC.newChan -- @n @EnergyState ns
+  (rs, rsR) <- UC.newChan -- @n @RuntimeStats ns
+  _ <- forkIO $ incomingMonitor esR
+  _ <- forkIO $ incomingMonitor rsR
   out <-  atomically $ initPubQ
   return $ MessageQs (WriteChan es) (WriteChan rs) out
   where
-    nullConsumer ic = S.mapM_ (print) $ S.repeatM (UC.readChan ic)
+    incomingMonitor :: forall a. (Show a) => UC.OutChan (n, a) -> IO ()
+    incomingMonitor ic = S.drain $ S.mapM (print) $ S.repeatM (UC.readChan ic) -- 
 
 writeToPubQ :: (Dispatch a) => PubQueue -> MQ.Topic -> a -> IO ()
 writeToPubQ p n et = do
@@ -172,11 +174,13 @@ mkCallback (MessageQs { stateChan, statsChan })  = MQ.SimpleCallback $ writer
         (Just n) ->
           case parsed of
             (Left err) -> error err
-            (Right mf) -> case (accessEnergyState mf) of
-              (Just a) ->  writeChan stateChan n a
-              Nothing -> case (accessRTS mf) of
-                (Just a) -> writeChan statsChan n a
-                Nothing -> print ("Not RTS AND NOT ES" <> showMessage mf) >> return ()
+            (Right mf) -> do
+              --print mf
+              case (accessEnergyState mf) of
+                (Just a) ->  writeChan stateChan n a
+                Nothing -> case (accessRTS mf) of
+                  (Just a) -> writeChan statsChan n a
+                  Nothing -> print ("Not RTS AND NOT ES" <> showMessage mf) >> return ()
       where
         nodeId :: Maybe n
         nodeId = fromStateTopic $ t
