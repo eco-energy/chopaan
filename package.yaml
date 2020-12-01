@@ -69,7 +69,7 @@ dependencies:
 - linear
 - ad
 - numeric-limits
-- dhall >= 1.24.0
+- dhall
 - keys
 - vector
 - vector-sized

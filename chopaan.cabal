@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f363499b359e5710d5d79d967f76c6c7cc1666f1df31934d333bd7384cbe2966
+-- hash: fbb8d33c77631f4c22c07e75da2dc5b88fa67c76c49339cb99dad4997af2769d
 
 name:           chopaan
 version:        0.1.0.0
@@ -38,7 +38,7 @@ library
       Chopaan.DB
       Chopaan.DB.DB
       Chopaan.DB.Nodes
-      Chopaan.DB.Streams
+      Chopaan.DB.Sensors
       Chopaan.Kibbutz.Allocate
       Chopaan.Kibbutz.AWS.Things
       Chopaan.Kibbutz.Kibbutz
@@ -92,7 +92,7 @@ library
     , containers
     , convertible
     , data-default-class
-    , dhall >=1.24.0
+    , dhall
     , dimensional
     , directory
     , distributive
@@ -175,7 +175,7 @@ executable chopaan-demo-exe
     , containers
     , convertible
     , data-default-class
-    , dhall >=1.24.0
+    , dhall
     , dimensional
     , directory
     , distributive
@@ -259,7 +259,7 @@ executable chopaan-exe
     , containers
     , convertible
     , data-default-class
-    , dhall >=1.24.0
+    , dhall
     , dimensional
     , directory
     , distributive
@@ -343,7 +343,7 @@ executable tx-test-exe
     , containers
     , convertible
     , data-default-class
-    , dhall >=1.24.0
+    , dhall
     , dimensional
     , directory
     , distributive
@@ -439,7 +439,7 @@ test-suite chopaan-test
     , containers
     , convertible
     , data-default-class
-    , dhall >=1.24.0
+    , dhall
     , dimensional
     , directory
     , distributive
