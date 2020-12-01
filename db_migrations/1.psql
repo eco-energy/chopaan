@@ -2,22 +2,22 @@
 Version 1 Schema
 */
 
-CREATE ROLE administrator WITH LOGIN PASSWORD '$PGPASSWORD' CREATEDB;
+CREATE ROLE chopaan WITH LOGIN PASSWORD '$PGPASSWORD' CREATEDB;
 
 CREATE database chopaan;
 
-GRANT ALL PRIVILEGES ON DATABASE chopaan TO administrator;
+GRANT ALL PRIVILEGES ON DATABASE chopaan TO chopaan;
 
 /* Timescale initialization */
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 
 CREATE TABLE "users" (
-       id        SERIAL      PRIMARY,
+       id        SERIAL      PRIMARY KEY,
        name      TEXT        NOT NULL,
        phone     TEXT        NOT NULL,
        createdAt TIMESTAMPTZ NOT NULL,
        updatedAt TIMESTAMPTZ NOT NULL
-)
+);
 
 /* Node Config Table */
 CREATE TABLE "nodes" (
@@ -26,7 +26,7 @@ CREATE TABLE "nodes" (
        batteryType     TEXT     NOT NULL,
        batteryMinV     FLOAT    NOT NULL,
        batteryMaxV     FLOAT    NOT NULL,
-       batteryAmpHours FLOAT    NOT NULL
+       batteryAmpHours FLOAT    NOT NULL,
        pvOCV           FLOAT    NOT NULL,
        pvMPPTv         FLOAT    NOT NULL,
        pvMPPTi         FLOAT    NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE "sensors" (
        grid_relay_current     FLOAT         NOT NULL,
        generation_current     FLOAT         NOT NULL,
        temperature            FLOAT         NOT NULL,
-       PRIMARY KEY(node_time, nodeId)
+       PRIMARY KEY(node_time, node_id)
 );
 
 /* create a hypertable */
@@ -60,8 +60,8 @@ SELECT create_hypertable('sensors', 'node_time');
 CREATE TABLE "kibbutzim" (
        id        SERIAL      NOT NULL,
        name      TEXT        NOT NULL,
-       nodes     []INTEGER   REFERENCES nodes (id),
-       chopaans  []INTEGER   REFERENCES users (id),
+       nodes     INTEGER[]   NOT NULL, -- references nodes (id)
+       chopaans  INTEGER[]   NOT NULL, -- references users (id)
        createdAt TIMESTAMPTZ NOT NULL,
        updatedAt TIMESTAMPTZ NOT NULL
 );
@@ -73,22 +73,24 @@ CREATE TABLE "sessions" (
        energy_tx_in      FLOAT         NOT NULL,
        energy_tx_out     FLOAT         NOT NULL,
        energy_consumed   FLOAT         NOT NULL,
-       energy_generated  FLOAT         NOT NULL
+       energy_generated  FLOAT         NOT NULL,
 
-       PRIMARY KEY(sessionStart, nodeId)
+       PRIMARY KEY(session_start, node_id)
 );
 
-SELECT create_hypertable('state', 'sessionStart');
+SELECT create_hypertable('sessions', 'session_start');
 
 
 CREATE TABLE "transactions" (
-       transaction_id     SERIAL             PRIMARY,
+       transaction_id     SERIAL,
        transaction_ulid   TEXT               NOT NULL,
        start_time         TIMESTAMPTZ        NOT NULL,
        end_time           TIMESTAMPTZ        NOT NULL,
-       nodes              []INTEGER          REFERENCES nodes (id),
-       powers             []FLOAT            NOT NULL,
-       cost_per_watt      []FLOAT            NOT NULL
-)
+       nodes              INTEGER[]          NOT NULL,
+       powers             FLOAT[]            NOT NULL,
+       cost_per_watt      FLOAT[]            NOT NULL,
 
-SELECT create_hypertable('transaction', 'start');
+       PRIMARY KEY(transaction_id, start_time)
+);
+
+SELECT create_hypertable('transactions', 'start_time');
