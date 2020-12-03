@@ -7,8 +7,8 @@ import qualified Streamly.Prelude as S
 
 import Data.Maybe (fromJust, isNothing, isJust)
 import Data.Text (Text)
-import qualified Data.Map.Strict as M
-import Data.Map.Strict (Map)
+import qualified Data.Map.Lazy as M
+import Data.Map.Lazy (Map)
 import Data.Key
 
 import Control.Applicative (liftA2)
@@ -70,11 +70,11 @@ instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n)
 
 type KbtzConn t m n a = (IsStream t, MonadAsync m, Address n)
 
-runKbtz :: forall t m n a. KbtzConn t m n a => Kbtz t m n a -> m ()
-runKbtz = S.drain . adapt . unify
+runKbtz :: forall t m n a. KbtzConn t m n a => Kbtz t m n a -> t m a
+runKbtz = unify
   where
     unify :: Kbtz t m n a -> t m a
-    unify = (M.foldl' parallel mempty) . unKibbutz
+    unify = (M.foldl parallel mempty) . unKibbutz
 
 kbtz ::
   forall t m n a b.
