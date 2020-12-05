@@ -5,7 +5,7 @@ import Dhall
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.Transactor (Tx(..), Role(..), mkStake, dispatchTx, Stake(..))
 import Chopaan.Comm.Mqtt (pub, client)
-import Chopaan.Comm.Comm (initNodeQueue, trivialCB)
+import Chopaan.Comm.Comm (initPubQ, trivialCB)
 import Chopaan.Types
 import qualified Data.Map.Strict as Map
 import Control.Concurrent.STM (atomically)
@@ -22,8 +22,8 @@ srcs = NodeId <$> [ "7c:9e:bd:f6:5a:08"
 
 
 main = do
-  Options{mqttOpts} <- input auto "./options.dhall"
-  outbox <- atomically $ initNodeQueue @NodeMAC @(MeshFrame)
+  Options{mqttOpts} <- input auto "./txOpts.dhall"
+  outbox <- atomically $ initPubQ
   cl <- client mqttOpts trivialCB
   _ <- forkIO $ forever $ (pub cl outbox)
   mapM_ (\t -> (dispatchTx outbox t)
