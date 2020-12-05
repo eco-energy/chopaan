@@ -10,7 +10,7 @@ services:
     ports:
       - 5432:5432
     environment:
-      - POSTGRES_USER=administrator
+      - POSTGRES_USER=chopaan
       - POSTGRES_PASSWORD=testPassword
       - PGPASSWORD=testPassword
     volumes:
