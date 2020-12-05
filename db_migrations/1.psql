@@ -2,8 +2,6 @@
 Version 1 Schema
 */
 
-CREATE ROLE chopaan WITH LOGIN PASSWORD '$PGPASSWORD' CREATEDB;
-
 CREATE database chopaan;
 
 GRANT ALL PRIVILEGES ON DATABASE chopaan TO chopaan;
