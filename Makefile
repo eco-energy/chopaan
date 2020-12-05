@@ -24,8 +24,15 @@ run-d:
 	@LOCAL_USER_ID=${LOCAL_USER_ID} docker-compose-up
 
 gen_schema:
-	git submodule update --remote --merge \
-	&& protoc --plugin=protoc-gen-haskell=`stack exec -- which proto-lens-protoc` \
+	git submodule update --remote --merge && \
+	protoc --plugin=protoc-gen-haskell=`stack exec -- which proto-lens-protoc` \
+	--haskell_out=./src node_message_schema/NodeMessages.proto
+
+fetch_proto:
+	git submodule update --remote --merge
+
+gen_proto:
+	protoc --plugin=protoc-gen-haskell=`stack exec -- which proto-lens-protoc` \
 	--haskell_out=./src node_message_schema/NodeMessages.proto
 
 mqtt_cert:
