@@ -43,7 +43,7 @@ import Data.Text (Text)
 
 {--------------------- Type Classes for message conversion and addressing --------------------------}
 
-class Dispatch a where
+class (Show a) => Dispatch a where
   frame :: a -> MeshFrame
   unframe :: MeshFrame -> Maybe a
 
@@ -73,7 +73,7 @@ instance Dispatch Transaction where
   unframe = accessTx
 
 
-class (Ord a, Hashable a) => Address a where
+class (Ord a, Hashable a, Show a) => Address a where
   stateTopic :: a -> MQ.Topic
   controlTopic :: a -> MQ.Topic
   logTopic :: a -> MQ.Topic
@@ -132,7 +132,7 @@ initMessageQs ns = do
   return $ MessageQs (WriteChan es) (WriteChan rs) out
   where
     incomingMonitor :: forall a. (Show a) => UC.OutChan (n, a) -> IO ()
-    incomingMonitor ic = S.drain $ S.mapM (print) $ S.repeatM (UC.readChan ic) -- 
+    incomingMonitor ic = S.drain $ S.mapM (\_ -> print "Recieved at source") $ S.repeatM (UC.readChan ic) -- 
 
 writeToPubQ :: (Dispatch a) => PubQueue -> MQ.Topic -> a -> IO ()
 writeToPubQ p n et = do
@@ -143,8 +143,8 @@ class (Address n) => Subscribe n a where
   subscribe :: n -> NodeQueue n a
 
 
-data Incoming a = Incoming a deriving (Functor)
-data Outgoing a = Outgoing a deriving (Functor)
+data Incoming a = Incoming a deriving (Eq, Ord, Show, Functor)
+data Outgoing a = Outgoing a deriving (Eq, Ord, Show, Functor)
 
 instance (Dispatch a) => Dispatch (Outgoing a) where
   frame (Outgoing a) = frame a
@@ -196,9 +196,10 @@ class (Address n, Dispatch a) => Comm n a where
 
 subStream :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a) => n -> WriteChan n a -> m (t m a)
 subStream n (WriteChan wc) = do
+  liftIO . print $ "subscribing to " <> show n 
   rc <- liftIO . UC.dupChan $ wc
   return $ S.map snd
-    $ S.filter (\(n', _) -> n' == n)
+    $ S.trace (liftIO . print) $ S.filter (\(n', _) -> n' == n)
     $ S.repeatM . liftIO $ UC.readChan rc
 
 
