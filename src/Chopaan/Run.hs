@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeApplications, FlexibleContexts, ScopedTypeVariables, RankNTypes #-}
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses, GADTs, FlexibleInstances #-}
 module Chopaan.Run (run, mon) where
 
 import Chopaan.Types
@@ -41,22 +42,24 @@ import Proto.NodeMessageSchema.NodeMessages_Fields
 import Lens.Micro
 import Data.ProtoLens
 
+
+
 run :: RIO App ()
 run = do
   app <- ask
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
-  nodes <- runReaderT getNodes name -- return $ testNodes -- 
+  nodes <- (runReaderT getNodes name)
   liftIO $ print nodes
-  dbConn <- liftIO $ getDbConn dbOpts
+  dbConns <- liftIO $ getDbConn dbOpts
   qs@MessageQs{..} <- liftIO $ initQs nodes
   _ <- liftIO $ forkIO $ forever $
        runMqtt mqttOpts outbox nodes (mkCallback qs)
   --_ <- liftIO . forkIO $ testPub nodes outbox 
-  sensors' <- liftIO $ sensorKbtz @SerialT @IO nodes stateChan
+  sensors' <- liftIO $ sensorKbtz nodes stateChan
   runtime <- liftIO $ rsKbtz @SerialT @IO nodes statsChan
-  liftIO $ runKbtz @SerialT $ logKbtz sensors'
+  liftIO $ S.drain . runKbtz . logKbtz $ sensors'
   --sensorStore <- liftIO $ EKG.newStore
   --sensors <- liftIO $ monitor sensorStore sensors'
   --(txMonitor, txs) <- liftIO $ runTransactor outbox (60*5) sensors
@@ -65,6 +68,18 @@ run = do
   --liftIO $ forkIO $ runKbtz $ logKbtz runtime
   --liftIO $ runKbtz sensors
 
+
+data HasDB' m n a where
+  Insert :: (MonadIO m) => n -> a -> HasDB' m n a
+  Read   :: (MonadIO m) => n -> (HasDB' m n a)
+
+
+instance (Address n, Dispatch a) => HasDB (HasDB' n a) where
+  insert (Insert n a) = insert
+
+class HasDB n a where
+  insert :: (MonadIO m) => HasDB' m n a -> IO ()
+  read   :: (MonadIO m) => n -> m (HasDB' m n a)
 
 testNodes :: [NodeMAC]
 testNodes = take 5 $ NodeId <$> [Text.pack $ [a] <> [b] <> [c] <> [d]
