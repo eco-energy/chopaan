@@ -19,6 +19,8 @@ import Chopaan.Utils.Time (utcTimeNow)
 
 import Data.Time.Clock (UTCTime, getCurrentTime)
 
+import Control.Monad.Trans.Reader
+import Control.Monad.IO.Class
 
 type Ins = ( Maybe (Field SqlInt4) -- Id, auto-inserted
            , Field SqlText         -- macaddr
@@ -48,7 +50,6 @@ type Outs = (Field SqlInt4 -- Id, auto-inserted
            , Field SqlTimestamptz  -- updatedat
            )
 
-
 nodeTable :: Table Ins Outs
 nodeTable = Table "nodes" (p12 ( optional "id"
                                , required "macaddr"
@@ -64,17 +65,14 @@ nodeTable = Table "nodes" (p12 ( optional "id"
                                , required "updatedAt"
                                ))
 
-insertNode :: Connection -> NodeMAC -> HardwareConfig -> IO ([Int])
-insertNode conn n hw = do
-  time <- getCurrentTime
-  runInsert_ conn (ins time)
+type NodeTable = Table Ins Outs
+
+
+toInsert :: NodeTable -> UTCTime -> NodeMAC -> HardwareConfig -> Insert Ins
+toInsert = insut msg
   where
-    ins t = Insert { iTable = nodeTable
-                   , iRows = [msg t]
-                   , iReturning = rReturning (\(i,_, _, _, _, _, _, _, _, _, _, _) -> i)
-                   }
-    msg :: UTCTime -> Ins
-    msg t = ( Nothing
+    msg :: UTCTime -> NodeMAC -> HardwareConfig -> Ins
+    msg t n hw = ( Nothing
           , toFields . unNodeId $ n
           , toFields . show $ hw ^. F.battery ^. F.type'
           , toFields . f2d $ hw ^. F.battery ^. F.cutOffVoltage
@@ -90,5 +88,29 @@ insertNode conn n hw = do
     f2d = realToFrac @Float @Double
 
 
---getNode :: Connection -> IO (Node)
---getNode = proc 
+
+
+
+
+
+insertNode :: (MonadIO m) => HardwareConfig -> ReaderT (Connection, NodeMAC) m ()
+insertNode = insert t
+  where
+    t :: UTCTime -> NodeMAC -> HardwareConfig -> Insert Ins
+    t = (toInsert nodeTable)
+
+insut :: (UTCTime -> NodeMAC -> x -> a) -> Table a b -> UTCTime -> NodeMAC -> x -> Insert a
+insut toRows table t n x = Insert { iTable = table
+                                   , iRows = [toRows t n x]
+                                   }
+
+
+insert :: (MonadIO m) => (UTCTime -> NodeMAC -> x -> Insert a) -> x -> ReaderT (Connection, NodeMAC) m ()
+insert ins a = do
+  (conn, n) <- ask
+  time <- liftIO $ getCurrentTime
+  liftIO . void $ runInsert_ conn (ins time n a)
+
+
+runInsert :: Connection -> NodeMAC -> ReaderT (Connection, NodeMAC) m () -> m ()
+runInsert c m d = runReaderT d (c, m) 
