@@ -150,6 +150,9 @@ instance Monoid TransactionStatus where
     , endLag = 0
     }
 
+nodeCost :: (Functor f, Functor g, Foldable f, Foldable g) => Kbtz t m (n, n) TransactionStatus -> FL.Fold m TransactionStatus WattSeconds -> f (g WattSeconds)
+nodeCost k f = undefined   
+
 toNodeStates :: (Monad m, Address n, Ord n, IsStream t, Monad (t m)) => Kbtz t m n NodeS -> t m (NodeStates n)
 toNodeStates k = NodeStates <$> mapStream k
 
