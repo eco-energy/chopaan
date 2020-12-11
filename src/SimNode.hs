@@ -131,7 +131,7 @@ logsDist = do
 
 
 temporalGaussians :: (MonadSample m) => (LocalTime, LocalTime) -> [(Double, Double)] -> (LocalTime -> m Double)
-temporalGaussians (_, _) [] _ = return 0
+temporalGaussians _ [] _ = return 0
 temporalGaussians (start, end) ranges@(r:rs) t = do
   let
     sections = length ranges
@@ -200,7 +200,7 @@ server s = streamData
  where
   streamData :: (MonadIO m) => Connection -> m ()
   streamData c = do
-    liftIO $ withPingThread c 10 (return ()) $ (liftIO . S.mapM_ (sendTextData c . encode) $ s)
+    liftIO $ withPingThread c 10 (print "replace this with what it appears for") $ (liftIO . S.mapM_ (sendTextData c . encode) $ s)
 
 
 startApp :: IO ()
