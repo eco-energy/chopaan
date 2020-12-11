@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fbb8d33c77631f4c22c07e75da2dc5b88fa67c76c49339cb99dad4997af2769d
+-- hash: f0036a94df051e0895fa44b23d72d66fafa60754e840331299ac3b6c3c6fe6d4
 
 name:           chopaan
 version:        0.1.0.0
@@ -44,6 +44,7 @@ library
       Chopaan.Kibbutz.Kibbutz
       Chopaan.Kibbutz.LinOpt
       Chopaan.Kibbutz.Registry
+      Chopaan.Kibbutz.Serve
       Chopaan.Kibbutz.Subscriber
       Chopaan.Kibbutz.Transactor
       Chopaan.Node.Node
