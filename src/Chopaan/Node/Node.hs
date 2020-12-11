@@ -476,10 +476,8 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
     end (_, Nothing) = return $ emptyB @R @R
 
 
-
-
-nodeMonitor :: forall m. (MonadIO m) => (NodeMAC -> EnergyState -> IO ())  -> NodeMAC -> FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts) 
-nodeMonitor save n = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> sensors <*> (batteryFold defBatteryParams) <*> demandFold 
+nodeM :: forall m. (MonadIO m) => (EnergyState -> IO ()) -> FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts) 
+nodeM save = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> sensors <*> (batteryFold defBatteryParams) <*> demandFold 
   where
     tn :: FL.Fold m (EnergyState) Timestamp
     tn = timeFold
@@ -487,7 +485,7 @@ nodeMonitor save n = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold
     en =  energyFold
     sensors :: FL.Fold m (EnergyState) (EnergyState)
     sensors = FL.Fold (\_ nes -> do
-                          liftIO $ save n nes
+                          liftIO $ save nes
                           return nes
                       ) (pure zeroMsg) (pure) 
     demandFold :: FL.Fold m (EnergyState) WattSeconds
@@ -495,7 +493,8 @@ nodeMonitor save n = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold
       where
         d (Power{..}) = pToE (60 * 10) loadP
 
-
+nodeMonitor :: forall m. (MonadIO m) => Connection -> NodeMAC -> FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts)
+nodeMonitor conn n = nodeM (insertEnergyState conn n)
 
 {--------------------------------------------------------------------------------------------------------------
 
