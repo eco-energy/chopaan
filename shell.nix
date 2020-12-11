@@ -1,8 +1,49 @@
 # shell.nix
-{ pkgs ? import <nixpkgs> {} }:
+{
+  sources ? import ./nix/sources.nix
+, haskellNix ? import sources."haskell.nix" {}
+# haskell.nix provides access to the nixpkgs pins which are used by our CI,
+# hence you will be more likely to get cache hits when using these.
+# But you can also just use your own, e.g. '<nixpkgs>'.
+
+# haskell.nix provides some arguments to be passed to nixpkgs, including some
+# patches and also the haskell.nix functionality itself as an overlay.
+}:
+
 
 let
-  hsPkgs = import ./default.nix { inherit pkgs; };
+  nixpkgsArgs = haskellNix.nixpkgsArgs;
+  nixpkgsSrc = haskellNix.sources.nixpkgs-2003;
+  nixpkgs = import haskellNix.sources.nixpkgs haskellNix.nixpkgsArgs;
+  haskell = nixpkgs.haskell-nix;
+  def = import (./default.nix) {};
+in
+  haskell.haskellPackages.ghcWithPackages (ps: with ps;
+    [ def.chopaan.components.library lens conduit conduit-extra ])
+
+
+
+
+/*
+# shell.nix
+{
+  sources ? import ./nix/sources.nix
+, haskellNix ? import sources."haskell.nix" {}
+# haskell.nix provides access to the nixpkgs pins which are used by our CI,
+# hence you will be more likely to get cache hits when using these.
+# But you can also just use your own, e.g. '<nixpkgs>'.
+, nixpkgsSrc ? haskellNix.sources.nixpkgs-2003
+
+# haskell.nix provides some arguments to be passed to nixpkgs, including some
+# patches and also the haskell.nix functionality itself as an overlay.
+, nixpkgsArgs ? haskellNix.nixpkgsArgs
+
+# import nixpkgs with overlays
+, pkgs ? import nixpkgsSrc nixpkgsArgs
+}:
+
+let
+  hsPkgs = import ./default.nix {};
 in
   hsPkgs.shellFor {
     # Include only the *local* packages of your project.
@@ -21,10 +62,11 @@ in
     # See overlays/tools.nix for more details
 
     # Some you may need to get some other way.
-    buildInputs = with pkgs.haskellPackages;
-      [ protobuf ];
+    buildInputs =
+      [ pkgs.haskellPackages.ghcid pkgs.protobuf ];
 
     # Prevents cabal from choosing alternate plans, so that
     # *all* dependencies are provided by Nix.
     exactDeps = true;
   }
+*/
