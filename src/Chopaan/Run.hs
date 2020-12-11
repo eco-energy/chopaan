@@ -69,18 +69,6 @@ run = do
   --liftIO $ runKbtz sensors
 
 
-data HasDB' m n a where
-  Insert :: (MonadIO m) => n -> a -> HasDB' m n a
-  Read   :: (MonadIO m) => n -> (HasDB' m n a)
-
-
-instance (Address n, Dispatch a) => HasDB (HasDB' n a) where
-  insert (Insert n a) = insert
-
-class HasDB n a where
-  insert :: (MonadIO m) => HasDB' m n a -> IO ()
-  read   :: (MonadIO m) => n -> m (HasDB' m n a)
-
 testNodes :: [NodeMAC]
 testNodes = take 5 $ NodeId <$> [Text.pack $ [a] <> [b] <> [c] <> [d]
                        | a <- "acdsdfsv", b <- "casdaf"
