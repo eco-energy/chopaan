@@ -9,6 +9,8 @@ import Database.PostgreSQL.Simple (Connection)
 
 import Lens.Micro
 import Control.Monad (void)
+import Control.Monad.IO.Class
+
 import Data.Profunctor.Product (p10)
 
 import Proto.NodeMessageSchema.NodeMessages (EnergyState)

@@ -12,9 +12,7 @@ import Opaleye (
   , SqlInt4, SqlFloat8, SqlText, SqlTimestamptz, toFields, sqlUTCTime
   )
 import Database.PostgreSQL.Simple (Connection, connect, ConnectInfo(..))
-import Control.Arrow (returnA)
 import Control.Monad.IO.Class
-import Data.Time (Day)
 
 import Control.Monad.Trans.Reader
 
@@ -26,7 +24,6 @@ import Chopaan.Types (DBOpts(..))
 import Proto.NodeMessageSchema.NodeMessages (EnergyState, HardwareConfig)
 
 import RIO.Text (unpack)
-import RIO.Time
 
 import Streamly
 import qualified Streamly.Prelude as S
