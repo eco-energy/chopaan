@@ -1,9 +1,13 @@
-{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds, InstanceSigs #-}
+{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds, InstanceSigs, DeriveGeneric, StandaloneDeriving, TypeOperators #-}
 module Chopaan.Kibbutz.Kibbutz where
 
 import Prelude hiding (zipWith)
 import Streamly
 import qualified Streamly.Prelude as S
+import qualified Streamly.Data.Fold as FL
+import qualified Streamly.Internal.Data.Fold as FL
+
+import GHC.Generics
 
 import Data.Maybe (fromJust, isNothing, isJust)
 import Data.Text (Text)
@@ -44,13 +48,32 @@ import Reflex.Vty (VtyWidget)
 import qualified System.Metrics.Gauge as G
 import qualified System.Metrics as EKG
 import Data.Int
+import ConCat.Scan
+import ConCat.Misc
 
+{--
+class Functor f => LScan f where
+  lscan :: forall a. Monoid a => f a -> f a :* a
+  default lscan :: (Generic1 f, LScan (Rep1 f), Monoid a) => f a -> f a :* a
+  lscan = first to1 . lscan . from1
+  -- Temporary hack to avoid newtype-like representation. Still needed?
+  lscanDummy :: f a
+  lscanDummy = undefined
+--}
+
+
+
+instance KbtzConn t m n => LScan (Kbtz t m n) where
+  lscan :: forall a. (Monoid a) => Kbtz t m n a -> (Kbtz t m n a :* a)
+  lscan f = (f, mempty)
+
+--deriving instance (IsStream t, MonadAsync m) => Generic1 (t m)
 
 type KbtzId = Text
 
 newtype Kbtz (t :: (* -> *) -> * -> *) (m :: * -> *) n a = Kbtz {
   unKibbutz :: Map n (t m a)
-}
+} deriving (Eq, Ord, Show, Generic, Generic1)
 
 nodes :: Kbtz t m n a -> [n]
 nodes = M.keys . unKibbutz
@@ -67,6 +90,21 @@ instance (Ord n) => Monoid (Kbtz t m n a) where
 instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n) where
   pure a = Kbtz $ M.singleton mempty (pure a)
   (Kbtz a) <*> (Kbtz b) = Kbtz $ zipWith (<*>) a b
+
+
+postscan :: forall t m n a a'. (KbtzConn t m n, Monoid a, Monoid a') => Kbtz t m n a -> (a -> a') -> Kbtz t m n a'
+postscan (Kbtz m) f' = Kbtz $ (S.postscan f) <$> m
+  where
+    f :: FL.Fold m a a'
+    f = FL.Fold st in' out
+      where
+        st :: a' -> a -> m a'
+        st a' a = return $ f' a
+        in' :: m a'
+        in' = (pure mempty)--(pure (pure . const $ mempty) f')
+        out :: a' -> m a'
+        out = pure
+
 {--
 instance (IsStream t, Monad m) => Bifunctor (Kbtz t m) where
   bimap :: forall n a n' a'. (Ord n, Ord n') => (n -> n') -> (a -> a') -> Kbtz t m n a -> Kbtz t m n' a' 
@@ -80,9 +118,13 @@ instance (IsStream t, Monad m) => Bifunctor (Kbtz t m) where
       xx = (g <$> kbtz)
 --}
 
-type KbtzConn t m n a = (IsStream t, MonadAsync m, Address n)
+-- The Semantic Function is a scan
 
-runKbtz :: forall t m n a. KbtzConn t m n a => Kbtz t m n a -> t m a
+
+
+type KbtzConn t m n = (IsStream t, MonadAsync m, Address n)
+
+runKbtz :: forall t m n a. KbtzConn t m n => Kbtz t m n a -> t m a
 runKbtz = unify
   where
     unify :: Kbtz t m n a -> t m a
@@ -90,7 +132,7 @@ runKbtz = unify
 
 kbtz ::
   forall t m n a b.
-  (KbtzConn t m n a)
+  (KbtzConn t m n)
   => [n]
   -> (n -> m (t m b))
   -> (t m b -> t m a)
@@ -149,7 +191,7 @@ logNode k v = liftIO . print $ "Node: "
                        <> show k
                        <> "\n" <> show v
 
-logKbtz :: (IsStream t, MonadAsync m, Show n, Show a) => Kbtz t m n a -> Kbtz t m n a 
+logKbtz :: (KbtzConn t m n, Show a) => Kbtz t m n a -> Kbtz t m n a 
 logKbtz = traceKbtz logNode
 
 class Gauged a where
@@ -161,7 +203,7 @@ class Gauged a where
 instance Gauged NodeGauge
 
 -- $ Create a store for the kbtz, and NodeGauges for each node, then map the update across
-gauge :: forall t m n a b. (IsStream t, MonadAsync m, Ord n, Show n, Gauged b) => EKG.Store -> (EKG.Store -> m (Map n b)) -> (b -> a -> m ()) -> Kbtz t m n a -> m (Kbtz t m n a)
+gauge :: forall t m n a b. (KbtzConn t m n, Gauged b) => EKG.Store -> (EKG.Store -> m (Map n b)) -> (b -> a -> m ()) -> Kbtz t m n a -> m (Kbtz t m n a)
 gauge store mkGauge fn kb@(Kbtz km) = do
   gs <- mkGauge store
   return $ traceKbtz (\k s -> fn (gs M.! k) s) kb 
@@ -169,5 +211,5 @@ gauge store mkGauge fn kb@(Kbtz km) = do
 kbtzGauge :: (MonadAsync m, Show n) => Map n (t m NodeS) -> EKG.Store -> m (Map n NodeGauge)
 kbtzGauge km store = sequence $ M.mapWithKey (\k _ -> registerNodeG store k) km 
 
-monitor :: (IsStream t, MonadAsync m, Ord n, Show n) => EKG.Store -> Kbtz t m n NodeS -> m (Kbtz t m n NodeS)
+monitor :: (KbtzConn t m n, Show n) => EKG.Store -> Kbtz t m n NodeS -> m (Kbtz t m n NodeS)
 monitor store k@(Kbtz km) = gauge store (kbtzGauge km) updateNodeG k >>= (pure . logKbtz)
