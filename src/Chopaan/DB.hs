@@ -1,7 +1,7 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, RankNTypes #-}
 
-module Chopaan.DB (Persisted(..)) where
+module Chopaan.DB (Persisted(..), getDbConn) where
 
 import Opaleye (
   Field, Table(Table), Insert(..)
