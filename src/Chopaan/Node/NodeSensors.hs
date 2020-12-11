@@ -8,12 +8,14 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
-module Chopaan.Node.NodeSensors (fromNodeMessage, NodeSensors, Power, Energy) where
+module Chopaan.Node.NodeSensors (power) where
 
 import qualified Prelude as P
 
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
+
+import Data.Monoid
 
 import GHC.Generics hiding (C, R)
 
@@ -23,6 +25,16 @@ import Numeric.Units.Dimensional.Prelude
 import Data.Time
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Lens.Micro
+
+import Streamly
+import qualified Streamly.Prelude as S
+import qualified Streamly.Data.Fold as FL
+
+import Env.MonadEnv
+import Control.Monad.Bayes.Class
+import Control.Monad.Bayes.Sampler
+
+import Unsafe.Coerce
 
 -- Persistence
 --import PostgreSQL.Simple.
@@ -43,12 +55,50 @@ i = (*~ ampere)
 s :: (Num s) => s -> Sec s
 s = (*~ second)
 
-p :: (Num s) => I s -> V s -> Power s
-p = (*)
+p :: (Num s) => Current s -> Voltage s -> Power s
+p (Current i) (Voltage v) = i * v
 
 e :: (Num s) => Power s -> Sec s -> Energy s
 e = (*)
 
+
+type St u v = forall t m. (IsStream t, Monad m) => t m (u v)
+
+toDist :: forall m a. (MonadSample m, Double ~ a) => (a, a) -> a -> m a
+toDist (mean, std) a = do
+  noise <- normal mean std
+  return $ a P.+ noise
+  
+
+-- Streams of Sensors
+type V' s = St Voltage s
+type I' s = St Current s
+type P' s = St Power s
+type E' s = St Energy s
+
+type Vt t s = V' (t, s)
+type It t s = I' (t, s)
+type Pt t s = P' (t, s)
+type Et t s = E' (t, s)
+
+time :: (Num s) => s -> Sec s
+time = s
+
+volts :: (Num s) => s -> Voltage s
+volts = Voltage . v
+
+amps :: (Num s) => s -> Current s
+amps = Current . i
+
+power :: (Num s) => I' s -> V' s -> P' s
+power i v = S.zipWith p i v
+
+
+--energy :: (Num s) => P' s -> E' s
+--energy = S.postscan (FL.sum P.* FL.product) 
+
+newtype Voltage s = Voltage (V s) deriving (Eq, Ord, Show, Generic)
+newtype Current s = Current (I s) deriving (Eq, Ord, Show, Generic)
 
 data NodeSensors s = NodeSensors
   { batteryVoltage :: !(V s)
@@ -59,6 +109,8 @@ data NodeSensors s = NodeSensors
   , temperature :: !s
   } deriving (Eq, Ord, Show, Generic)
 
+getBuses :: NodeSensors s -> IO ()
+getBuses = undefined
 
 newtype NodeAt  s = NodeAt (UTCTime, NodeSensors s) deriving (Eq, Ord, Show, Generic)
 
@@ -93,11 +145,23 @@ diffUTC :: forall s. (Fractional s) => UTCTime -> UTCTime -> Sec s
 diffUTC a b = s . realToFrac $ diffUTCTime a b
 
 
-data SensorLoc = BatteryTerminal | TransmitterTerminal
+newtype Terminal s = Terminal (Voltage s, Current s) deriving (Eq, Ord, Show, Generic)
 
+data Bus' s = Gen (Terminal s)
+           | Storage (Terminal s)
+           | TxIn (Terminal s)
+           | TxOut (Terminal s)
+           | Load (Terminal s)
+           deriving (Eq, Ord, Show, Generic) 
+{--
+data Bus a b where
+  B2G :: s -> s -> (Bus Gen (Terminal s) (Storage (Terminal s)))
+  G2B :: s -> s -> (Bus Gen)
+--}
+{--
 type LocatedSensor u = (SensorLoc, u)
 
-newtype Sensor s = Sensor { unSensor :: (I s, V s) }
+--newtype Sensor s = Sensor { unSensor :: (I s, V s) }
 
 powerAt :: (Num s) => Sensor s -> Power s
 powerAt = (uncurry p) . unSensor
@@ -116,3 +180,4 @@ batteryCurrent NodeSensors{gridCurrent, genCurrent, loadCurrent} = gridCurrent +
 
 deltaT :: (Fractional s) => NodeAt s -> NodeAt s -> Sec s
 deltaT (NodeAt(t, _)) (NodeAt(t', _)) = diffUTC t t'
+--}
