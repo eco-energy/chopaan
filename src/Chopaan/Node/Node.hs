@@ -74,8 +74,10 @@ import Chopaan.Utils.Time
 import Data.Aeson hiding (encode, decode)
 import qualified Data.Aeson as A
 import Numeric.Estimator (KalmanFilter(..))
+import Chopaan.DB
 import Chopaan.DB.Nodes
 import Chopaan.DB.Sensors
+import Chopaan.Types
 
 import Text.Printf
 import qualified System.Metrics.Gauge as G
@@ -476,8 +478,8 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
     end (_, Nothing) = return $ emptyB @R @R
 
 
-nodeM :: forall m. (MonadIO m) => (EnergyState -> IO ()) -> FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts) 
-nodeM save = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> sensors <*> (batteryFold defBatteryParams) <*> demandFold 
+nodeMonitor' :: forall m. (MonadIO m) => (EnergyState -> IO ()) -> FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts) 
+nodeMonitor' save = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> sensors <*> (batteryFold defBatteryParams) <*> demandFold 
   where
     tn :: FL.Fold m (EnergyState) Timestamp
     tn = timeFold
@@ -493,8 +495,14 @@ nodeM save = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en 
       where
         d (Power{..}) = pToE (60 * 10) loadP
 
-nodeMonitor :: forall m. (MonadIO m) => Connection -> NodeMAC -> FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts)
-nodeMonitor conn n = nodeM (insertEnergyState conn n)
+nodeMonitor'' :: forall m. (MonadIO m) => DBOpts -> NodeMAC -> m (FL.Fold m EnergyState NodeS)
+nodeMonitor'' dbOpts n = do
+  conn <- (liftIO $ getDbConn dbOpts)
+  return $ nodeMonitor' $ insertEnergyState conn n
+
+nodeMonitor :: forall m. (MonadIO m) => FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts) 
+nodeMonitor = nodeMonitor' save
+  where save _ = print "x"
 
 {--------------------------------------------------------------------------------------------------------------
 
