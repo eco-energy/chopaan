@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds #-}
+{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds, InstanceSigs #-}
 module Chopaan.Kibbutz.Kibbutz where
 
 import Prelude hiding (zipWith)
@@ -11,6 +11,7 @@ import qualified Data.Map.Lazy as M
 import Data.Map.Lazy (Map)
 import Data.Key
 
+import Data.Bifunctor
 import Control.Applicative (liftA2)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Trans.Reader
@@ -66,7 +67,18 @@ instance (Ord n) => Monoid (Kbtz t m n a) where
 instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n) where
   pure a = Kbtz $ M.singleton mempty (pure a)
   (Kbtz a) <*> (Kbtz b) = Kbtz $ zipWith (<*>) a b
-
+{--
+instance (IsStream t, Monad m) => Bifunctor (Kbtz t m) where
+  bimap :: forall n a n' a'. (Ord n, Ord n') => (n -> n') -> (a -> a') -> Kbtz t m n a -> Kbtz t m n' a' 
+  bimap f g kbtz = Kbtz $ zz
+    where
+      zz :: Map n' (t m a')
+      zz = M.mapKeys f $ yy
+      yy :: Map n (t m a')
+      yy = unKibbutz xx
+      xx :: Kbtz t m n a'
+      xx = (g <$> kbtz)
+--}
 
 type KbtzConn t m n a = (IsStream t, MonadAsync m, Address n)
 
