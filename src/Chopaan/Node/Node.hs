@@ -460,9 +460,7 @@ batteryFold bat@BatteryParams{..} = FL.Fold step begin end
   where
     step :: (Maybe Time.UTCTime, Maybe (KF R)) -> EnergyState -> m (Maybe Time.UTCTime, Maybe (KF R))
     step (t, kf) sensorReadings = ((\(_, b) -> (Just tnow, Just b)) . snd) <$>
-        (runKalmanState (tdiff t) (cState kf) $
-        runProcessModel bat (tdiff t) processNoise sensorNoise $
-        storageSensors sensorReadings)
+        (runKalmanState (tdiff t) (cState kf) $ runEstimator bat (tdiff t) $ storageSensors sensorReadings)
       where
         cState (Just (KalmanFilter currState _)) = currState
         cState Nothing = initDynamic {soC = ocvToSoC bat (sensorTerminalV . storageSensors $ sensorReadings)}
