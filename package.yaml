@@ -101,7 +101,8 @@ dependencies:
 - Shpadoinkle-html
 - ekg
 - ekg-core
-
+- comonad
+- pointed
 ghc-options:
 - -Wall
 - -Wcompat
