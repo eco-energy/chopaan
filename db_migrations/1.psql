@@ -2,7 +2,7 @@
 Version 1 Schema
 */
 
-CREATE database chopaan;
+CREATE DATABASE IF NOT EXISTS chopaan;
 
 GRANT ALL PRIVILEGES ON DATABASE chopaan TO chopaan;
 
