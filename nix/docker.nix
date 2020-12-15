@@ -1,5 +1,5 @@
 { # Fetch the latest haskell.nix and import its default.nix
-  sources ? import ./nix/sources.nix
+  sources ? import ./sources.nix
 , haskellNix ? import sources."haskell.nix" {}
 # haskell.nix provides access to the nixpkgs pins which are used by our CI,
 # hence you will be more likely to get cache hits when using these.
@@ -27,7 +27,7 @@ pkgs.dockerTools.buildImage {
     
   config = {
     Cmd = [ "${chopaan}/bin/chopaan-exe" ];
-    Version = "1.0"
+    Version = "1.0";
     ExposedPorts = {
       "8883/tcp" = {};
     };
