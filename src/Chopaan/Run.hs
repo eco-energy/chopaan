@@ -31,12 +31,12 @@ import qualified System.Metrics as EKG
 import Chopaan.DB
 import Chopaan.DB.Sensors
 
-{-- TESTING --}
+{-- TESTING
 
 import Chopaan.Node.NodeId (NodeMAC, NodeId(..))
 import Proto.NodeMessageSchema.NodeMessages (EnergyState)
 import Proto.NodeMessageSchema.NodeMessages_Fields
-
+--}
 
 
 import Lens.Micro
@@ -52,7 +52,7 @@ run = do
     KibbutzOpts{..} = kibbutzOpts
   nodes <- (runReaderT getNodes name)
   liftIO $ print nodes
-  dbConns <- liftIO $ getDbConn dbOpts
+  dbConn <- liftIO $ getDbConn dbOpts
   qs@MessageQs{..} <- liftIO $ initQs nodes
   _ <- liftIO $ forkIO $ forever $
        runMqtt mqttOpts outbox nodes (mkCallback qs)
@@ -68,7 +68,7 @@ run = do
   --liftIO $ forkIO $ runKbtz $ logKbtz runtime
   --liftIO $ runKbtz sensors
 
-
+{--
 testNodes :: [NodeMAC]
 testNodes = take 5 $ NodeId <$> [Text.pack $ [a] <> [b] <> [c] <> [d]
                        | a <- "acdsdfsv", b <- "casdaf"
@@ -94,3 +94,4 @@ simNodeES (n:ns) = foldl' (wAsync) (es n) (es <$> ns)
           & solarInputCurrent .~ 10
           & dutyCycle .~ 0
           & cpuTime .~ (fromIntegral $ (1581444138 + t))
+--}
