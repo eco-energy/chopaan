@@ -4,17 +4,20 @@ let
   accessKeyId = "default";
 
 in
-  { machine = { config, pkgs, resources, ... }: {
+{
+  network.description = "Chopaan and DB.";
+  
+  machine = { config, pkgs, resources, ... }: {
       deployment = {
         targetEnv = "ec2";
-        #targetEnv = "virtualbox";
-        #virtualbox.headless = true;
-        #virtualbox.memorySize = 1024;
-        #virtualbox.vcpu = 1;
+        
         ec2 = {
           inherit accessKeyId region;
 
           instanceType = "t3.nano";
+
+          ebsBoot = true;
+          ebsInitialRootDiskSize = 10;
 
           keyPair = resources.ec2KeyPairs.chopaan-key-pair;
 
@@ -24,13 +27,20 @@ in
           ];
         };
       };
+      #fileSystems."/" =
+      #  { autoFormat = true;
+      #    fsType = "btrfs";
+      #    device = "/dev/nvme1n1";
+      #    ec2.size = 10;
+      #    ec2.volumeType = "gp2";
+      #  };
 
-      networking.firewall.allowedTCPPorts = [ 80 ];
+      networking.firewall.allowedTCPPorts = [ 80 8093 ];
 
       services.postgresql = {
         enable = true;
         extraPlugins = [ pkgs.timescaledb ];
-        extraConfig = "shared_preload_libraries = 'timescaledb'";
+        settings = { shared_preload_libraries = "timescaledb"; };
         authentication = ''
           local all all ident map=mapping
         '';
@@ -57,7 +67,7 @@ in
             # --connectPort ${toString config.services.postgresql.port}
           in
             ''
-            ${chopaan-exe}
+            ${chopaan-exe}/bin/chopaan-exe
             '';
       };
     };
