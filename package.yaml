@@ -89,12 +89,14 @@ dependencies:
 - mgenv
 - opt-expect
 - ghc-prim
-- servant-websockets
 - base64-bytestring
 - wai
 - warp
 - websockets
+- servant
 - servant-server
+- servant-websockets
+- servant-js
 - sbv
 - Shpadoinkle
 - Shpadoinkle-backend-pardiff
