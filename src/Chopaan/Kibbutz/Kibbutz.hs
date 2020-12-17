@@ -9,14 +9,14 @@ import qualified Streamly.Internal.Data.Fold as FL
 
 import GHC.Generics
 
-import Data.Maybe (fromJust, isNothing, isJust)
+import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Map.Lazy as M
 import Data.Map.Lazy (Map)
 import Data.Key
 
-import Data.Bifunctor
-import Control.Applicative (liftA2)
+--import Data.Bifunctor
+--import Control.Applicative (liftA2)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Trans.Reader
 
@@ -45,9 +45,8 @@ import Proto.NodeMessageSchema.NodeMessages ( RuntimeStats
 import Chopaan.Utils.StreamsInterop (toEvent)
 import qualified Reflex as R
 import Reflex.Vty (VtyWidget)
-import qualified System.Metrics.Gauge as G
 import qualified System.Metrics as EKG
-import Data.Int
+
 import ConCat.Scan
 import ConCat.Misc
 
@@ -92,16 +91,16 @@ instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n)
   (Kbtz a) <*> (Kbtz b) = Kbtz $ zipWith (<*>) a b
 
 
-postscan :: forall t m n a a'. (KbtzConn t m n, Monoid a, Monoid a') => Kbtz t m n a -> (a -> a') -> Kbtz t m n a'
-postscan (Kbtz m) f' = Kbtz $ (S.postscan f) <$> m
+postscan :: forall t m n a a'. (KbtzConn t m n) => Kbtz t m n a -> (a -> a') -> a' -> Kbtz t m n a'
+postscan (Kbtz m) f' start = Kbtz $ (S.postscan f) <$> m
   where
     f :: FL.Fold m a a'
     f = FL.Fold st in' out
       where
         st :: a' -> a -> m a'
-        st a' a = return $ f' a
+        st _ a = return $ f' a
         in' :: m a'
-        in' = (pure mempty)--(pure (pure . const $ mempty) f')
+        in' = pure start
         out :: a' -> m a'
         out = pure
 
@@ -162,7 +161,7 @@ asFRPNetwork h = sequence . (M.map (toEvent @t @t' h)) . unKibbutz
 traceKbtz :: (IsStream t, MonadAsync m) => (n -> a -> m ())
           -> Kbtz t m n a
           -> Kbtz t m n a
-traceKbtz act (Kbtz k) = Kbtz $ M.mapWithKey (\k stream -> S.trace (act k) stream) k
+traceKbtz act (Kbtz k) = Kbtz $ M.mapWithKey (\k' stream -> S.trace (act k') stream) k
 
 sub :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a)
   => WriteChan n a
@@ -194,8 +193,7 @@ logNode k v = liftIO . print $ "Node: "
 logKbtz :: (KbtzConn t m n, Show a) => Kbtz t m n a -> Kbtz t m n a 
 logKbtz = traceKbtz logNode
 
-class Gauged a where
-  toInt64 :: a -> Int64
+class Gauged a
   
 --instance Gauged  where
 --  toInt64 = registerNodeG
@@ -204,7 +202,7 @@ instance Gauged NodeGauge
 
 -- $ Create a store for the kbtz, and NodeGauges for each node, then map the update across
 gauge :: forall t m n a b. (KbtzConn t m n, Gauged b) => EKG.Store -> (EKG.Store -> m (Map n b)) -> (b -> a -> m ()) -> Kbtz t m n a -> m (Kbtz t m n a)
-gauge store mkGauge fn kb@(Kbtz km) = do
+gauge store mkGauge fn kb = do
   gs <- mkGauge store
   return $ traceKbtz (\k s -> fn (gs M.! k) s) kb 
 

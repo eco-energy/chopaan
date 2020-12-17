@@ -64,7 +64,7 @@ getThings thingTypeName = do
   let
     iiot = iot "execute-api"
     req = (Iot.listThings & Iot.ltThingTypeName .~ (Just thingTypeName))
-  lgr <- newLogger Trace stdout
+  lgr <- newLogger Debug stdout
   env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot  
   runResourceT . runAWST env $ do
     things <- S.toList
