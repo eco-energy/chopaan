@@ -27,7 +27,7 @@ import Chopaan.Utils.JSON
 import Chopaan.Utils.Time
 
 
-import Proto.NodeMessageSchema.NodeMessages
+import Proto.NodeMessageSchema.NodeMessages hiding (NodeId)
 import Proto.NodeMessageSchema.NodeMessages_Fields
 import ConCat.Misc (R)
 
