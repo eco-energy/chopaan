@@ -24,4 +24,6 @@ services:
   #    - LOCAL_USER_ID=${LOCAL_USER_ID}
     ports:
       - 3000:3000
+    volumes:
+      - ~/.aws/credentials:/.aws/credentials
     #command: /opt/chopaan/chopaan
