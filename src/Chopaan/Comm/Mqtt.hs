@@ -89,7 +89,7 @@ subscribe :: (Address n) => MQ.MQTTClient -> n -> IO (Either MQTy.SubErr MQ.QoS)
 subscribe c n = head <$> (fst <$> MQ.subscribe c [subTopic n] [])
 
 subTopic :: (Address n) => n -> (MQ.Topic, MQ.SubOptions)
-subTopic n = (stateTopic n, MQ.subOptions)
+subTopic n = (stateTopic n, MQ.subOptions { MQ._subQoS = MQ.QoS1 })
 
 -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
     -- not stateful.
