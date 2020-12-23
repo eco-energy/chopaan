@@ -131,12 +131,11 @@ initMessageQs ns = do
   out <-  atomically $ initPubQ
   return $ MessageQs (WriteChan es) (WriteChan rs) out
   where
-    incomingMonitor :: forall a. (Show a) => UC.OutChan (n, a) -> IO ()
-    incomingMonitor ic = S.drain $ S.mapM (\_ -> print "Recieved at source") $ S.repeatM (UC.readChan ic) -- 
+    incomingMonitor :: forall a. (Show n, Show a) => UC.OutChan (n, a) -> IO ()
+    incomingMonitor ic = S.drain $ S.mapM (\(n, a) -> print (n, a)) $ S.repeatM (UC.readChan ic) -- 
 
 writeToPubQ :: (Dispatch a) => PubQueue -> MQ.Topic -> a -> IO ()
-writeToPubQ p n et = do
-  atomically $ writeNodeQ p n (frame et)
+writeToPubQ p n et = atomically $ writeNodeQ p n (frame et)
 
 
 class (Address n) => Subscribe n a where
@@ -199,7 +198,9 @@ subStream n (WriteChan wc) = do
   liftIO . print $ "subscribing to " <> show n 
   rc <- liftIO . UC.dupChan $ wc
   return $ S.map snd
-    $ S.trace (liftIO . print) $ S.filter (\(n', _) -> n' == n)
+    -- $ S.trace (liftIO . (\(n', _) -> print $ "After " <> show n' <> "\n Expected " <> show n))
+    $ S.filter (\(n', _) -> n' == n)
+    -- $ S.trace (liftIO . (\(n', _) -> print $ "Before " <> show n' <> "\n Expected " <> show n))
     $ S.repeatM . liftIO $ UC.readChan rc
 
 
