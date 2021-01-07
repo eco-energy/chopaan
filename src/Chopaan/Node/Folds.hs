@@ -39,56 +39,6 @@ import Chopaan.DB.Sensors
 
 import Proto.NodeMessageSchema.NodeMessages
 
-
-
-{------------------ Basic Types -----------------------}
-
-
-
-newtype WattSeconds = WS { unWs :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
-
-newtype Watts = W { unW :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
-
-instance Show WattSeconds where
-  show = (printf ("%.2g")) . fromWattSeconds
-
-instance Show Watts where
-  show = (printf ("%.2g")) . fromWatts
-
-
-fromWatts :: Watts -> Double
-fromWatts = uncompensated . unW
-
-fromWattSeconds :: WattSeconds -> Double
-fromWattSeconds = uncompensated . unWs
-
-toWatts :: Double -> Watts
-toWatts a = W $ add a 0 compensated
-
-toWattSeconds :: Double -> WattSeconds
-toWattSeconds a = WS $ add a 0 compensated
-
-
-instance ToField (Watts) where
-  toField = toField . uncompensated . unW
-
-instance ToField (WattSeconds) where
-  toField = toField . uncompensated . unWs
-
-instance ToJSON WattSeconds where
-  toJSON = toJSON . uncompensated . unWs
-
-instance ToJSON Watts where
-  toJSON = toJSON . uncompensated . unW
-
-instance FromJSON WattSeconds where
-  parseJSON x = toWattSeconds <$> (A.parseJSON x)
-
-instance FromJSON Watts where
-  parseJSON x = toWatts <$> (A.parseJSON x)
-
-
-
 {----------------------------------------------------------------------------------------------------
 
 
@@ -98,7 +48,7 @@ Folds of type FL.Fold, as functions to the instantatenous values of the system o
 
 -----------------------------------------------------------------------------------------------------}
 
-timeFold :: forall m. Monad m => FL.Fold m (EnergyState) Timestamp
+timeFold :: forall m. Applicative m => FL.Fold m (EnergyState) Timestamp
 timeFold = FL.Fold step' begin' done'
   where
     step' :: (Timestamp -> EnergyState -> m Timestamp)
@@ -115,37 +65,36 @@ timeFold = FL.Fold step' begin' done'
 
 
 
-powerFold :: forall m. (Monad m) => FL.Fold m EnergyState (Power Watts)
-powerFold = FL.Fold (\_ b-> pure $ power' b) (pure $ mempty) return 
+powerFold :: forall m. (Applicative m) => FL.Fold m EnergyState (Power)
+powerFold = FL.Fold (\_ b-> pure $ power b) (pure $ mempty) pure 
 
 
-energyFold :: forall m. (Monad m) => FL.Fold m (EnergyState) (Energy WattSeconds)
+energyFold :: forall m. (Applicative m) => FL.Fold m (EnergyState) (Energy)
 energyFold = (FL.Fold step begin end)
   where
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
-    step :: (Energy WattSeconds, Maybe UTCTime) -> EnergyState -> m (Energy WattSeconds, Maybe UTCTime)
-    step (esPrev, (Just tPrev)) cur = pure $ ((esPrev <> (eAtT (power' cur) (Just tn, diffUTC tn tPrev))), Just tn)
+    step :: (Energy, Maybe UTCTime) -> EnergyState -> m (Energy, Maybe UTCTime)
+    step (esPrev, (Just tPrev)) cur = pure $
+      (esPrev <> eAtT (power cur) (diffUTC tn tPrev), Just tn)
       where
         tn = utcTimeES cur
-    step (esPrev, Nothing) cur = pure $ ((esPrev <> (eAtT (power' cur) (Just tn, diffUTC tn tn))), Just tn)
+    step (esPrev, Nothing) cur = pure $
+      (esPrev <> (eAtT (power cur) 0), Just tn)
       where
         tn = utcTimeES cur
-    begin :: m (Energy WattSeconds, Maybe UTCTime)
+    begin :: m (Energy, Maybe UTCTime)
     begin = pure $ (mempty, Nothing)
-    end :: (Energy WattSeconds, Maybe UTCTime) -> m (Energy WattSeconds)
+    end :: (Energy, Maybe UTCTime) -> m (Energy)
     end = pure . fst
-    eAtT :: Power Watts -> Timestamp -> (Energy WattSeconds)
-    eAtT p (_, t) = Energy { txIn = (pToE t tInP)
-                           , txOut = (pToE t tOutP)
-                           , consumed = (pToE t loadP)
-                           , generated = (pToE t genP)}
+    eAtT :: Power -> DiffTime -> (Energy)
+    eAtT p t = Node { txIn = (pToE t txIn)
+                         , txOut = (pToE t txOut)
+                         , consumed = (pToE t consumed)
+                         , generated = (pToE t generated)}
       where
-        Power{..} = p
+        Node{..} = p
 
-pToE :: (Real t) => t -> Watts -> WattSeconds
-pToE t (W p') = WS $ (realToFrac t) *^ p'
-
-batteryFold :: forall m. (MonadIO m) => BatteryParams R -> FL.Fold m EnergyState (Battery R R)
+batteryFold :: forall m. (Monad m) => BatteryParams R -> FL.Fold m EnergyState (Battery R R)
 batteryFold bat@BatteryParams{} = FL.Fold step begin end
   where
     step :: (Maybe UTCTime, Maybe (KF R)) -> EnergyState -> m (Maybe UTCTime, Maybe (KF R))
@@ -159,46 +108,39 @@ batteryFold bat@BatteryParams{} = FL.Fold step begin end
         tdiff Nothing = 0
         
     begin :: m (Maybe UTCTime, Maybe (KF R))
-    begin = return $ (Nothing, Nothing)
+    begin = pure $ (Nothing, Nothing)
     end :: (Maybe UTCTime, Maybe (KF R)) -> m (Battery R R)
-    end (_, Just (KalmanFilter (StateVector{..}) _)) = return $
+    end (_, Just (KalmanFilter (StateVector{..}) _)) = pure $
       (emptyB @R @R) { soc = soC
                      , totalCapacity = chargeCapacity bat
                      }
-    end (_, Nothing) = return $ emptyB @R @R
+    end (_, Nothing) = pure $ emptyB @R @R
 
 
-nodeMonitor' :: forall m. (MonadIO m) => (EnergyState -> IO ()) -> FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts) 
-nodeMonitor' save = NodeMetrics <$> (fst <$> tn) <*> (snd <$> tn) <*> powerFold <*> en <*> sensors <*> (batteryFold defBatteryParams) <*> demandFold 
+sensorFold :: forall m. (Monad m) => FL.Fold m (EnergyState) (SensorMetrics WattSeconds Watts) 
+sensorFold = SensorMetrics
+             <$> (fst <$> timeFold)
+             <*> (snd <$> timeFold)
+             <*> powerFold
+             <*> energyFold
+             <*> sensors
+             <*> (batteryFold defBatteryParams)
+             <*> demandFold 
   where
-    tn :: FL.Fold m (EnergyState) Timestamp
-    tn = timeFold
-    en :: FL.Fold m (EnergyState) (Energy WattSeconds)
-    en =  energyFold
-    sensors :: FL.Fold m (EnergyState) (EnergyState)
-    sensors = FL.Fold (\_ nes -> do
-                          liftIO $ save nes
-                          return nes
-                      ) (pure zeroMsg) (pure) 
-    demandFold :: FL.Fold m (EnergyState) WattSeconds
-    demandFold = FL.Fold (\_ nes -> pure (d $ power' nes)) (pure 0) pure
-      where
-        d (Power{..}) = pToE (60 * 10) loadP
+    
 
 
-nodeMonitor'' :: forall m. (MonadIO m) => DBOpts -> NodeMAC -> m (FL.Fold m EnergyState NodeS)
-nodeMonitor'' dbOpts n = do
-  conn <- (liftIO $ getDbConn dbOpts)
-  return $ nodeMonitor' $ insertEnergyState conn n
+demandFold :: (Applicative m) => FL.Fold m (EnergyState) WattSeconds
+demandFold = FL.Fold (\_ nes -> pure (d $ power nes)) (pure 0) pure
+  where
+    d (Node{..}) = pToE (60 * 10) consumed
 
-nodeMonitor :: forall m. (MonadIO m) => FL.Fold m (EnergyState) (NodeMetrics WattSeconds Watts) 
-nodeMonitor = nodeMonitor' save
-  where save _ = print "x"
+sensors :: (Applicative m) => FL.Fold m EnergyState EnergyState
+sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
 
-power' :: EnergyState -> Power Watts 
-power' = (toWatts <$>) . power
 
-type NodeS = NodeMetrics WattSeconds Watts 
 
-defNodeS :: NodeS
-defNodeS = NodeMetrics Nothing 0 mempty mempty zeroMsg mempty 0
+type SensorS = SensorMetrics WattSeconds Watts 
+
+defSensorS :: SensorS
+defSensorS = SensorMetrics Nothing 0 mempty mempty zeroMsg mempty 0

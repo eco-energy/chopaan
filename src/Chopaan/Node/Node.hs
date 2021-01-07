@@ -16,17 +16,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Chopaan.Node.Node (
   -- scans
-  nodeS, energyS, powerS, timeS
+  nodeS, SensorS, energyS, powerS, timeS
   -- folds
-  , energyFold, powerFold, timeFold
-  -- data constructors
-  , EnergyState, NodeS, NodeMetrics(..), Energy(..), Power(..), WattSeconds, Watts, pToE, Battery(..)
-  -- default builders
-  , zeroMsg, defNodeS
-  , nmFilter
-  -- initialization fns
-  , toWattSeconds, toWatts, fromWattSeconds, fromWatts
-  , registerNodeG, updateNodeG, NodeGauge
+  , sensorFold, energyFold, powerFold, timeFold
   ) where
 
 
@@ -54,17 +46,17 @@ import System.Metrics
 ---------------------------------------------------------------------------------------------------------------}
 
 
-energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m (Energy WattSeconds)
+energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Energy
 energyS = S.postscan energyFold
 
 timeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
 timeS = S.postscan timeFold
 
-powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m (Power Watts)
+powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Power
 powerS = S.postscan powerFold
 
-nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m NodeS
-nodeS = S.postscan nodeMonitor
+nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m SensorS
+nodeS = S.postscan sensorFold
 
 {--
 newtype Grid n s = Grid (Map.Map n s) deriving (Show, Generic, Functor)
@@ -104,13 +96,13 @@ registerNodeG store node = do
     withName metric = (T.pack . show $ node) <> "." <> (metric)
 
   
-updateNodeG :: forall m p e. (MonadIO m, RealFrac p) => NodeGauge -> NodeMetrics e p -> m ()
-updateNodeG NodeGauge{..} NodeMetrics{_powerT} = do
-  setG inG  tInP
-  setG outG tOutP
-  setG generatedG genP
-  setG consumedG loadP
+updateNodeG :: forall m. (MonadIO m) => NodeGauge -> SensorS -> m ()
+updateNodeG NodeGauge{..} SensorMetrics{_powerT} = do
+  setG inG  txIn
+  setG outG txOut
+  setG generatedG generated
+  setG consumedG consumed
   where
     setG g v = liftIO $ G.set g (readVal v) 
-    readVal :: (Power p -> p) -> Int64
+    readVal :: (Power -> Watts) -> Int64
     readVal f = fromIntegral . floor . f $ _powerT

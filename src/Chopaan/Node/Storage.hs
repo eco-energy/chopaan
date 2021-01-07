@@ -9,7 +9,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, ApplicativeDo #-}
 module Chopaan.Node.Storage where
 
 import Numeric.Estimator.KalmanFilter

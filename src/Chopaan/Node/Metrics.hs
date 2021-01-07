@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveGeneric, RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving #-}
 module Chopaan.Node.Metrics where
 
 import GHC.Generics hiding (R)
@@ -14,6 +15,7 @@ import qualified Data.Vector as Vec (fromList)
 
 import Data.ByteString.Char8 (pack)
 import Data.Maybe (isJust)
+import Numeric.Compensated
 
 import Data.ProtoLens
 import Data.ProtoLens.TextFormat
@@ -27,26 +29,74 @@ import Chopaan.Utils.JSON
 import Chopaan.Utils.Time
 
 
-import Proto.NodeMessageSchema.NodeMessages hiding (NodeId)
+import Proto.NodeMessageSchema.NodeMessages hiding (SensorId)
 import Proto.NodeMessageSchema.NodeMessages_Fields
 import ConCat.Misc (R)
 
+{----- Basic Types ------}
+
+newtype WattSeconds = WS { unWs :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
+
+newtype Watts = W { unW :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
+
+instance Show WattSeconds where
+  show = (printf ("%.2g")) . fromWattSeconds
+
+instance Show Watts where
+  show = (printf ("%.2g")) . fromWatts
+
+
+fromWatts :: Watts -> Double
+fromWatts = uncompensated . unW
+
+fromWattSeconds :: WattSeconds -> Double
+fromWattSeconds = uncompensated . unWs
+
+toWatts :: Double -> Watts
+toWatts a = W $ add a 0 compensated
+
+toWattSeconds :: Double -> WattSeconds
+toWattSeconds a = WS $ add a 0 compensated
+
+pToE :: (Real t) => t -> Watts -> WattSeconds
+pToE t (W p') = WS $ (*^) (realToFrac t) p'
+
+instance ToField (Watts) where
+  toField = toField . uncompensated . unW
+
+instance ToField (WattSeconds) where
+  toField = toField . uncompensated . unWs
+
+instance ToJSON WattSeconds where
+  toJSON = toJSON . uncompensated . unWs
+
+instance ToJSON Watts where
+  toJSON = toJSON . uncompensated . unW
+
+instance FromJSON WattSeconds where
+  parseJSON x = toWattSeconds <$> (A.parseJSON x)
+
+instance FromJSON Watts where
+  parseJSON x = toWatts <$> (A.parseJSON x)
+
+
+
 -- Episodic Metrics
 
-data Energy a = Energy
+data Node a = Node
   { txIn :: !a
   , txOut :: !a
   , consumed :: !a
   , generated :: !a
   } deriving (Eq, Ord, Generic, Functor)
 
-instance (ToJSON a) => ToJSON (Energy a)
-instance (FromJSON a) => FromJSON (Energy a)
+instance (ToJSON a) => ToJSON (Node a)
+instance (FromJSON a) => FromJSON (Node a)
 
 
-instance (Show a) => Show (Energy a) where
-  show Energy{..} = "Energy" <> nl
-    <> "Generated : " <> (rs generated)
+instance (Show a) => Show (Node a) where
+  show Node{..} = 
+    "Generated : " <> (rs generated)
     <> "Consumed : " <> (rs consumed)
     <> "Incoming : " <> (rs txIn)
     <> "Outgoing : " <> (rs txOut)
@@ -54,103 +104,59 @@ instance (Show a) => Show (Energy a) where
       nl = "\n"
       rs x = show x <> nl
 
-instance (ToField a) => ToNamedRecord (Energy a)
+instance (ToField a) => ToNamedRecord (Node a)
 
-instance DefaultOrdered (Energy a) where
+instance DefaultOrdered (Node a) where
   headerOrder _ = Vec.fromList ["txIn", "txOut", "consumed", "generated"]
 
-instance Applicative Energy where
-  pure v = Energy
+instance Applicative Node where
+  pure v = Node
     { txIn = v
     , txOut = v
     , consumed = v
     , generated = v
     }
-  f <*> v = Energy
+  f <*> v = Node
               { txIn = txIn f $ txIn v
               , txOut = txOut f $ txOut v
               , consumed = consumed f $ consumed v
               , generated = generated f $ generated v
               }
 
-initEA :: (Num a) => Energy a
-initEA = Energy 0 0 0 0
+initEA :: (Num a) => Node a
+initEA = Node 0 0 0 0
 
 -- Check associativity
-instance (Num a) => Semigroup (Energy a) where
-  v1 <> v2 = Energy
+instance (Num a) => Semigroup (Node a) where
+  v1 <> v2 = Node
     { txIn = txIn v1 + txIn v2
     , txOut = txOut v1 + txOut v2
     , consumed = consumed v1 + consumed v2
     , generated = generated v1 + generated v2
     }
 
-instance (Num a) => Monoid (Energy a) where
+instance (Num a) => Monoid (Node a) where
   mempty = initEA
 
 
 
-data Power a = Power
-  { genP :: !a
-  , tInP :: !a
-  , tOutP :: !a
-  , loadP :: !a }
-  deriving (Eq, Ord, Generic, Functor)
 
-
-instance (Show a) => Show (Power a) where
-  show Power{..} = "Power (Watts)" <> nl
-    <> "Generation : " <> (rs genP) <> nl
-    <> "Load : " <> (rs loadP) <> nl
-    <> "Incoming : " <> (rs tInP) <> nl
-    <> "Outgoing : " <> (rs tOutP) <> nl
-    where
-      nl = "\n"
-      rs = show
-
-instance (ToJSON a) => ToJSON (Power a)
-instance (FromJSON a) => FromJSON (Power a)
-
-instance (ToField a) => ToNamedRecord (Power a)
-
-instance DefaultOrdered (Power a) where
-  headerOrder _ = Vec.fromList ["genP", "tInP", "tOutP", "loadP"]
-
-instance Applicative Power where
-  pure v = Power
-    { tInP = v
-    , tOutP = v
-    , loadP = v
-    , genP = v
-    }
-  f <*> v = Power
-              { tInP = tInP f $ tInP v
-              , tOutP = tOutP f $ tOutP v
-              , loadP = loadP f $ loadP v
-              , genP = genP f $ genP v
-              }
-
-instance (Num a) => Semigroup (Power a) where
-  p <> p' = (+) <$> p <*> p'
-
-instance (Num a) => Monoid (Power a) where
-  mempty = Power 0 0 0 0
 
 --instance (Num a) => VS.V R (Power a) where
 
-data NodeMetrics e p = NodeMetrics
+data SensorMetrics e p = SensorMetrics
   { _time :: !(Maybe UTCTime)
   , lastTimeDiff :: !DiffTime
-  , _powerT :: !(Power p)
-  , _energyT :: !(Energy e)
+  , _powerT :: !(Node p)
+  , _energyT :: !(Node e)
   , _sensorsT :: !EnergyState
   , _battery :: !(Battery R R)
   , _demand :: !e
   } deriving (Eq, Ord, Generic)
 
 
-instance (ToJSON e, ToJSON p) => ToJSON (NodeMetrics e p)
---instance (FromJSON e, FromJSON p) => FromJSON (NodeMetrics e p)
+instance (ToJSON e, ToJSON p) => ToJSON (SensorMetrics e p)
+--instance (FromJSON e, FromJSON p) => FromJSON (SensorMetrics e p)
 
 instance ToJSON (EnergyState) where
   toJSON a = object $ zipWith (A..=) esFieldNamesJSON (fieldAccessorsJSON a)
@@ -221,8 +227,8 @@ instance DefaultOrdered EnergyState where
 instance ToField UTCTime where
   toField t = pack (show t)
 
-instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
-  toNamedRecord (NodeMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
+instance (ToField e, ToField p) => ToNamedRecord (SensorMetrics e p) where
+  toNamedRecord (SensorMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
     [ toNamedRecord _battery,
       toNamedRecord _powerT,
       toNamedRecord _energyT,
@@ -232,8 +238,8 @@ instance (ToField e, ToField p) => ToNamedRecord (NodeMetrics e p) where
 
 showDec = (printf ("%.2g"))
 
-instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) where
-  show NodeMetrics{..} = ("last connection: " <> show _time)
+instance (Show e, Show p, RealFrac e, RealFrac p) => Show (SensorMetrics e p) where
+  show SensorMetrics{..} = ("last connection: " <> show _time)
     <> sep <> ("battery energy stored (Ws): " <> sep <> showDec (socPercentage _battery * totalCapacity _battery))
     <> sep <> ("runtime estimate :" <> sep <> showDec (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
     <> sep <> ("current demand (Ws): " <> show _demand)
@@ -246,15 +252,13 @@ instance (Show e, Show p, RealFrac e, RealFrac p) => Show (NodeMetrics e p) wher
 secsToMinutes :: (Num a) => a -> a
 secsToMinutes = (* 60)
 
-nmFilter :: (NodeId a) -> NodeMetrics e p -> Bool
+nmFilter :: (NodeId a) -> SensorMetrics e p -> Bool
 nmFilter _ = isJust . _time
 
 
-
-instance DefaultOrdered (NodeMetrics e p)
+instance DefaultOrdered (SensorMetrics e p)
 
 type Timestamp = (Maybe UTCTime, DiffTime)
-
 
 data Battery e p = Battery
   { soc :: !e
@@ -301,6 +305,10 @@ socPercentage Battery{..} = (soc * 100 / totalCapacity)
                                           Helper Functions
 ---------------------------------------------------------------------------------------------------------------------}
 
+type Power = Node (Watts)
+
+type Energy = Node (WattSeconds)
+
 
 storageSensors :: EnergyState -> SensorVector R
 storageSensors es = SensorVector
@@ -311,18 +319,18 @@ storageSensors es = SensorVector
     i = - (es ^. gridToBatteryCurrent + es ^. solarInputCurrent)
     o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
 
-power :: EnergyState -> Power Double
-power es = Power
-           { tInP = txIn'
-           , tOutP = txOut'
-           , loadP = cnsm'
-           , genP = genP' }
+power :: EnergyState -> Power
+power es = Node
+           { txIn = txIn'
+           , txOut = txOut'
+           , consumed = cnsm'
+           , generated = genP' }
   where
     txIn' = p batteryVoltage gridToBatteryCurrent
     txOut' = p batteryVoltage batteryToGridCurrent
     cnsm' = p batteryVoltage batteryToLoadCurrent
     genP' = p batteryVoltage solarInputCurrent
-    p v i = (es ^. i) * v'
+    p v i = toWatts $ (es ^. i) * v'
       where
         v' = (es ^. v)
 
@@ -351,8 +359,8 @@ zeroMsg = defMessage
 
 
 
--- Identified node type for monitoring
-newtype TaggedNode n e p = TaggedNode (n, NodeMetrics e p) deriving (Generic)
+-- Identified sensor type for monitoring
+newtype TaggedNode n e p = TaggedNode (n, SensorMetrics e p) deriving (Generic)
 
 instance (ToField n, ToField e, ToField p) => ToNamedRecord (TaggedNode n e p) where
   toNamedRecord (TaggedNode (n, ns)) = (HM.fromList [("NodeId", toField n)]) <> toNamedRecord ns
@@ -360,6 +368,8 @@ instance (ToField n, ToField e, ToField p) => ToNamedRecord (TaggedNode n e p) w
 instance DefaultOrdered (TaggedNode n e p) where
   headerOrder _ = (Vec.fromList $ ["NodeId", "time"])
                   <> (headerOrder (undefined :: EnergyState))
-                  <> (headerOrder (undefined :: Power p))
-                  <> (headerOrder (undefined :: Energy e))
+                  <> (headerOrder (undefined :: Power))
+                  <> (headerOrder (undefined :: Energy))
+
+
 
