@@ -74,13 +74,12 @@ dependencies:
 - vector
 - vector-sized
 - dimensional
-- reflex-vty
-- reflex
-- vty
+- retry
 - algebraic-graphs
 - katip
 - opaleye
 - postgresql-simple
+- resource-pool
 - product-profunctors
 - concat-classes
 - concat-examples
@@ -98,13 +97,18 @@ dependencies:
 - servant-websockets
 - servant-js
 - sbv
-- Shpadoinkle
-- Shpadoinkle-backend-pardiff
-- Shpadoinkle-html
+- suavemente
+- diagrams-lib
+- diagrams-svg >= 1.4.3
+- diagrams-contrib >= 1.4.4
 - ekg
 - ekg-core
 - comonad
 - pointed
+- interpolatedstring-perl6
+- blaze-markup
+- servant-blaze
+- retry
 ghc-options:
 - -Wall
 - -Wcompat
