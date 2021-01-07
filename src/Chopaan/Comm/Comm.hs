@@ -132,7 +132,7 @@ initMessageQs ns = do
   return $ MessageQs (WriteChan es) (WriteChan rs) out
   where
     incomingMonitor :: forall a. (Show n, Show a) => UC.OutChan (n, a) -> IO ()
-    incomingMonitor ic = S.drain $ S.mapM (\(n, a) -> print (n, a)) $ S.repeatM (UC.readChan ic) -- 
+    incomingMonitor ic = S.drain $ S.repeatM (UC.readChan ic) -- 
 
 writeToPubQ :: (Dispatch a) => PubQueue -> MQ.Topic -> a -> IO ()
 writeToPubQ p n et = atomically $ writeNodeQ p n (frame et)
@@ -174,7 +174,6 @@ mkCallback (MessageQs { stateChan, statsChan })  = MQ.SimpleCallback $ writer
           case parsed of
             (Left err) -> error err
             (Right mf) -> do
-              --print mf
               case (accessEnergyState mf) of
                 (Just a) ->  writeChan stateChan n a
                 Nothing -> case (accessRTS mf) of
@@ -198,9 +197,9 @@ subStream n (WriteChan wc) = do
   liftIO . print $ "subscribing to " <> show n 
   rc <- liftIO . UC.dupChan $ wc
   return $ S.map snd
-    -- $ S.trace (liftIO . (\(n', _) -> print $ "After " <> show n' <> "\n Expected " <> show n))
+    -- $ S.trace (liftIO . (\(n', _) -> print $ "After Filter " <> show n' <> "\n Expected " <> show n))
     $ S.filter (\(n', _) -> n' == n)
-    -- $ S.trace (liftIO . (\(n', _) -> print $ "Before " <> show n' <> "\n Expected " <> show n))
+    -- $ S.trace (liftIO . (\(n', _) -> print $ "Before Filter " <> show n' <> "\n Expected " <> show n))
     $ S.repeatM . liftIO $ UC.readChan rc
 
 

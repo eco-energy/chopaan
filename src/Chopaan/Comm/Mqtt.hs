@@ -30,7 +30,7 @@ import Network.TLS.Extra.Cipher
 import Network.URI
 
 import Control.Exception (Handler (..), catches)
-import Control.Monad (forever)
+import Control.Monad (forever, void)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
 
@@ -39,7 +39,9 @@ import Data.ProtoLens (encodeMessage)
 import Chopaan.Types (MQTTOpts(..))
 import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue)
 import Chopaan.Comm.Queues (NodeQueue(..))
+import Chopaan.Utils.Retry
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame)
+
 
 
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control
@@ -60,13 +62,12 @@ mkTLSSettings cert key caPath hostName name = do
                   }
   return (TLSSettings clientParams)
 
-
 -- need reader for creds and logs
 runMqtt :: forall a. (Address a) => MQTTOpts -> PubQueue -> [a] -> MQ.MessageCallback -> IO ()
 runMqtt opts outQueue ts msgCB = do
   mc <- client opts msgCB
-  _ <- forkIO $ forever $ catches (pub mc outQueue) [Handler errorHandler]
-  connStatus <- mapM (subscribe mc) ts
+  _ <- forkIO $ forever $ catches (pub mc outQueue) ((Handler . errorHandler) <$> ts)
+  connStatus <- sequence $ (resub mc) <$> ts
   print connStatus
   MQ.waitForClient mc
 
@@ -102,10 +103,12 @@ pub c tv = do
         MQ.publish c nId (encode mf) False
       encode = BL.fromStrict . encodeMessage
 
+resub :: (Address n) => MQ.MQTTClient -> n -> IO (Either MQTy.SubErr MQ.QoS)
+resub c n = (subscribe c n)--retryEither n (subscribe c)
 
-
-errorHandler :: MQ.MQTTException -> IO ()
-errorHandler (MQ.Timeout) = putStrLn ("ERROR : Timeout") >> threadDelay 100000
-errorHandler (MQ.BadData) = putStrLn ("ERROR : BadData") >> threadDelay 100000
-errorHandler (MQ.Discod d) = putStrLn ("ERROR Discod -> " <> (show d)) >> threadDelay 100000
-errorHandler (MQ.MQTTException e) = putStrLn ("ERROR :" <> (show e)) >> threadDelay 100000
+errorHandler :: (Address n) => n -> MQ.MQTTException -> IO ()
+errorHandler n (MQ.Timeout) = printError n "Timeout" 
+errorHandler n (MQ.BadData) = printError n "BadData" 
+errorHandler n (MQ.Discod d) = printError n d  
+errorHandler n (MQ.MQTTException e) =  printError n e
+printError n e = print $ (show e) <> "caught for Node:" <> show n
