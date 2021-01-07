@@ -12,14 +12,13 @@ import GHC.Generics
 import Control.Monad.Bayes.Class
 
 import Chopaan.Kibbutz.Transactor (runTransactor)
-import Chopaan.Kibbutz.Kibbutz (kbtz, Kbtz, taggedS)
+import Chopaan.Kibbutz.Kibbutz (kbtz, Kbtz, kbtzState)
 import Chopaan.Comm.Comm (Address(..), Dispatch(..), MessageQs(..))
 import Chopaan.Comm.Queues (initNodeQueue)
 import Chopaan.Comm.Mqtt (Topic)
 import Chopaan.Utils.Time
-import Chopaan.Utils.StreamsInterop (inIO)
-import Chopaan.Run (mon)
-import Chopaan.Node.Node (nodeS)
+import Chopaan.Ui (mon)
+import Chopaan.Node.Node (nodeS, SensorS)
 
 import Proto.NodeMessageSchema.NodeMessages
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as F
@@ -44,7 +43,7 @@ import Streamly
 import qualified Streamly.Prelude as S
 
 import Env.MonadEnv (MonadEnv, sampleIOE)
-import Reflex.Vty (mainWidget)
+
 
 import Servant.API.WebSocket (WebSocket)
 import Network.Wai              (Application)
@@ -128,8 +127,6 @@ logsDist = do
   uiDelay
   return defMessage
 
-
-
 temporalGaussians :: (MonadSample m) => (LocalTime, LocalTime) -> [(Double, Double)] -> (LocalTime -> m Double)
 temporalGaussians _ [] _ = return 0
 temporalGaussians (start, end) ranges@(r:rs) t = do
@@ -205,10 +202,14 @@ server s = streamData
 
 startApp :: IO ()
 startApp = do
-  let sensors = testKbtz @SerialT (take 10 testNodes) (\_ -> nodeStream) (nodeS)
-  let s = inIO sampleIOE $ taggedS sensors
-  putStrLn "Starting server on http://localhost:8080"
-  run 8080 (app s)
+  let
+    ns = take 10 testNodes
+    sensors :: Kbtz SerialT MonadEnv NodeTest SensorS
+    sensors = testKbtz ns (\_ -> nodeStream) (nodeS)
+    --mesh = testKbtz ns (\_ -> meshStream) (meshT)
+    --market = testKbtz ns (\_ -> txStream) (txS)
+  --(s :: _) <- sampleIOE $ kbtzState sensors
+  undefined
 
 app :: (ToJSON a) => (SerialT IO a) -> Application
 app s = serve api (server s)

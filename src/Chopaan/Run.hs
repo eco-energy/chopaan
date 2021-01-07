@@ -22,26 +22,35 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          , writeToPubQ
                          , PubQueue
                          )
-import Chopaan.Kibbutz.Kibbutz (sensorKbtz, rsKbtz, getNodes, monitor, taggedS, runKbtz, logKbtz)
-import Chopaan.Kibbutz.Transactor (runTransactor)
+import Chopaan.Kibbutz.Kibbutz ( sensorKbtz
+                               , rsKbtz
+                               , getNodes
+                               , scanKbtz
+                               , runKbtz
+                               , logKbtz
+                               , Kbtz(..)
+                               , KbtzId(..)
+                               )
+import Chopaan.Kibbutz.Transactor (runTransactor, Tx(..), TransactionStatus, asKbtz)
 
-import Chopaan.UI (mon)
+import Chopaan.Ui (mon, defGrid)
 import qualified System.Remote.Monitoring as EKG
 import qualified System.Metrics as EKG
 import Chopaan.DB
 import Chopaan.DB.Sensors
 
-{-- TESTING
-
 import Chopaan.Node.NodeId (NodeMAC, NodeId(..))
+
+
+
+-- TESTING
 import Proto.NodeMessageSchema.NodeMessages (EnergyState)
 import Proto.NodeMessageSchema.NodeMessages_Fields
---}
+--
 
 
 import Lens.Micro
 import Data.ProtoLens
-
 
 
 run :: RIO App ()
@@ -50,29 +59,55 @@ run = do
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
-  nodes <- (runReaderT getNodes name)
-  liftIO $ print nodes
-  dbConn <- liftIO $ getDbConn dbOpts
+    nodes = testNodes
+  --nodes <- (runReaderT getNodes (KbtzId name))
+  --liftIO $ print nodes
+  --dbpool <- liftIO $ dbPool dbOpts
   qs@MessageQs{..} <- liftIO $ initQs nodes
-  _ <- liftIO $ forkIO $ forever $
-       runMqtt mqttOpts outbox nodes (mkCallback qs)
-  --_ <- liftIO . forkIO $ testPub nodes outbox 
-  sensors' <- liftIO $ sensorKbtz nodes stateChan
+  _ <- liftIO $ forkIO $ forever $ runMqtt mqttOpts outbox nodes (mkCallback qs)
+  _ <- liftIO . forkIO $ testPub nodes outbox 
+  sensors <- liftIO $ sensorKbtz @SerialT @IO nodes stateChan
   runtime <- liftIO $ rsKbtz @SerialT @IO nodes statsChan
-  liftIO $ S.drain . runKbtz . logKbtz $ sensors'
-  --sensorStore <- liftIO $ EKG.newStore
-  --sensors <- liftIO $ monitor sensorStore sensors'
-  --(txMonitor, txs) <- liftIO $ runTransactor outbox (60*5) sensors
-  --liftIO $ EKG.registerGcMetrics sensorStore
-  --_ <- liftIO $ EKG.forkServerWith sensorStore "localhost" 8000
-  --liftIO $ forkIO $ runKbtz $ logKbtz runtime
-  --liftIO $ runKbtz sensors
+  --(txns :: Kbtz AheadT IO (Tx NodeMAC) TransactionStatus) <-
+    --liftIO $
+    --runTransactor outbox (60*5) sensors
+  --liftIO . forkIO $ S.mapM_ print $ adapt . runKbtz $ txns
+  liftIO $ print ("Running Monitor...")
+  liftIO $ mon id (defGrid nodes) sensors runtime
 
-{--
+
+k1Nodes :: [NodeMAC]
+k1Nodes = NodeId <$> [ "24:6f:28:a9:71:30"
+                     , "7c:9e:bd:f6:42:68"
+                     , "7c:9e:b7:75:c6:cc"
+                     , "7c:9e:bd:f5:07:c8"
+                     , "7c:9e:bd:f6:44:98"
+                     , "a4:cf:12:99:d3:d8"
+                     , "24:6f:28:9d:43:48"
+                     , "a4:cf:12:9a:39:4c"
+                     ]
+
+--k1GLayout = gridGraphLayout k1Nodes k1Edges 
+
+in6 :: [a] -> [[a]]
+in6 x = return $ take 6 x
+
 testNodes :: [NodeMAC]
-testNodes = take 5 $ NodeId <$> [Text.pack $ [a] <> [b] <> [c] <> [d]
-                       | a <- "acdsdfsv", b <- "casdaf"
-                       , c <- "asdsad", d <- "asdasda"]
+testNodes = take 10 $
+  (\ns -> NodeId (Text.pack $ mconcat ((<> (":" :: String))
+                                       <$> ns)))
+  <$> (in6 (twistor [a, b, c, d, e, f]) :: ([[String]]))
+  where
+    a = "aa"
+    b = "bb"
+    c = "cc"
+    d = "dd"
+    e = "ee"
+    f = "ff"
+    g = "gg"
+
+twistor [] = []
+twistor (x:xs) = (xs <> [x])
 
 testPub :: [NodeMAC] -> PubQueue -> IO ()
 testPub ns q = S.mapM_ (uncurry $ writeToPubQ q) $ constRate 1 $ asTopicDispatch <$> (simNodeES ns)
@@ -94,4 +129,4 @@ simNodeES (n:ns) = foldl' (wAsync) (es n) (es <$> ns)
           & solarInputCurrent .~ 10
           & dutyCycle .~ 0
           & cpuTime .~ (fromIntegral $ (1581444138 + t))
---}
+
