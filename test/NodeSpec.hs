@@ -3,7 +3,7 @@
 
 module NodeSpec (spec) where
 
-import Chopaan.Node.Node
+import Chopaan.Node.Metrics
 import Test.Hspec
 import Test.QuickCheck.Classes
 import Test.QuickCheck.Checkers
@@ -23,45 +23,34 @@ import Data.ProtoLens (defMessage)
 import Lens.Micro
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import qualified Data.Time as Time
---import Chopaan.Subscriber (subStream, runSubscriber, Subscriber, StreamMap, getStream, writeSub, mkSub, subMap)
 
 import Control.Concurrent (threadDelay, forkIO)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (isEmptyTChan, dupTChan)
 import Control.Monad (forever, liftM)
 
---import Chopaan.Registry (duplicateS)
+
 import Numeric.Compensated
 
 --instance Arbitrary EnergyState where
 --  arbitrary = arbitraryMessage
 
-instance (Arbitrary a) => Arbitrary (Power a) where
-  arbitrary = Power <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary 
-
-instance (Arbitrary a) => Arbitrary (Energy a) where
-  arbitrary = Energy <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+instance (Arbitrary a) => Arbitrary (Node a) where
+  arbitrary = Node <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary 
 
 
---instance (Arbitrary a, Arbitrary b) => Arbitrary (NodeMetrics a b) where
---  arbitrary = NodeMetrics <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
-
-instance (Eq a) => EqProp (Power a) where
+instance (Eq a) => EqProp (Node a) where
   a =-= b = eq a b
 
-instance (Eq a) => EqProp (Energy a) where
-  a =-= b = eq a b
 
 
 spec :: Spec
 spec = do
   describe "This is how we use node streams" $ do
     it "power is a monoid and an applicative" $ do
-      verboseBatch (monoid (undefined :: (Power Double)))
-      verboseBatch (applicative (undefined :: Power (Double, Double, Double)))
-    it "energy is a monoid and an applicative" $ do
-      verboseBatch (monoid (undefined :: (Energy Double)))
-      verboseBatch (applicative (undefined :: Energy (Double, Double, Double)))
+      verboseBatch (monoid (undefined :: (Node Double)))
+      verboseBatch (applicative (undefined :: Node (Double, Double, Double)))
+
 {--    it "a stream at a 1 sec interval with a fixed power has an energy after n steps equivalent to the sum of the powers" $ do
       let
         len = 102 :: Int
