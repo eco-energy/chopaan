@@ -5,6 +5,7 @@ module Chopaan.Utils.StreamsInterop where
 
 import Streamly
 import qualified Streamly.Prelude as S
+{--
 import qualified Reflex as R
 
 import Control.Monad (void)
@@ -43,3 +44,4 @@ fromEvent e = S.unfoldrM iterOverEvent e
 
 inIO :: forall t m a. (IsStream t, Monad m) => (forall b. m b -> IO b) -> t m a -> t IO a
 inIO f s = hoist f s
+--}
