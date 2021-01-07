@@ -8,24 +8,36 @@
 module Chopaan.Kibbutz.Transactor ( runTransactor
                                   , Stake(..)
                                   , Tx(..)
+                                  , TxPlan(..)
                                   , Role(..)
                                   , TransactionStatus(..)
                                   , mkStake
                                   , dispatchTx
+                                  , asKbtz
                                   ) where
 
 import Prelude hiding (zip, zipWith)
 
 import Control.Monad.IO.Class
 
-import Chopaan.Kibbutz.Kibbutz (Kbtz(..), mapStream)
+import Chopaan.Kibbutz.Kibbutz (Kbtz(..), kbtzState, scanKbtz, runKbtzKeyed)
 import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue, writeToPubQ)
-import Chopaan.Node.Node (pToE, toWattSeconds, toWatts, fromWattSeconds, fromWatts, Watts, WattSeconds, NodeS, NodeMetrics(..), Power(..), Battery(..))
+import Chopaan.Node.Node (SensorS)
+import Chopaan.Node.Metrics (Power
+                            , toWattSeconds, toWatts
+                            , fromWattSeconds, fromWatts
+                            , Watts, WattSeconds
+                            , SensorMetrics(..)
+                            , Node(..)
+                            , pToE
+                            , Battery(..)
+                            )
+
 
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
-import Data.Maybe (isNothing, fromJust)
+import Data.Maybe (isJust, fromJust)
 
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
@@ -49,69 +61,35 @@ import Data.Key
 import qualified Data.List as L
 
 import Chopaan.Kibbutz.LinOpt
-
 import Data.SBV
-
 import ConCat.Misc (R)
+
 
 type T = Time.NominalDiffTime
 
-mkETR :: Watts -> Time.DiffTime -> NM.PDirection -> NM.EnergyTransactionRequest
-mkETR power howLong dir = defMessage
-         & NM.powerInWatts .~ (fromWatts power)
-         & NM.durationInSeconds .~ (timeToWord howLong)
-         & NM.direction .~ dir
-  where
-    timeToWord :: Time.DiffTime -> Word64
-    timeToWord = (convert @Int @Word64) . (round @Time.DiffTime @Int)
+newtype Tx n a = Tx (M.Map n a) deriving (Eq, Ord, Show, Generic)
 
-
-mkTxDispatch :: (Address n) => Text.Text -> Time.UTCTime -> Tx n -> NM.Transaction
-mkTxDispatch uid stime (Tx txns) = defMessage
-                         & NM.uuid .~ uid
-                         & NM.start .~ (utcToWord64 stime)
-                         & NM.etrs .~ (M.mapKeys (toRemoteId) $ fromStake <$> txns) 
-  where
-    utcToWord64 :: Time.UTCTime -> Word64
-    utcToWord64 = (convert @Int @Word64) . (convert @Time.UTCTime @Int)
-
-fromStake :: Stake -> NM.EnergyTransactionRequest
-fromStake (Stake (role, watts, duration)) = mkETR watts duration (toPDir role)
-  where
-    toPDir Source = NM.Outgoing
-    toPDir Sink = NM.Incoming
-
-
-data Role = Source | Sink deriving (Eq, Ord, Show, Generic)
-
-newtype Stake = Stake { unStake :: (Role, Watts, Time.DiffTime) } deriving (Eq, Ord, Show, Generic)
-
-mkStake :: Role -> Double -> Int -> Stake
-mkStake r p t = Stake (r, toWatts p, fromIntegral t)
-
-newtype Tx n = Tx (M.Map n Stake) deriving (Eq, Ord, Show, Generic)
-
-instance (Ord n) => Semigroup (Tx n) where
+instance (Ord n) => Semigroup (Tx n a) where
   (Tx m) <> (Tx m') = Tx (m <> m')
 
-instance (Ord n) => Monoid (Tx n) where
+instance (Ord n) => Monoid (Tx n a) where
   mempty = Tx mempty
 
-newtype TxState n = TxState (M.Map n (Role, TransactionStatus)) deriving (Eq, Ord, Show, Generic)
+type TxPlan n = Tx n Stake
 
-instance (Ord n) => Semigroup (TxState n) where
-  (TxState m) <> (TxState m') = TxState (m <> m')
+type TxState n = Tx n (Role, TransactionStatus)
 
-instance (Ord n) => Monoid (TxState n) where
-  mempty = TxState mempty
+type NodeStates n = Tx n SensorS
 
-newtype NodeStates n = NodeStates (M.Map n NodeS) deriving (Eq, Ord, Show, Generic)
 
-instance (Ord n) => Semigroup (NodeStates n) where
-  (NodeStates m) <> (NodeStates m') = NodeStates (m <> m')
 
-instance (Ord n) => Monoid (NodeStates n) where
-  mempty = NodeStates mempty
+asKbtz :: forall t m n a. (IsStream t, MonadAsync m, Ord n)
+  => t m (TxPlan n, t m TransactionStatus)
+  -> m (Kbtz t m (TxPlan n) TransactionStatus)
+asKbtz txs = do
+  tx <- S.toList . adapt $ txs
+  return . Kbtz . M.fromList $ tx
+
 
 data TransactionStatus = TransactionStatus
   { energyDispatched :: WattSeconds
@@ -150,32 +128,41 @@ instance Monoid TransactionStatus where
     , endLag = 0
     }
 
-nodeCost :: (Functor f, Functor g, Foldable f, Foldable g) => Kbtz t m (n, n) TransactionStatus -> FL.Fold m TransactionStatus WattSeconds -> f (g WattSeconds)
-nodeCost k f = undefined   
+nodeCost :: (Functor f, Functor g, Foldable f, Foldable g) => t m (TxPlan n) -> t m TransactionStatus -> FL.Fold m TransactionStatus WattSeconds -> f (g WattSeconds)
+nodeCost k f = undefined
 
-toNodeStates :: (Monad m, Address n, Ord n, IsStream t, Monad (t m)) => Kbtz t m n NodeS -> t m (NodeStates n)
-toNodeStates k = NodeStates <$> mapStream k
+toNodeStates :: (MonadAsync m, Address n, Ord n, IsStream t, Monad (t m)) => Kbtz t m n SensorS -> t m (NodeStates n)
+toNodeStates k = Tx <$> (kbtzState k)
 
-planTx :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m)) => Time.DiffTime -> Kbtz t m n NodeS -> t m (Tx n)
-planTx horizon k = S.postscan (transactionPlanner horizon) $ S.map (fromJust) $ S.filter (isNothing) $ S.intervalsOf (realToFrac horizon) FL.last $ toNodeStates k -- apply intervals of to t m NodeS instead of t m (Tx n)
+planTx :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m)) => Time.DiffTime -> Kbtz t m n SensorS -> t m (TxPlan n)
+planTx horizon k = S.trace (\p -> liftIO . print $ "Plan For Interval:\n" <> show p) $
+                   S.postscan (transactionPlanner horizon)
+                    $ S.map (fromJust)
+                    $ S.filter (isJust)
+                    $ S.intervalsOf (realToFrac horizon) FL.last
+                    $ toNodeStates k 
+                   
 
-monitorTx :: (Monad m, Address n, Ord n, IsStream t, Monad (t m)) => Tx n -> Kbtz t m n NodeS -> t m (TransactionStatus)
-monitorTx tx k = S.postscan (transactionFold tx) $ toNodeStates k
+monitorTx :: (MonadAsync m, Address n, Ord n, IsStream t, Monad (t m)) => TxPlan n -> Kbtz t m n SensorS -> t m TransactionStatus
+monitorTx tx k = S.postscan (transactionFold tx)
+                 $ S.trace (\tx -> liftIO . print $ "Entering Tx Monitor" <> "\n" <> show tx)  
+                 $ toNodeStates k
 
 
 runTransactor :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m))
   => PubQueue
   -> Time.DiffTime
-  -> Kbtz t m n NodeS
-  -> m (t m TransactionStatus, t m (Tx n))
-runTransactor q horizon k = return (statuses, txs)
+  -> Kbtz t m n SensorS
+  -> m (Kbtz t m (TxPlan n) TransactionStatus)
+runTransactor q horizon k =  (return . Kbtz . M.fromList) =<< (S.toList . adapt $ (,) <$> txs <*> statuses)
   where
     txs = S.trace (dispatchTx q) $ planTx horizon k
-    statuses = S.concatMap (flip monitorTx $ k) txs 
+    statuses = S.map (flip monitorTx $ k) txs 
+    withLog f q = f q >> \tx -> putStrLn ("Tx:\n" <> show tx) 
 
 dispatchTx :: forall m n. (MonadIO m, Address n)
   => PubQueue
-  -> Tx n
+  -> TxPlan n
   -> m ()
 dispatchTx q tx = do
   uid <- liftIO $ (Text.pack . show) <$> getULID
@@ -185,29 +172,29 @@ dispatchTx q tx = do
 
 
 -- The state will just be carried across as a TransactionStatus
-transactionFold :: forall m n. (Monad m, Address n, Ord n) => Tx n
+transactionFold :: forall m n. (Monad m, Address n, Ord n) => TxPlan n
   -> FL.Fold m (NodeStates n) (TransactionStatus)
 transactionFold (Tx participants) = FL.Fold step start end
   where
     step :: TxState n -> NodeStates n -> m (TxState n)
     -- Zip instance for Map is defined as intersection with, so we don't need
     -- to filter the NodeStates.
-    step (TxState ts) (NodeStates ns) = return . TxState $ zipWith updateTS ts ns 
+    step (Tx ts) (Tx ns) = return . Tx $ zipWith updateTS ts ns 
     start :: m (TxState n)
-    start = return . TxState $
+    start = return . Tx $
       (\(Stake (px, w, t))-> (px, mempty{ timeRemaining = t
                           , energyRemaining = (pToE @Double) (realToFrac t) w
                           , startLag = 0
                           }))
       <$> participants
     end :: TxState n -> m TransactionStatus
-    end (TxState gt) = let
+    end (Tx gt) = let
       gridTx = foldl (<>) mempty $ snd <$> gt
       loss = energyDispatched gridTx - energyReceived gridTx
       lossPerWS = loss / (energyDispatched gridTx)
       in return $ gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
-    updateTS :: (Role, TransactionStatus) -> NodeS -> (Role, TransactionStatus)
-    updateTS (px, tx) NodeMetrics{..} = let
+    updateTS :: (Role, TransactionStatus) -> SensorS -> (Role, TransactionStatus)
+    updateTS (px, tx) SensorMetrics{..} = let
       nextTS = case px of
                  Source -> (mempty @TransactionStatus)
                            { energyDispatched = e + energyDispatched tx
@@ -226,41 +213,42 @@ transactionFold (Tx participants) = FL.Fold step start end
       in (px, nextTS)
       where
         e :: WattSeconds
-        e = (pToE @Double) (realToFrac lastTimeDiff) (tOutP _powerT)
-        hasStarted Source = (tOutP _powerT) >= eta
-        hasStarted Sink = (tInP _powerT) >= eta
-        hasEnded Source =  shouldHaveEnded && (tOutP _powerT) <= eta
-        hasEnded Sink = shouldHaveEnded && (tInP _powerT) <= eta
+        e = (pToE @Double) (realToFrac lastTimeDiff) (txOut _powerT)
+        hasStarted Source = (txOut _powerT) >= eta
+        hasStarted Sink = (txIn _powerT) >= eta
+        hasEnded Source =  shouldHaveEnded && (txOut _powerT) <= eta
+        hasEnded Sink = shouldHaveEnded && (txIn _powerT) <= eta
         shouldHaveEnded = (energyRemaining tx - e) <= 0
         eta = 0.5
 
-transactionPlanner :: forall m n. (MonadIO m, Show n, Address n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (Tx n)
+transactionPlanner :: forall m n. (MonadIO m, Show n, Address n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (TxPlan n)
 transactionPlanner timeHorizon = FL.Fold step start end
   where
-    step ::  Tx n -> NodeStates n -> m (Tx n)
-    step (Tx _) (NodeStates nodes) = do
+    step ::  TxPlan n -> NodeStates n -> m (TxPlan n)
+    step (Tx _) (Tx nodes) = do
       s <- schedule
-      let (ValidPlan sc c) = s
-      return $ sc
+      case s of
+        (ValidPlan sc c) -> return $ sc
+        Wait -> return $ mempty
       where
         consumption = M.toAscList $ fmap _demand nodes
         storage = M.toAscList $ fmap (\n -> toWattSeconds $ (totalCapacity . _battery $ n) * (soc . _battery $ n)) nodes
         d = zipWith (\(i, c) (_, s) -> (i, c - s)) consumption storage
         (sources, sinks) = L.partition (\x -> snd x > 0) d
         better f ss = uncurry f $ unzip $ (\(x, y) -> (x, fromWattSeconds y)) <$> ss
-        schedule :: m (TxPlan n)
+        schedule :: m (TxPlan' n)
         schedule = solveTP timeHorizon
           (better mkSources sources)
           (better mkSinks sinks)
           [[1 |_ <- [1..length sources]] | _ <- [1..length sinks]]        
-    start :: m (Tx n)
+    start :: m (TxPlan n)
     start = pure mempty
-    end :: Tx n -> m (Tx n)
+    end :: TxPlan n -> m (TxPlan n)
     end = pure
 
-data TxPlan n = ValidPlan (Tx n) R | Wait
+data TxPlan' n = ValidPlan (TxPlan n) R | Wait
 
-solveTP :: forall m n. (MonadIO m, Ord n, Show n) => Time.DiffTime -> Sources n -> Sinks n -> [[Double]] -> m (TxPlan n)
+solveTP :: forall m n. (MonadIO m, Ord n, Show n) => Time.DiffTime -> Sources n -> Sinks n -> [[Double]] -> m (TxPlan' n)
 solveTP timeHorizon sources sinks cs = do
   liftIO $ do
     (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs
@@ -298,9 +286,35 @@ isValidPlan :: [a] -> Bool
 isValidPlan plan = length plan > 0
 
 
+{---
+    Concretely
+----}
 
+data Role = Source | Sink deriving (Eq, Ord, Show, Generic)
 
+newtype Stake = Stake {
+  unStake :: (Role, Watts, Time.DiffTime)
+  } deriving (Eq, Ord, Show, Generic)
 
---planSoCDelta :: TxPlan n -> Kbtz t m n NodeS -> Kbtz t m n WattSeconds 
---planSoCDelta Wait k = 0
---planSoCDelta (ValidPlan xs cost) k = fmap toWattSeconds cost
+mkStake :: Role -> Double -> Int -> Stake
+mkStake r p t = Stake (r, toWatts p, fromIntegral t)
+
+mkTxDispatch :: (Address n) => Text.Text -> Time.UTCTime -> TxPlan n -> NM.Transaction
+mkTxDispatch uid stime (Tx txns) = defMessage
+                         & NM.uuid .~ uid
+                         & NM.start .~ (utcToWord64 stime)
+                         & NM.etrs .~ (M.mapKeys (toRemoteId) $ fromStake <$> txns) 
+  where
+    utcToWord64 :: Time.UTCTime -> Word64
+    utcToWord64 = (convert @Int @Word64) . (convert @Time.UTCTime @Int)
+
+fromStake :: Stake -> NM.EnergyTransactionRequest
+fromStake (Stake (role, watts, duration)) = defMessage
+                                            & NM.powerInWatts .~ (fromWatts watts)
+                                            & NM.durationInSeconds .~ (timeToWord duration)
+                                            & NM.direction .~ (toPDir role) 
+  where
+    toPDir Source = NM.Outgoing
+    toPDir Sink = NM.Incoming
+    timeToWord :: Time.DiffTime -> Word64
+    timeToWord = (convert @Int @Word64) . (round @Time.DiffTime @Int)

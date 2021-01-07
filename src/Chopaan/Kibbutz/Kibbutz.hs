@@ -1,7 +1,8 @@
-{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds, InstanceSigs, DeriveGeneric, StandaloneDeriving, TypeOperators #-}
+{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds, InstanceSigs, DeriveGeneric, StandaloneDeriving, TypeOperators, QuantifiedConstraints #-}
+
 module Chopaan.Kibbutz.Kibbutz where
 
-import Prelude hiding (zipWith)
+import Prelude hiding ((.), id, zipWith, const)
 import Streamly
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
@@ -15,8 +16,8 @@ import qualified Data.Map.Lazy as M
 import Data.Map.Lazy (Map)
 import Data.Key
 
---import Data.Bifunctor
---import Control.Applicative (liftA2)
+import Data.Bifunctor
+import Control.Applicative (liftA2)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Trans.Reader
 
@@ -26,12 +27,7 @@ import Chopaan.Comm.Comm ( Address
                          , WriteChan
                          )
 
-import Chopaan.Node.Node ( nodeS
-                         , NodeS
-                         , registerNodeG
-                         , updateNodeG
-                         , NodeGauge
-                         )
+import Chopaan.Node.Node ( nodeS, SensorS )
 import Chopaan.Node.NodeId ( NodeMAC
                            , NodeId(..)
                            )
@@ -42,40 +38,32 @@ import Chopaan.Kibbutz.AWS.Things ( getThings
 import Proto.NodeMessageSchema.NodeMessages ( RuntimeStats
                                             , EnergyState
                                             )
-import Chopaan.Utils.StreamsInterop (toEvent)
-import qualified Reflex as R
-import Reflex.Vty (VtyWidget)
+
 import qualified System.Metrics as EKG
 
 import ConCat.Scan
 import ConCat.Misc
+import ConCat.Category
 
-{--
-class Functor f => LScan f where
-  lscan :: forall a. Monoid a => f a -> f a :* a
-  default lscan :: (Generic1 f, LScan (Rep1 f), Monoid a) => f a -> f a :* a
-  lscan = first to1 . lscan . from1
-  -- Temporary hack to avoid newtype-like representation. Still needed?
-  lscanDummy :: f a
-  lscanDummy = undefined
---}
-
+import Data.Distributive 
 
 
 instance KbtzConn t m n => LScan (Kbtz t m n) where
   lscan :: forall a. (Monoid a) => Kbtz t m n a -> (Kbtz t m n a :* a)
   lscan f = (f, mempty)
 
---deriving instance (IsStream t, MonadAsync m) => Generic1 (t m)
-
-type KbtzId = Text
+newtype KbtzId = KbtzId Text
 
 newtype Kbtz (t :: (* -> *) -> * -> *) (m :: * -> *) n a = Kbtz {
   unKibbutz :: Map n (t m a)
 } deriving (Eq, Ord, Show, Generic, Generic1)
 
+streams :: Kbtz t m n a -> [t m a]
+streams = (snd <$>) . M.toList . unKibbutz
+
 nodes :: Kbtz t m n a -> [n]
 nodes = M.keys . unKibbutz
+
 
 instance (IsStream t, Monad m) => Functor (Kbtz t m n) where
   fmap f (Kbtz m) = Kbtz $ fmap (S.map f) m
@@ -91,43 +79,69 @@ instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n)
   (Kbtz a) <*> (Kbtz b) = Kbtz $ zipWith (<*>) a b
 
 
-postscan :: forall t m n a a'. (KbtzConn t m n) => Kbtz t m n a -> (a -> a') -> a' -> Kbtz t m n a'
-postscan (Kbtz m) f' start = Kbtz $ (S.postscan f) <$> m
-  where
-    f :: FL.Fold m a a'
-    f = FL.Fold st in' out
-      where
-        st :: a' -> a -> m a'
-        st _ a = return $ f' a
-        in' :: m a'
-        in' = pure start
-        out :: a' -> m a'
-        out = pure
-
-{--
-instance (IsStream t, Monad m) => Bifunctor (Kbtz t m) where
-  bimap :: forall n a n' a'. (Ord n, Ord n') => (n -> n') -> (a -> a') -> Kbtz t m n a -> Kbtz t m n' a' 
-  bimap f g kbtz = Kbtz $ zz
+instance (IsStream t, Monad m, (forall a. Ord a)) => Bifunctor (Kbtz t m) where
+  bimap :: forall n n' a a'. (Ord n')
+    => (n -> n')
+    -> (a -> a')
+    -> Kbtz t m n a
+    -> Kbtz t m n' a' 
+  bimap f g kbz = Kbtz $ zz
     where
       zz :: Map n' (t m a')
       zz = M.mapKeys f $ yy
       yy :: Map n (t m a')
       yy = unKibbutz xx
       xx :: Kbtz t m n a'
-      xx = (g <$> kbtz)
+      xx = (g <$> kbz)
+
+{--
+instance (IsStream t, Monad m, (forall n. Monoid n), (forall a. Monoid a)) => Category (Kbtz t m) where
+  id = Kbtz $ M.singleton mempty S.nil
+  (.) :: forall b c a. Ok3 (Kbtz t m) a b c => (Kbtz t m b c) -> (Kbtz t m a b) -> (Kbtz t m a c)
+  (Kbtz k) . (Kbtz k') = undefined
+
+instance (IsStream t, Monad m) => Distributive (Kbtz t m n) where
+  distribute :: Functor f => f (Kbtz t m n a) -> Kbtz t m n (f a)
+  distribute kbtz = undefined -- $ streams kbtz 
 --}
-
--- The Semantic Function is a scan
-
-
+--instance (IsStream t, Monad m) => Representable (Kbtz t m n)
 
 type KbtzConn t m n = (IsStream t, MonadAsync m, Address n)
 
-runKbtz :: forall t m n a. KbtzConn t m n => Kbtz t m n a -> t m a
-runKbtz = unify
+-- The Semantic Function is a scan
+scanKbtz :: forall t m n a a'. (KbtzConn t m n)
+  => Kbtz t m n a
+  -> FL.Fold m a a'
+  -> Kbtz t m n a'
+scanKbtz (Kbtz m) f' = Kbtz $ (S.postscan f') <$> m
+
+scanState :: forall t m n a a'. (KbtzConn t m n, Monad (t m))
+  => FL.Fold m (Map n a) (Map n a')
+  -> Kbtz t m n a
+  -> t m (Map n a')
+scanState f = (S.postscan f) . kbtzState
+
+scanfn :: forall t m n a a'. (KbtzConn t m n)
+  => Kbtz t m n a
+  -> (a' -> a -> a')
+  -> a'
+  -> Kbtz t m n a'
+scanfn k f i = scanKbtz k $ pureFold f i id 
+
+pureFold :: (Applicative m) => (a' -> a -> a') -> a' -> (a' -> a') -> FL.Fold m a a'
+pureFold f i e = FL.Fold (\x y -> pure $ f x y) (pure i) (pure . e)
+
+runKbtz :: forall t m n a. (IsStream t, MonadAsync m, Ord n) => Kbtz t m n a -> t m a
+runKbtz = (M.foldl parallel mempty) . unKibbutz
+
+runKbtzKeyed :: forall t m n a. (IsStream t, MonadAsync m) => Kbtz t m n a -> t m (n, a)
+runKbtzKeyed = (M.foldlWithKey taggedParallel mempty) . unKibbutz
   where
-    unify :: Kbtz t m n a -> t m a
-    unify = (M.foldl parallel mempty) . unKibbutz
+    taggedParallel :: t m (n, a) -> n -> t m a -> t m (n, a)
+    taggedParallel c key s = (S.zipWith (,) (S.repeat key) s) `parallel` c
+
+kbtzState :: (IsStream t, Monad m, Monad (t m)) => Kbtz t m n a -> t m (Map n a)
+kbtzState (Kbtz k) = sequence k
 
 kbtz ::
   forall t m n a b.
@@ -144,7 +158,7 @@ kbtz ns subscribe process = do
 sensorKbtz :: forall t m. (IsStream t, MonadAsync m)
   => [NodeMAC]
   -> WriteChan NodeMAC EnergyState
-  -> m (Kbtz t m NodeMAC NodeS)
+  -> m (Kbtz t m NodeMAC SensorS)
 sensorKbtz ns q = kbtz ns (sub @t @m @NodeMAC @EnergyState q) nodeS
 
 rsKbtz :: forall t m. (IsStream t, MonadAsync m)
@@ -152,11 +166,6 @@ rsKbtz :: forall t m. (IsStream t, MonadAsync m)
   -> WriteChan NodeMAC RuntimeStats
   -> m (Kbtz t m NodeMAC RuntimeStats)
 rsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @RuntimeStats q) id
-
-asFRPNetwork :: forall t t' m m' n a.
-  (IsStream t, MonadAsync m, R.Reflex t', R.TriggerEvent t' m', MonadIO m', Show a)
-  => (forall x. m x -> IO x) -> Kbtz t m n a -> VtyWidget t' m' (Map n (R.Event t' a))
-asFRPNetwork h = sequence . (M.map (toEvent @t @t' h)) . unKibbutz
 
 traceKbtz :: (IsStream t, MonadAsync m) => (n -> a -> m ())
           -> Kbtz t m n a
@@ -171,19 +180,9 @@ sub = flip (subStream @t @m @n @a)
 
 getNodes :: (MonadIO m) => ReaderT KbtzId m [NodeMAC]
 getNodes = do
-  n <- ask
+  (KbtzId n) <- ask
   ((fmap $ NodeId . fromJust . thingName)
               <$> (liftIO . getThings $ n))
-
-mapStream :: (IsStream t, Monad m, Monad (t m)) => Kbtz t m n a -> t m (Map n a)
-mapStream (Kbtz k) = sequence k
-
-taggedS :: forall t m n a. (IsStream t, MonadAsync m) => Kbtz t m n a -> t m (n, a)
-taggedS (Kbtz k) = M.foldlWithKey' (nodeTagMerge) (S.fromList []) k
-  where
-    nodeTagMerge :: t m (n, a) -> n -> t m a -> t m (n, a)
-    nodeTagMerge c key s = (S.map (\x -> (key, x)) s) <> c
-
 
 logNode :: (MonadIO m, Show n, Show a) => n -> a -> m ()
 logNode k v = liftIO . print $ "Node: "
@@ -193,12 +192,15 @@ logNode k v = liftIO . print $ "Node: "
 logKbtz :: (KbtzConn t m n, Show a) => Kbtz t m n a -> Kbtz t m n a 
 logKbtz = traceKbtz logNode
 
+{--
+
 class Gauged a
   
 --instance Gauged  where
 --  toInt64 = registerNodeG
 
 instance Gauged NodeGauge
+
 
 -- $ Create a store for the kbtz, and NodeGauges for each node, then map the update across
 gauge :: forall t m n a b. (KbtzConn t m n, Gauged b) => EKG.Store -> (EKG.Store -> m (Map n b)) -> (b -> a -> m ()) -> Kbtz t m n a -> m (Kbtz t m n a)
@@ -211,3 +213,4 @@ kbtzGauge km store = sequence $ M.mapWithKey (\k _ -> registerNodeG store k) km
 
 monitor :: (KbtzConn t m n, Show n) => EKG.Store -> Kbtz t m n NodeS -> m (Kbtz t m n NodeS)
 monitor store k@(Kbtz km) = gauge store (kbtzGauge km) updateNodeG k >>= (pure . logKbtz)
+--}
