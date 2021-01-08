@@ -121,7 +121,7 @@ defGrid n = inOrder n
 drawGrid :: forall n. NodeKey n => GridL n -> Diagram B
 drawGrid GridL{nodesL, edgesL} = let
   dia = gridSnake (drawNode <$> nodesL)
-  in applyAll [connectOutside i j | (i, j) <- edgesL] dia    
+  in dia --applyAll [connectOutside i j | (i, j) <- edgesL] dia    
   where
     drawNode :: n  -> Diagram B
     drawNode n = SVG.svgId (show n) $ (square 10
@@ -154,14 +154,11 @@ instance FromHttpApiData Page where
   parseUrlPiece = parseUrlPiece
 
 
-renderDiag :: Double -> Diagram B -> Markup
-renderDiag w = (sendDiagram w)
-
 pageWithSockets :: (NodeKey n) => Double -> [n] -> Diagram B -> Page -> Markup
-pageWithSockets w nodes diag res = preEscapedString $
+pageWithSockets w ns diag res = preEscapedString $
                         (markupRender $ emptyStyle [])
-                        <> (webSocketScript nodes $ show res)
-                        <> (markupRender $ renderDiag w diag)
+                        <> (webSocketScript ns $ show res)
+                        <> (markupRender $ sendDiagram w diag)
 
 type PageT m n = (ReaderT (Double, n) m Markup)
 
@@ -209,7 +206,7 @@ webSocketScript nodes res = [q|
         };
 
         let svgPath = "node-state-" + node;
-        let wsPath = "node/" +|] ++ res ++ [q| +"/" + node;
+        let wsPath = "node/" + "|] <> res <> [q|" + "/" + node;
 
         let ws = new WebSocket("ws://localhost:8080/" +  wsPath);
         
@@ -217,6 +214,7 @@ webSocketScript nodes res = [q|
         ws.onmessage = e => document.getElementById(svgPath).innerHTML = e.data;
         //ws.onclose = e => document.getElementById(svgPath).innerHTML =;
     };
+    |] <> [qc|
     const ns = {asJSList $ show <$> nodes}
     ns.map(createNodeSocket);
   </script>
@@ -242,25 +240,15 @@ type API n = MarkupAPI :<|> (WebSocketAPI n)
 
 type WebSocketAPI n = "node" :> (Capture "resource" String) :> (Capture "nodeid" n) :> WebSocket
 
-{--
-handler ::
-  (IsStream t, MonadAsync m, Address n, IsName n)
-  => M.Map Page (SomeKbtz t m n)
-  -> Double
-  -> [n]
-  -> Handler ()
-handler pd w ns = 
---}
 
 renderGr :: (NodeKey n) => Page -> Double -> GridL n -> Markup
-renderGr p w g@(GridL{nodesL}) = pageWithSockets w nodesL (drawGrid g) p 
+renderGr p w g@(GridL{nodesL}) = pageWithSockets w nodesL (drawGrid g) p
 
 renderTr :: (NodeKey n, Show a) => Double -> Tree (n, a) -> Markup
 renderTr w t = sendDiagram w $ radialTree t 
 
 class HasPage a where
   page' :: (Page -> a -> Markup)
-  
 
 gridPage w ns = renderGr GridP w (inOrder ns)
 
@@ -393,7 +381,7 @@ data CommSchema c = CommSchema
   , txChannel :: c
   } deriving (Eq, Ord, Show, Generic)
 
-
+{--
 data Kibbutzim
 
 kibbutz :: forall t m n. (MonadAsync m, NodeKey n)
@@ -424,3 +412,4 @@ monitor = undefined
 
 save :: forall a. a -> IO ()
 save = undefined
+--}
