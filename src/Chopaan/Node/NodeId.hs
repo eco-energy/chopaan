@@ -22,6 +22,9 @@ instance (ToField a) => ToField (NodeId a) where
 instance (FromHttpApiData a) => FromHttpApiData (NodeId a) where
   parseUrlPiece text = NodeId <$> (parseUrlPiece text)
 
+instance (ToHttpApiData a) => ToHttpApiData (NodeId a) where
+  toUrlPiece (NodeId ns) = (toUrlPiece ns)
+
 instance (Typeable a, Ord a, Show a) => IsName (NodeId a)
 
 type ThingName = Text.Text
