@@ -1,7 +1,7 @@
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications, FlexibleContexts, NamedFieldPuns, InstanceSigs #-}
 {-# LANGUAGE DeriveFunctor, DeriveGeneric #-}
 {-# LANGUAGE ApplicativeDo, QuasiQuotes, DataKinds, TypeOperators #-}
-{-# LANGUAGE GADTs, RankNTypes, ConstraintKinds #-}
+{-# LANGUAGE GADTs, RankNTypes, ConstraintKinds, TypeFamilies #-}
 module Chopaan.Ui (mon, defGrid) where
 
 import GHC.Generics hiding (R)
@@ -15,9 +15,10 @@ import qualified Data.Foldable as F
 import           Network.Wai.Handler.Warp (run)
 import           Network.WebSockets (Connection, sendTextData)
 import           Servant ( Get, Handler, Capture, Proxy(..), (:<|>)(..), (:>)
-                         , serve, FromHttpApiData(..))
-import           Servant.API.WebSocket (WebSocket)
+                         , serve, FromHttpApiData(..), ToHttpApiData(..))
+import           Servant.API.WebSocket (WebSocket (..))
 import           Servant.HTML.Blaze (HTML)
+import Servant.Links
 
 import Chopaan.Kibbutz.Kibbutz (Kbtz(..), getNodes, KbtzId, scanKbtz, traceKbtz, runKbtz
                                , nodes, streams)
@@ -25,7 +26,7 @@ import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, TransactionStatus(..), Stake(
 import Chopaan.Comm.Comm (Address)
 
 import Chopaan.Node.Node (SensorS)
-import Chopaan.Node.NodeId (NodeId)
+import Chopaan.Node.NodeId (NodeId(..), NodeMAC)
 import Chopaan.Node.Folds
 import Proto.NodeMessageSchema.NodeMessages (RuntimeStats)
 
@@ -54,6 +55,9 @@ import Control.Monad.Trans.Reader
 
 import Algebra.Graph.Labelled.AdjacencyMap
 
+instance HasLink WebSocket where
+  type MkLink (WebSocket) r = r 
+  toLink toA _ = toA
 
 
 -- Existentialized Kbtz
@@ -124,10 +128,7 @@ drawGrid GridL{nodesL, edgesL} = let
   in dia --applyAll [connectOutside i j | (i, j) <- edgesL] dia    
   where
     drawNode :: n  -> Diagram B
-    drawNode n = SVG.svgId (show n) $ (square 10
-                                       # fc white
-                                       # lc black
-                                       # named n)
+    drawNode n = mkNode n "This is not here yet"
 
 radialTree :: forall n a. (NodeKey n, Show a) => Tree (n, a) -> Diagram B
 radialTree t =
@@ -137,7 +138,14 @@ radialTree t =
    # centerXY # pad 1.1
 
 mkNode :: (Address n, Show a) => n -> a -> Diagram B
-mkNode n s = SVG.svgId ("node-state-" <> show n) $ text (show s) # fontSizeL 0.2 # fc white
+mkNode n s =  nodeSvgId n $ text (show s) # fontSizeL 0.2
+
+nodeSvgId :: (Show n) => n -> Diagram B -> Diagram B
+nodeSvgId n = SVG.svgId ("node-state-" <> (removeQuotes . show $ n))
+  where
+    removeQuotes :: String -> String  
+    removeQuotes [] = ""
+    removeQuotes (_:ns) = take (length ns - 1) ns
 
 data Page = GridP | MeshP | TxP deriving (Eq, Ord)
 
@@ -155,10 +163,8 @@ instance FromHttpApiData Page where
 
 
 pageWithSockets :: (NodeKey n) => Double -> [n] -> Diagram B -> Page -> Markup
-pageWithSockets w ns diag res = preEscapedString $
-                        (markupRender $ emptyStyle [])
-                        <> (webSocketScript ns $ show res)
-                        <> (markupRender $ sendDiagram w diag)
+pageWithSockets w ns diag res = (webSocketScript ns $ show res)
+                                <> (markupRender $ sendDiagram w diag)
 
 type PageT m n = (ReaderT (Double, n) m Markup)
 
@@ -184,25 +190,24 @@ treePage = do
   return $ pageWithSockets w (F.toList $ fmap fst t) (radialTree t) MeshP
   
 emptyStyle :: [a] -> Markup
-emptyStyle [] = [q|
+emptyStyle [] = preEscapedString $ [q|
   <style>
   </style>|]
-emptyStyle (n:ns) = [qc|
+emptyStyle (n:ns) = preEscapedString $ [qc|
   <style>
   </style>|]
 
 
-markupRender markup = [qc|
+markupRender markup = preEscapedString $ [qc|
   <div id="result">{renderMarkup markup}</div>
-  <table>
   |]
   
-webSocketScript nodes res = [q|
+webSocketScript ns res = preEscapedString $ [q|
   <script>
     const createNodeSocket = (node) => {
         const keepAlive = () => {
-            ws.send(JSON.stringify({}));
-            setTimeout(keepAlive, 1000);
+            //ws.send(JSON.stringify({}));
+            setTimeout(keepAlive, 100000);
         };
 
         let svgPath = "node-state-" + node;
@@ -210,12 +215,22 @@ webSocketScript nodes res = [q|
 
         let ws = new WebSocket("ws://localhost:8080/" +  wsPath);
         
-        ws.onopen = e => keepAlive();
-        ws.onmessage = e => document.getElementById(svgPath).innerHTML = e.data;
-        //ws.onclose = e => document.getElementById(svgPath).innerHTML =;
+        ws.onopen = e => {
+            console.log("WS Open:", e);
+            keepAlive();
+        }
+        ws.onmessage = e => {
+            console.log("Got Message", e);
+            let nsvg = document.getElementById(svgPath);
+            nsvg.replaceWith(e.data);
+            
+            
+        }
+        ws.onclose = e => console.log('WS closed: ', e);
+        ws.onerror = e => console.log('ws error', e);
     };
     |] <> [qc|
-    const ns = {asJSList $ show <$> nodes}
+    const ns = {asJSList $ show <$> ns}
     ns.map(createNodeSocket);
   </script>
   |]
@@ -229,8 +244,8 @@ asJSList ns = "[" <> (conv ns) <> "];"
         safeShow [] = error "empty string shouldn't happen on a safeShow!"
         safeShow (ss) = take (length ss) ss
 
-wsClosed :: String
-wsClosed = renderMarkup [q|
+wsClosed :: Markup
+wsClosed = preEscapedString $ [q|
              "No Websocket Connection"
            |]
 
@@ -238,8 +253,22 @@ type MarkupAPI = "page" :> (Capture "resource" String) :> Get '[HTML] Markup
   
 type API n = MarkupAPI :<|> (WebSocketAPI n)
 
-type WebSocketAPI n = "node" :> (Capture "resource" String) :> (Capture "nodeid" n) :> WebSocket
+type WebSocketAPI n = "node"
+                      :> (Capture "resource" String)
+                      :> (Capture "nodeid" n)
+                      :> WebSocket
 
+wsLink :: Page -> NodeMAC -> T.Text
+wsLink p n = toUrlPiece $ (safeLink api ws) (show p) n 
+  where
+    api = Proxy :: (Proxy (API NodeMAC))
+    ws =  Proxy :: (Proxy (WebSocketAPI NodeMAC))
+
+pageLink :: Page -> T.Text
+pageLink p = toUrlPiece $ (safeLink api mkup) (show p) 
+  where
+    api = Proxy :: (Proxy (API NodeMAC))
+    mkup =  Proxy :: (Proxy (MarkupAPI))
 
 renderGr :: (NodeKey n) => Page -> Double -> GridL n -> Markup
 renderGr p w g@(GridL{nodesL}) = pageWithSockets w nodesL (drawGrid g) p
@@ -247,8 +276,6 @@ renderGr p w g@(GridL{nodesL}) = pageWithSockets w nodesL (drawGrid g) p
 renderTr :: (NodeKey n, Show a) => Double -> Tree (n, a) -> Markup
 renderTr w t = sendDiagram w $ radialTree t 
 
-class HasPage a where
-  page' :: (Page -> a -> Markup)
 
 gridPage w ns = renderGr GridP w (inOrder ns)
 
@@ -260,7 +287,7 @@ pageHandler :: (NodeKey n) => Double -> [n] -> Page -> Handler Markup
 pageHandler w n p = case p of
   GridP -> pure $ gridPage w n
   MeshP -> pure $ meshPage w n
-  --TxP -> pure $ txnPage w n
+  TxP -> error "no TxP handler yet" -- pure $ txnPage w n
 
 
 socketHandler :: forall t m n. (IsStream t, MonadAsync m, NodeKey n)
@@ -271,10 +298,12 @@ socketHandler :: forall t m n. (IsStream t, MonadAsync m, NodeKey n)
   -> Connection
   -> Handler ()
 socketHandler hoister pages node page conn = do
+  liftIO . print $ "handling socket for: " <> (show node)
   case pages M.! page of
     (Grid g) -> c g
     (Mesh m) -> c m
     (Market t) -> d t
+    (Game _ _ _) -> error "no game handler yet"
   where
     d :: (MonadAsync m) => Kbtz t m (TxPlan n) TransactionStatus -> Handler ()
     d = liftIO . hoister . sendtx
@@ -305,7 +334,7 @@ socketHandler hoister pages node page conn = do
     sendKbtz :: forall a. Show a => Kbtz t m n a -> m ()
     sendKbtz k = do
       case M.lookup node $ unKibbutz k of
-        Nothing -> return ()
+        Nothing -> liftIO . print $ "No stream found for node" >> return ()
         (Just nodeS) ->
           S.mapM_ (liftIO
                    . sendTextData conn
@@ -338,22 +367,22 @@ serveKbtzm :: forall t m n.
   -> M.Map Page (SomeKbtz t m n)
   -> [n]
   -> IO ()
-serveKbtzm hoister pageMap nodes = do
+serveKbtzm hoister pm ns = do
   putStrLn $ "Start Serving..."
   run 8080
     . serve (Proxy @(API n))
-    $ (pg :<|> sc)
+    $ (pg :<|> sock)
     where
       page "grid" = GridP
       page "mesh" = MeshP
       page "tx" = TxP
       page _ = error "Wrong Page!"
-      sc :: String -> n -> Connection -> Handler ()
-      sc s = flip (socketHandler hoister pageMap) (page s)
+      sock :: String -> n -> Connection -> Handler ()
+      sock s = flip (socketHandler hoister pm) (page s)
       pg :: String -> Handler Markup
-      pg p = pageHandler 1000 nodes (page p)
+      pg p = pageHandler 1000 ns (page p)
       defaultHandler :: Handler (Markup)
-      defaultHandler = return [q|
+      defaultHandler = return . preEscapedString $ [q|
                                 <div>
                                 <text>You Need to Know Where You're Going</text>
                                 <text></text>

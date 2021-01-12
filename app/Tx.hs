@@ -3,7 +3,7 @@ module Main where
 
 import Dhall
 import Chopaan.Node.NodeId
-import Chopaan.Kibbutz.Transactor (Tx(..), Role(..), mkStake, dispatchTx, Stake(..))
+import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchTx, Stake(..))
 import Chopaan.Comm.Mqtt (pub, client)
 import Chopaan.Comm.Comm (initPubQ, trivialCB)
 import Chopaan.Types
@@ -36,10 +36,10 @@ delay = oneSec * (t + 10)
 
 oneSec = 1000*1000 
 
-loop :: [NodeMAC] -> [Tx NodeMAC]
+loop :: [NodeMAC] -> [TxPlan NodeMAC]
 loop addrs = fmap (txAtT addrs) $ stakeLL addrs
   
-txAtT :: [NodeMAC] -> [Stake] -> Tx NodeMAC
+txAtT :: [NodeMAC] -> [Stake] -> TxPlan NodeMAC
 txAtT addrs stakes = Tx $ Map.fromList $ zip addrs stakes
 
 stakeLL :: [NodeMAC] -> [[Stake]]
@@ -67,7 +67,7 @@ switchStakePolarity (Stake (Sink, p, t)) = Stake (Source, p, t)
 
 testMACs = (NodeId "7c:9e:bd:f5:07:c8")
 
-testConvEff1 :: NodeMAC -> [Tx NodeMAC]
+testConvEff1 :: NodeMAC -> [TxPlan NodeMAC]
 testConvEff1 f = (\p -> Tx $ Map.fromList [ (f, mkStake Source p t) ])
                                               --, (s, mkStake Sink p t)
                                               --]

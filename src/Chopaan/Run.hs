@@ -87,16 +87,11 @@ k1Nodes = NodeId <$> [ "24:6f:28:a9:71:30"
                      , "a4:cf:12:9a:39:4c"
                      ]
 
---k1GLayout = gridGraphLayout k1Nodes k1Edges 
-
-in6 :: [a] -> [[a]]
-in6 x = return $ take 6 x
 
 testNodes :: [NodeMAC]
 testNodes = take 10 $
-  (\ns -> NodeId (Text.pack $ mconcat ((<> (":" :: String))
-                                       <$> ns)))
-  <$> (in6 (twistor [a, b, c, d, e, f]) :: ([[String]]))
+  (\ns -> NodeId (Text.intercalate (":" :: Text.Text) ns))
+  <$> ((take 6) <$> (iterate twistor [a, b, c, d, e, f]))
   where
     a = "aa"
     b = "bb"
@@ -104,8 +99,9 @@ testNodes = take 10 $
     d = "dd"
     e = "ee"
     f = "ff"
-    g = "gg"
+    g = "gg" :: Text.Text
 
+twistor :: [a] -> [a]
 twistor [] = []
 twistor (x:xs) = (xs <> [x])
 

@@ -472,7 +472,28 @@ packages:
       size: 3032
       sha256: 36e7cd88a0fe800a0b0ea216c0c3ea96db02e25fd34ef53653f6d5008730476c
   original:
-    hackage: quickspec-2.1.5@sha256:1d1cc020fa9075cb5fafd4056fe1d930d5763b954fa8200e57ce6aba057544b2,3557
+    hackage: quickspec-2.1.5
+- completed:
+    hackage: suavemente-0.2.0.0@sha256:ad439fd93c974b8cc72685f121ede524a9a4f26d3ab56221762c71945370164b,1567
+    pantry-tree:
+      size: 589
+      sha256: b6a50c952f5127d52b2362cfaba05d38cef05341db501262dc9eeaf2da2c5755
+  original:
+    hackage: suavemente-0.2.0.0
+- completed:
+    hackage: diagrams-svg-1.4.3@sha256:36708b0b4cf35507ccf689f1a25f6f81b8f41c2c4c2900793de820f66d4e241c,3181
+    pantry-tree:
+      size: 475
+      sha256: 2a2f10e8c32a6c181a06494e13a462e00f77e98ad346fd99c123afa3fa89f9e1
+  original:
+    hackage: diagrams-svg-1.4.3
+- completed:
+    hackage: diagrams-contrib-1.4.4@sha256:54afec4e0a1ad5fc151852d993b514168955a23884dca119f6fa294af44ea506,4753
+    pantry-tree:
+      size: 11387
+      sha256: a5a363bcdaf16f7638e24050cb9f93f2107e849479553181fadb97d5d58252f5
+  original:
+    hackage: diagrams-contrib-1.4.4
 snapshots:
 - completed:
     size: 524799
