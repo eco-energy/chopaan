@@ -1,0 +1,536 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: e460f6d998393a8abfcc5ca91aebfb97d75cbe15297b6fc27b07fd2c5d569f0c
+
+name:           chopaan
+version:        0.1.0.0
+description:    Please see the README on Github at <https://github.com/faezs/chopaan#readme>
+homepage:       https://github.com/faezs/chopaan#readme
+bug-reports:    https://github.com/faezs/chopaan/issues
+author:         Faez Shakil
+maintainer:     faez.shakil@gmail.com
+copyright:      2019 Faez Shakil
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+data-files:
+    options.dhall
+    certs/chopaan.cert.pem
+    certs/chopaan.private.key.pem
+    certs/ca.cert.pem
+
+source-repository head
+  type: git
+  location: https://github.com/faezs/chopaan
+
+library
+  exposed-modules:
+      Chopaan.Comm.Comm
+      Chopaan.Comm.Mqtt
+      Chopaan.Comm.Queues
+      Chopaan.Comm.Socket
+      Chopaan.DB
+      Chopaan.DB.DB
+      Chopaan.DB.Nodes
+      Chopaan.DB.Sensors
+      Chopaan.Kibbutz.Allocate
+      Chopaan.Kibbutz.AWS.Things
+      Chopaan.Kibbutz.Kibbutz
+      Chopaan.Kibbutz.LinOpt
+      Chopaan.Kibbutz.Mesh
+      Chopaan.Kibbutz.Registry
+      Chopaan.Kibbutz.Serve
+      Chopaan.Kibbutz.Subscriber
+      Chopaan.Kibbutz.Transactor
+      Chopaan.Node.Calibration
+      Chopaan.Node.Folds
+      Chopaan.Node.Metrics
+      Chopaan.Node.Node
+      Chopaan.Node.NodeId
+      Chopaan.Node.NodeOpts
+      Chopaan.Node.NodeSensors
+      Chopaan.Node.SoC
+      Chopaan.Node.Storage
+      Chopaan.Node.Structure
+      Chopaan.Node.Tf
+      Chopaan.Run
+      Chopaan.Types
+      Chopaan.Ui
+      Chopaan.Utils.JSON
+      Chopaan.Utils.Retry
+      Chopaan.Utils.StreamsInterop
+      Chopaan.Utils.Time
+      Proto.NodeMessageSchema.NodeMessages
+      Proto.NodeMessageSchema.NodeMessages_Fields
+      SimNode
+      TxModel
+  other-modules:
+      Paths_chopaan
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2
+  build-depends:
+      ad
+    , aeson
+    , algebraic-graphs
+    , amazonka
+    , amazonka-iot
+    , base >=4.11 && <10
+    , base64-bytestring
+    , blaze-markup
+    , bytestring
+    , cassava
+    , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , connection
+    , containers
+    , convertible
+    , data-default-class
+    , dhall
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , ekg
+    , ekg-core
+    , estimator
+    , ghc-prim
+    , hashable
+    , hmatrix
+    , interpolatedstring-perl6
+    , katip
+    , keys
+    , linear
+    , mgenv
+    , microlens
+    , monad-bayes
+    , mtl
+    , net-mqtt >=0.7.0
+    , network-uri
+    , numeric-limits
+    , opaleye
+    , opt-expect
+    , pointed
+    , postgresql-simple
+    , product-profunctors
+    , proto-lens
+    , proto-lens-protoc
+    , proto-lens-runtime
+    , resource-pool
+    , retry
+    , rio >=0.1.8.0
+    , sbv
+    , servant
+    , servant-blaze
+    , servant-js
+    , servant-server
+    , servant-websockets
+    , stm
+    , streamly >=0.7.0 && <0.7.1
+    , suavemente
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , time-lens
+    , tls
+    , transformers
+    , ulid
+    , unagi-chan
+    , unordered-containers
+    , vector
+    , vector-sized
+    , wai
+    , warp
+    , websockets
+    , x509-store
+    , x509-validation
+  default-language: Haskell2010
+
+executable chopaan-demo-exe
+  main-is: Demo.hs
+  other-modules:
+      Paths_chopaan
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
+  build-depends:
+      ad
+    , aeson
+    , algebraic-graphs
+    , amazonka
+    , amazonka-iot
+    , base
+    , base64-bytestring
+    , blaze-markup
+    , bytestring
+    , cassava
+    , chopaan
+    , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , connection
+    , containers
+    , convertible
+    , data-default-class
+    , dhall
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , ekg
+    , ekg-core
+    , estimator
+    , ghc-prim
+    , hashable
+    , hmatrix
+    , interpolatedstring-perl6
+    , katip
+    , keys
+    , linear
+    , mgenv
+    , microlens
+    , monad-bayes
+    , mtl
+    , net-mqtt >=0.7.0
+    , network-uri
+    , numeric-limits
+    , opaleye
+    , opt-expect
+    , optparse-simple
+    , pointed
+    , postgresql-simple
+    , product-profunctors
+    , proto-lens
+    , proto-lens-protoc
+    , proto-lens-runtime
+    , resource-pool
+    , retry
+    , rio >=0.1.8.0
+    , sbv
+    , servant
+    , servant-blaze
+    , servant-js
+    , servant-server
+    , servant-websockets
+    , stm
+    , streamly >=0.7.0 && <0.7.1
+    , suavemente
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , time-lens
+    , tls
+    , transformers
+    , ulid
+    , unagi-chan
+    , unordered-containers
+    , vector
+    , vector-sized
+    , wai
+    , warp
+    , websockets
+    , x509-store
+    , x509-validation
+  default-language: Haskell2010
+
+executable chopaan-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_chopaan
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -eventlog -rtsopts -with-rtsopts=-N -with-rtsopts=-T
+  build-depends:
+      ad
+    , aeson
+    , algebraic-graphs
+    , amazonka
+    , amazonka-iot
+    , base
+    , base64-bytestring
+    , blaze-markup
+    , bytestring
+    , cassava
+    , chopaan
+    , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , connection
+    , containers
+    , convertible
+    , data-default-class
+    , dhall
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , ekg
+    , ekg-core
+    , estimator
+    , ghc-prim
+    , hashable
+    , hmatrix
+    , interpolatedstring-perl6
+    , katip
+    , keys
+    , linear
+    , mgenv
+    , microlens
+    , monad-bayes
+    , mtl
+    , net-mqtt >=0.7.0
+    , network-uri
+    , numeric-limits
+    , opaleye
+    , opt-expect
+    , optparse-simple
+    , pointed
+    , postgresql-simple
+    , product-profunctors
+    , proto-lens
+    , proto-lens-protoc
+    , proto-lens-runtime
+    , resource-pool
+    , retry
+    , rio >=0.1.8.0
+    , sbv
+    , servant
+    , servant-blaze
+    , servant-js
+    , servant-server
+    , servant-websockets
+    , stm
+    , streamly >=0.7.0 && <0.7.1
+    , suavemente
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , time-lens
+    , tls
+    , transformers
+    , ulid
+    , unagi-chan
+    , unordered-containers
+    , vector
+    , vector-sized
+    , wai
+    , warp
+    , websockets
+    , x509-store
+    , x509-validation
+  default-language: Haskell2010
+
+executable tx-test-exe
+  main-is: Tx.hs
+  other-modules:
+      Paths_chopaan
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
+  build-depends:
+      ad
+    , aeson
+    , algebraic-graphs
+    , amazonka
+    , amazonka-iot
+    , base
+    , base64-bytestring
+    , blaze-markup
+    , bytestring
+    , cassava
+    , chopaan
+    , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , connection
+    , containers
+    , convertible
+    , data-default-class
+    , dhall
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , ekg
+    , ekg-core
+    , estimator
+    , ghc-prim
+    , hashable
+    , hmatrix
+    , interpolatedstring-perl6
+    , katip
+    , keys
+    , linear
+    , mgenv
+    , microlens
+    , monad-bayes
+    , mtl
+    , net-mqtt >=0.7.0
+    , network-uri
+    , numeric-limits
+    , opaleye
+    , opt-expect
+    , optparse-simple
+    , pointed
+    , postgresql-simple
+    , product-profunctors
+    , proto-lens
+    , proto-lens-protoc
+    , proto-lens-runtime
+    , resource-pool
+    , retry
+    , rio >=0.1.8.0
+    , sbv
+    , servant
+    , servant-blaze
+    , servant-js
+    , servant-server
+    , servant-websockets
+    , stm
+    , streamly >=0.7.0 && <0.7.1
+    , suavemente
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , time-lens
+    , tls
+    , transformers
+    , ulid
+    , unagi-chan
+    , unordered-containers
+    , vector
+    , vector-sized
+    , wai
+    , warp
+    , websockets
+    , x509-store
+    , x509-validation
+  default-language: Haskell2010
+
+test-suite chopaan-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Common
+      KbtzSpec
+      NodeSpec
+      RegistrySpec
+      StorageSpec
+      SubscriberSpec
+      TransactorSpec
+      Paths_chopaan
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
+  build-depends:
+      QuickCheck
+    , ad
+    , aeson
+    , algebraic-graphs
+    , amazonka
+    , amazonka-iot
+    , base >=4.11 && <10
+    , base64-bytestring
+    , blaze-markup
+    , bytestring
+    , cassava
+    , checkers
+    , chopaan
+    , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , connection
+    , containers
+    , convertible
+    , data-default-class
+    , dhall
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , ekg
+    , ekg-core
+    , estimator
+    , ghc-prim
+    , hashable
+    , hmatrix
+    , hspec
+    , interpolatedstring-perl6
+    , katip
+    , keys
+    , linear
+    , mgenv
+    , microlens
+    , monad-bayes
+    , mtl
+    , net-mqtt >=0.7.0
+    , network-uri
+    , numeric-limits
+    , opaleye
+    , opt-expect
+    , pointed
+    , postgresql-simple
+    , product-profunctors
+    , proto-lens
+    , proto-lens-arbitrary
+    , proto-lens-protoc
+    , proto-lens-runtime
+    , quickcheck-instances
+    , quickspec
+    , resource-pool
+    , retry
+    , rio >=0.1.8.0
+    , sbv
+    , servant
+    , servant-blaze
+    , servant-js
+    , servant-server
+    , servant-websockets
+    , stm
+    , streamly >=0.7.0 && <0.7.1
+    , suavemente
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , time-lens
+    , tls
+    , transformers
+    , ulid
+    , unagi-chan
+    , unordered-containers
+    , vector
+    , vector-sized
+    , wai
+    , warp
+    , websockets
+    , x509-store
+    , x509-validation
+  default-language: Haskell2010
