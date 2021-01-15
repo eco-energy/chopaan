@@ -22,6 +22,7 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          , writeToPubQ
                          , PubQueue
                          )
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Kibbutz ( sensorKbtz
                                , rsKbtz
                                , getNodes
@@ -29,8 +30,8 @@ import Chopaan.Kibbutz.Kibbutz ( sensorKbtz
                                , runKbtz
                                , logKbtz
                                , Kbtz(..)
-                               , KbtzId(..)
                                )
+import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
 import Chopaan.Kibbutz.Transactor (runTransactor, Tx(..), TransactionStatus, asKbtz)
 
 import Chopaan.Ui (mon, defGrid)
@@ -64,7 +65,8 @@ run = do
   --liftIO $ print nodes
   --dbpool <- liftIO $ dbPool dbOpts
   qs@MessageQs{..} <- liftIO $ initQs nodes
-  _ <- liftIO $ forkIO $ forever $ runMqtt mqttOpts outbox nodes (mkCallback qs)
+  _ <- liftIO $ forkIO $
+       withMqttAuth (KbtzId name) (forever . (runMqtt mqttOpts outbox nodes (mkCallback qs)))
   _ <- liftIO . forkIO $ testPub nodes outbox 
   sensors <- liftIO $ sensorKbtz @SerialT @IO nodes stateChan
   runtime <- liftIO $ rsKbtz @SerialT @IO nodes statsChan
@@ -74,6 +76,7 @@ run = do
   --liftIO . forkIO $ S.mapM_ print $ adapt . runKbtz $ txns
   liftIO $ print ("Running Monitor...")
   liftIO $ mon id (defGrid nodes) sensors runtime
+
 
 
 k1Nodes :: [NodeMAC]

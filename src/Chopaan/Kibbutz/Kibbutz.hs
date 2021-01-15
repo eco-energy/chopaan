@@ -3,6 +3,8 @@
 module Chopaan.Kibbutz.Kibbutz where
 
 import Prelude hiding ((.), id, zipWith, const)
+
+
 import Streamly
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
@@ -26,13 +28,16 @@ import Chopaan.Comm.Comm ( Address
                          , subStream
                          , WriteChan
                          )
-
+       
 import Chopaan.Node.Node ( nodeS, SensorS )
 import Chopaan.Node.NodeId ( NodeMAC
                            , NodeId(..)
                            )
+
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.AWS.Things ( getThings
                                   , thingName
+                                  , inAwsContext
                                   )
 
 import Proto.NodeMessageSchema.NodeMessages ( RuntimeStats
@@ -52,7 +57,6 @@ instance KbtzConn t m n => LScan (Kbtz t m n) where
   lscan :: forall a. (Monoid a) => Kbtz t m n a -> (Kbtz t m n a :* a)
   lscan f = (f, mempty)
 
-newtype KbtzId = KbtzId Text
 
 newtype Kbtz (t :: (* -> *) -> * -> *) (m :: * -> *) n a = Kbtz {
   unKibbutz :: Map n (t m a)
@@ -85,17 +89,11 @@ instance (IsStream t, Monad m, (forall a. Ord a)) => Bifunctor (Kbtz t m) where
     -> (a -> a')
     -> Kbtz t m n a
     -> Kbtz t m n' a' 
-  bimap f g kbz = Kbtz $ zz
-    where
-      zz :: Map n' (t m a')
-      zz = M.mapKeys f $ yy
-      yy :: Map n (t m a')
-      yy = unKibbutz xx
-      xx :: Kbtz t m n a'
-      xx = (g <$> kbz)
+  bimap f g kbz = Kbtz $ (M.mapKeys f) $ (unKibbutz (g <$> kbz))
+
 
 {--
-instance (IsStream t, Monad m, (forall n. Monoid n), (forall a. Monoid a)) => Category (Kbtz t m) where
+instance (IsStream t, Monad m, (forall n. Monoid n)) => Category (Kbtz t m) where
   id = Kbtz $ M.singleton mempty S.nil
   (.) :: forall b c a. Ok3 (Kbtz t m) a b c => (Kbtz t m b c) -> (Kbtz t m a b) -> (Kbtz t m a c)
   (Kbtz k) . (Kbtz k') = undefined
@@ -178,11 +176,11 @@ sub :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a)
   -> m (t m a)
 sub = flip (subStream @t @m @n @a) 
 
-getNodes :: (MonadIO m) => ReaderT KbtzId m [NodeMAC]
+getNodes :: (MonadIO m) => ReaderT KbtzName m [NodeMAC]
 getNodes = do
   (KbtzId n) <- ask
   ((fmap $ NodeId . fromJust . thingName)
-              <$> (liftIO . getThings $ n))
+              <$> (liftIO . inAwsContext . getThings $ n))
 
 logNode :: (MonadIO m, Show n, Show a) => n -> a -> m ()
 logNode k v = liftIO . print $ "Node: "

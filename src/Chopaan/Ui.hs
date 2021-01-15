@@ -20,7 +20,8 @@ import           Servant.API.WebSocket (WebSocket (..))
 import           Servant.HTML.Blaze (HTML)
 import Servant.Links
 
-import Chopaan.Kibbutz.Kibbutz (Kbtz(..), getNodes, KbtzId, scanKbtz, traceKbtz, runKbtz
+import Chopaan.Kibbutz.KbtzId
+import Chopaan.Kibbutz.Kibbutz (Kbtz(..), getNodes, scanKbtz, traceKbtz, runKbtz
                                , nodes, streams)
 import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, TransactionStatus(..), Stake(..))
 import Chopaan.Comm.Comm (Address)

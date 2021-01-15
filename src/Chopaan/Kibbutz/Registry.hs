@@ -11,29 +11,25 @@ import qualified Data.Text as Text
 import GHC.Generics (Generic)
 import Data.Maybe (fromJust)
 
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.AWS.Things
 import Chopaan.Node.NodeId
 
+
 data Kibbutz = Kibbutz
-  { kname :: Text.Text
+  { kname :: KbtzName
   , nodes :: [NodeMAC]
   } deriving (Generic)
 
 
-instance Show Kibbutz where
-  show Kibbutz {..} = Text.unpack $ (kname <> " Kibbutz, " <> (Text.pack $ show $ length nodes) <> " nodes")
-
 data KibbutzEvents = StateUpdate deriving (Eq, Ord, Show)
 
 kbtz :: Text.Text -> [NodeMAC] -> Kibbutz
-kbtz = Kibbutz
+kbtz k = Kibbutz (KbtzId k)
 
 getKibbutz :: Text.Text -> IO Kibbutz
 getKibbutz n = do
-  ts <- getThings n
+  ts <- inAwsContext $ getThings n
   let
     ns = map (NodeId . fromJust . thingName) ts
   return $ kbtz n ns
-
-
-

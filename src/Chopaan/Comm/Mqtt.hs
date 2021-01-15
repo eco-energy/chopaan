@@ -12,6 +12,7 @@ module Chopaan.Comm.Mqtt (runMqtt, client, pub, MQ.Topic) where
 import qualified Data.Text as Text 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BSC
+import qualified Data.ByteString as B
 
 
 
@@ -36,6 +37,7 @@ import Control.Concurrent.STM
 
 import Data.ProtoLens (encodeMessage)
 
+import Chopaan.Kibbutz.AWS.Things (MQTTCreds(..))
 import Chopaan.Types (MQTTOpts(..))
 import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue)
 import Chopaan.Comm.Queues (NodeQueue(..))
@@ -48,34 +50,33 @@ import Proto.NodeMessageSchema.NodeMessages (MeshFrame)
 
 
 -- https://stackoverflow.com/questions/40081508/how-to-provide-a-client-certificate-to-http-client-tls
-mkTLSSettings :: FilePath -> FilePath -> FilePath -> Text.Text -> Text.Text -> IO TLSSettings
-mkTLSSettings cert key caPath hostName name = do
-  creds <- either (error "Client Certificate Not Found") Just <$> credentialLoadX509 cert key
+mkTLSSettings :: B.ByteString -> B.ByteString -> B.ByteString -> Text.Text -> Text.Text -> TLSSettings
+mkTLSSettings cert key caPath hostName name = let
+  creds = either (const Nothing) (Just) (credentialLoadX509FromMemory cert key)
   --caCreds <- fromJust (error "CA Certificate Not Found") (readCertificateStore caPath)
-  let
-    hooks = def { onCertificateRequest = \_ -> return creds
-                , onServerCertificate = \_ _ _ _ -> mempty -- validateDefault caCreds a b c
-                }
-    clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
-                  { clientHooks=hooks
-                  , clientSupported = def {supportedCiphers=ciphersuite_strong}
-                  }
-  return (TLSSettings clientParams)
+  hooks = def { onCertificateRequest = \_ -> return creds
+              , onServerCertificate = \_ _ _ _ -> mempty -- validateDefault caCreds a b c
+              }
+  clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
+                 { clientHooks=hooks
+                 , clientSupported = def {supportedCiphers=ciphersuite_strong}
+                 }
+  in (TLSSettings clientParams)
 
 -- need reader for creds and logs
-runMqtt :: forall a. (Address a) => MQTTOpts -> PubQueue -> [a] -> MQ.MessageCallback -> IO ()
-runMqtt opts outQueue ts msgCB = do
-  mc <- client opts msgCB
+runMqtt :: forall a. (Address a) => MQTTOpts -> PubQueue -> [a] -> MQ.MessageCallback -> MQTTCreds -> IO ()
+runMqtt opts outQueue ts msgCB creds = do
+  mc <- client opts msgCB creds
   _ <- forkIO $ forever $ catches (pub mc outQueue) ((Handler . errorHandler) <$> ts)
   connStatus <- sequence $ (resub mc) <$> ts
   print connStatus
   MQ.waitForClient mc
 
 
-client :: MQTTOpts -> MQ.MessageCallback -> IO (MQ.MQTTClient)
-client MQTTOpts{..} msgCB = do
-  tlsConf <- mkTLSSettings certPath keyPath caPath mqttURI connId
+client :: MQTTOpts -> MQ.MessageCallback -> MQTTCreds -> IO (MQ.MQTTClient)
+client MQTTOpts{..} msgCB MQTTCreds{..} = do
   let
+    tlsConf = mkTLSSettings cert privateKey undefined mqttURI connId
     (Just uri) = parseURI $ Text.unpack $ mqttURI <> "#" <> connId
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311

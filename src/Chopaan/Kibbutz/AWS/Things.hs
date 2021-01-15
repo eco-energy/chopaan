@@ -3,14 +3,15 @@
 {-# LANGUAGE ScopedTypeVariables, NamedFieldPuns, TypeApplications #-}
 module Chopaan.Kibbutz.AWS.Things where
 
-
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 import Chopaan.Utils.Retry
 
 import Data.HashMap.Strict
 import Data.Aeson (fromJSON)
 import qualified Data.Text as Text
-import qualified Data.ByteString as BS
+import Data.Text.Encoding (encodeUtf8)
+import qualified Data.ByteString as B
 
 import qualified Network.MQTT.Topic as MQ
 
@@ -95,7 +96,7 @@ inAwsContext ma = do
 thingName :: Iot.ThingAttribute -> Maybe ThingName
 thingName t = t ^. Iot.taThingName
 
-iot :: BS.ByteString -> Service
+iot :: B.ByteString -> Service
 iot svc = Iot.ioT{_svcPrefix=svc} :: Service
 
 getThings :: Text.Text -> AWSC [Iot.ThingAttribute]
@@ -119,54 +120,54 @@ type ChopaanId = Text.Text
 defId :: ChopaanId
 defId = "chopaan-v1"
 
-data MqttCreds = MqttCreds
+data MQTTCreds = MQTTCreds
   { certId :: CertId
-  , cert :: Text.Text
-  , privateKey :: Text.Text
+  , cert :: B.ByteString
+  , privateKey :: B.ByteString
   , certARN :: CertARN
   } deriving (Eq, Ord, Show)
 
-type KbtzId = Text.Text
 type CertId = Text.Text
 type CertARN = Text.Text
 
-thingMap :: ThingName -> KbtzId -> CertId -> HashMap Text.Text Text.Text
-thingMap thing kbtz cert = fromList $ [("ThingName", thing)
+thingMap :: ThingName -> KbtzName -> CertId -> HashMap Text.Text Text.Text
+thingMap thing (KbtzId kbtz) cert = fromList $ [("ThingName", thing)
                            , ("CertificateId", cert)
                            , ("CommonName", thing)
                            , ("Kibbutz", kbtz)]
 
-chopaanId :: KbtzId -> ThingName
-chopaanId k = "chopaan-" <> k
+chopaanId :: KbtzName -> ThingName
+chopaanId (KbtzId k) = "chopaan-" <> k
 
-withMqttAuth :: KbtzId -> (MqttCreds -> IO c) -> IO c
+withMqttAuth :: KbtzName -> (MQTTCreds -> IO c) -> IO c
 withMqttAuth k = bracket
   (inAwsContext . registerChopaan $ k)
   (inAwsContext . (deregisterChopaan k))
 
-registerChopaan :: KbtzId -> AWSC (MqttCreds)
-registerChopaan k = createCertAndKey >>= (\mc@MqttCreds{certId} ->
-                                              registerThing (chopaanId k) k certId
+registerChopaan :: KbtzName -> AWSC (MQTTCreds)
+registerChopaan k = createCertAndKey >>= (\mc@MQTTCreds{certId} ->
+                                              registerThing k (chopaanId k) certId
                                               >> return mc)
 
 
-deregisterChopaan :: KbtzId -> MqttCreds -> AWSC (Bool)
-deregisterChopaan k MqttCreds{certARN, certId} = deleteCert certId certARN
+deregisterChopaan :: KbtzName -> MQTTCreds -> AWSC (Bool)
+deregisterChopaan k MQTTCreds{certARN, certId} = deleteCert certId certARN
   >> deleteThing (chopaanId k)  
 
-createCertAndKey :: AWSC (MqttCreds)
+createCertAndKey :: AWSC (MQTTCreds)
 createCertAndKey = do
   let req = Cert.createKeysAndCertificate & Cert.ckacSetAsActive .~ (Just True)
   c <- send req
-  return $ MqttCreds
+  return $ MQTTCreds
     { certId = fromJust $ c ^. Cert.ckacrsCertificateId
-    , cert = (fromJust $ c ^. Cert.ckacrsCertificatePem)
-    , privateKey = fromJust (c ^? Cert.ckacrsKeyPair . _Just . Iot.kpPrivateKey . _Just)
+    , cert = encodeUtf8 . fromJust $ c ^. Cert.ckacrsCertificatePem
+    , privateKey = encodeUtf8 . fromJust $ c ^? Cert.ckacrsKeyPair . _Just . Iot.kpPrivateKey . _Just
     , certARN = fromJust (c ^. Cert.ckacrsCertificateARN)
     }
 
-registerThing :: ThingName -> KbtzId -> CertId -> AWSC (HashMap Text.Text Text.Text)
-registerThing thing kbtz certId = do
+
+registerThing :: KbtzName -> ThingName -> CertId -> AWSC (HashMap Text.Text Text.Text)
+registerThing kbtz thing certId = do
   let req = Thing.registerThing chopaanTemplate
         & Thing.rtParameters .~ thingMap thing kbtz certId
   c <- send req

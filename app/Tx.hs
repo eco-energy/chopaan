@@ -3,6 +3,8 @@ module Main where
 
 import Dhall
 import Chopaan.Node.NodeId
+import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchTx, Stake(..))
 import Chopaan.Comm.Mqtt (pub, client)
 import Chopaan.Comm.Comm (initPubQ, trivialCB)
@@ -24,7 +26,7 @@ srcs = NodeId <$> [ "7c:9e:bd:f6:5a:08"
 main = do
   Options{mqttOpts} <- input auto "./txOpts.dhall"
   outbox <- atomically $ initPubQ
-  cl <- client mqttOpts trivialCB
+  cl <- withMqttAuth (KbtzId "pilot") (client mqttOpts trivialCB)
   _ <- forkIO $ forever $ (pub cl outbox)
   mapM_ (\t -> (dispatchTx outbox t)
           >> print ("Dispatched! " <> show t)
