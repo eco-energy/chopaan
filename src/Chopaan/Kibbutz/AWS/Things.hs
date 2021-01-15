@@ -1,10 +1,14 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, NamedFieldPuns, TypeApplications #-}
 module Chopaan.Kibbutz.AWS.Things where
 
 
 import Chopaan.Node.NodeId
+import Chopaan.Utils.Retry
+
+import Data.HashMap.Strict
+import Data.Aeson (fromJSON)
 import qualified Data.Text as Text
 import qualified Data.ByteString as BS
 
@@ -13,11 +17,26 @@ import qualified Network.MQTT.Topic as MQ
 import Lens.Micro
 
 -- AWS Imports
-import qualified Network.AWS.IoT.ListThings as Iot
+import qualified Network.AWS.IoT.ListThings as Thing
+import qualified Network.AWS.IoT.RegisterThing as Thing
+import qualified Network.AWS.IoT.DeleteThing as Thing
+
 import qualified Network.AWS.IoT.Types as Iot
+import qualified Network.AWS.IoT.DescribeCertificate as Cert
+import qualified Network.AWS.IoT.CreateKeysAndCertificate as Cert
+import qualified Network.AWS.IoT.UpdateCertificate as Cert
+import qualified Network.AWS.IoT.DeleteCertificate as Cert
+import qualified Network.AWS.IoT.DetachPolicy as Policy
+
+import Control.Monad.IO.Class
 import Control.Monad.Trans.AWS
+import Control.Monad.Trans.Resource
+import Control.Exception (bracket)
+
 import Data.Maybe
 import System.IO
+
+import Text.InterpolatedString.Perl6
 
 -- Streamly
 import Streamly ()
@@ -46,12 +65,32 @@ topicToNodeId suffix t =
       where
         i = ":"
 
-
 {--------------------------------------------------------------------------------------------------------
 
                    Thing Tings and Rules for Topics
 ---------------------------------------------------------------------------------------------------------}
 
+success :: Int -> Bool
+success = (== 200)
+{--
+retryOnFail :: (MonadIO m) => m a -> (a -> Int) -> (a -> b) -> m b
+retryOnFail action getStatus getRes = do
+  r <- action
+  case (success . getStatus $ r) of
+    True -> return . getRes $ r
+    False -> retryBool action
+--}
+
+iotApi :: Service
+iotApi = iot "execute-api"
+
+type AWSC b = AWST' Env (ResourceT IO) b
+
+inAwsContext :: AWST' Env (ResourceT IO) b -> IO b
+inAwsContext ma = do
+  lgr <- newLogger Debug stdout
+  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iotApi  
+  runResourceT . runAWST env $ ma
 
 thingName :: Iot.ThingAttribute -> Maybe ThingName
 thingName t = t ^. Iot.taThingName
@@ -59,18 +98,94 @@ thingName t = t ^. Iot.taThingName
 iot :: BS.ByteString -> Service
 iot svc = Iot.ioT{_svcPrefix=svc} :: Service
 
-getThings :: Text.Text -> IO [Iot.ThingAttribute]
+getThings :: Text.Text -> AWSC [Iot.ThingAttribute]
 getThings thingTypeName = do
   let
-    iiot = iot "execute-api"
-    req = (Iot.listThings & Iot.ltThingTypeName .~ (Just thingTypeName))
-  lgr <- newLogger Debug stdout
-  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iiot  
-  runResourceT . runAWST env $ do
-    things <- S.toList
-      $ S.map (\x -> x ^. Iot.ltrsThings)
-      $ S.unfold pageUF req
-    return $ concat things
+    req = (Thing.listThings & Thing.ltThingTypeName .~ (Just thingTypeName))
+  things <- S.toList
+    $ S.map (\x -> x ^. Thing.ltrsThings)
+    $ S.unfold pageUF req
+  return $ concat things
+
+
+getCertPem :: CertId -> AWSC (Maybe Text.Text)
+getCertPem certId = do
+  c <- send $ Cert.describeCertificate certId
+  return $ c ^? Cert.dcrsCertificateDescription . _Just . Iot.cdCertificatePem . _Just
+
+
+type ChopaanId = Text.Text
+
+defId :: ChopaanId
+defId = "chopaan-v1"
+
+data MqttCreds = MqttCreds
+  { certId :: CertId
+  , cert :: Text.Text
+  , privateKey :: Text.Text
+  , certARN :: CertARN
+  } deriving (Eq, Ord, Show)
+
+type KbtzId = Text.Text
+type CertId = Text.Text
+type CertARN = Text.Text
+
+thingMap :: ThingName -> KbtzId -> CertId -> HashMap Text.Text Text.Text
+thingMap thing kbtz cert = fromList $ [("ThingName", thing)
+                           , ("CertificateId", cert)
+                           , ("CommonName", thing)
+                           , ("Kibbutz", kbtz)]
+
+chopaanId :: KbtzId -> ThingName
+chopaanId k = "chopaan-" <> k
+
+withMqttAuth :: KbtzId -> (MqttCreds -> IO c) -> IO c
+withMqttAuth k = bracket
+  (inAwsContext . registerChopaan $ k)
+  (inAwsContext . (deregisterChopaan k))
+
+registerChopaan :: KbtzId -> AWSC (MqttCreds)
+registerChopaan k = createCertAndKey >>= (\mc@MqttCreds{certId} ->
+                                              registerThing (chopaanId k) k certId
+                                              >> return mc)
+
+
+deregisterChopaan :: KbtzId -> MqttCreds -> AWSC (Bool)
+deregisterChopaan k MqttCreds{certARN, certId} = deleteCert certId certARN
+  >> deleteThing (chopaanId k)  
+
+createCertAndKey :: AWSC (MqttCreds)
+createCertAndKey = do
+  let req = Cert.createKeysAndCertificate & Cert.ckacSetAsActive .~ (Just True)
+  c <- send req
+  return $ MqttCreds
+    { certId = fromJust $ c ^. Cert.ckacrsCertificateId
+    , cert = (fromJust $ c ^. Cert.ckacrsCertificatePem)
+    , privateKey = fromJust (c ^? Cert.ckacrsKeyPair . _Just . Iot.kpPrivateKey . _Just)
+    , certARN = fromJust (c ^. Cert.ckacrsCertificateARN)
+    }
+
+registerThing :: ThingName -> KbtzId -> CertId -> AWSC (HashMap Text.Text Text.Text)
+registerThing thing kbtz certId = do
+  let req = Thing.registerThing chopaanTemplate
+        & Thing.rtParameters .~ thingMap thing kbtz certId
+  c <- send req
+  return $ c ^. Thing.rtrsResourceARNs
+
+deleteThing :: ThingName -> AWSC (Bool)
+deleteThing thing = do
+  c <- send $ Thing.deleteThing thing
+  return $ success (c ^. Thing.ddrsResponseStatus)
+
+deleteCert :: CertId -> CertARN  -> AWSC ()
+deleteCert certId certArn = do
+  send $ Policy.detachPolicy chopaanPolicy certArn
+  send $ Cert.updateCertificate certId Iot.CSInactive
+  send $ Cert.deleteCertificate certId
+  return ()
+  where
+    chopaanPolicy = "kibbutz-node-comm"
+
 
 pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)
 pageUF = UF.Unfold step inject
@@ -83,3 +198,51 @@ pageUF = UF.Unfold step inject
       return $ STy.Stop
     inject :: a -> m (Maybe a)
     inject = pure . Just
+
+
+chopaanTemplate :: Text.Text
+chopaanTemplate = [q|
+{
+    "Parameters" : {
+        "ThingName" : {
+            "Type" : "String"
+        },
+        "CommonName" : {
+            "Type" : "String"
+        },
+        "Kibbutz" : {
+            "Type" : "String",
+            "Default" : "Test"
+        },
+        "CertificateId" : {
+            "Type" : "String"
+        }
+    },
+    "Resources" : {
+        "thing" : {
+            "Type" : "AWS::IoT::Thing",
+            "Properties" : {
+                "ThingName" : {"Ref" : "ThingName"},
+                "AttributePayload" : { "version" : "v1", "kibbutz": {"Ref" : "Kibbutz"}, "commonName" :  {"Ref" : "CommonName"}},
+                "ThingTypeName" :  "kibbutz-pilot-chopaan",
+                "ThingGroups" : ["kibbutz-pilot-v1"]
+            }
+        },
+        "certificate" : {
+            "Type" : "AWS::IoT::Certificate",
+            "Properties" : {
+                "CertificateId": {"Ref" : "CertificateId"}
+            },
+            "OverrideSettings" : {
+                "Status" : "DO_NOTHING"
+            }
+        },
+        "policy" : {
+            "Type" : "AWS::IoT::Policy",
+            "Properties" : {
+                "PolicyName" : "kibbutz-node-comm"
+            }
+        }
+    }
+}
+|]
