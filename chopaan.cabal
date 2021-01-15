@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f5395b81027de0a7467cc8637f2f91840b8ade63f0fd1308743f9f2712ec56f2
+-- hash: 5114f4adf773e3e9f0b6900c70254fa04175a519ec80e3f5b04d0dc76ef3a849
 
 name:           chopaan
 version:        0.1.0.0
@@ -22,9 +22,6 @@ extra-source-files:
     ChangeLog.md
 data-files:
     options.dhall
-    certs/chopaan.cert.pem
-    certs/chopaan.private.key.pem
-    certs/ca.cert.pem
 
 source-repository head
   type: git
@@ -42,6 +39,7 @@ library
       Chopaan.DB.Sensors
       Chopaan.Kibbutz.Allocate
       Chopaan.Kibbutz.AWS.Things
+      Chopaan.Kibbutz.KbtzId
       Chopaan.Kibbutz.Kibbutz
       Chopaan.Kibbutz.LinOpt
       Chopaan.Kibbutz.Mesh
