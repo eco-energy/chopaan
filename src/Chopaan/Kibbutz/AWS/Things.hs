@@ -21,6 +21,7 @@ import Lens.Micro
 import qualified Network.AWS.IoT.ListThings as Thing
 import qualified Network.AWS.IoT.RegisterThing as Thing
 import qualified Network.AWS.IoT.DeleteThing as Thing
+import qualified Network.AWS.IoT.DetachThingPrincipal as Thing
 
 import qualified Network.AWS.IoT.Types as Iot
 import qualified Network.AWS.IoT.DescribeCertificate as Cert
@@ -29,6 +30,7 @@ import qualified Network.AWS.IoT.UpdateCertificate as Cert
 import qualified Network.AWS.IoT.DeleteCertificate as Cert
 import qualified Network.AWS.IoT.DetachPolicy as Policy
 
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.AWS
 import Control.Monad.Trans.Resource
@@ -137,7 +139,7 @@ thingMap thing (KbtzId kbtz) cert = fromList $ [("ThingName", thing)
                            , ("Kibbutz", kbtz)]
 
 chopaanId :: KbtzName -> ThingName
-chopaanId (KbtzId k) = "chopaan-" <> k
+chopaanId (KbtzId k) = k
 
 withMqttAuth :: KbtzName -> (MQTTCreds -> IO c) -> IO c
 withMqttAuth k = bracket
@@ -151,8 +153,10 @@ registerChopaan k = createCertAndKey >>= (\mc@MQTTCreds{certId} ->
 
 
 deregisterChopaan :: KbtzName -> MQTTCreds -> AWSC (Bool)
-deregisterChopaan k MQTTCreds{certARN, certId} = deleteCert certId certARN
-  >> deleteThing (chopaanId k)  
+deregisterChopaan k MQTTCreds{certARN, certId} = do
+  detachCert (chopaanId k) certARN
+  deleteCert certId certARN
+  deleteThing (chopaanId k)
 
 createCertAndKey :: AWSC (MQTTCreds)
 createCertAndKey = do
@@ -165,6 +169,9 @@ createCertAndKey = do
     , certARN = fromJust (c ^. Cert.ckacrsCertificateARN)
     }
 
+detachCert :: ThingName -> CertARN -> AWSC ()
+detachCert thing certArn = do
+  void $ send $ Thing.detachThingPrincipal thing certArn
 
 registerThing :: KbtzName -> ThingName -> CertId -> AWSC (HashMap Text.Text Text.Text)
 registerThing kbtz thing certId = do
