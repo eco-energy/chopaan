@@ -37,7 +37,7 @@ import Control.Concurrent.STM
 
 import Data.ProtoLens (encodeMessage)
 
-import Chopaan.Kibbutz.AWS.Things (MQTTCreds(..))
+import Chopaan.Kibbutz.AWS.Things (MQTTCreds(..), withMqttAuth)
 import Chopaan.Types (MQTTOpts(..))
 import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue)
 import Chopaan.Comm.Queues (NodeQueue(..))
