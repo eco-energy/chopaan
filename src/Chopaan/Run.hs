@@ -43,7 +43,6 @@ import Chopaan.DB.Sensors
 import Chopaan.Node.NodeId (NodeMAC, NodeId(..))
 
 
-
 -- TESTING
 import Proto.NodeMessageSchema.NodeMessages (EnergyState)
 import Proto.NodeMessageSchema.NodeMessages_Fields
@@ -62,11 +61,12 @@ run = do
     KibbutzOpts{..} = kibbutzOpts
     nodes = testNodes
   --nodes <- (runReaderT getNodes (KbtzId name))
-  --liftIO $ print nodes
-  --dbpool <- liftIO $ dbPool dbOpts
+  dbpool <- liftIO $ dbPool dbOpts                             
   qs@MessageQs{..} <- liftIO $ initQs nodes
-  _ <- liftIO $ forkIO $
-       withMqttAuth (KbtzId name) (forever . (runMqtt mqttOpts outbox nodes (mkCallback qs)))
+  _ <- liftIO . forkIO $
+       withMqttAuth
+         (KbtzId name)
+         (runMqtt mqttOpts{connId=name} outbox nodes (mkCallback qs))
   _ <- liftIO . forkIO $ testPub nodes outbox 
   sensors <- liftIO $ sensorKbtz @SerialT @IO nodes stateChan
   runtime <- liftIO $ rsKbtz @SerialT @IO nodes statsChan
