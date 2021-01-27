@@ -97,18 +97,6 @@ mon hoister (GridL{nodesL}) grid mesh =
   liftIO $ serveKbtzm hoister (pageMap [Grid grid, Mesh mesh]) nodesL
 
 
-changeNamed ::
-  forall n a. (IsName n, Show a)
-  => (n -> a -> Subdiagram B V2 Double Any -> Diagram B -> Diagram B)
-  -> Diagram B
-  -> M.Map n a
-  -> Diagram B
-changeNamed change d ss = foldl (\d' (n, s) -> withName n (change n s) d') d (M.toList ss)
-
-
-changeES n s = atop . place (mkNode n s) . location
-
-
 data GridL n = GridL
   { nodesL :: [n]
   , edgesL :: [(n, n)]
@@ -282,7 +270,6 @@ gridPage w ns = renderGr GridP w (inOrder ns)
 
 meshPage w ns = renderGr MeshP w (inOrder ns)
 
---txnPage w ns = renderPage w renderGr (inOrder ns)
 
 pageHandler :: (NodeKey n) => Double -> [n] -> Page -> Handler Markup
 pageHandler w n p = case p of
@@ -361,6 +348,7 @@ sendNode conn nodeSize node payload = (liftIO
              $ mkNode node payload)
 
 type UIConn t m n = (IsStream t, MonadAsync m, NodeKey n)
+
 
 serveKbtzm :: forall t m n.
   UIConn t m n
