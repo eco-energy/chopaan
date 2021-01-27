@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeOperators, DataKinds #-}
 {-# LANGUAGE DeriveGeneric, RecordWildCards #-}
 module SimNode where
-
+{--
 import Lens.Micro
 import Data.ProtoLens
 
@@ -228,4 +228,5 @@ testClient = undefined
   (txMonitor, txs) <- sampleIOE $ runTransactor outbox (60*5) sensors
   return $ ()
   --mainWidget $ mon sampleIOE sensors runtime undefined txs txMonitor
+--}
 --}
