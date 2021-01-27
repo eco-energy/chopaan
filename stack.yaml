@@ -35,9 +35,6 @@ packages:
 # forks / in-progress versions pinned to a git hash. For example:
 #
 extra-deps:
- - git: git@bitbucket.org:ecoenergy/mgenv.git
-   commit: 2856de81e517ee18623cfad49d26ae67d2c93cd4
-   # nix-sha256: 0jvj1j77c538ja3736b2rzg00vsvp9vhwac4q2sglf5fzlwrlhq9
  - git: https://github.com/conal/concat.git
    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
    subdirs:
@@ -50,17 +47,8 @@ extra-deps:
      - graphics
      - hardware
    # nix-sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
- - git: https://github.com/faezs/opt-expect.git
-   commit: cdf9e45622d1739816b40765df23506bc74046b6
-   # nix-sha256: 1ph87c07zrz27irdd6x49kldw77kdlh2p9jj8bf8sl7qgxr2244x
- - git: git@bitbucket.org:ecoenergy/lcirc.git
-   commit: 3f240d9c0ce99c3af6eb2bb4ac9afa594350cd34
-   # nix-sha256: 0w1sjbvi4nisz75rvgs6rff9r864bc29riy8dg6dn6vhs2a4zc8w
- - git: https://github.com/ekmett/propagators.git
-   commit: 6de416c68d7970d734dc139079337a20b078e45c
-   # nix-sha256: 1l2dabwjybf33rrydi5a049iyrniczpbhg6387imghmfj0ibkijr
  - git: https://gitlab.com/fresheyeball/Shpadoinkle.git
-   commit: 8c73571af6b2d186fa66739acd69261a2affa77f
+   commit: 291d5de8d5cd3980791dec61470162b51ef367be
    subdirs:
      - core
      - backends/pardiff
@@ -123,7 +111,7 @@ flags:
   concat-examples:
     smt: False
 
-allow-newer: true
+allow-newer: false
 
     
 # Extra package databases containing global packages

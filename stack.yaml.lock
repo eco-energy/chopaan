@@ -109,28 +109,6 @@ packages:
     git: https://github.com/conal/concat.git
     commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
 - completed:
-    name: opt-expect
-    version: 0.1.0.0
-    git: https://github.com/faezs/opt-expect.git
-    pantry-tree:
-      size: 2106
-      sha256: 2e6116b471dc6a17a0e6fd202f443dbdfc249694aa205c9e0a15bad1148a0a8e
-    commit: cdf9e45622d1739816b40765df23506bc74046b6
-  original:
-    git: https://github.com/faezs/opt-expect.git
-    commit: cdf9e45622d1739816b40765df23506bc74046b6
-- completed:
-    name: propagators
-    version: '0'
-    git: https://github.com/ekmett/propagators.git
-    pantry-tree:
-      size: 953
-      sha256: a535b2cead7831fa11a222917504820efb9e3fab4f858dd1fc170cbbfbf5fc32
-    commit: 6de416c68d7970d734dc139079337a20b078e45c
-  original:
-    git: https://github.com/ekmett/propagators.git
-    commit: 6de416c68d7970d734dc139079337a20b078e45c
-- completed:
     hackage: amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
     pantry-tree:
       size: 992

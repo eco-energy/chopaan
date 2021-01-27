@@ -54,7 +54,8 @@ dependencies:
 - time-lens
 - directory
 - microlens
-- streamly >= 0.7.0 && < 0.7.1
+- generic-lens
+- streamly >= 0.7.2
 - mtl
 - transformers
 - resourcet
@@ -83,8 +84,6 @@ dependencies:
 - concat-examples
 - concat-plugin
 - monad-bayes
-- mgenv
-- opt-expect
 - ghc-prim
 - base64-bytestring
 - wai
@@ -107,6 +106,9 @@ dependencies:
 - blaze-markup
 - servant-blaze
 - retry
+- Shpadoinkle >= 0.3.0.0
+- Shpadoinkle-backend-pardiff
+- Shpadoinkle-html
 ghc-options:
 - -Wall
 - -Wcompat
@@ -138,21 +140,6 @@ executables:
       - -rtsopts
       - -with-rtsopts=-N
       - -with-rtsopts=-T
-  chopaan-demo-exe:
-    main:                Demo.hs
-    source-dirs:         app
-    dependencies:
-    - chopaan
-    - optparse-simple
-    - base
-    other-modules:
-    - Paths_chopaan
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    - -fplugin=ConCat.Plugin
-    - -O2
   tx-test-exe:
     main:                Tx.hs
     source-dirs:         app
