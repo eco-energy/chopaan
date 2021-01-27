@@ -1,10 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeApplications, FlexibleContexts, ScopedTypeVariables, RankNTypes #-}
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses, GADTs, FlexibleInstances #-}
 module Chopaan.Run (run, mon) where
 
+import GHC.Generics
 import Chopaan.Types
 import RIO hiding (view, async)
 import qualified Data.Text as Text
@@ -53,6 +54,11 @@ import Lens.Micro
 import Data.ProtoLens
 
 
+data ChopaanState = ChopaanState
+  { mqttClient :: Bool
+  , serverHandle :: Bool
+  } deriving (Eq, Ord, Show, Generic)
+
 run :: RIO App ()
 run = do
   app <- ask
@@ -67,13 +73,9 @@ run = do
        withMqttAuth
          (KbtzId name)
          (runMqtt mqttOpts{connId=name} outbox nodes (mkCallback qs))
-  _ <- liftIO . forkIO $ testPub nodes outbox 
+  _ <- liftIO . forkIO $ testPub nodes outbox
   sensors <- liftIO $ sensorKbtz @SerialT @IO nodes stateChan
   runtime <- liftIO $ rsKbtz @SerialT @IO nodes statsChan
-  --(txns :: Kbtz AheadT IO (Tx NodeMAC) TransactionStatus) <-
-    --liftIO $
-    --runTransactor outbox (60*5) sensors
-  --liftIO . forkIO $ S.mapM_ print $ adapt . runKbtz $ txns
   liftIO $ print ("Running Monitor...")
   liftIO $ mon id (defGrid nodes) sensors runtime
 
