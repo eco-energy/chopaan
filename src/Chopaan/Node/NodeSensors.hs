@@ -30,14 +30,11 @@ import Streamly
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 
-import Env.MonadEnv
 import Control.Monad.Bayes.Class
 import Control.Monad.Bayes.Sampler
 
 import Unsafe.Coerce
 
--- Persistence
---import PostgreSQL.Simple.
 
 
 type R = Double
