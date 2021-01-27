@@ -132,7 +132,7 @@ initMessageQs ns = do
   return $ MessageQs (WriteChan es) (WriteChan rs) out
   where
     incomingMonitor :: forall a. (Show n, Show a) => UC.OutChan (n, a) -> IO ()
-    incomingMonitor ic = S.drain $ S.repeatM (UC.readChan ic) -- 
+    incomingMonitor ic = S.drain $ S.repeatM (UC.readChan ic) 
 
 writeToPubQ :: (Dispatch a) => PubQueue -> MQ.Topic -> a -> IO ()
 writeToPubQ p n et = atomically $ writeNodeQ p n (frame et)
