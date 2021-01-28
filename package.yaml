@@ -76,10 +76,11 @@ dependencies:
 - retry
 - algebraic-graphs
 - katip
-- opaleye
+- beam-core
+- beam-postgres
+- beam-migrate
 - postgresql-simple
 - resource-pool
-- product-profunctors
 - concat-classes
 - concat-examples
 - concat-plugin
