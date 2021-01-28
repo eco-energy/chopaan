@@ -4,17 +4,8 @@
 
 module Chopaan.DB (Persisted(..), dbPool, DBPool) where
 
-import Opaleye (
-  Field, Table(Table), Insert(..)
-  , required, optional, (.==), (.<)
-  , arrangeDeleteSql, arrangeInsertManySql
-  , arrangeUpdateSql, arrangeInsertManyReturningSql
-  , runInsertMany
-  , SqlInt4, SqlFloat8, SqlText, SqlTimestamptz, toFields, sqlUTCTime
-  )
 import Database.PostgreSQL.Simple (Connection, connect, ConnectInfo(..), close)
 
-import Control.Monad
 import Control.Monad.IO.Class
 import Data.Pool
 
@@ -22,8 +13,7 @@ import Control.Monad.Trans.Reader
 
 import Chopaan.Node.NodeId
 
-import Chopaan.DB.Sensors (insertEnergyState, sensorsTable)
-import Chopaan.DB.Nodes (insertNode)
+
 import Chopaan.Types (DBOpts(..))
 import Proto.NodeMessageSchema.NodeMessages (EnergyState, HardwareConfig)
 
@@ -49,45 +39,6 @@ getDbConn DBOpts{..} = liftIO $ connect ConnectInfo
   , connectPassword = unpack password
   }
 
-type NodeConn m a = ReaderT (NodeMAC, DBOpts) m a
-
-runInsert :: (MonadIO m) => DBOpts -> NodeMAC -> (Connection -> NodeMAC -> a -> IO ()) -> a -> m ()
-runInsert db n i a = (\f -> f a) =<< runReaderT (insertConn i)  (n, db)
-
-
-fromPool pool = withResource pool insertConn
-
-insertConn :: (MonadIO m) => (Connection -> NodeMAC -> a -> IO ()) -> ReaderT (NodeMAC, DBOpts) m (a -> m ())
-insertConn insert = do
-  (n, dbOpts) <- ask
-  return $ \a -> ((\conn -> liftIO $ insert conn n a)
-                      =<< (liftIO $ getDbConn dbOpts))
-
-
---instance (IsStream t, MonadIO m) => Persisted t m Transaction where
-
---insertES :: m (EnergyState)
-
-insertES' :: MonadIO m => DBOpts -> NodeMAC -> EnergyState -> m ()
-insertES' dbOpts n = runInsert dbOpts n insertEnergyState
-
-readES :: forall m. (MonadIO m) => DBOpts -> NodeMAC -> m EnergyState
-readES db n = (readES' n =<< getDbConn db)
-  where
-    readES' :: NodeMAC -> Connection -> m (EnergyState)
-    readES' = undefined -- selectTable sensorsTable
-
-readN :: (IsStream t, MonadAsync m) => DBOpts -> NodeMAC -> t m HardwareConfig
-readN db n = S.repeatM (liftIO (readN' n =<< getDbConn db))
-  where
-    readN' :: NodeMAC -> Connection -> IO (HardwareConfig)
-    readN' = undefined -- selectTable sensorsTable
-
-insertNode' :: MonadIO m => DBOpts -> NodeMAC -> HardwareConfig -> m ()
-insertNode' dbOpts n a = liftIO $ runInsert dbOpts n (\conn -> (\_ _ -> runReaderT (insertNode a) (conn, n))) =<< getDbConn dbOpts
-
-
-type Range = (LocalTime, LocalTime)
 
 class HasPool p where
   type Opts p
@@ -101,12 +52,10 @@ instance HasPool Connection where
 
 class (Show n, Show a) => Persisted n a where
   save :: (HasPool p, MonadAsync m) => p -> n -> a -> m (Maybe n)
-  retrieve :: (HasPool p, MonadAsync m) => p -> n -> m (Maybe (n, a))
+  retrieve :: (HasPool p, MonadAsync m) => p -> n -> m [(n, a)]
 
-class Key a where
-  hasKey :: a -> String
 
-saveStream :: forall p t m n a. (IsStream t, MonadAsync m, Key n, HasPool p, Persisted n a)
+saveStream :: forall p t m n a. (IsStream t, MonadAsync m, HasPool p, Persisted n a)
   => Pool p
   -> t m (n, a)
   -> m ()

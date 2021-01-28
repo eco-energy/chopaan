@@ -1,9 +1,5 @@
 module Chopaan.DB.Sensors where
 
-import           Opaleye (Field, Table(Table),
-                          required, optional, (.==), (.<),
-                          runInsert_, Insert(..),
-                          SqlInt4, SqlFloat8, SqlText, SqlTimestamptz, toFields, sqlUTCTime)
 
 import Database.PostgreSQL.Simple (Connection)
 
@@ -11,7 +7,7 @@ import Lens.Micro
 import Control.Monad (void)
 import Control.Monad.IO.Class
 
-import Data.Profunctor.Product (p10)
+
 
 import Proto.NodeMessageSchema.NodeMessages (EnergyState)
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as F
@@ -19,29 +15,7 @@ import Chopaan.Node.NodeId (NodeMAC, unNodeId)
 import Chopaan.Utils.Time (utcTimeNow)
 
 
-
-type Ins = ( Field SqlInt4
-           , Field SqlTimestamptz
-           , Field SqlFloat8
-           , Field SqlFloat8
-           , Field SqlFloat8
-           , Field SqlFloat8
-           , Field SqlFloat8
-           , Field SqlFloat8
-           , Field SqlFloat8
-           , Field SqlFloat8)
-
-type Outs = ( Field SqlInt4
-            , Field SqlTimestamptz
-            , Field SqlFloat8
-            , Field SqlFloat8
-            , Field SqlFloat8
-            , Field SqlFloat8
-            , Field SqlFloat8
-            , Field SqlFloat8
-            , Field SqlFloat8
-            , Field SqlFloat8)
-
+{--
 sensorsTable :: Table Ins Outs
 sensorsTable = Table "sensors" (p10 ( required "node_id"
                                     , required "node_time"
@@ -77,3 +51,4 @@ insertEnergyState conn n es =
                  , iRows = [fromES]
                  
                  }
+--}
