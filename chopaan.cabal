@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c976e38425a08c0f19c987f7a65a74ad323e5ce0bc9a8da2fc1c0fc2aba23555
+-- hash: 3b462a1a2b9405542e5e02e7c0ee518ec93191d89548f0c3b323855437b134e9
 
 name:           chopaan
 version:        0.1.0.0
@@ -34,7 +34,6 @@ library
       Chopaan.Comm.Queues
       Chopaan.Comm.Socket
       Chopaan.DB
-      Chopaan.DB.DB
       Chopaan.DB.Nodes
       Chopaan.DB.Sensors
       Chopaan.Kibbutz.Allocate
