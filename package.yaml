@@ -30,6 +30,7 @@ dependencies:
 - proto-lens-runtime
 - proto-lens-protoc
 - rio >= 0.1.8.0
+- exceptions
 - amazonka
 - amazonka-iot
 - net-mqtt >= 0.7.0

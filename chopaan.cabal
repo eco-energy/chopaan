@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3b462a1a2b9405542e5e02e7c0ee518ec93191d89548f0c3b323855437b134e9
+-- hash: 69ad7d4e7d8a0d82e5859f39ae2c8a30c2a3d80d30706c76391793b5628445e1
 
 name:           chopaan
 version:        0.1.0.0
@@ -110,6 +110,7 @@ library
     , ekg
     , ekg-core
     , estimator
+    , exceptions
     , generic-lens
     , ghc-prim
     , hashable
@@ -204,6 +205,7 @@ executable chopaan-exe
     , ekg
     , ekg-core
     , estimator
+    , exceptions
     , generic-lens
     , ghc-prim
     , hashable
@@ -299,6 +301,7 @@ executable tx-test-exe
     , ekg
     , ekg-core
     , estimator
+    , exceptions
     , generic-lens
     , ghc-prim
     , hashable
@@ -404,6 +407,7 @@ test-suite chopaan-test
     , ekg
     , ekg-core
     , estimator
+    , exceptions
     , generic-lens
     , ghc-prim
     , hashable
