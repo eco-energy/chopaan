@@ -64,16 +64,27 @@ mkTLSSettings cert key caPath hostName name = let
   in (TLSSettings clientParams)
 
 -- need reader for creds and logs
-runMqtt :: forall a. (Address a) => MQTTOpts -> PubQueue -> [a] -> MQ.MessageCallback -> MQTTCreds -> IO ()
+runMqtt ::
+  forall a. (Address a)
+  => MQTTOpts
+  -> PubQueue
+  -> [a]
+  -> MQ.MessageCallback
+  -> MQTTCreds
+  -> IO ()
 runMqtt opts outQueue ts msgCB creds = do
   mc <- client opts msgCB creds
-  _ <- forkIO $ forever $ catches (pub mc outQueue) ((Handler . errorHandler) <$> ts)
+  _ <- forkIO $ forever $ catches (pub mc outQueue) [(Handler errorHandler)]
   connStatus <- sequence $ (resub mc) <$> ts
   print connStatus
   MQ.waitForClient mc
 
 
-client :: MQTTOpts -> MQ.MessageCallback -> MQTTCreds -> IO (MQ.MQTTClient)
+client ::
+  MQTTOpts
+  -> MQ.MessageCallback
+  -> MQTTCreds
+  -> IO (MQ.MQTTClient)
 client MQTTOpts{..} msgCB MQTTCreds{..} = do
   let
     tlsConf = mkTLSSettings cert privateKey undefined mqttURI connId
@@ -105,11 +116,11 @@ pub c tv = do
       encode = BL.fromStrict . encodeMessage
 
 resub :: (Address n) => MQ.MQTTClient -> n -> IO (Either MQTy.SubErr MQ.QoS)
-resub c n = (subscribe c n)--retryEither n (subscribe c)
+resub c n = retryEither n (subscribe c)
 
-errorHandler :: (Address n) => n -> MQ.MQTTException -> IO ()
-errorHandler n (MQ.Timeout) = printError n "Timeout" 
-errorHandler n (MQ.BadData) = printError n "BadData" 
-errorHandler n (MQ.Discod d) = printError n d  
-errorHandler n (MQ.MQTTException e) =  printError n e
-printError n e = print $ (show e) <> "caught for Node:" <> show n
+errorHandler :: MQ.MQTTException -> IO ()
+errorHandler (MQ.Timeout) = printError "Timeout" 
+errorHandler (MQ.BadData) = printError "BadData" 
+errorHandler (MQ.Discod d) = printError d  
+errorHandler (MQ.MQTTException e) =  printError e
+printError e = print $ "MQTT Publisher Exception:\n" <> (show e)
