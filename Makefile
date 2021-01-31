@@ -51,7 +51,6 @@ db_image:
 runDB: db_image
 	docker-compose up
 
-
 dev:
 	stack test --fast --haddock-deps --file-watch
 
@@ -66,3 +65,6 @@ build:
 
 s2nix:
 	stack-to-nix -o ./nix --stack-yaml=stack.yaml
+
+image:
+	docker load < $$(nix-build ./nix/docker.nix)
