@@ -27,19 +27,17 @@ import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Kibbutz ( sensorKbtz
                                , rsKbtz
                                , getNodes
-                               , scanKbtz
                                , runKbtz
-                               , logKbtz
                                , Kbtz(..)
                                )
 import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
 import Chopaan.Kibbutz.Transactor (runTransactor, Tx(..), TransactionStatus, asKbtz)
 
 import Chopaan.Ui (mon, defGrid)
-import qualified System.Remote.Monitoring as EKG
-import qualified System.Metrics as EKG
+
 import Chopaan.DB
-import Chopaan.DB.Sensors
+import Chopaan.Utils.Retry
+
 
 import Chopaan.Node.NodeId (NodeMAC, NodeId(..))
 
@@ -67,7 +65,7 @@ run = do
     KibbutzOpts{..} = kibbutzOpts
     nodes = testNodes
   --nodes <- (runReaderT getNodes (KbtzId name))
-  dbpool <- liftIO $ dbPool dbOpts                             
+  dbpool <- liftIO . recoverC $ dbPool dbOpts                             
   qs@MessageQs{..} <- liftIO $ initQs nodes
   _ <- liftIO . forkIO $
        withMqttAuth
