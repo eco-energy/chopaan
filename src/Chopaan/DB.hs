@@ -9,17 +9,8 @@ import Database.PostgreSQL.Simple (Connection, connect, ConnectInfo(..), close)
 import Control.Monad.IO.Class
 import Data.Pool
 
-import Control.Monad.Trans.Reader
-
-import Chopaan.Node.NodeId
-
-
 import Chopaan.Types (DBOpts(..))
-import Proto.NodeMessageSchema.NodeMessages (EnergyState, HardwareConfig)
-
-import Data.Time
-import Data.Maybe
-import RIO.Text (unpack)
+import Data.Text (unpack)
 
 import Streamly
 import qualified Streamly.Prelude as S
