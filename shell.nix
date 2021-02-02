@@ -6,32 +6,6 @@
 # hence you will be more likely to get cache hits when using these.
 # But you can also just use your own, e.g. '<nixpkgs>'.
 
-# haskell.nix provides some arguments to be passed to nixpkgs, including some
-# patches and also the haskell.nix functionality itself as an overlay.
-}:
-
-
-let
-  nixpkgsArgs = haskellNix.nixpkgsArgs;
-  nixpkgsSrc = haskellNix.sources.nixpkgs-2003;
-  nixpkgs = import haskellNix.sources.nixpkgs haskellNix.nixpkgsArgs;
-  haskell = nixpkgs.haskell-nix;
-  def = import (./default.nix) {};
-in
-  haskell.haskellPackages.ghcWithPackages (ps: with ps;
-    [ def.chopaan.components.library lens conduit conduit-extra ])
-
-
-
-
-/*
-# shell.nix
-{
-  sources ? import ./nix/sources.nix
-, haskellNix ? import sources."haskell.nix" {}
-# haskell.nix provides access to the nixpkgs pins which are used by our CI,
-# hence you will be more likely to get cache hits when using these.
-# But you can also just use your own, e.g. '<nixpkgs>'.
 , nixpkgsSrc ? haskellNix.sources.nixpkgs-2003
 
 # haskell.nix provides some arguments to be passed to nixpkgs, including some
@@ -48,12 +22,12 @@ in
   hsPkgs.shellFor {
     # Include only the *local* packages of your project.
     packages = ps: with ps; [
-      hsPkgs.chopaan
+      chopaan
     ];
 
     # Builds a Hoogle documentation index of all dependencies,
     # and provides a "hoogle" command to search the index.
-    withHoogle = true;
+    withHoogle = false;
 
     # You might want some extra tools in the shell (optional).
 
@@ -62,11 +36,10 @@ in
     # See overlays/tools.nix for more details
 
     # Some you may need to get some other way.
-    buildInputs =
-      [ pkgs.haskellPackages.ghcid pkgs.protobuf ];
+    buildInputs = with pkgs;
+      [ haskellPackages.ghcid pkgs.protobuf pkgs.postgresql ];
 
     # Prevents cabal from choosing alternate plans, so that
     # *all* dependencies are provided by Nix.
-    exactDeps = true;
+    exactDeps = false;
   }
-*/
