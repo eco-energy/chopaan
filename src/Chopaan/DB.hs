@@ -2,19 +2,22 @@
 {-# LANGUAGE FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies #-}
 
-module Chopaan.DB (Persisted(..), dbPool, DBPool) where
+module Chopaan.DB (Persisted(..), dbPool, DBPool, getSchema) where
 
-import Database.PostgreSQL.Simple (Connection, connect, ConnectInfo(..), close)
 
 import Control.Monad.IO.Class
-import Data.Pool
-
-import Chopaan.Types (DBOpts(..))
 import Data.Text (unpack)
 
 import Streamly
 import qualified Streamly.Prelude as S
 
+import Database.Beam.Migrate.Simple
+import Database.Beam.Postgres (runBeamPostgres)
+import Database.Beam.Postgres.Migrate (migrationBackend)
+import Database.PostgreSQL.Simple (Connection, connect, ConnectInfo(..), close)
+
+import Data.Pool
+import Chopaan.Types (DBOpts(..))
 
 type DBPool = Pool Connection
 
@@ -29,6 +32,12 @@ getDbConn DBOpts{..} = liftIO $ connect ConnectInfo
   , connectUser = unpack user
   , connectPassword = unpack password
   }
+
+
+getSchema :: forall m. (MonadIO m) => DBOpts -> m String
+getSchema opts = do
+  pg <- getDbConn opts 
+  liftIO $ runBeamPostgres pg (haskellSchema migrationBackend)
 
 
 class HasPool p where
