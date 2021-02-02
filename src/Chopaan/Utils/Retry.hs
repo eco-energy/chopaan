@@ -6,14 +6,14 @@ import Control.Monad.Catch
 import Data.Either
 import Control.Monad.IO.Class
 
-chopaanPolicy :: (MonadIO m) => RetryPolicyM m
-chopaanPolicy = exponentialBackoff 50 <> limitRetries 10
+chopaanPolicy :: (MonadIO m) => Int -> RetryPolicyM m
+chopaanPolicy n = exponentialBackoff 1000 <> limitRetries n
 
-recoverC :: (MonadIO m, MonadMask m) => m a -> m a
-recoverC action = recoverAll chopaanPolicy (\_ -> action)
+recoverC :: (MonadIO m, MonadMask m) => Int -> m a -> m a
+recoverC n action = recoverAll (chopaanPolicy n) (\_ -> action)
 
 retryEither :: (MonadIO m) => n -> (n -> m (Either a b)) -> m (Either a b)
-retryEither n f = retrying chopaanPolicy shouldRetryEither (\retryStatus ->  (liftIO $ print retryStatus) >> f n)
+retryEither n f = retrying (chopaanPolicy 10) shouldRetryEither (\retryStatus ->  (liftIO $ print retryStatus) >> f n)
 
 shouldRetryEither :: (Monad m) => RetryStatus -> (Either a b) -> m Bool
 shouldRetryEither _ = return . isLeft
