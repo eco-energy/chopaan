@@ -377,18 +377,7 @@ serveKbtzm hoister pm ns = do
                                 <text></text>
                                 </div>
                                 |]
-    
-{--
-data GridEvent a = StartCharge a
-                 | StopCharge a
-                 | StartDischarge a
-                 | StopDischarge a
-                 | BatteryLow a
-                 | BatteryHigh a
-                 | TxHigh a
-                 | TxLow a
-                 deriving (Eq, Ord, Show, Generic, Functor)
---}
+
 
 type NodeKey n = (Address n, IsName n, FromHttpApiData n)
 
