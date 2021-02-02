@@ -65,7 +65,9 @@ run = do
     KibbutzOpts{..} = kibbutzOpts
     nodes = testNodes
   --nodes <- (runReaderT getNodes (KbtzId name))
-  dbpool <- liftIO . recoverC $ dbPool dbOpts                             
+  dbpool <- liftIO . (recoverC 100) $ dbPool dbOpts
+  liftIO . print $ "DB Connection Pool Initialized"
+  liftIO . print =<< (liftIO . (recoverC 1) . getSchema $ dbOpts)
   qs@MessageQs{..} <- liftIO $ initQs nodes
   _ <- liftIO . forkIO $
        withMqttAuth
