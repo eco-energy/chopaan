@@ -6,6 +6,8 @@ module Chopaan.Kibbutz.AWS.Things where
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 import Chopaan.Utils.Retry
+import Chopaan.Kibbutz.AWS.Common
+
 
 import Data.HashMap.Strict
 import Data.Aeson (fromJSON)
@@ -42,11 +44,11 @@ import System.IO
 import Text.InterpolatedString.Perl6
 
 -- Streamly
-import Streamly ()
+import Streamly
 import qualified Streamly.Prelude as S
-import qualified Streamly.Data.Unfold as UF
-import qualified Streamly.Internal.Data.Unfold.Types as UF
-import qualified Streamly.Internal.Data.Stream.StreamD.Type as STy
+
+
+{--------------- Name to Topic -------------------}
 
 nameToTopic :: Text.Text -> ThingName -> MQ.Topic
 nameToTopic suffix name = prefix <> n <> suffix
@@ -75,25 +77,14 @@ topicToNodeId suffix t =
 
 success :: Int -> Bool
 success = (== 200)
-{--
-retryOnFail :: (MonadIO m) => m a -> (a -> Int) -> (a -> b) -> m b
-retryOnFail action getStatus getRes = do
-  r <- action
-  case (success . getStatus $ r) of
-    True -> return . getRes $ r
-    False -> retryBool action
---}
 
 iotApi :: Service
 iotApi = iot "execute-api"
 
 type AWSC b = AWST' Env (ResourceT IO) b
 
-inAwsContext :: AWST' Env (ResourceT IO) b -> IO b
-inAwsContext ma = do
-  lgr <- newLogger Debug stdout
-  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure iotApi  
-  runResourceT . runAWST env $ ma
+inIotContext :: Logger -> AWST' Env (ResourceT IO) b -> IO b
+inIotContext lgr = inAwsContext lgr iotApi
 
 thingName :: Iot.ThingAttribute -> Maybe ThingName
 thingName t = t ^. Iot.taThingName
@@ -141,10 +132,10 @@ thingMap thing (KbtzId kbtz) cert = fromList $ [("ThingName", thing)
 chopaanId :: KbtzName -> ThingName
 chopaanId (KbtzId k) = k
 
-withMqttAuth :: KbtzName -> (MQTTCreds -> IO c) -> IO c
-withMqttAuth k = bracket
-  (inAwsContext . registerChopaan $ k)
-  (inAwsContext . (deregisterChopaan k))
+withMqttAuth :: Logger -> KbtzName -> (MQTTCreds -> IO c) -> IO c
+withMqttAuth lgr k = bracket
+  ((inIotContext lgr) . registerChopaan $ k)
+  ((inIotContext lgr) . (deregisterChopaan k))
 
 registerChopaan :: KbtzName -> AWSC (MQTTCreds)
 registerChopaan k = createCertAndKey >>= (\mc@MQTTCreds{certId} ->
@@ -193,20 +184,6 @@ deleteCert certId certArn = do
   return ()
   where
     chopaanPolicy = "kibbutz-node-comm"
-
-
-pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)
-pageUF = UF.Unfold step inject
-  where
-    step :: Maybe a -> m (STy.Step (Maybe a) (Rs a)) 
-    step (Just req) = do
-      y <- send req
-      return $ STy.Yield y (page req y)
-    step Nothing = do
-      return $ STy.Stop
-    inject :: a -> m (Maybe a)
-    inject = pure . Just
-
 
 chopaanTemplate :: Text.Text
 chopaanTemplate = [q|
