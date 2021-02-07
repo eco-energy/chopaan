@@ -1,5 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module Chopaan.Kibbutz.AWS.Common where
+module Chopaan.Kibbutz.AWS.Common
+  ( inAwsContext
+  , pageUF
+  , newLogger
+  , LogLevel (..)
+  ) where
 
 import Control.Monad.Trans.AWS
 import Control.Monad.Trans.Resource

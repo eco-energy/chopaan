@@ -29,7 +29,7 @@ in
            }
   ]
 , kibbutzOpts = { name = "kibbutz-pilot-node" }
-, dbOpts = { host = "localhost"
+, dbOpts = { host = "timescale"
            , port = Natural/toInteger 5432
            , database = "chopaan"
            , user = "chopaan"

@@ -4,7 +4,6 @@
 module Chopaan.Kibbutz.Registry
   ( Kibbutz(..)
   , KibbutzEvents(..)
-  , getKibbutz
   ) where
 
 import qualified Data.Text as Text
@@ -27,9 +26,12 @@ data KibbutzEvents = StateUpdate deriving (Eq, Ord, Show)
 kbtz :: Text.Text -> [NodeMAC] -> Kibbutz
 kbtz k = Kibbutz (KbtzId k)
 
+{--
 getKibbutz :: Text.Text -> IO Kibbutz
 getKibbutz n = do
-  ts <- inAwsContext $ getThings n
+  lgr <- newLogger Debug
+  ts <- (inIotContext lgr) $ getThings n
   let
     ns = map (NodeId . fromJust . thingName) ts
   return $ kbtz n ns
+--}

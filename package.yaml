@@ -33,6 +33,8 @@ dependencies:
 - exceptions
 - amazonka
 - amazonka-iot
+- amazonka-s3
+- conduit
 - net-mqtt >= 0.7.0
 - unagi-chan
 - aeson
@@ -81,6 +83,7 @@ dependencies:
 - beam-postgres
 - beam-migrate
 - postgresql-simple
+- postgresql-libpq
 - resource-pool
 - concat-classes
 - concat-examples
@@ -98,7 +101,7 @@ dependencies:
 - sbv
 - suavemente
 - diagrams-lib
-- diagrams-svg >= 1.4.3
+- diagrams-svg >= 1.4.2
 - diagrams-contrib >= 1.4.4
 - ekg
 - ekg-core

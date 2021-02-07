@@ -37,8 +37,9 @@ import Chopaan.Node.NodeId ( NodeMAC
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.AWS.Things ( getThings
                                   , thingName
-                                  , inAwsContext
+                                  , inIotContext
                                   )
+import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
 
 import Proto.NodeMessageSchema.NodeMessages ( RuntimeStats
                                             , EnergyState
@@ -50,7 +51,9 @@ import ConCat.Scan
 import ConCat.Misc
 import ConCat.Category
 
-import Data.Distributive 
+import Data.Distributive
+
+import System.IO
 
 
 instance KbtzConn t m n => LScan (Kbtz t m n) where
@@ -178,9 +181,10 @@ sub = flip (subStream @t @m @n @a)
 
 getNodes :: (MonadIO m) => ReaderT KbtzName m [NodeMAC]
 getNodes = do
+  lgr <- liftIO $ newLogger Debug stdout
   (KbtzId n) <- ask
   ((fmap $ NodeId . fromJust . thingName)
-              <$> (liftIO . inAwsContext . getThings $ n))
+              <$> (liftIO . (inIotContext lgr) . getThings $ n))
 
 logNode :: (MonadIO m, Show n, Show a) => n -> a -> m ()
 logNode k v = liftIO . print $ "Node: "
@@ -189,26 +193,3 @@ logNode k v = liftIO . print $ "Node: "
 
 logKbtz :: (KbtzConn t m n, Show a) => Kbtz t m n a -> Kbtz t m n a 
 logKbtz = traceKbtz logNode
-
-{--
-
-class Gauged a
-  
---instance Gauged  where
---  toInt64 = registerNodeG
-
-instance Gauged NodeGauge
-
-
--- $ Create a store for the kbtz, and NodeGauges for each node, then map the update across
-gauge :: forall t m n a b. (KbtzConn t m n, Gauged b) => EKG.Store -> (EKG.Store -> m (Map n b)) -> (b -> a -> m ()) -> Kbtz t m n a -> m (Kbtz t m n a)
-gauge store mkGauge fn kb = do
-  gs <- mkGauge store
-  return $ traceKbtz (\k s -> fn (gs M.! k) s) kb 
-
-kbtzGauge :: (MonadAsync m, Show n) => Map n (t m NodeS) -> EKG.Store -> m (Map n NodeGauge)
-kbtzGauge km store = sequence $ M.mapWithKey (\k _ -> registerNodeG store k) km 
-
-monitor :: (KbtzConn t m n, Show n) => EKG.Store -> Kbtz t m n NodeS -> m (Kbtz t m n NodeS)
-monitor store k@(Kbtz km) = gauge store (kbtzGauge km) updateNodeG k >>= (pure . logKbtz)
---}

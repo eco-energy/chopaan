@@ -56,6 +56,7 @@ extra-deps:
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
  - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
  - amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135
+ - amazonka-s3-1.6.1@sha256:9d07240fca59ad5197fb614ce3051e701e4951e6d4625a2dab4a9c17a1900194,6317
  - net-mqtt-0.7.0.1
  - ulid-0.2.0.0@sha256:ac415298b0272479909ca576f4444862ae942ed85c7849fa0675e3bf496be6f3,2485
  - crockford-0.2@sha256:6ec593711a20bd4b81a0fc13f3d850d2d890690941d777230fbf980c483e434a,553
@@ -98,6 +99,10 @@ extra-deps:
  - suavemente-0.2.0.0
  - diagrams-svg-1.4.3
  - diagrams-contrib-1.4.4
+ - beam-core-0.9.0.0
+ - beam-postgres-0.5.0.0
+ - beam-migrate-0.5.0.0
+
  #- z3-408.2@sha256:1f8b6ccbcc6d06a6701900a09fcfcbaf86ed8a8495615710bef4da5cdb073a3f,4226
 # Override default flag values for local packages and extra-deps
 flags:

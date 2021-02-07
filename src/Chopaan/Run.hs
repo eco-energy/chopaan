@@ -31,6 +31,7 @@ import Chopaan.Kibbutz.Kibbutz ( sensorKbtz
                                , Kbtz(..)
                                )
 import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
+import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
 import Chopaan.Kibbutz.Transactor (runTransactor, Tx(..), TransactionStatus, asKbtz)
 
 import Chopaan.Ui (mon, defGrid)
@@ -45,7 +46,7 @@ import Chopaan.Node.NodeId (NodeMAC, NodeId(..))
 -- TESTING
 import Proto.NodeMessageSchema.NodeMessages (EnergyState)
 import Proto.NodeMessageSchema.NodeMessages_Fields
---
+import System.IO
 
 
 import Lens.Micro
@@ -57,6 +58,9 @@ data ChopaanState = ChopaanState
   , serverHandle :: Bool
   } deriving (Eq, Ord, Show, Generic)
 
+
+class Monad m => KbtzM m where
+
 run :: RIO App ()
 run = do
   app <- ask
@@ -64,20 +68,23 @@ run = do
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
     nodes = testNodes
-  --nodes <- (runReaderT getNodes (KbtzId name))
+  nodes <- (runReaderT getNodes (KbtzId name))
   dbpool <- liftIO . (recoverC 100) $ dbPool dbOpts
   liftIO . print $ "DB Connection Pool Initialized"
   liftIO . print =<< (liftIO . (recoverC 1) . getSchema $ dbOpts)
   qs@MessageQs{..} <- liftIO $ initQs nodes
-  _ <- liftIO . forkIO $
-       withMqttAuth
-         (KbtzId name)
+  lg <- liftIO $ newLogger Debug stdout
+  inbox <- liftIO . forkIO $
+       withMqttAuth lg (KbtzId name)
          (runMqtt mqttOpts{connId=name} outbox nodes (mkCallback qs))
-  _ <- liftIO . forkIO $ testPub nodes outbox
+  outbox <- liftIO . forkIO $ testPub nodes outbox
   sensors <- liftIO $ sensorKbtz @SerialT @IO nodes stateChan
   runtime <- liftIO $ rsKbtz @SerialT @IO nodes statsChan
   liftIO $ print ("Running Monitor...")
   liftIO $ mon id (defGrid nodes) sensors runtime
+
+
+
 
 
 

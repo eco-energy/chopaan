@@ -3,6 +3,7 @@ module Main where
 
 import Dhall
 import Chopaan.Node.NodeId
+import Chopaan.Kibbutz.AWS.Common
 import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchTx, Stake(..))
@@ -15,6 +16,10 @@ import Control.Concurrent
 import Control.Monad
 import Proto.NodeMessageSchema.NodeMessages
 
+
+import System.IO
+
+
 srcs :: [NodeMAC]
 srcs = NodeId <$> [ "7c:9e:bd:f6:5a:08"
                   , "7c:9e:bd:f5:c6:cc"
@@ -25,8 +30,9 @@ srcs = NodeId <$> [ "7c:9e:bd:f6:5a:08"
 
 main = do
   Options{mqttOpts} <- input auto "./txOpts.dhall"
+  lg <- newLogger Debug stdout
   outbox <- atomically $ initPubQ
-  cl <- withMqttAuth (KbtzId "pilot") (client mqttOpts trivialCB)
+  cl <- withMqttAuth lg (KbtzId "pilot") (client mqttOpts trivialCB)
   _ <- forkIO $ forever $ (pub cl outbox)
   mapM_ (\t -> (dispatchTx outbox t)
           >> print ("Dispatched! " <> show t)
