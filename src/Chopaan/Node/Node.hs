@@ -22,23 +22,14 @@ module Chopaan.Node.Node (
   ) where
 
 
-
-import qualified Data.Text as T
-import Data.Int
-
 import Proto.NodeMessageSchema.NodeMessages
 
 import Streamly
 import qualified Streamly.Prelude as S
 
-import Control.Monad.State.Lazy
 
 import Chopaan.Node.Folds
 import Chopaan.Node.Metrics
-
-
-import qualified System.Metrics.Gauge as G
-import System.Metrics
 
 {--------------------------------------------------------------------------------------------------------------
 
@@ -46,14 +37,14 @@ import System.Metrics
 ---------------------------------------------------------------------------------------------------------------}
 
 
-energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Energy
-energyS = S.postscan energyFold
-
-timeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
-timeS = S.postscan timeFold
-
 powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Power
-powerS = S.postscan powerFold
+powerS = S.postscan . unAppF $ powerFold
+
+energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Energy
+energyS = S.postscan . unAppF $ energyFold
 
 nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m SensorS
 nodeS = S.postscan sensorFold
+
+timeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
+timeS = S.postscan timeFold

@@ -68,7 +68,7 @@ run = do
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
     nodes = testNodes
-  nodes <- (runReaderT getNodes (KbtzId name))
+  --nodes <- (runReaderT getNodes (KbtzId name))
   dbpool <- liftIO . (recoverC 100) $ dbPool dbOpts
   liftIO . print $ "DB Connection Pool Initialized"
   liftIO . print =<< (liftIO . (recoverC 1) . getSchema $ dbOpts)

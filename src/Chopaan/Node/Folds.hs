@@ -5,37 +5,23 @@ LANGUAGE ScopedTypeVariables
 , DeriveGeneric
 , RecordWildCards
 , GeneralizedNewtypeDeriving
+, ExistentialQuantification
+, RankNTypes
+, QuantifiedConstraints
 #-}
 module Chopaan.Node.Folds where
-
-import GHC.Generics hiding (R)
-
 
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 
-
 import Data.Time
-import Data.Aeson (ToJSON(..), FromJSON(..))
-import qualified Data.Aeson as A
-import Data.Csv hiding ((.:))
 import Numeric.Estimator (KalmanFilter(..))
-import Numeric.Compensated
 import ConCat.Misc (R)
-import Text.Printf
 
 
-import Control.Monad.IO.Class
-
-import Chopaan.Node.NodeId
 import Chopaan.Node.Storage
 import Chopaan.Node.Metrics
-import Chopaan.Types (DBOpts)
 import Chopaan.Utils.Time
-
-import Chopaan.DB
-import Chopaan.DB.Sensors
-
 
 import Proto.NodeMessageSchema.NodeMessages
 
@@ -47,6 +33,8 @@ Folds of type FL.Fold, as functions to the instantatenous values of the system o
 
 
 -----------------------------------------------------------------------------------------------------}
+
+
 
 timeFold :: forall m. Applicative m => FL.Fold m (EnergyState) Timestamp
 timeFold = FL.Fold step' begin' done'
@@ -63,14 +51,18 @@ timeFold = FL.Fold step' begin' done'
     done' :: Timestamp -> m Timestamp
     done' = pure
 
+newtype AppF m a b = AppF { unAppF :: FL.Fold m a b } deriving (Functor)
+
+instance (Applicative m) => Applicative (AppF m a) where
+  pure = AppF . pure
+  (AppF f) <*> (AppF xs) = AppF $ f <*> xs
+
+powerFold :: forall m. Applicative m => AppF m EnergyState (Power)
+powerFold = AppF (FL.Fold (\_ b-> pure $ power b) (pure $ mempty) pure) 
 
 
-powerFold :: forall m. (Applicative m) => FL.Fold m EnergyState (Power)
-powerFold = FL.Fold (\_ b-> pure $ power b) (pure $ mempty) pure 
-
-
-energyFold :: forall m. (Applicative m) => FL.Fold m (EnergyState) (Energy)
-energyFold = (FL.Fold step begin end)
+energyFold :: forall m. Applicative m => AppF m (EnergyState) (Energy)
+energyFold = AppF (FL.Fold step begin end)
   where
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
     step :: (Energy, Maybe UTCTime) -> EnergyState -> m (Energy, Maybe UTCTime)
@@ -121,24 +113,20 @@ sensorFold :: forall m. (Monad m) => FL.Fold m (EnergyState) (SensorMetrics Watt
 sensorFold = SensorMetrics
              <$> (fst <$> timeFold)
              <*> (snd <$> timeFold)
-             <*> powerFold
-             <*> energyFold
+             <*> unAppF powerFold
+             <*> unAppF energyFold
              <*> sensors
              <*> (batteryFold defBatteryParams)
              <*> demandFold 
-  where
     
-
-
 demandFold :: (Applicative m) => FL.Fold m (EnergyState) WattSeconds
 demandFold = FL.Fold (\_ nes -> pure (d $ power nes)) (pure 0) pure
   where
-    d (Node{..}) = pToE (60 * 10) consumed
+    d (Node{..}) = pToE horizon consumed
+    horizon = (60 * 10)
 
 sensors :: (Applicative m) => FL.Fold m EnergyState EnergyState
 sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
-
-
 
 type SensorS = SensorMetrics WattSeconds Watts 
 

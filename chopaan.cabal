@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: eb9e6e34ff4f0f7789c69daa6398bf631617f0298326f579fb63008a35c74c98
+-- hash: 9291b40823817dfdc33803bb3a0518d1556efe3f80c31c30452610a2b638c3c7
 
 name:           chopaan
 version:        0.1.0.0
@@ -36,7 +36,6 @@ library
       Chopaan.DB
       Chopaan.DB.Nodes
       Chopaan.DB.Sensors
-      Chopaan.Kbtz
       Chopaan.Kibbutz.Allocate
       Chopaan.Kibbutz.AWS.Common
       Chopaan.Kibbutz.AWS.Hydration
@@ -68,6 +67,7 @@ library
       Chopaan.Utils.Retry
       Chopaan.Utils.StreamsInterop
       Chopaan.Utils.Time
+      Kbtz
       Proto.NodeMessageSchema.NodeMessages
       Proto.NodeMessageSchema.NodeMessages_Fields
       SimNode

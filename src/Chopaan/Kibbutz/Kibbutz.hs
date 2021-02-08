@@ -83,7 +83,7 @@ instance (Ord n) => Monoid (Kbtz t m n a) where
 
 instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n) where
   pure a = Kbtz $ M.singleton mempty (pure a)
-  (Kbtz a) <*> (Kbtz b) = Kbtz $ zipWith (<*>) a b
+  (Kbtz f) <*> (Kbtz b) = Kbtz $ zipWith (<*>) f b
 
 
 instance (IsStream t, Monad m, (forall a. Ord a)) => Bifunctor (Kbtz t m) where

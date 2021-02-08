@@ -6,10 +6,8 @@ import ConCat.Misc
 data V
 data I
 
-
-data Node= Node
-  { grid :: (V :* I) -> (V :* I) :* (V:* I-> V:* I) -- bidirectional converter
-  , load :: V :* I-- draw 
-  , generation :: V :* I-> V :* I-- charger
-  , storage :: (V :* I :+ V :* I) :+ (V :* I :+ V :* I) -> V :* I
-  }
+data NodeF f where
+  Grid :: (V :* I) -> (V :* I) :* (V:* I -> V:* I) -> NodeF f -- bidirectional converter
+  Load :: V :* I -> NodeF f
+  Generation :: V :* I -> V :* I -> NodeF f
+  Storage :: (V :* I :+ V :* I) :+ (V :* I :+ V :* I) -> V :* I -> NodeF f

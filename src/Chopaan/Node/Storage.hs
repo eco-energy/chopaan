@@ -9,7 +9,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric, ApplicativeDo #-}
+{-# LANGUAGE DeriveGeneric, ApplicativeDo, GADTs, TypeOperators #-}
 module Chopaan.Node.Storage where
 
 import Numeric.Estimator.KalmanFilter
@@ -30,6 +30,8 @@ import Control.Monad.State.Lazy
 import Numeric.AD
 import Numeric.AD.Internal.Reverse ()
 
+import ConCat.Interval
+import ConCat.Regress
 
 -- | Goals
 -- 1) SoC Estimation
@@ -43,6 +45,15 @@ import Numeric.AD.Internal.Reverse ()
 --   Page 33-35
 
 -- $ Data Structures
+
+
+data BatteryM a where
+  Hysteresis :: (v ~ a, i ~ a, Additive f) => f v -> f i -> BatteryM a
+  Sensor :: (v ~ a, i ~ a, Additive f) => f v -> f i -> BatteryM a
+  Resistance :: (v ~ a, i ~ a, Additive f) => f v -> f i -> BatteryM a
+
+r :: (Fractional a, Applicative f) => f a -> f a -> f a
+r v i = (/) <$> v <*> i
 
 data BatteryParams a = BatteryParams
   { gamma :: !a -- unitless constant γ adjusts how quickly the hysteresis state changes with a change in cell SOC
@@ -103,6 +114,9 @@ data StateVector a = StateVector
   , hysteresisVoltage :: !a
   } deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 
+
+--data Bank a = Parallel (a :+: a) | Series (a :* a) deriving (Generic, Eq, Ord, Show)
+
 instance Applicative StateVector where
   pure v = StateVector
     { soC = v
@@ -154,19 +168,21 @@ instance Additive SensorVector where
   a ^+^ b = (+) <$> a <*> b
   a ^-^ b = (-) <$> a <*> b
 
+vi :: (Applicative f, Num a) => f a -> f a -> f a
+vi a b = (*) <$> a <*> b
 
 type ParamType a = (Real a, RealFrac a, Floating a, Ord a, Enum a)
 
 
--- $ ----------------------------------------------------------------------------
--- $           Kalman Filter Process Model
--- $ ----------------------------------------------------------------------------
+-- | $ ----------------------------------------------------------------------------
+-- | $           Kalman Filter Process Model
+-- | ----------------------------------------------------------------------------
 
 
 processModel :: forall a. (ParamType a)
   => BatteryParams a
   -> a
-  -> a -- time since last process model update
+  -> a  -- time since last process model update
   -> AugmentState StateVector SensorVector a -- prior (augmented) state
   -> AugmentState StateVector SensorVector a -- posterior (augmented) state
 processModel bp w_k dt
