@@ -119,11 +119,11 @@ data MessageQs n = MessageQs
 initPubQ :: STM (PubQueue)
 initPubQ = initNodeQueue @MQ.Topic @MeshFrame
 
-initQs :: [NodeMAC] -> IO (MessageQs NodeMAC)
+initQs :: IO (MessageQs NodeMAC)
 initQs = initMessageQs @NodeMAC
 
-initMessageQs :: forall n. (Address n, Show n) => [n] -> IO (MessageQs n)
-initMessageQs ns = do 
+initMessageQs :: forall n. (Address n, Show n) => IO (MessageQs n)
+initMessageQs = do 
   (es, esR) <- UC.newChan -- @n @EnergyState ns
   (rs, rsR) <- UC.newChan -- @n @RuntimeStats ns
   _ <- forkIO $ incomingMonitor esR
