@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9291b40823817dfdc33803bb3a0518d1556efe3f80c31c30452610a2b638c3c7
+-- hash: 7bead3603102923bd8e3d2505de49356877885f92d50b4cc85200efcaaf1aac1
 
 name:           chopaan
 version:        0.1.0.0
@@ -61,6 +61,7 @@ library
       Chopaan.Node.Structure
       Chopaan.Node.Tf
       Chopaan.Run
+      Chopaan.Testing
       Chopaan.Types
       Chopaan.Ui
       Chopaan.Utils.JSON
