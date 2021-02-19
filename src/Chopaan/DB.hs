@@ -36,9 +36,9 @@ getDbConn DBOpts{..} = liftIO $ connect ConnectInfo
 
 getSchema :: forall m. (MonadIO m) => DBOpts -> m String
 getSchema opts = do
-  pg <- getDbConn opts 
+  pg <- getDbConn opts
+  liftIO $ print $ "got DB Conn"
   liftIO $ runBeamPostgres pg (haskellSchema migrationBackend)
-
 
 class HasPool p where
   type Opts p

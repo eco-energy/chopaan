@@ -153,11 +153,11 @@ runTransactor :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m
   => PubQueue
   -> Time.DiffTime
   -> Kbtz t m n SensorS
-  -> m (Kbtz t m (TxPlan n) TransactionStatus)
-runTransactor q horizon k =  (return . Kbtz . M.fromList) =<< (S.toList . adapt $ (,) <$> txs <*> statuses)
+  -> t m (TxPlan n, t m TransactionStatus)
+runTransactor q horizon k = (,) <$> txs <*> statuses
   where
     txs = S.trace (dispatchTx q) $ planTx horizon k
-    statuses = S.map (flip monitorTx $ k) txs 
+    statuses = S.map (flip monitorTx $ k) txs
     withLog f q = f q >> \tx -> putStrLn ("Tx:\n" <> show tx) 
 
 dispatchTx :: forall m n. (MonadIO m, Address n)

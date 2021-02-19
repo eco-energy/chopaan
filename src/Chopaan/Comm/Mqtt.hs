@@ -7,7 +7,6 @@
 
 module Chopaan.Comm.Mqtt (runMqtt, client, pub, MQ.Topic) where
 
-
 -- Different string modules should be unified under one interface
 import qualified Data.Text as Text 
 import qualified Data.ByteString.Lazy as BL
@@ -32,6 +31,7 @@ import Network.URI
 
 import Control.Exception (Handler (..), catches)
 import Control.Monad (forever, void)
+import Control.Monad.IO.Class
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
 
@@ -39,7 +39,7 @@ import Data.ProtoLens (encodeMessage)
 
 import Chopaan.Kibbutz.AWS.Things (MQTTCreds(..), withMqttAuth)
 import Chopaan.Types (MQTTOpts(..))
-import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue)
+import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue, initMessageQs, MessageQs(..))
 import Chopaan.Comm.Queues (NodeQueue(..))
 import Chopaan.Utils.Retry
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame)
@@ -65,19 +65,20 @@ mkTLSSettings cert key caPath hostName name = let
 
 -- need reader for creds and logs
 runMqtt ::
-  forall a. (Address a)
+  forall m a. (MonadIO m, Address a)
   => MQTTOpts
-  -> PubQueue
   -> [a]
-  -> MQ.MessageCallback
+  -> (MessageQs a -> MQ.MessageCallback)
   -> MQTTCreds
-  -> IO ()
-runMqtt opts outQueue ts msgCB creds = do
-  mc <- client opts msgCB creds
-  _ <- forkIO $ forever $ catches (pub mc outQueue) [(Handler errorHandler)]
-  connStatus <- sequence $ (resub mc) <$> ts
-  print connStatus
-  MQ.waitForClient mc
+  -> m (MessageQs a)
+runMqtt opts ts msgCB creds = do
+  qs@MessageQs{..} <- liftIO initMessageQs
+  mc <- liftIO $ client opts (msgCB qs) creds
+  _ <- liftIO . forkIO $ forever $ catches (pub mc outbox) [(Handler errorHandler)]
+  connStatus <- liftIO $ sequence $ (resub mc) <$> ts
+  liftIO $ print connStatus
+  liftIO . forkIO $ recoverC 10 (MQ.waitForClient mc)
+  return qs
 
 
 client ::
@@ -108,7 +109,7 @@ subTopic n = (stateTopic n, MQ.subOptions { MQ._subQoS = MQ.QoS1 })
     -- not stateful.
 pub :: MQ.MQTTClient -> PubQueue -> IO ()
 pub c tv = do
-  forever $ pub' =<< (atomically $ do readTBQueue (runNodeQueue tv))
+  (\s -> recoverC 10 (pub' s)) =<< (atomically $ do readTBQueue (runNodeQueue tv))
     where
       pub' :: (MQ.Topic, MeshFrame) -> IO ()
       pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ nId)) >>
@@ -117,6 +118,7 @@ pub c tv = do
 
 resub :: (Address n) => MQ.MQTTClient -> n -> IO (Either MQTy.SubErr MQ.QoS)
 resub c n = retryEither n (subscribe c)
+
 
 errorHandler :: MQ.MQTTException -> IO ()
 errorHandler (MQ.Timeout) = printError "Timeout" 

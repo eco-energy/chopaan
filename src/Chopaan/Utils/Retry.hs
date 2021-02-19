@@ -7,10 +7,10 @@ import Data.Either
 import Control.Monad.IO.Class
 
 chopaanPolicy :: (MonadIO m) => Int -> RetryPolicyM m
-chopaanPolicy n = exponentialBackoff 1000 <> limitRetries n
+chopaanPolicy n = exponentialBackoff 10 <> limitRetries n
 
 recoverC :: (MonadIO m, MonadMask m) => Int -> m a -> m a
-recoverC n action = recoverAll (chopaanPolicy n) (\_ -> action)
+recoverC n action = recoverAll (chopaanPolicy n) (\_ -> (liftIO $ print "retrying") >> action)
 
 retryEither :: (MonadIO m) => n -> (n -> m (Either a b)) -> m (Either a b)
 retryEither n f = retrying (chopaanPolicy 10) shouldRetryEither (\retryStatus ->  (liftIO $ print retryStatus) >> f n)
