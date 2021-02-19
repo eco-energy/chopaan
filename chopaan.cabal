@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7bead3603102923bd8e3d2505de49356877885f92d50b4cc85200efcaaf1aac1
+-- hash: 0fd45e8dd3c096cbc429ebfdd607377b40fb67d573e85b5930c0932e343074de
 
 name:           chopaan
 version:        0.1.0.0
@@ -44,11 +44,11 @@ library
       Chopaan.Kibbutz.Kibbutz
       Chopaan.Kibbutz.LinOpt
       Chopaan.Kibbutz.Mesh
+      Chopaan.Kibbutz.NetSpider
       Chopaan.Kibbutz.Registry
       Chopaan.Kibbutz.Serve
       Chopaan.Kibbutz.Subscriber
       Chopaan.Kibbutz.Transactor
-      Chopaan.Models
       Chopaan.Node.Calibration
       Chopaan.Node.Folds
       Chopaan.Node.Metrics
@@ -61,6 +61,7 @@ library
       Chopaan.Node.Structure
       Chopaan.Node.Tf
       Chopaan.Run
+      Chopaan.Server
       Chopaan.Testing
       Chopaan.Types
       Chopaan.Ui
@@ -88,6 +89,7 @@ library
     , amazonka
     , amazonka-iot
     , amazonka-s3
+    , async
     , base >=4.11 && <10
     , base64-bytestring
     , beam-core
@@ -108,8 +110,9 @@ library
     , data-default-class
     , dhall
     , diagrams-contrib >=1.4.4
+    , diagrams-graphviz >=1.4.1.1
     , diagrams-lib
-    , diagrams-svg >=1.4.2
+    , diagrams-svg >=1.4.3
     , dimensional
     , directory
     , distributive
@@ -119,6 +122,7 @@ library
     , exceptions
     , generic-lens
     , ghc-prim
+    , greskell
     , hashable
     , hmatrix
     , interpolatedstring-perl6
@@ -129,6 +133,7 @@ library
     , monad-bayes
     , mtl
     , net-mqtt >=0.7.0
+    , net-spider
     , network-uri
     , numeric-limits
     , pointed
@@ -185,6 +190,7 @@ executable chopaan-exe
     , amazonka
     , amazonka-iot
     , amazonka-s3
+    , async
     , base
     , base64-bytestring
     , beam-core
@@ -206,8 +212,9 @@ executable chopaan-exe
     , data-default-class
     , dhall
     , diagrams-contrib >=1.4.4
+    , diagrams-graphviz >=1.4.1.1
     , diagrams-lib
-    , diagrams-svg >=1.4.2
+    , diagrams-svg >=1.4.3
     , dimensional
     , directory
     , distributive
@@ -217,6 +224,7 @@ executable chopaan-exe
     , exceptions
     , generic-lens
     , ghc-prim
+    , greskell
     , hashable
     , hmatrix
     , interpolatedstring-perl6
@@ -227,6 +235,7 @@ executable chopaan-exe
     , monad-bayes
     , mtl
     , net-mqtt >=0.7.0
+    , net-spider
     , network-uri
     , numeric-limits
     , optparse-simple
@@ -284,6 +293,7 @@ executable tx-test-exe
     , amazonka
     , amazonka-iot
     , amazonka-s3
+    , async
     , base
     , base64-bytestring
     , beam-core
@@ -305,8 +315,9 @@ executable tx-test-exe
     , data-default-class
     , dhall
     , diagrams-contrib >=1.4.4
+    , diagrams-graphviz >=1.4.1.1
     , diagrams-lib
-    , diagrams-svg >=1.4.2
+    , diagrams-svg >=1.4.3
     , dimensional
     , directory
     , distributive
@@ -316,6 +327,7 @@ executable tx-test-exe
     , exceptions
     , generic-lens
     , ghc-prim
+    , greskell
     , hashable
     , hmatrix
     , interpolatedstring-perl6
@@ -326,6 +338,7 @@ executable tx-test-exe
     , monad-bayes
     , mtl
     , net-mqtt >=0.7.0
+    , net-spider
     , network-uri
     , numeric-limits
     , optparse-simple
@@ -392,6 +405,7 @@ test-suite chopaan-test
     , amazonka
     , amazonka-iot
     , amazonka-s3
+    , async
     , base >=4.11 && <10
     , base64-bytestring
     , beam-core
@@ -414,8 +428,9 @@ test-suite chopaan-test
     , data-default-class
     , dhall
     , diagrams-contrib >=1.4.4
+    , diagrams-graphviz >=1.4.1.1
     , diagrams-lib
-    , diagrams-svg >=1.4.2
+    , diagrams-svg >=1.4.3
     , dimensional
     , directory
     , distributive
@@ -425,6 +440,7 @@ test-suite chopaan-test
     , exceptions
     , generic-lens
     , ghc-prim
+    , greskell
     , hashable
     , hmatrix
     , hspec
@@ -436,6 +452,7 @@ test-suite chopaan-test
     , monad-bayes
     , mtl
     , net-mqtt >=0.7.0
+    , net-spider
     , network-uri
     , numeric-limits
     , pointed
