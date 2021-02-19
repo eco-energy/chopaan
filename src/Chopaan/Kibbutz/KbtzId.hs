@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving #-}
 module Chopaan.Kibbutz.KbtzId where
 
 import Servant
@@ -8,9 +8,15 @@ import GHC.Generics
 import qualified Data.Text as Text
 import Diagrams.Names
 import Data.Typeable
+import Data.Aeson
 
 
-newtype KbtzId a = KbtzId { unKbtzId :: a } deriving (Eq, Ord, Show, Generic, Typeable)
+type KbtzName = KbtzId Text.Text
+
+newtype KbtzId a = KbtzId { unKbtzId :: a } deriving (Eq, Ord, Generic, Typeable, FromJSON, ToJSON)
+
+instance (Show a) => Show (KbtzId a) where
+  show (KbtzId a) = show a
 
 instance (Hashable a) => Hashable (KbtzId a)
 
@@ -24,5 +30,3 @@ instance (ToHttpApiData a) => ToHttpApiData (KbtzId a) where
   toUrlPiece (KbtzId ns) = (toUrlPiece ns)
 
 instance (Typeable a, Ord a, Show a) => IsName (KbtzId a)
-
-type KbtzName = KbtzId Text.Text

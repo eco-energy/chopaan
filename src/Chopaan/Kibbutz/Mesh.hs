@@ -1,29 +1,44 @@
 {-# LANGUAGE DeriveGeneric, DeriveFunctor, GeneralizedNewtypeDeriving, DeriveFoldable, DeriveTraversable, DerivingStrategies, NamedFieldPuns #-}
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, TypeApplications, RankNTypes, FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables
+, TypeOperators
+, TypeApplications
+, RankNTypes
+, FlexibleContexts
+, InstanceSigs
+, OverloadedStrings
+#-}
 module Chopaan.Kibbutz.Mesh where
 
 import Prelude hiding (id, (.), curry, uncurry)
+
+import Control.Monad.IO.Class
 import Data.ProtoLens
 import Lens.Micro
 import qualified Proto.NodeMessageSchema.NodeMessages as N
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N
 import GHC.Generics
 
-import ConCat.Category
-import ConCat.Misc
-
-import Data.Time (DiffTime)
+import Data.Time (DiffTime, LocalTime)
 import Data.Text
-import Data.Tree
-import Control.Applicative
-import Control.Monad
 
 import Chopaan.Comm.Comm (Address(..))
+import Chopaan.Node.NodeId
 
 import qualified Streamly.Prelude as S
 import Streamly
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
+
+
+import Data.Greskell (newBind, gProperty, lookupAs, Key, pMapToFail)
+import Data.Greskell.Extra (writeKeyValues, (<=:>))
+import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
+import NetSpider.Spider
+  (Spider, connectWS, close, addFoundNode, clearAll, getSnapshotSimple)
+import NetSpider.Graph (LinkAttributes(..), EFinds, NodeAttributes(..), VFoundNode)
+import NetSpider.Timestamp (Timestamp, fromS)
+import NetSpider.Snapshot (nodeId, nodeTimestamp)
+import qualified NetSpider.Snapshot as Sn
 
 {--
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.isRoot' @:: Lens' RuntimeStats Prelude.Bool@
@@ -34,13 +49,105 @@ import qualified Streamly.Internal.Data.Fold as FL
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.uptime' @:: Lens' RuntimeStats Data.Word.Word64@
  -}
 
-data MeshNode n = MeshNode { isRoot :: Bool, children :: [n], routerRSSI :: Int, parentRSSI :: Int, version :: Text, uptime :: DiffTime}
+newtype RxSignal = RxSignal Double
 
-fromRTS :: N.RuntimeStats -> MeshNode n
-fromRTS rts = MeshNode (rts ^. N.isRoot) [] (fromIntegral $ rts ^. N.wifiStrength) (fromIntegral $ rts ^. N.meshParentStrength) (rts ^. N.version) (fromIntegral $ rts ^. N.uptime)
+instance LinkAttributes RxSignal where
+  writeLinkAttributes (RxSignal s) = do
+    sv <- newBind s
+    return $ gProperty "rx_signal" sv
+  parseLinkAttributes props =
+    pMapToFail $ RxSignal <$> lookupAs ("rx_signal" :: Key EFinds Double) props
+    
+
+
+data MeshLink = MeshLink deriving (Eq, Show, Ord)
+
+data MeshNode = MeshNode
+  { isRoot :: Bool
+  , uptime :: DiffTime
+  , routerRSSI :: Int
+  , version :: Text
+  } deriving (Eq, Ord, Show, Generic)
+
+rootKey :: Key VFoundNode Bool
+rootKey = "isRoot"
+
+uptimeKey :: Key VFoundNode Int
+uptimeKey = "uptime"
+
+routerRSSIKey :: Key VFoundNode Int
+routerRSSIKey = "routerRSSI"
+
+versionKey :: Key VFoundNode Text
+versionKey = "version"
+
+instance NodeAttributes MeshNode where
+  writeNodeAttributes n = fmap writeKeyValues $
+                          sequence $
+                          [ rootKey <=:> isRoot n
+                          , uptimeKey <=:> (truncate $ uptime n)
+                          , routerRSSIKey <=:> routerRSSI n
+                          , versionKey <=:> version n
+                          ]
+  parseNodeAttributes props =
+    pMapToFail (MeshNode
+                 <$> lookupAs rootKey props
+                 <*> (fromIntegral <$> lookupAs uptimeKey props)
+                 <*> lookupAs routerRSSIKey props
+                 <*> lookupAs versionKey props
+               )
+spiderStream :: forall t m n a c d. (IsStream t, MonadAsync m, Address n)
+  => (Spider Text c d -> (n, a) -> m ())
+  -> Spider Text c d
+  -> t m (n, a)
+  -> m ()
+spiderStream f spider xs = S.drain
+  $ adapt
+  $ S.sequence
+  $ fmap (f spider) xs
+
+
+
+rsStream :: (IsStream t, MonadAsync m) => Spider Text MeshNode RxSignal
+  -> t m (NodeMAC, N.RuntimeStats) -> m ()
+rsStream = (spiderStream fromRTS)
+
+rtsFinding :: (Address n) => n -> N.RuntimeStats
+  -> FoundNode n MeshNode RxSignal
+rtsFinding n rts = FoundNode n timestamp links node
+  where
+    timestamp = undefined
+    links = undefined
+    node = undefined
+
+fromRTS :: (MonadIO m, Address n)
+        => Spider Text MeshNode RxSignal
+        -> (n, N.RuntimeStats)
+        -> m ()
+fromRTS spider (n, rts) = liftIO $ addFoundNode spider finding
+  where
+    toText = pack . show
+    finding = FoundNode { subjectNode= toText n
+                        , foundAt = fromS ""
+                        , neighborLinks = [link]
+                        , nodeAttributes = node
+                        }
+    node = MeshNode { uptime = (fromIntegral $ rts ^. N.uptime)
+                    , isRoot = (rts ^. N.isRoot)
+                    , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
+                    , version = (rts ^. N.version) } 
+    link = FoundLink { targetNode= toText n
+                     , linkState=LinkBidirectional
+                     , linkAttributes = RxSignal (fromIntegral $ rts ^. N.meshParentStrength)
+                     }
+
+
+
+
+
 {--(fromIntegral $ rts ^. N.connectedChildren)--}
 
-
+{--
 toTree :: forall t m n. (IsStream t, MonadAsync m, Address n) => t m (n, N.RuntimeStats) -> t m (MeshT (MeshNode n))
 toTree = S.postscan (ting)
   where
@@ -55,6 +162,7 @@ toTree = S.postscan (ting)
         end = pure
         unfolder :: (b -> m ((MeshNode n), [b])) -> b -> m (Tree (MeshNode n))
         unfolder = unfoldTreeM
+
 
 data Node a = Root a | Child a deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 
@@ -73,7 +181,7 @@ data CommStats = CommStats
   { nothing :: ()
   }
 
-newtype Effect a b = Effect { unEffect :: forall f. (Applicative f) => a -> f b }
+newtype Effect a b = Effect { unEffect :: forall f. (Monad f) => a -> f b }
 
 data MeshD a b = MeshD
   { structure :: forall t. Traversable t => t a
@@ -86,16 +194,19 @@ composeEffect a b = b . a
 composeStructure :: (Traversable t) => t a -> t b -> t b
 composeStructure = undefined
 
-affect :: (Applicative f) => MeshD a b -> (a -> f b)
+affect :: (Applicative f, Monad f) => MeshD a b -> (a -> f b)
 affect = unEffect . effect
 
-coprod :: (Traversable t, Applicative f) => MeshD a b -> f (t b)
+coprod :: (Traversable t, Applicative f, Monad f) => MeshD a b -> f (t b)
 coprod f = traverse (affect f) (structure f)
 
 --terminal :: MeshD k a b -> b
 --terminal m = traverse . ((affect :+ structure m)) 
 
-instance Category Effect
+instance Category Effect where
+  id = id
+  (.) :: Effect b c -> Effect a b -> Effect a c
+  (Effect f') . (Effect f) = Effect (\a -> join $ f' <$> f a) --Effect (f <*> f')
 
 instance Category (MeshD) where
   id = id
@@ -117,3 +228,4 @@ connectionStrengths = undefined
 
 cpuLoadCheck :: Mesh a -> Int -> [a]
 cpuLoadCheck = undefined
+--}
