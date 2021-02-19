@@ -30,6 +30,7 @@ dependencies:
 - proto-lens-runtime
 - proto-lens-protoc
 - rio >= 0.1.8.0
+- async
 - exceptions
 - amazonka
 - amazonka-iot
@@ -101,8 +102,9 @@ dependencies:
 - sbv
 - suavemente
 - diagrams-lib
-- diagrams-svg >= 1.4.2
+- diagrams-svg >= 1.4.3
 - diagrams-contrib >= 1.4.4
+- diagrams-graphviz >= 1.4.1.1
 - ekg
 - ekg-core
 - comonad
@@ -114,6 +116,8 @@ dependencies:
 - Shpadoinkle >= 0.3.0.0
 - Shpadoinkle-backend-pardiff
 - Shpadoinkle-html
+- net-spider
+- greskell
 ghc-options:
 - -Wall
 - -Wcompat

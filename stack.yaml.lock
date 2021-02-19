@@ -431,6 +431,13 @@ packages:
   original:
     hackage: diagrams-contrib-1.4.4
 - completed:
+    hackage: diagrams-graphviz-1.4.1.1@sha256:e71afa8f89904c2a6a2cb490dba7108c6425779c2174b90bd90dbaf507a9d3dc,1388
+    pantry-tree:
+      size: 343
+      sha256: c7f310199441f885ec6063af6cf316130be4672170b9c258eab488496b55124b
+  original:
+    hackage: diagrams-graphviz-1.4.1.1@sha256:e71afa8f89904c2a6a2cb490dba7108c6425779c2174b90bd90dbaf507a9d3dc,1388
+- completed:
     hackage: beam-core-0.9.0.0@sha256:e5b1cb4d5b8a8a166f3373e8718672a3884feb9a5a133404b047b0af76538023,5282
     pantry-tree:
       size: 2704
@@ -451,6 +458,41 @@ packages:
       sha256: 0aa2b84eef52bf8a7fc9906c2b2a1bc37d077456f232cdf445fc182ee888c20f
   original:
     hackage: beam-migrate-0.5.0.0
+- completed:
+    hackage: net-spider-0.4.3.4@sha256:51bae8d3b9412f8419071f48442aceb571d97175033339f6d68879189a153bb1,6198
+    pantry-tree:
+      size: 2918
+      sha256: a4db6d6f49713d7146981791459f7142000882fbe0c6ed1efe24c90e2ed01a6d
+  original:
+    hackage: net-spider-0.4.3.4@sha256:51bae8d3b9412f8419071f48442aceb571d97175033339f6d68879189a153bb1,6198
+- completed:
+    hackage: data-interval-2.0.1@sha256:e5a8705d15a14d56791fbc1cdb90fdcc434bc084f938c096e70a3194a442b444,2393
+    pantry-tree:
+      size: 1136
+      sha256: 154bdaed0d5bae64579c9f178fc412f678d5a2a9991e29c5c808331e42c681b3
+  original:
+    hackage: data-interval-2.0.1@sha256:e5a8705d15a14d56791fbc1cdb90fdcc434bc084f938c096e70a3194a442b444,2393
+- completed:
+    hackage: extended-reals-0.2.4.0@sha256:c1c815b8d8763b22566c7877b43a5e9e748b09b753d63096604c61102146d6f0,1621
+    pantry-tree:
+      size: 398
+      sha256: 5c710810aa5b751d9c37ff6b797177a68ae97ca532f764fd1334cd2d8e3d9158
+  original:
+    hackage: extended-reals-0.2.4.0@sha256:c1c815b8d8763b22566c7877b43a5e9e748b09b753d63096604c61102146d6f0,1621
+- completed:
+    hackage: greskell-1.1.0.3@sha256:f50a8ef342d3426f6b13262e1f164a2b514547da3390784c2ecbbfac6f521e1b,6580
+    pantry-tree:
+      size: 2867
+      sha256: 1df561249698f999a3b8fdab169aa186d8a16533b95617d261108983eab156f9
+  original:
+    hackage: greskell-1.1.0.3@sha256:f50a8ef342d3426f6b13262e1f164a2b514547da3390784c2ecbbfac6f521e1b,6580
+- completed:
+    hackage: greskell-core-0.1.3.5@sha256:1a0734d82a84435fae296019d21f3dd9fc2f6d88b46fe969103841853fc47909,3473
+    pantry-tree:
+      size: 1178
+      sha256: 24ebfb7cf9c83e4840f1897104554233c3a29c1cdc83e0082b87e5b564fcc44b
+  original:
+    hackage: greskell-core-0.1.3.5@sha256:1a0734d82a84435fae296019d21f3dd9fc2f6d88b46fe969103841853fc47909,3473
 snapshots:
 - completed:
     size: 524799
