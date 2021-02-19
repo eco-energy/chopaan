@@ -1,12 +1,20 @@
 version: '3'
 
 services:
+  janusgraph:
+    image: docker.io/janusgraph/janusgraph:latest
+    container_name: janusgraph-default
+    ports:
+      - "8182:8182"
+    # The mounted volume only makes sense if JanusGraph is being run with the BerekeleyDB storage.
+    volumes:
+      - "janusgraph-default-data:/var/lib/janusgraph"
   timescale:
     build:
       context: .
       dockerfile: ./Dockerfile.db 
     image: chopaan/timescale
-    command: postgres -c shared_preload_libraries=timescaledb
+    command: postgres -c shared_preload_libraries=timescaledb -c log_statement=all -c log_destination=stderr
     ports:
       - 5432:5432
     environment:
@@ -20,6 +28,7 @@ services:
     image: chopaan
     depends_on:
       - timescale
+    restart: always
     ports:
       - 3000:3000
       - 8080:8080
@@ -29,3 +38,6 @@ services:
     links:
       - "timescale"
     #command: /opt/chopaan/chopaan
+
+volumes:
+  janusgraph-default-data:
