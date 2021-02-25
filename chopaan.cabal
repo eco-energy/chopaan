@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0fd45e8dd3c096cbc429ebfdd607377b40fb67d573e85b5930c0932e343074de
+-- hash: 12a8c144a5c2772744fa993382e959c8422d95236c4407ceaa50f45ce83586f1
 
 name:           chopaan
 version:        0.1.0.0
@@ -134,6 +134,7 @@ library
     , mtl
     , net-mqtt >=0.7.0
     , net-spider
+    , network
     , network-uri
     , numeric-limits
     , pointed
@@ -236,6 +237,7 @@ executable chopaan-exe
     , mtl
     , net-mqtt >=0.7.0
     , net-spider
+    , network
     , network-uri
     , numeric-limits
     , optparse-simple
@@ -339,6 +341,7 @@ executable tx-test-exe
     , mtl
     , net-mqtt >=0.7.0
     , net-spider
+    , network
     , network-uri
     , numeric-limits
     , optparse-simple
@@ -453,6 +456,7 @@ test-suite chopaan-test
     , mtl
     , net-mqtt >=0.7.0
     , net-spider
+    , network
     , network-uri
     , numeric-limits
     , pointed

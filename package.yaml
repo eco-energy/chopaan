@@ -118,6 +118,7 @@ dependencies:
 - Shpadoinkle-html
 - net-spider
 - greskell
+- network
 ghc-options:
 - -Wall
 - -Wcompat
