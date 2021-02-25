@@ -168,7 +168,7 @@ dispatchTx q tx = do
   uid <- liftIO $ (Text.pack . show) <$> getULID
   t0 <- liftIO $ Time.getCurrentTime
   let txDispatch = mkTxDispatch uid t0 tx
-  liftIO $ (writeToPubQ q) (rootTopic @n (undefined)) $ frame txDispatch
+  liftIO $ (writeToPubQ q) (rootTopic @n (undefined)) $ txDispatch
 
 
 -- The state will just be carried across as a TransactionStatus

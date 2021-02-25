@@ -154,10 +154,6 @@ instance (Dispatch a) => Dispatch (Incoming a) where
   frame (Incoming a) = frame a
   unframe a = Incoming <$> unframe a
 
-  
-instance Dispatch MeshFrame where
-  frame = id
-  unframe = Just . id
 
 
 trivialCB :: MQ.MessageCallback

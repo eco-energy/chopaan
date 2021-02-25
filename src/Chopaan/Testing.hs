@@ -48,7 +48,7 @@ twistor (x:xs) = (xs <> [x])
 testPub :: [NodeMAC] -> PubQueue -> IO ()
 testPub ns q = S.mapM_ (uncurry $ writeToPubQ q) $ constRate 1 $ asTopicDispatch <$> (simNodeES ns)
   where
-    asTopicDispatch (x, y) = (stateTopic x, frame y)
+    asTopicDispatch (x, y) = (stateTopic x, y)
 
 simNodeES :: (MonadAsync m) => [NodeMAC] -> SerialT m (NodeMAC, EnergyState)
 simNodeES (n:ns) = foldl' (wAsync) (es n) (es <$> ns) 
