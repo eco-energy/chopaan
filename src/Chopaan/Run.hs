@@ -8,8 +8,6 @@ module Chopaan.Run (run, mon) where
 import GHC.Generics
 import Chopaan.Types
 import RIO hiding (view, async, withAsync, Async)
-import qualified Data.Text as Text
-import Control.Concurrent (forkIO)
 import qualified Control.Concurrent.Async as A
 
 import Streamly
@@ -20,31 +18,25 @@ import Chopaan.Node.Folds (SensorS)
 import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, HardwareConfig)
 import Chopaan.Comm.Mqtt (runMqtt)
 import Chopaan.Comm.Comm (MessageQs(..)
-                         , initQs
                          , mkCallback
-                         , Dispatch(..)
-                         , Address(..)
-                         , PubQueue
                          )
 
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Kibbutz ( sensorKbtz
                                , rsKbtz
-                               , getNodes
                                , runKbtz
-                               , Kbtz(..)
                                )
 import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
 import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
-import Chopaan.Kibbutz.Transactor (runTransactor, Tx(..), TransactionStatus)
-import Chopaan.Kibbutz.Mesh
+import Chopaan.Kibbutz.Transactor (runTransactor, TransactionStatus, TxPlan)
 
 
-import Chopaan.Server (mon, defGrid)
+
+import Chopaan.Server (mon)
 import Kbtz
 import Chopaan.DB
 import Chopaan.Utils.Retry
-import Chopaan.Testing (testNodes, testPub)
+--import Chopaan.Testing (testNodes, testPub)
 
 
 data ChopaanState = ChopaanState
@@ -73,13 +65,21 @@ run = do
   --liftIO $ print ("Running Monitor...")
   --liftIO $ mon id (defGrid nodes) sensors runtime
 
-type Kibbutzim t m n a = (IsStream t, MonadAsync m) => Map KbtzName (Kbtz t m n a)
+
+newtype Kibbutzim t m n = Kibbutzim {
+  unKibbutzim :: Map KbtzName (KbtzState t m n)
+  }
 
 
 
+data KbtzState t m n = KbtzState
+  { kSensors :: t m (n, SensorS)
+  , kRuntime :: t m (n, RuntimeStats)
+  , kTx :: t m (TxPlan n, t m TransactionStatus)
+  }
 
 
-runKibbutz :: forall t m. (KbtzM m NodeMAC) => MQTTOpts -> KbtzName -> m ()
+runKibbutz :: forall m. (KbtzM m NodeMAC) => MQTTOpts -> KbtzName -> m ()
 runKibbutz mqttOpts name = do
   ns <- nodes name
   lg <- liftIO $ newLogger Debug stdout
