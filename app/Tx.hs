@@ -8,7 +8,7 @@ import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchTx, Stake(..))
 import Chopaan.Comm.Mqtt (pub, client)
-import Chopaan.Comm.Comm (initPubQ, trivialCB)
+import Chopaan.Comm.Comm (initPubQ, trivialCallback)
 import Chopaan.Types
 import qualified Data.Map.Strict as Map
 import Control.Concurrent.STM (atomically)
@@ -32,7 +32,7 @@ main = do
   Options{mqttOpts} <- input auto "./txOpts.dhall"
   lg <- newLogger Debug stdout
   outbox <- atomically $ initPubQ
-  cl <- withMqttAuth lg (KbtzId "pilot") (client mqttOpts trivialCB)
+  cl <- withMqttAuth lg (KbtzId "pilot") (client mqttOpts trivialCallback)
   _ <- forkIO $ forever $ (pub cl outbox)
   mapM_ (\t -> (dispatchTx outbox t)
           >> print ("Dispatched! " <> show t)

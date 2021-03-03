@@ -13,9 +13,14 @@
 module Chopaan.Comm.Comm (Chopaan.Comm.Dispatch.Dispatch(..)
                          , Chopaan.Comm.Address.Address(..)
                          , initQs
+                         , initMessageQs
+                         , initPubQ
                          , MessageQs(..)
+                         , PubQueue
+                         , WriteChan(..)
                          , writeToPubQ
                          , mkCallback
+                         , trivialCallback
                          , subStream
                          ) where
 
@@ -82,6 +87,8 @@ initMessageQs = do
 writeToPubQ :: (Dispatch a) => PubQueue -> MQ.Topic -> a -> IO ()
 writeToPubQ p n et = atomically $ writeNodeQ p n (frame et)
 
+
+trivialCallback = MQ.SimpleCallback (\_ _ _ _ -> return ())
 
 mkCallback :: forall n. (Address n) => MessageQs n -> MQ.MessageCallback
 mkCallback (MessageQs { stateChan, statsChan })  = MQ.SimpleCallback $ writer
