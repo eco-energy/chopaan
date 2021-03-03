@@ -9,7 +9,7 @@
 #-}
 module Chopaan.Kibbutz.Mesh where
 
-import Prelude hiding (id, (.), curry, uncurry)
+import Prelude
 
 import Control.Monad.IO.Class
 import Data.ProtoLens
@@ -101,11 +101,10 @@ spiderStream :: forall t m n a c d. (IsStream t, MonadAsync m, Address n)
   -> Spider Text c d
   -> t m (n, a)
   -> m ()
-spiderStream f spider xs = S.drain
+spiderStream save spider xs = S.drain
   $ adapt
   $ S.sequence
-  $ fmap (f spider) xs
-
+  $ fmap (save spider) xs
 
 
 rsStream :: (IsStream t, MonadAsync m) => Spider Text MeshNode RxSignal
@@ -140,92 +139,3 @@ fromRTS spider (n, rts) = liftIO $ addFoundNode spider finding
                      , linkState=LinkBidirectional
                      , linkAttributes = RxSignal (fromIntegral $ rts ^. N.meshParentStrength)
                      }
-
-
-
-
-
-{--(fromIntegral $ rts ^. N.connectedChildren)--}
-
-{--
-toTree :: forall t m n. (IsStream t, MonadAsync m, Address n) => t m (n, N.RuntimeStats) -> t m (MeshT (MeshNode n))
-toTree = S.postscan (ting)
-  where
-    ting :: FL.Fold m (n, N.RuntimeStats) (MeshT (MeshNode n))
-    ting = FL.Fold next start end
-      where
-        next :: MeshT (MeshNode n) -> (n, N.RuntimeStats) -> m (MeshT (MeshNode n))
-        next (MeshT ptree) (n, rts) = pure . MeshT $ ptree
-        start :: m (MeshT (MeshNode n))
-        start = pure undefined
-        end :: MeshT (MeshNode n) -> m (MeshT (MeshNode n))
-        end = pure
-        unfolder :: (b -> m ((MeshNode n), [b])) -> b -> m (Tree (MeshNode n))
-        unfolder = unfoldTreeM
-
-
-data Node a = Root a | Child a deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
-
-instance Applicative Node where
-  pure = Root
-  (Root f) <*> (Root a) = Root $ f a
-  (Root f) <*> (Child a) = Root $ f a
-  (Child f) <*> (Root a) = Child $ f a
-  (Child f) <*> (Child a) = Child $ f a
-
-
-newtype MeshT a = MeshT { unMeshT :: Tree a }
-  deriving (Eq, Show, Generic, Functor, Applicative, Monad, Foldable, Traversable) 
-
-data CommStats = CommStats
-  { nothing :: ()
-  }
-
-newtype Effect a b = Effect { unEffect :: forall f. (Monad f) => a -> f b }
-
-data MeshD a b = MeshD
-  { structure :: forall t. Traversable t => t a
-  , effect :: Effect a b
-  }
-
-composeEffect :: (Effect a b) -> (Effect b c) -> Effect a c
-composeEffect a b = b . a
-
-composeStructure :: (Traversable t) => t a -> t b -> t b
-composeStructure = undefined
-
-affect :: (Applicative f, Monad f) => MeshD a b -> (a -> f b)
-affect = unEffect . effect
-
-coprod :: (Traversable t, Applicative f, Monad f) => MeshD a b -> f (t b)
-coprod f = traverse (affect f) (structure f)
-
---terminal :: MeshD k a b -> b
---terminal m = traverse . ((affect :+ structure m)) 
-
-instance Category Effect where
-  id = id
-  (.) :: Effect b c -> Effect a b -> Effect a c
-  (Effect f') . (Effect f) = Effect (\a -> join $ f' <$> f a) --Effect (f <*> f')
-
-instance Category (MeshD) where
-  id = id
-  m1 . m0 = MeshD { structure = structure m0
-                  , effect = eff
-                  }
-            where
-              eff = composeEffect (effect m0) (effect m1)
-
-newtype Mesh a = Mesh { unMesh :: forall f b. (Applicative f) => a -> f b }
-
-messageRoute :: (Applicative f) => (a -> f b) -> MeshT a -> f (MeshT b)
-messageRoute mesh nodes = traverse mesh nodes  
-
-type RSSI = Int
-
-connectionStrengths :: MeshT (MeshNode n) -> MeshT RSSI
-connectionStrengths = undefined
-
-cpuLoadCheck :: Mesh a -> Int -> [a]
-cpuLoadCheck = undefined
---}
