@@ -1,6 +1,6 @@
 # release.nix
 let
-  sources = import ./nix/sources.nix;
+  sources = import ./nix/sources.nix {};
   haskellNix = import sources."haskell.nix" {};
   nixpkgsSrc = haskellNix.sources.nixpkgs-2003;
   nixpkgsArgs = haskellNix.nixpkgsArgs;
@@ -8,11 +8,11 @@ let
   pkgs = import nixpkgsSrc nixpkgsArgs;
 
   chopaan = import(./default.nix);
-  nativeArgs = nixpkgsArgs // {
+  raspiArgs = nixpkgsArgs // {
     crossSystem = pkgsNative.lib.systems.examples.raspberryPi;
   };
   pkgsNative = pkgs;
-  pkgsRaspberryPi = import nixpkgsSrc nativeArgs; 
+  pkgsRaspberryPi = import nixpkgsSrc raspiArgs; 
 
   native = chopaan { pkgs = pkgsNative; };
   crossRaspberryPi = chopaan { pkgs = pkgsRaspberryPi; };
