@@ -161,7 +161,6 @@ instance (Enum state) => Enum (T.Column (Gr flow state)) where
 
 
 -- $ Graph View
-
 -- $ Constraints for edge labels and nodes
 type GrConn f s = (Bounded s, Show s, Ord s, Eq s, Enum s, Show f, Monoid f, Ord f)
 
@@ -242,5 +241,5 @@ opS :: (S, Gr S Op) -> (S, Gr S Op)
 opS (i, g) = (inc i, ov g $ gr (inc i) (op i) (op (inc i)))
   where
     op :: S -> Op
-    op i' = unOp . toEnum $ rem (getS i') maxBound
+    op i' = unOp . toEnum $ rem (getS i') (fromEnum $ maxBound @Op)
     inc = (+1)
