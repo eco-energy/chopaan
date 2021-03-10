@@ -55,6 +55,7 @@ import Data.Distributive
 
 import System.IO
 
+type KbtzConn t m n = (IsStream t, MonadAsync m, Address n)
 
 instance KbtzConn t m n => LScan (Kbtz t m n) where
   lscan :: forall a. (Monoid a) => Kbtz t m n a -> (Kbtz t m n a :* a)
@@ -64,12 +65,6 @@ instance KbtzConn t m n => LScan (Kbtz t m n) where
 newtype Kbtz (t :: (* -> *) -> * -> *) (m :: * -> *) n a = Kbtz {
   unKibbutz :: Map n (t m a)
 } deriving (Eq, Ord, Show, Generic, Generic1)
-
-streams :: Kbtz t m n a -> [t m a]
-streams = (snd <$>) . M.toList . unKibbutz
-
-nodes :: Kbtz t m n a -> [n]
-nodes = M.keys . unKibbutz
 
 
 instance (IsStream t, Monad m) => Functor (Kbtz t m n) where
@@ -85,6 +80,8 @@ instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n)
   pure a = Kbtz $ M.singleton mempty (pure a)
   (Kbtz f) <*> (Kbtz b) = Kbtz $ zipWith (<*>) f b
 
+instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Monad (Kbtz t m n) where
+  (Kbtz (x :: Map n (t m a))) >>= (f :: a -> Kbtz t m n b) = undefined
 
 instance (IsStream t, Monad m, (forall a. Ord a)) => Bifunctor (Kbtz t m) where
   bimap :: forall n n' a a'. (Ord n')
@@ -95,19 +92,12 @@ instance (IsStream t, Monad m, (forall a. Ord a)) => Bifunctor (Kbtz t m) where
   bimap f g kbz = Kbtz $ (M.mapKeys f) $ (unKibbutz (g <$> kbz))
 
 
-{--
-instance (IsStream t, Monad m, (forall n. Monoid n)) => Category (Kbtz t m) where
-  id = Kbtz $ M.singleton mempty S.nil
-  (.) :: forall b c a. Ok3 (Kbtz t m) a b c => (Kbtz t m b c) -> (Kbtz t m a b) -> (Kbtz t m a c)
-  (Kbtz k) . (Kbtz k') = undefined
+streams :: Kbtz t m n a -> [t m a]
+streams = (snd <$>) . M.toList . unKibbutz
 
-instance (IsStream t, Monad m) => Distributive (Kbtz t m n) where
-  distribute :: Functor f => f (Kbtz t m n a) -> Kbtz t m n (f a)
-  distribute kbtz = undefined -- $ streams kbtz 
---}
---instance (IsStream t, Monad m) => Representable (Kbtz t m n)
+nodes :: Kbtz t m n a -> [n]
+nodes = M.keys . unKibbutz
 
-type KbtzConn t m n = (IsStream t, MonadAsync m, Address n)
 
 -- The Semantic Function is a scan
 scanKbtz :: forall t m n a a'. (KbtzConn t m n)
