@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: edfc086f417d2826cd25d6d3d4db6eaa2e7fa23ccdbff13eedca9698c0ddd8ec
+-- hash: cbcc7143f9f77ac5ce3f13bd66a8cdbe89045c8b5223851fc6d994b5d210a68e
 
 name:           chopaan
 version:        0.1.0.0
@@ -76,6 +76,7 @@ library
       Proto.NodeMessageSchema.NodeMessages_Fields
       SimNode
       TxModel
+      Ui
   other-modules:
       Paths_chopaan
   hs-source-dirs:
@@ -85,6 +86,7 @@ library
       Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-html
+    , Shpadoinkle-widgets
     , ad
     , aeson
     , algebraic-graphs
@@ -110,6 +112,7 @@ library
     , containers
     , convertible
     , data-default-class
+    , deepseq
     , dhall
     , diagrams-contrib >=1.4.4
     , diagrams-graphviz >=1.4.1.1
@@ -138,6 +141,7 @@ library
     , net-spider
     , network
     , network-uri
+    , newtype-generics
     , numeric-limits
     , pointed
     , postgresql-libpq
@@ -149,6 +153,7 @@ library
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe
     , sbv
     , servant
     , servant-blaze
@@ -187,6 +192,7 @@ executable chopaan-exe
       Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-html
+    , Shpadoinkle-widgets
     , ad
     , aeson
     , algebraic-graphs
@@ -213,6 +219,7 @@ executable chopaan-exe
     , containers
     , convertible
     , data-default-class
+    , deepseq
     , dhall
     , diagrams-contrib >=1.4.4
     , diagrams-graphviz >=1.4.1.1
@@ -241,6 +248,7 @@ executable chopaan-exe
     , net-spider
     , network
     , network-uri
+    , newtype-generics
     , numeric-limits
     , optparse-simple
     , pointed
@@ -253,6 +261,7 @@ executable chopaan-exe
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe
     , sbv
     , servant
     , servant-blaze
@@ -291,6 +300,7 @@ executable tx-test-exe
       Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-html
+    , Shpadoinkle-widgets
     , ad
     , aeson
     , algebraic-graphs
@@ -317,6 +327,7 @@ executable tx-test-exe
     , containers
     , convertible
     , data-default-class
+    , deepseq
     , dhall
     , diagrams-contrib >=1.4.4
     , diagrams-graphviz >=1.4.1.1
@@ -345,6 +356,7 @@ executable tx-test-exe
     , net-spider
     , network
     , network-uri
+    , newtype-generics
     , numeric-limits
     , optparse-simple
     , pointed
@@ -357,6 +369,115 @@ executable tx-test-exe
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe
+    , sbv
+    , servant
+    , servant-blaze
+    , servant-js
+    , servant-server
+    , servant-websockets
+    , stm
+    , streamly >=0.7.2
+    , suavemente
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , time-lens
+    , tls
+    , transformers
+    , ulid
+    , unagi-chan
+    , unordered-containers
+    , vector
+    , vector-sized
+    , wai
+    , warp
+    , websockets
+    , x509-store
+    , x509-validation
+  default-language: Haskell2010
+
+executable ui
+  main-is: Snapshot.hs
+  other-modules:
+      Paths_chopaan
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
+  build-depends:
+      Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
+    , Shpadoinkle-widgets
+    , ad
+    , aeson
+    , algebraic-graphs
+    , amazonka
+    , amazonka-iot
+    , amazonka-s3
+    , async
+    , base
+    , base64-bytestring
+    , beam-core
+    , beam-migrate
+    , beam-postgres
+    , blaze-markup
+    , bytestring
+    , cassava
+    , chopaan
+    , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , conduit
+    , connection
+    , containers
+    , convertible
+    , data-default-class
+    , deepseq
+    , dhall
+    , diagrams-contrib >=1.4.4
+    , diagrams-graphviz >=1.4.1.1
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , ekg
+    , ekg-core
+    , estimator
+    , exceptions
+    , generic-lens
+    , ghc-prim
+    , greskell
+    , hashable
+    , hmatrix
+    , interpolatedstring-perl6
+    , katip
+    , keys
+    , linear
+    , microlens
+    , monad-bayes
+    , mtl
+    , net-mqtt >=0.7.0
+    , net-spider
+    , network
+    , network-uri
+    , newtype-generics
+    , numeric-limits
+    , optparse-simple
+    , pointed
+    , postgresql-libpq
+    , postgresql-simple
+    , proto-lens
+    , proto-lens-protoc
+    , proto-lens-runtime
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , safe
     , sbv
     , servant
     , servant-blaze
@@ -404,6 +525,7 @@ test-suite chopaan-test
     , Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-html
+    , Shpadoinkle-widgets
     , ad
     , aeson
     , algebraic-graphs
@@ -431,6 +553,7 @@ test-suite chopaan-test
     , containers
     , convertible
     , data-default-class
+    , deepseq
     , dhall
     , diagrams-contrib >=1.4.4
     , diagrams-graphviz >=1.4.1.1
@@ -460,6 +583,7 @@ test-suite chopaan-test
     , net-spider
     , network
     , network-uri
+    , newtype-generics
     , numeric-limits
     , pointed
     , postgresql-libpq
@@ -474,6 +598,7 @@ test-suite chopaan-test
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe
     , sbv
     , servant
     , servant-blaze
