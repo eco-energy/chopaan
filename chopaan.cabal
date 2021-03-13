@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: cbcc7143f9f77ac5ce3f13bd66a8cdbe89045c8b5223851fc6d994b5d210a68e
+-- hash: c9894371997215bfc596259e6b2d7a559b99f91774d20757e64a50d7658cad92
 
 name:           chopaan
 version:        0.1.0.0
@@ -51,6 +51,7 @@ library
       Chopaan.Kibbutz.Serve
       Chopaan.Kibbutz.Subscriber
       Chopaan.Kibbutz.Transactor
+      Chopaan.Kibbutz.Ui
       Chopaan.Node.Calibration
       Chopaan.Node.Folds
       Chopaan.Node.Metrics
@@ -67,6 +68,8 @@ library
       Chopaan.Testing
       Chopaan.Types
       Chopaan.Ui
+      Chopaan.Ui.Foreign.Utils
+      Chopaan.Ui.Foreign.WebSocket
       Chopaan.Utils.JSON
       Chopaan.Utils.Retry
       Chopaan.Utils.StreamsInterop
@@ -127,10 +130,12 @@ library
     , exceptions
     , generic-lens
     , ghc-prim
+    , ghcjs-dom
     , greskell
     , hashable
     , hmatrix
     , interpolatedstring-perl6
+    , jsaddle
     , katip
     , keys
     , linear
@@ -234,10 +239,12 @@ executable chopaan-exe
     , exceptions
     , generic-lens
     , ghc-prim
+    , ghcjs-dom
     , greskell
     , hashable
     , hmatrix
     , interpolatedstring-perl6
+    , jsaddle
     , katip
     , keys
     , linear
@@ -342,10 +349,12 @@ executable tx-test-exe
     , exceptions
     , generic-lens
     , ghc-prim
+    , ghcjs-dom
     , greskell
     , hashable
     , hmatrix
     , interpolatedstring-perl6
+    , jsaddle
     , katip
     , keys
     , linear
@@ -450,10 +459,12 @@ executable ui
     , exceptions
     , generic-lens
     , ghc-prim
+    , ghcjs-dom
     , greskell
     , hashable
     , hmatrix
     , interpolatedstring-perl6
+    , jsaddle
     , katip
     , keys
     , linear
@@ -568,11 +579,13 @@ test-suite chopaan-test
     , exceptions
     , generic-lens
     , ghc-prim
+    , ghcjs-dom
     , greskell
     , hashable
     , hmatrix
     , hspec
     , interpolatedstring-perl6
+    , jsaddle
     , katip
     , keys
     , linear

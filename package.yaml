@@ -119,6 +119,8 @@ dependencies:
 - Shpadoinkle-backend-pardiff
 - Shpadoinkle-html
 - Shpadoinkle-widgets
+- jsaddle
+- ghcjs-dom
 - net-spider
 - greskell
 - network
