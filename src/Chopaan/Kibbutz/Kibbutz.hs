@@ -1,8 +1,9 @@
-{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds, InstanceSigs, DeriveGeneric, StandaloneDeriving, TypeOperators, QuantifiedConstraints #-}
-
+{-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds, InstanceSigs #-}
+{-# LANGUAGE DeriveGeneric, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies #-}
+{-# LANGUAGE TypeOperators, QuantifiedConstraints, TypeFamilies #-}
 module Chopaan.Kibbutz.Kibbutz where
 
-import Prelude hiding ((.), id, zipWith, const)
+import Prelude hiding (zipWith)
 
 
 import Streamly
@@ -11,6 +12,7 @@ import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 
 import GHC.Generics
+import Control.DeepSeq (NFData)
 
 import Data.Maybe (fromJust)
 import Data.Text (Text)
@@ -45,12 +47,9 @@ import Proto.NodeMessageSchema.NodeMessages ( RuntimeStats
                                             , EnergyState
                                             )
 
-import qualified System.Metrics as EKG
 
 import ConCat.Scan
 import ConCat.Misc
-import ConCat.Category
-
 import Data.Distributive
 
 import System.IO
@@ -64,8 +63,9 @@ instance KbtzConn t m n => LScan (Kbtz t m n) where
 
 newtype Kbtz (t :: (* -> *) -> * -> *) (m :: * -> *) n a = Kbtz {
   unKibbutz :: Map n (t m a)
-} deriving (Eq, Ord, Show, Generic, Generic1)
-
+  }
+  deriving (Eq, Ord, Show, Generic, Generic1)
+  deriving newtype (NFData)
 
 instance (IsStream t, Monad m) => Functor (Kbtz t m n) where
   fmap f (Kbtz m) = Kbtz $ fmap (S.map f) m
@@ -79,9 +79,6 @@ instance (Ord n) => Monoid (Kbtz t m n a) where
 instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Applicative (Kbtz t m n) where
   pure a = Kbtz $ M.singleton mempty (pure a)
   (Kbtz f) <*> (Kbtz b) = Kbtz $ zipWith (<*>) f b
-
-instance (IsStream t, MonadAsync m, Ord n, Monoid n) => Monad (Kbtz t m n) where
-  (Kbtz (x :: Map n (t m a))) >>= (f :: a -> Kbtz t m n b) = undefined
 
 instance (IsStream t, Monad m, (forall a. Ord a)) => Bifunctor (Kbtz t m) where
   bimap :: forall n n' a a'. (Ord n')
@@ -97,7 +94,6 @@ streams = (snd <$>) . M.toList . unKibbutz
 
 nodes :: Kbtz t m n a -> [n]
 nodes = M.keys . unKibbutz
-
 
 -- The Semantic Function is a scan
 scanKbtz :: forall t m n a a'. (KbtzConn t m n)
@@ -119,7 +115,7 @@ scanfn :: forall t m n a a'. (KbtzConn t m n)
   -> Kbtz t m n a'
 scanfn k f i = scanKbtz k $ pureFold f i id 
 
-pureFold :: (Applicative m) => (a' -> a -> a') -> a' -> (a' -> a') -> FL.Fold m a a'
+pureFold :: forall m a a'. (Applicative m) => (a' -> a -> a') -> a' -> (a' -> a') -> FL.Fold m a a'
 pureFold f i e = FL.Fold (\x y -> pure $ f x y) (pure i) (pure . e)
 
 runKbtz :: forall t m n a. (IsStream t, MonadAsync m, Ord n) => Kbtz t m n a -> t m a
