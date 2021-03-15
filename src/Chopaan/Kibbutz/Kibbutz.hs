@@ -15,7 +15,6 @@ import GHC.Generics
 import Control.DeepSeq (NFData)
 
 import Data.Maybe (fromJust)
-import Data.Text (Text)
 import qualified Data.Map.Lazy as M
 import Data.Map.Lazy (Map)
 import Data.Key
@@ -50,7 +49,7 @@ import Proto.NodeMessageSchema.NodeMessages ( RuntimeStats
 
 import ConCat.Scan
 import ConCat.Misc
-import Data.Distributive
+
 
 import System.IO
 
@@ -118,11 +117,11 @@ scanfn k f i = scanKbtz k $ pureFold f i id
 pureFold :: forall m a a'. (Applicative m) => (a' -> a -> a') -> a' -> (a' -> a') -> FL.Fold m a a'
 pureFold f i e = FL.Fold (\x y -> pure $ f x y) (pure i) (pure . e)
 
-runKbtz :: forall t m n a. (IsStream t, MonadAsync m, Ord n) => Kbtz t m n a -> t m a
-runKbtz = (M.foldl parallel mempty) . unKibbutz
+stream' :: forall t m n a. (IsStream t, MonadAsync m, Ord n) => Kbtz t m n a -> t m a
+stream' = (M.foldl parallel mempty) . unKibbutz
 
-runKbtzKeyed :: forall t m n a. (IsStream t, MonadAsync m) => Kbtz t m n a -> t m (n, a)
-runKbtzKeyed = (M.foldlWithKey taggedParallel mempty) . unKibbutz
+stream :: forall t m n a. (IsStream t, MonadAsync m) => Kbtz t m n a -> t m (n, a)
+stream = (M.foldlWithKey taggedParallel mempty) . unKibbutz
   where
     taggedParallel :: t m (n, a) -> n -> t m a -> t m (n, a)
     taggedParallel c key s = (S.zipWith (,) (S.repeat key) s) `parallel` c
@@ -141,23 +140,10 @@ kbtz ns subscribe process = do
   ss <- mapM subscribe ns
   return $ Kbtz . M.fromList $ [(n, process s) | n <- ns, s <- ss]
 
-
-sensorKbtz :: forall t m. (IsStream t, MonadAsync m)
-  => [NodeMAC]
-  -> WriteChan NodeMAC EnergyState
-  -> m (Kbtz t m NodeMAC SensorS)
-sensorKbtz ns q = kbtz ns (sub @t @m @NodeMAC @EnergyState q) nodeS
-
-rsKbtz :: forall t m. (IsStream t, MonadAsync m)
-  => [NodeMAC]
-  -> WriteChan NodeMAC RuntimeStats
-  -> m (Kbtz t m NodeMAC RuntimeStats)
-rsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @RuntimeStats q) id
-
 traceKbtz :: (IsStream t, MonadAsync m) => (n -> a -> m ())
           -> Kbtz t m n a
           -> Kbtz t m n a
-traceKbtz act (Kbtz k) = Kbtz $ M.mapWithKey (\k' stream -> S.trace (act k') stream) k
+traceKbtz act (Kbtz k) = Kbtz $ M.mapWithKey (\k' s -> S.trace (act k') s) k
 
 sub :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a)
   => WriteChan n a
@@ -179,3 +165,4 @@ logNode k v = liftIO . print $ "Node: "
 
 logKbtz :: (KbtzConn t m n, Show a) => Kbtz t m n a -> Kbtz t m n a 
 logKbtz = traceKbtz logNode
+

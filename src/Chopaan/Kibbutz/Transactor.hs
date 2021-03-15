@@ -20,7 +20,7 @@ import Prelude hiding (zip, zipWith)
 
 import Control.Monad.IO.Class
 
-import Chopaan.Kibbutz.Kibbutz (Kbtz(..), kbtzState, scanKbtz, runKbtzKeyed)
+import Chopaan.Kibbutz.Kibbutz (Kbtz(..), kbtzState, scanKbtz, stream)
 import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue, writeToPubQ)
 import Chopaan.Node.Node (SensorS)
 import Chopaan.Node.Metrics (Power
