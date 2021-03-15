@@ -26,8 +26,8 @@ import qualified Streamly.Prelude as S
 import RIO
 
 class (MonadAsync m, Address n) => KbtzM m n | m -> n where
-  nodes :: KbtzName -> m [n]
-  getQueues :: m (MessageQs n)
+  kbtzNodes :: KbtzName -> m [n]
+  kbtzQueues :: m (MessageQs n)
   subscribe :: forall t a. (IsStream t, Dispatch a)
     => WriteChan n a -> n -> m (t m a)
   publish :: forall t a. (IsStream t, Dispatch a)
@@ -37,8 +37,8 @@ class (MonadAsync m, Address n) => KbtzM m n | m -> n where
 
 
 instance KbtzM (ReaderT App IO) NodeMAC where
-  nodes = liftIO . runReaderT getNodes
-  getQueues = liftIO initMessageQs
+  kbtzNodes = liftIO . runReaderT getNodes
+  kbtzQueues = liftIO initMessageQs
   subscribe = sub
   publish p s = S.mapM_ (\(n, a) -> liftIO $ writeToPubQ p (controlTopic n) a) $ adapt s
   save = undefined
