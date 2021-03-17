@@ -87,12 +87,12 @@ child ::
         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "child" a) =>
         Lens.Family2.LensLike' f s a
 child = Data.ProtoLens.Field.field @"child"
-connectedChildren ::
-                  forall f s a .
-                    (Prelude.Functor f,
-                     Data.ProtoLens.Field.HasField s "connectedChildren" a) =>
-                    Lens.Family2.LensLike' f s a
-connectedChildren = Data.ProtoLens.Field.field @"connectedChildren"
+children ::
+         forall f s a .
+           (Prelude.Functor f,
+            Data.ProtoLens.Field.HasField s "children" a) =>
+           Lens.Family2.LensLike' f s a
+children = Data.ProtoLens.Field.field @"children"
 control ::
         forall f s a .
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "control" a) =>
@@ -219,12 +219,11 @@ key ::
       (Prelude.Functor f, Data.ProtoLens.Field.HasField s "key" a) =>
       Lens.Family2.LensLike' f s a
 key = Data.ProtoLens.Field.field @"key"
-macAddress ::
-           forall f s a .
-             (Prelude.Functor f,
-              Data.ProtoLens.Field.HasField s "macAddress" a) =>
-             Lens.Family2.LensLike' f s a
-macAddress = Data.ProtoLens.Field.field @"macAddress"
+macAddr ::
+        forall f s a .
+          (Prelude.Functor f, Data.ProtoLens.Field.HasField s "macAddr" a) =>
+          Lens.Family2.LensLike' f s a
+macAddr = Data.ProtoLens.Field.field @"macAddr"
 maxChildNodesPerLayer ::
                       forall f s a .
                         (Prelude.Functor f,
@@ -575,6 +574,12 @@ value ::
         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "value" a) =>
         Lens.Family2.LensLike' f s a
 value = Data.ProtoLens.Field.field @"value"
+vec'children ::
+             forall f s a .
+               (Prelude.Functor f,
+                Data.ProtoLens.Field.HasField s "vec'children" a) =>
+               Lens.Family2.LensLike' f s a
+vec'children = Data.ProtoLens.Field.field @"vec'children"
 version ::
         forall f s a .
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "version" a) =>

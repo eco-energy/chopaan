@@ -17,7 +17,7 @@ module Proto.NodeMessageSchema.NodeMessages
         _MeshFrame'MeshConf, _MeshFrame'OtaConf, _MeshFrame'Meshversion,
         _MeshFrame'Parent, _MeshFrame'Child, _MeshFrame'ForcedActions,
         _MeshFrame'Otastatus, _MeshFrame'NodeTxRequest, NodeControl(),
-        NodeIdentity(), OTAConfig(), PDirection(..), PDirection(),
+        NodeId(), OTAConfig(), PDirection(..), PDirection(),
         PDirection'UnrecognizedValue, PVParameters(),
         ReconciliationChild(), ReconciliationParent(), RuntimeStats(),
         SetVersion(), StreamState(..), StreamState(),
@@ -3207,47 +3207,44 @@ instance Control.DeepSeq.NFData NodeControl where
                           (())))))
 {- | Fields :
 
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.macAddress' @:: Lens' NodeIdentity Data.Text.Text@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.macAddr' @:: Lens' NodeId Data.Text.Text@
  -}
-data NodeIdentity = NodeIdentity{_NodeIdentity'macAddress ::
-                                 !Data.Text.Text,
-                                 _NodeIdentity'_unknownFields :: !Data.ProtoLens.FieldSet}
-                      deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show NodeIdentity where
+data NodeId = NodeId{_NodeId'macAddr :: !Data.Text.Text,
+                     _NodeId'_unknownFields :: !Data.ProtoLens.FieldSet}
+                deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show NodeId where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Data.ProtoLens.Field.HasField NodeIdentity "macAddress"
+instance Data.ProtoLens.Field.HasField NodeId "macAddr"
            (Data.Text.Text)
          where
         fieldOf _
-          = (Lens.Family2.Unchecked.lens _NodeIdentity'macAddress
-               (\ x__ y__ -> x__{_NodeIdentity'macAddress = y__}))
+          = (Lens.Family2.Unchecked.lens _NodeId'macAddr
+               (\ x__ y__ -> x__{_NodeId'macAddr = y__}))
               Prelude.. Prelude.id
-instance Data.ProtoLens.Message NodeIdentity where
-        messageName _ = Data.Text.pack "NodeIdentity"
+instance Data.ProtoLens.Message NodeId where
+        messageName _ = Data.Text.pack "NodeId"
         fieldsByTag
-          = let macAddress__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "macAddress"
+          = let macAddr__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "macAddr"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
                          Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
                       (Data.ProtoLens.PlainField Data.ProtoLens.Optional
-                         (Data.ProtoLens.Field.field @"macAddress"))
-                      :: Data.ProtoLens.FieldDescriptor NodeIdentity
+                         (Data.ProtoLens.Field.field @"macAddr"))
+                      :: Data.ProtoLens.FieldDescriptor NodeId
               in
               Data.Map.fromList
-                [(Data.ProtoLens.Tag 1, macAddress__field_descriptor)]
+                [(Data.ProtoLens.Tag 1, macAddr__field_descriptor)]
         unknownFields
-          = Lens.Family2.Unchecked.lens _NodeIdentity'_unknownFields
-              (\ x__ y__ -> x__{_NodeIdentity'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _NodeId'_unknownFields
+              (\ x__ y__ -> x__{_NodeId'_unknownFields = y__})
         defMessage
-          = NodeIdentity{_NodeIdentity'macAddress =
-                           Data.ProtoLens.fieldDefault,
-                         _NodeIdentity'_unknownFields = ([])}
+          = NodeId{_NodeId'macAddr = Data.ProtoLens.fieldDefault,
+                   _NodeId'_unknownFields = ([])}
         parseMessage
-          = let loop ::
-                     NodeIdentity -> Data.ProtoLens.Encoding.Bytes.Parser NodeIdentity
+          = let loop :: NodeId -> Data.ProtoLens.Encoding.Bytes.Parser NodeId
                 loop x
                   = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
                        if end then
@@ -3271,10 +3268,9 @@ instance Data.ProtoLens.Message NodeIdentity where
                                                          Prelude.Left err -> Prelude.Left
                                                                                (Prelude.show err)
                                                          Prelude.Right r -> Prelude.Right r))
-                                                Data.ProtoLens.Encoding.Bytes.<?> "macAddress"
+                                                Data.ProtoLens.Encoding.Bytes.<?> "macAddr"
                                          loop
-                                           (Lens.Family2.set
-                                              (Data.ProtoLens.Field.field @"macAddress")
+                                           (Lens.Family2.set (Data.ProtoLens.Field.field @"macAddr")
                                               y
                                               x)
                                 wire -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
@@ -3285,11 +3281,11 @@ instance Data.ProtoLens.Message NodeIdentity where
                                                 x)
               in
               (do loop Data.ProtoLens.defMessage)
-                Data.ProtoLens.Encoding.Bytes.<?> "NodeIdentity"
+                Data.ProtoLens.Encoding.Bytes.<?> "NodeId"
         buildMessage
           = (\ _x ->
                (let _v
-                      = Lens.Family2.view (Data.ProtoLens.Field.field @"macAddress") _x
+                      = Lens.Family2.view (Data.ProtoLens.Field.field @"macAddr") _x
                   in
                   if (_v) Prelude.== Data.ProtoLens.fieldDefault then
                     Data.Monoid.mempty else
@@ -3303,11 +3299,11 @@ instance Data.ProtoLens.Message NodeIdentity where
                  Data.Monoid.<>
                  Data.ProtoLens.Encoding.Wire.buildFieldSet
                    (Lens.Family2.view Data.ProtoLens.unknownFields _x))
-instance Control.DeepSeq.NFData NodeIdentity where
+instance Control.DeepSeq.NFData NodeId where
         rnf
           = (\ x__ ->
-               Control.DeepSeq.deepseq (_NodeIdentity'_unknownFields x__)
-                 (Control.DeepSeq.deepseq (_NodeIdentity'macAddress x__) (())))
+               Control.DeepSeq.deepseq (_NodeId'_unknownFields x__)
+                 (Control.DeepSeq.deepseq (_NodeId'macAddr x__) (())))
 {- | Fields :
 
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.endpoint' @:: Lens' OTAConfig Data.Text.Text@
@@ -3968,22 +3964,28 @@ instance Control.DeepSeq.NFData ReconciliationParent where
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.currentFreeHeap' @:: Lens' RuntimeStats Data.Word.Word32@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.cpuUtilization' @:: Lens' RuntimeStats Data.Word.Word32@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.isRoot' @:: Lens' RuntimeStats Prelude.Bool@
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.connectedChildren' @:: Lens' RuntimeStats Data.Word.Word32@
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.wifiStrength' @:: Lens' RuntimeStats Data.Word.Word32@
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.meshParentStrength' @:: Lens' RuntimeStats Data.Word.Word32@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.children' @:: Lens' RuntimeStats [NodeId]@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.vec'children' @:: Lens' RuntimeStats (Data.Vector.Vector NodeId)@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.wifiStrength' @:: Lens' RuntimeStats Data.Int.Int32@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.meshParentStrength' @:: Lens' RuntimeStats Data.Int.Int32@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.version' @:: Lens' RuntimeStats Data.Text.Text@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.uptime' @:: Lens' RuntimeStats Data.Word.Word64@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.parent' @:: Lens' RuntimeStats NodeId@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.maybe'parent' @:: Lens' RuntimeStats (Prelude.Maybe NodeId)@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.cpuTime' @:: Lens' RuntimeStats Data.Word.Word64@
  -}
 data RuntimeStats = RuntimeStats{_RuntimeStats'minFreeHeap ::
                                  !Data.Word.Word32,
                                  _RuntimeStats'currentFreeHeap :: !Data.Word.Word32,
                                  _RuntimeStats'cpuUtilization :: !Data.Word.Word32,
                                  _RuntimeStats'isRoot :: !Prelude.Bool,
-                                 _RuntimeStats'connectedChildren :: !Data.Word.Word32,
-                                 _RuntimeStats'wifiStrength :: !Data.Word.Word32,
-                                 _RuntimeStats'meshParentStrength :: !Data.Word.Word32,
+                                 _RuntimeStats'children :: !(Data.Vector.Vector NodeId),
+                                 _RuntimeStats'wifiStrength :: !Data.Int.Int32,
+                                 _RuntimeStats'meshParentStrength :: !Data.Int.Int32,
                                  _RuntimeStats'version :: !Data.Text.Text,
                                  _RuntimeStats'uptime :: !Data.Word.Word64,
+                                 _RuntimeStats'parent :: !(Prelude.Maybe NodeId),
+                                 _RuntimeStats'cpuTime :: !Data.Word.Word64,
                                  _RuntimeStats'_unknownFields :: !Data.ProtoLens.FieldSet}
                       deriving (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show RuntimeStats where
@@ -4021,16 +4023,24 @@ instance Data.ProtoLens.Field.HasField RuntimeStats "isRoot"
           = (Lens.Family2.Unchecked.lens _RuntimeStats'isRoot
                (\ x__ y__ -> x__{_RuntimeStats'isRoot = y__}))
               Prelude.. Prelude.id
-instance Data.ProtoLens.Field.HasField RuntimeStats
-           "connectedChildren"
-           (Data.Word.Word32)
+instance Data.ProtoLens.Field.HasField RuntimeStats "children"
+           ([NodeId])
          where
         fieldOf _
-          = (Lens.Family2.Unchecked.lens _RuntimeStats'connectedChildren
-               (\ x__ y__ -> x__{_RuntimeStats'connectedChildren = y__}))
+          = (Lens.Family2.Unchecked.lens _RuntimeStats'children
+               (\ x__ y__ -> x__{_RuntimeStats'children = y__}))
+              Prelude..
+              Lens.Family2.Unchecked.lens Data.Vector.Generic.toList
+                (\ _ y__ -> Data.Vector.Generic.fromList y__)
+instance Data.ProtoLens.Field.HasField RuntimeStats "vec'children"
+           (Data.Vector.Vector NodeId)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _RuntimeStats'children
+               (\ x__ y__ -> x__{_RuntimeStats'children = y__}))
               Prelude.. Prelude.id
 instance Data.ProtoLens.Field.HasField RuntimeStats "wifiStrength"
-           (Data.Word.Word32)
+           (Data.Int.Int32)
          where
         fieldOf _
           = (Lens.Family2.Unchecked.lens _RuntimeStats'wifiStrength
@@ -4038,7 +4048,7 @@ instance Data.ProtoLens.Field.HasField RuntimeStats "wifiStrength"
               Prelude.. Prelude.id
 instance Data.ProtoLens.Field.HasField RuntimeStats
            "meshParentStrength"
-           (Data.Word.Word32)
+           (Data.Int.Int32)
          where
         fieldOf _
           = (Lens.Family2.Unchecked.lens _RuntimeStats'meshParentStrength
@@ -4057,6 +4067,27 @@ instance Data.ProtoLens.Field.HasField RuntimeStats "uptime"
         fieldOf _
           = (Lens.Family2.Unchecked.lens _RuntimeStats'uptime
                (\ x__ y__ -> x__{_RuntimeStats'uptime = y__}))
+              Prelude.. Prelude.id
+instance Data.ProtoLens.Field.HasField RuntimeStats "parent"
+           (NodeId)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _RuntimeStats'parent
+               (\ x__ y__ -> x__{_RuntimeStats'parent = y__}))
+              Prelude.. Data.ProtoLens.maybeLens Data.ProtoLens.defMessage
+instance Data.ProtoLens.Field.HasField RuntimeStats "maybe'parent"
+           (Prelude.Maybe NodeId)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _RuntimeStats'parent
+               (\ x__ y__ -> x__{_RuntimeStats'parent = y__}))
+              Prelude.. Prelude.id
+instance Data.ProtoLens.Field.HasField RuntimeStats "cpuTime"
+           (Data.Word.Word64)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _RuntimeStats'cpuTime
+               (\ x__ y__ -> x__{_RuntimeStats'cpuTime = y__}))
               Prelude.. Prelude.id
 instance Data.ProtoLens.Message RuntimeStats where
         messageName _ = Data.Text.pack "RuntimeStats"
@@ -4089,24 +4120,24 @@ instance Data.ProtoLens.Message RuntimeStats where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Optional
                          (Data.ProtoLens.Field.field @"isRoot"))
                       :: Data.ProtoLens.FieldDescriptor RuntimeStats
-                connectedChildren__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "connectedChildren"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
-                      (Data.ProtoLens.PlainField Data.ProtoLens.Optional
-                         (Data.ProtoLens.Field.field @"connectedChildren"))
+                children__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "children"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor NodeId)
+                      (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
+                         (Data.ProtoLens.Field.field @"children"))
                       :: Data.ProtoLens.FieldDescriptor RuntimeStats
                 wifiStrength__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "wifiStrength"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.Int32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Int.Int32)
                       (Data.ProtoLens.PlainField Data.ProtoLens.Optional
                          (Data.ProtoLens.Field.field @"wifiStrength"))
                       :: Data.ProtoLens.FieldDescriptor RuntimeStats
                 meshParentStrength__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "meshParentStrength"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.Int32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Int.Int32)
                       (Data.ProtoLens.PlainField Data.ProtoLens.Optional
                          (Data.ProtoLens.Field.field @"meshParentStrength"))
                       :: Data.ProtoLens.FieldDescriptor RuntimeStats
@@ -4124,17 +4155,33 @@ instance Data.ProtoLens.Message RuntimeStats where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Optional
                          (Data.ProtoLens.Field.field @"uptime"))
                       :: Data.ProtoLens.FieldDescriptor RuntimeStats
+                parent__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "parent"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor NodeId)
+                      (Data.ProtoLens.OptionalField
+                         (Data.ProtoLens.Field.field @"maybe'parent"))
+                      :: Data.ProtoLens.FieldDescriptor RuntimeStats
+                cpuTime__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "cpu_time"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt64Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word64)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Optional
+                         (Data.ProtoLens.Field.field @"cpuTime"))
+                      :: Data.ProtoLens.FieldDescriptor RuntimeStats
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, minFreeHeap__field_descriptor),
                  (Data.ProtoLens.Tag 2, currentFreeHeap__field_descriptor),
                  (Data.ProtoLens.Tag 3, cpuUtilization__field_descriptor),
                  (Data.ProtoLens.Tag 4, isRoot__field_descriptor),
-                 (Data.ProtoLens.Tag 5, connectedChildren__field_descriptor),
+                 (Data.ProtoLens.Tag 5, children__field_descriptor),
                  (Data.ProtoLens.Tag 6, wifiStrength__field_descriptor),
                  (Data.ProtoLens.Tag 7, meshParentStrength__field_descriptor),
                  (Data.ProtoLens.Tag 8, version__field_descriptor),
-                 (Data.ProtoLens.Tag 9, uptime__field_descriptor)]
+                 (Data.ProtoLens.Tag 9, uptime__field_descriptor),
+                 (Data.ProtoLens.Tag 10, parent__field_descriptor),
+                 (Data.ProtoLens.Tag 11, cpuTime__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _RuntimeStats'_unknownFields
               (\ x__ y__ -> x__{_RuntimeStats'_unknownFields = y__})
@@ -4144,19 +4191,28 @@ instance Data.ProtoLens.Message RuntimeStats where
                          _RuntimeStats'currentFreeHeap = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'cpuUtilization = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'isRoot = Data.ProtoLens.fieldDefault,
-                         _RuntimeStats'connectedChildren = Data.ProtoLens.fieldDefault,
+                         _RuntimeStats'children = Data.Vector.Generic.empty,
                          _RuntimeStats'wifiStrength = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'meshParentStrength = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'version = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'uptime = Data.ProtoLens.fieldDefault,
+                         _RuntimeStats'parent = Prelude.Nothing,
+                         _RuntimeStats'cpuTime = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'_unknownFields = ([])}
         parseMessage
           = let loop ::
-                     RuntimeStats -> Data.ProtoLens.Encoding.Bytes.Parser RuntimeStats
-                loop x
+                     RuntimeStats ->
+                       Data.ProtoLens.Encoding.Growing.Growing Data.Vector.Vector
+                         Data.ProtoLens.Encoding.Growing.RealWorld
+                         NodeId
+                         -> Data.ProtoLens.Encoding.Bytes.Parser RuntimeStats
+                loop x mutable'children
                   = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
                        if end then
-                         do let missing = [] in
+                         do frozen'children <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                                 (Data.ProtoLens.Encoding.Growing.unsafeFreeze
+                                                    mutable'children)
+                            let missing = [] in
                               if Prelude.null missing then Prelude.return () else
                                 Prelude.fail
                                   (("Missing required fields: ") Prelude.++
@@ -4164,7 +4220,9 @@ instance Data.ProtoLens.Message RuntimeStats where
                             Prelude.return
                               (Lens.Family2.over Data.ProtoLens.unknownFields
                                  (\ !t -> Prelude.reverse t)
-                                 x)
+                                 (Lens.Family2.set (Data.ProtoLens.Field.field @"vec'children")
+                                    frozen'children
+                                    x))
                          else
                          do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
                             case tag of
@@ -4176,6 +4234,7 @@ instance Data.ProtoLens.Message RuntimeStats where
                                              (Data.ProtoLens.Field.field @"minFreeHeap")
                                              y
                                              x)
+                                          mutable'children
                                 16 -> do y <- (Prelude.fmap Prelude.fromIntegral
                                                  Data.ProtoLens.Encoding.Bytes.getVarInt)
                                                 Data.ProtoLens.Encoding.Bytes.<?> "currentFreeHeap"
@@ -4184,6 +4243,7 @@ instance Data.ProtoLens.Message RuntimeStats where
                                               (Data.ProtoLens.Field.field @"currentFreeHeap")
                                               y
                                               x)
+                                           mutable'children
                                 24 -> do y <- (Prelude.fmap Prelude.fromIntegral
                                                  Data.ProtoLens.Encoding.Bytes.getVarInt)
                                                 Data.ProtoLens.Encoding.Bytes.<?> "cpuUtilization"
@@ -4192,6 +4252,7 @@ instance Data.ProtoLens.Message RuntimeStats where
                                               (Data.ProtoLens.Field.field @"cpuUtilization")
                                               y
                                               x)
+                                           mutable'children
                                 32 -> do y <- (Prelude.fmap ((Prelude./=) 0)
                                                  Data.ProtoLens.Encoding.Bytes.getVarInt)
                                                 Data.ProtoLens.Encoding.Bytes.<?> "isRoot"
@@ -4199,15 +4260,17 @@ instance Data.ProtoLens.Message RuntimeStats where
                                            (Lens.Family2.set (Data.ProtoLens.Field.field @"isRoot")
                                               y
                                               x)
-                                40 -> do y <- (Prelude.fmap Prelude.fromIntegral
-                                                 Data.ProtoLens.Encoding.Bytes.getVarInt)
-                                                Data.ProtoLens.Encoding.Bytes.<?>
-                                                "connectedChildren"
-                                         loop
-                                           (Lens.Family2.set
-                                              (Data.ProtoLens.Field.field @"connectedChildren")
-                                              y
-                                              x)
+                                           mutable'children
+                                42 -> do !y <- (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                                   Data.ProtoLens.Encoding.Bytes.isolate
+                                                     (Prelude.fromIntegral len)
+                                                     Data.ProtoLens.parseMessage)
+                                                 Data.ProtoLens.Encoding.Bytes.<?> "children"
+                                         v <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                                (Data.ProtoLens.Encoding.Growing.append
+                                                   mutable'children
+                                                   y)
+                                         loop x v
                                 48 -> do y <- (Prelude.fmap Prelude.fromIntegral
                                                  Data.ProtoLens.Encoding.Bytes.getVarInt)
                                                 Data.ProtoLens.Encoding.Bytes.<?> "wifiStrength"
@@ -4216,6 +4279,7 @@ instance Data.ProtoLens.Message RuntimeStats where
                                               (Data.ProtoLens.Field.field @"wifiStrength")
                                               y
                                               x)
+                                           mutable'children
                                 56 -> do y <- (Prelude.fmap Prelude.fromIntegral
                                                  Data.ProtoLens.Encoding.Bytes.getVarInt)
                                                 Data.ProtoLens.Encoding.Bytes.<?>
@@ -4225,6 +4289,7 @@ instance Data.ProtoLens.Message RuntimeStats where
                                               (Data.ProtoLens.Field.field @"meshParentStrength")
                                               y
                                               x)
+                                           mutable'children
                                 66 -> do y <- (do value <- do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
                                                               Data.ProtoLens.Encoding.Bytes.getBytes
                                                                 (Prelude.fromIntegral len)
@@ -4238,20 +4303,42 @@ instance Data.ProtoLens.Message RuntimeStats where
                                            (Lens.Family2.set (Data.ProtoLens.Field.field @"version")
                                               y
                                               x)
+                                           mutable'children
                                 72 -> do y <- (Data.ProtoLens.Encoding.Bytes.getVarInt)
                                                 Data.ProtoLens.Encoding.Bytes.<?> "uptime"
                                          loop
                                            (Lens.Family2.set (Data.ProtoLens.Field.field @"uptime")
                                               y
                                               x)
+                                           mutable'children
+                                82 -> do y <- (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                                  Data.ProtoLens.Encoding.Bytes.isolate
+                                                    (Prelude.fromIntegral len)
+                                                    Data.ProtoLens.parseMessage)
+                                                Data.ProtoLens.Encoding.Bytes.<?> "parent"
+                                         loop
+                                           (Lens.Family2.set (Data.ProtoLens.Field.field @"parent")
+                                              y
+                                              x)
+                                           mutable'children
+                                88 -> do y <- (Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                                Data.ProtoLens.Encoding.Bytes.<?> "cpu_time"
+                                         loop
+                                           (Lens.Family2.set (Data.ProtoLens.Field.field @"cpuTime")
+                                              y
+                                              x)
+                                           mutable'children
                                 wire -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                                    wire
                                            loop
                                              (Lens.Family2.over Data.ProtoLens.unknownFields
                                                 (\ !t -> (:) y t)
                                                 x)
+                                             mutable'children
               in
-              (do loop Data.ProtoLens.defMessage)
+              (do mutable'children <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                        Data.ProtoLens.Encoding.Growing.new
+                  loop Data.ProtoLens.defMessage mutable'children)
                 Data.ProtoLens.Encoding.Bytes.<?> "RuntimeStats"
         buildMessage
           = (\ _x ->
@@ -4297,17 +4384,17 @@ instance Data.ProtoLens.Message RuntimeStats where
                                (\ b -> if b then 1 else 0))
                               _v)
                        Data.Monoid.<>
-                       (let _v
-                              = Lens.Family2.view
-                                  (Data.ProtoLens.Field.field @"connectedChildren")
-                                  _x
-                          in
-                          if (_v) Prelude.== Data.ProtoLens.fieldDefault then
-                            Data.Monoid.mempty else
-                            (Data.ProtoLens.Encoding.Bytes.putVarInt 40) Data.Monoid.<>
-                              ((Data.ProtoLens.Encoding.Bytes.putVarInt) Prelude..
-                                 Prelude.fromIntegral)
-                                _v)
+                       (Data.ProtoLens.Encoding.Bytes.foldMapBuilder
+                          (\ _v ->
+                             (Data.ProtoLens.Encoding.Bytes.putVarInt 42) Data.Monoid.<>
+                               (((\ bs ->
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                       (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                      Data.Monoid.<> Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                  Prelude.. Data.ProtoLens.encodeMessage)
+                                 _v)
+                          (Lens.Family2.view (Data.ProtoLens.Field.field @"vec'children")
+                             _x))
                          Data.Monoid.<>
                          (let _v
                                 = Lens.Family2.view (Data.ProtoLens.Field.field @"wifiStrength") _x
@@ -4353,8 +4440,37 @@ instance Data.ProtoLens.Message RuntimeStats where
                                     (Data.ProtoLens.Encoding.Bytes.putVarInt 72) Data.Monoid.<>
                                       Data.ProtoLens.Encoding.Bytes.putVarInt _v)
                                  Data.Monoid.<>
-                                 Data.ProtoLens.Encoding.Wire.buildFieldSet
-                                   (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+                                 (case
+                                    Lens.Family2.view (Data.ProtoLens.Field.field @"maybe'parent")
+                                      _x
+                                    of
+                                      (Prelude.Nothing) -> Data.Monoid.mempty
+                                      Prelude.Just _v -> (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                            82)
+                                                           Data.Monoid.<>
+                                                           (((\ bs ->
+                                                                (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                                   (Prelude.fromIntegral
+                                                                      (Data.ByteString.length bs)))
+                                                                  Data.Monoid.<>
+                                                                  Data.ProtoLens.Encoding.Bytes.putBytes
+                                                                    bs))
+                                                              Prelude..
+                                                              Data.ProtoLens.encodeMessage)
+                                                             _v)
+                                   Data.Monoid.<>
+                                   (let _v
+                                          = Lens.Family2.view
+                                              (Data.ProtoLens.Field.field @"cpuTime")
+                                              _x
+                                      in
+                                      if (_v) Prelude.== Data.ProtoLens.fieldDefault then
+                                        Data.Monoid.mempty else
+                                        (Data.ProtoLens.Encoding.Bytes.putVarInt 88) Data.Monoid.<>
+                                          Data.ProtoLens.Encoding.Bytes.putVarInt _v)
+                                     Data.Monoid.<>
+                                     Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                       (Lens.Family2.view Data.ProtoLens.unknownFields _x))
 instance Control.DeepSeq.NFData RuntimeStats where
         rnf
           = (\ x__ ->
@@ -4363,12 +4479,14 @@ instance Control.DeepSeq.NFData RuntimeStats where
                     (Control.DeepSeq.deepseq (_RuntimeStats'currentFreeHeap x__)
                        (Control.DeepSeq.deepseq (_RuntimeStats'cpuUtilization x__)
                           (Control.DeepSeq.deepseq (_RuntimeStats'isRoot x__)
-                             (Control.DeepSeq.deepseq (_RuntimeStats'connectedChildren x__)
+                             (Control.DeepSeq.deepseq (_RuntimeStats'children x__)
                                 (Control.DeepSeq.deepseq (_RuntimeStats'wifiStrength x__)
                                    (Control.DeepSeq.deepseq (_RuntimeStats'meshParentStrength x__)
                                       (Control.DeepSeq.deepseq (_RuntimeStats'version x__)
                                          (Control.DeepSeq.deepseq (_RuntimeStats'uptime x__)
-                                            (())))))))))))
+                                            (Control.DeepSeq.deepseq (_RuntimeStats'parent x__)
+                                               (Control.DeepSeq.deepseq (_RuntimeStats'cpuTime x__)
+                                                  (())))))))))))))
 {- | Fields :
 
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.version' @:: Lens' SetVersion Data.Text.Text@
