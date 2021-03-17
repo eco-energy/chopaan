@@ -123,6 +123,7 @@ dependencies:
 - ghcjs-dom
 - net-spider
 - greskell
+- greskell-core
 - network
 - newtype-generics
 ghc-options:

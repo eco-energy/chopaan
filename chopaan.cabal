@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c9894371997215bfc596259e6b2d7a559b99f91774d20757e64a50d7658cad92
+-- hash: f14c78b9d2e53a1e94a9dd2a939b1005b07f869bde9ed508136bc33540198abe
 
 name:           chopaan
 version:        0.1.0.0
@@ -44,6 +44,7 @@ library
       Chopaan.Kibbutz.AWS.Things
       Chopaan.Kibbutz.KbtzId
       Chopaan.Kibbutz.Kibbutz
+      Chopaan.Kibbutz.Kibbutzim
       Chopaan.Kibbutz.LinOpt
       Chopaan.Kibbutz.Mesh
       Chopaan.Kibbutz.NetSpider
@@ -70,6 +71,7 @@ library
       Chopaan.Ui
       Chopaan.Ui.Foreign.Utils
       Chopaan.Ui.Foreign.WebSocket
+      Chopaan.Ui.WebSocket
       Chopaan.Utils.JSON
       Chopaan.Utils.Retry
       Chopaan.Utils.StreamsInterop
@@ -132,6 +134,7 @@ library
     , ghc-prim
     , ghcjs-dom
     , greskell
+    , greskell-core
     , hashable
     , hmatrix
     , interpolatedstring-perl6
@@ -241,6 +244,7 @@ executable chopaan-exe
     , ghc-prim
     , ghcjs-dom
     , greskell
+    , greskell-core
     , hashable
     , hmatrix
     , interpolatedstring-perl6
@@ -351,6 +355,7 @@ executable tx-test-exe
     , ghc-prim
     , ghcjs-dom
     , greskell
+    , greskell-core
     , hashable
     , hmatrix
     , interpolatedstring-perl6
@@ -461,6 +466,7 @@ executable ui
     , ghc-prim
     , ghcjs-dom
     , greskell
+    , greskell-core
     , hashable
     , hmatrix
     , interpolatedstring-perl6
@@ -581,6 +587,7 @@ test-suite chopaan-test
     , ghc-prim
     , ghcjs-dom
     , greskell
+    , greskell-core
     , hashable
     , hmatrix
     , hspec
