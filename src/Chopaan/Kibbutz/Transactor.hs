@@ -1,6 +1,5 @@
 {-# LANGUAGE NamedFieldPuns, OverloadedStrings #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveFunctor, DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveFoldable, DeriveTraversable #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
@@ -8,17 +7,22 @@
 module Chopaan.Kibbutz.Transactor ( runTransactor
                                   , Stake(..)
                                   , Tx(..)
-                                  , TxPlan(..)
+                                  , TxPlan
+                                  , TxState
                                   , Role(..)
                                   , TransactionStatus(..)
                                   , mkStake
                                   , dispatchTx
                                   , asKbtz
+                                  , planTx
+                                  , monitorTx
+                                  , curryTx
                                   ) where
 
 import Prelude hiding (zip, zipWith)
 
 import Control.Monad.IO.Class
+import Control.DeepSeq (NFData)
 
 import Chopaan.Kibbutz.Kibbutz (Kbtz(..), kbtzState, scanKbtz, stream)
 import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue, writeToPubQ)
@@ -37,7 +41,7 @@ import Chopaan.Node.Metrics (Power
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust, fromJust, fromMaybe)
 
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
@@ -48,6 +52,7 @@ import Data.ProtoLens
 import Data.Convertible
 import Data.Convertible.Instances ()
 import Data.ULID
+import Data.Aeson (ToJSON, FromJSON, parseJSON)
 
 import GHC.Generics (Generic)
 
@@ -57,23 +62,31 @@ import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 
 import qualified Data.Map.Strict as M
-import Data.Key
+import Data.Key hiding (Key)
 import qualified Data.List as L
 
 import Chopaan.Kibbutz.LinOpt
 import Data.SBV
 import ConCat.Misc (R)
 
+import Data.Greskell (lookupAs, Key, pMapToFail, FromGraphSON(..), parseGraphSON)
+import Data.Greskell.Extra (writeKeyValues, (<=:>))
+import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
+import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
+import NetSpider.Graph (LinkAttributes(..), EFinds)
 
-type T = Time.NominalDiffTime
 
-newtype Tx n a = Tx (M.Map n a) deriving (Eq, Ord, Show, Generic)
+newtype Tx n a = Tx (M.Map n a)
+  deriving stock (Eq, Ord, Show, Generic, Traversable)
+  deriving newtype (ToJSON, FromJSON, NFData, Functor, Foldable)
 
 instance (Ord n) => Semigroup (Tx n a) where
   (Tx m) <> (Tx m') = Tx (m <> m')
 
 instance (Ord n) => Monoid (Tx n a) where
   mempty = Tx mempty
+
+  
 
 type TxPlan n = Tx n Stake
 
@@ -90,6 +103,8 @@ asKbtz txs = do
   tx <- S.toList . adapt $ txs
   return . Kbtz . M.fromList $ tx
 
+curryTx :: forall n a. (Address n) => a -> Tx n a -> n -> a
+curryTx defA (Tx p) n = fromMaybe defA $ M.lookup n p
 
 data TransactionStatus = TransactionStatus
   { energyDispatched :: WattSeconds
@@ -100,7 +115,7 @@ data TransactionStatus = TransactionStatus
   , totalLoss :: WattSeconds
   , startLag :: Time.DiffTime
   , endLag :: Time.DiffTime
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
 
 instance Semigroup TransactionStatus where
   tx <> tx' = TransactionStatus
@@ -143,17 +158,18 @@ planTx horizon k = S.trace (\p -> liftIO . print $ "Plan For Interval:\n" <> sho
                     $ toNodeStates k 
                    
 
-monitorTx :: (MonadAsync m, Address n, Ord n, IsStream t, Monad (t m)) => TxPlan n -> Kbtz t m n SensorS -> t m TransactionStatus
+monitorTx :: (MonadAsync m, Address n, Ord n, IsStream t, Monad (t m)) => TxPlan n -> Kbtz t m n SensorS -> t m (TxState n)
 monitorTx tx k = S.postscan (transactionFold tx)
                  $ S.trace (\tx -> liftIO . print $ "Entering Tx Monitor" <> "\n" <> show tx)  
                  $ toNodeStates k
+
 
 
 runTransactor :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m))
   => PubQueue
   -> Time.DiffTime
   -> Kbtz t m n SensorS
-  -> t m (TxPlan n, t m TransactionStatus)
+  -> t m (TxPlan n, t m (TxState n))
 runTransactor q horizon k = (,) <$> txs <*> statuses
   where
     txs = S.trace (dispatchTx q) $ planTx horizon k
@@ -171,9 +187,16 @@ dispatchTx q tx = do
   liftIO $ (writeToPubQ q) (rootTopic @n (undefined)) $ txDispatch
 
 
+foldTxState :: (Monad m) => TxState n -> m TransactionStatus
+foldTxState (Tx gt) = let
+      gridTx = foldl (<>) mempty $ snd <$> gt
+      loss = energyDispatched gridTx - energyReceived gridTx
+      lossPerWS = loss / (energyDispatched gridTx)
+      in return $ gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
+
 -- The state will just be carried across as a TransactionStatus
 transactionFold :: forall m n. (Monad m, Address n, Ord n) => TxPlan n
-  -> FL.Fold m (NodeStates n) (TransactionStatus)
+  -> FL.Fold m (NodeStates n) (TxState n)
 transactionFold (Tx participants) = FL.Fold step start end
   where
     step :: TxState n -> NodeStates n -> m (TxState n)
@@ -187,38 +210,34 @@ transactionFold (Tx participants) = FL.Fold step start end
                           , startLag = 0
                           }))
       <$> participants
-    end :: TxState n -> m TransactionStatus
-    end (Tx gt) = let
-      gridTx = foldl (<>) mempty $ snd <$> gt
-      loss = energyDispatched gridTx - energyReceived gridTx
-      lossPerWS = loss / (energyDispatched gridTx)
-      in return $ gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
+    end :: TxState n -> m (TxState n)
+    end = pure
     updateTS :: (Role, TransactionStatus) -> SensorS -> (Role, TransactionStatus)
-    updateTS (px, tx) SensorMetrics{..} = let
+    updateTS (px, txn) SensorMetrics{..} = let
       nextTS = case px of
                  Source -> (mempty @TransactionStatus)
-                           { energyDispatched = e + energyDispatched tx
-                           , timeRemaining = timeRemaining tx - lastTimeDiff
-                           , energyRemaining = energyRemaining tx - e
-                           , startLag = if hasStarted px then startLag tx else (startLag tx + lastTimeDiff)
+                           { energyDispatched = txEnergy + energyDispatched txn
+                           , timeRemaining = timeRemaining txn - lastTimeDiff
+                           , energyRemaining = energyRemaining txn - txEnergy
+                           , startLag = if hasStarted px then startLag txn else (startLag txn + lastTimeDiff)
                            , endLag = if hasEnded px && shouldHaveEnded then 0 else lastTimeDiff
                            }
                  Sink -> (mempty @TransactionStatus)
-                   { energyReceived = e + energyReceived tx
-                   , timeRemaining = timeRemaining tx - lastTimeDiff
-                   , energyRemaining = energyRemaining tx - e
-                   , startLag = if hasStarted px then startLag tx else (startLag tx + lastTimeDiff)
-                   , endLag = if not shouldHaveEnded then 0 else (if hasEnded px then endLag tx else endLag tx + lastTimeDiff)
+                   { energyReceived = txEnergy + energyReceived txn
+                   , timeRemaining = timeRemaining txn - lastTimeDiff
+                   , energyRemaining = energyRemaining txn - txEnergy
+                   , startLag = if hasStarted px then startLag txn else (startLag txn + lastTimeDiff)
+                   , endLag = if not shouldHaveEnded then 0 else (if hasEnded px then endLag txn else endLag txn + lastTimeDiff)
                    }
       in (px, nextTS)
       where
-        e :: WattSeconds
-        e = (pToE @Double) (realToFrac lastTimeDiff) (txOut _powerT)
-        hasStarted Source = (txOut _powerT) >= eta
-        hasStarted Sink = (txIn _powerT) >= eta
-        hasEnded Source =  shouldHaveEnded && (txOut _powerT) <= eta
-        hasEnded Sink = shouldHaveEnded && (txIn _powerT) <= eta
-        shouldHaveEnded = (energyRemaining tx - e) <= 0
+        txEnergy :: WattSeconds
+        txEnergy = (pToE @Double) (realToFrac lastTimeDiff) (tx _powerT)
+        hasStarted Source = (abs $ tx _powerT) >= eta
+        hasStarted Sink = (abs $ tx _powerT) >= eta
+        hasEnded Source =  shouldHaveEnded && (abs $ tx _powerT) <= eta
+        hasEnded Sink = shouldHaveEnded && (abs $ tx _powerT) <= eta
+        shouldHaveEnded = (energyRemaining txn - txEnergy) <= 0
         eta = 0.5
 
 transactionPlanner :: forall m n. (MonadIO m, Show n, Address n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (TxPlan n)
@@ -290,11 +309,58 @@ isValidPlan plan = length plan > 0
     Concretely
 ----}
 
-data Role = Source | Sink deriving (Eq, Ord, Show, Generic)
+data Role = Source | Sink
+  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+
+instance FromGraphSON Role where
+  parseGraphSON = parseJSON . unwrapOne
 
 newtype Stake = Stake {
   unStake :: (Role, Watts, Time.DiffTime)
-  } deriving (Eq, Ord, Show, Generic)
+  }
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype (NFData, ToJSON, FromJSON)
+
+
+roleKey :: Key EFinds Role
+roleKey = "role"
+
+powerKey :: Key EFinds Watts
+powerKey = "power"
+
+durationKey :: Key EFinds Time.DiffTime
+durationKey = "duration"
+
+
+instance LinkAttributes Stake where
+  writeLinkAttributes (Stake (r, w, t)) = fmap writeKeyValues $
+    sequence [ (roleKey <=:> r)
+             , (powerKey <=:> w)
+             , (durationKey <=:> t)
+             ]
+  parseLinkAttributes props = pMapToFail (Stake <$> tupleUp)
+    where
+      tupleUp = tup3
+                <$> lookupAs roleKey props
+                <*> lookupAs powerKey props
+                <*> lookupAs durationKey props
+      tup3 a b c = (a, b, c) 
+                      
+
+instance Semigroup Stake where
+  (Stake (Source, w, t)) <> (Stake (Source, w', t')) = Stake (Source, w + w', t + t')
+  (Stake (Source, w, t)) <> (Stake (Sink, w', t')) = Stake (role, w'', t + t')
+    where
+      w'' = abs $ w - w'
+      role = if w - w' > 0 then Source else Sink
+  (Stake (Sink, w, t)) <> (Stake (Source, w', t')) = Stake (role, w'', t + t')
+    where
+      w'' = abs $ w - w'
+      role = if w - w' > 0 then Source else Sink
+  (Stake (Sink, w, t)) <> (Stake (Sink, w', t')) = Stake (Sink, abs $ w + w', t + t')
+
+instance Monoid Stake where
+  mempty = Stake (Sink, 0, 0)
 
 mkStake :: Role -> Double -> Int -> Stake
 mkStake r p t = Stake (r, toWatts p, fromIntegral t)
@@ -318,3 +384,52 @@ fromStake (Stake (role, watts, duration)) = defMessage
     toPDir Sink = NM.Incoming
     timeToWord :: Time.DiffTime -> Word64
     timeToWord = (convert @Int @Word64) . (round @Time.DiffTime @Int)
+
+
+
+keyED :: Key EFinds WattSeconds
+keyED = "energyDispatched"
+
+keyERec :: Key EFinds WattSeconds
+keyERec = "energyReceived"
+
+keyTR :: Key EFinds Time.DiffTime
+keyTR = "timeRemaining"
+
+keyERem :: Key EFinds WattSeconds
+keyERem = "energyRemaining"
+
+keyLPW :: Key EFinds WattSeconds
+keyLPW = "lossPerWattSecond"
+
+keyTL :: Key EFinds WattSeconds
+keyTL = "totalLoss"
+
+keySL :: Key EFinds Time.DiffTime
+keySL = "stateLag"
+
+keyEL :: Key EFinds Time.DiffTime
+keyEL = "endLag"
+
+
+instance LinkAttributes TransactionStatus where
+  writeLinkAttributes TransactionStatus{..} = fmap writeKeyValues $ sequence $
+    [ keyED <=:> energyDispatched
+    , keyERec <=:> energyReceived
+    , keyTR <=:> timeRemaining
+    , keyERem <=:> energyRemaining
+    , keyLPW <=:> lossPerWattSecond
+    , keyTL <=:> totalLoss
+    , keySL <=:> startLag
+    , keyEL <=:> endLag
+    ]
+  parseLinkAttributes props =
+    pMapToFail (TransactionStatus
+                <$> lookupAs keyED props
+                <*> lookupAs keyERec props
+                <*> lookupAs keyTR props
+                <*> lookupAs keyERem props
+                <*> lookupAs keyLPW props
+                <*> lookupAs keyTL props
+                <*> lookupAs keySL props
+                <*> lookupAs keyEL props)

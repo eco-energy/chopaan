@@ -20,9 +20,10 @@ import GHC.Generics
 
 import Data.Time (DiffTime, LocalTime)
 import Data.Text
-
+import Data.Aeson (FromJSON, ToJSON)
 import Chopaan.Comm.Comm (Address(..))
 import Chopaan.Node.NodeId
+import Chopaan.Utils.Time (utcTimeNow)
 
 import qualified Streamly.Prelude as S
 import Streamly
@@ -36,7 +37,7 @@ import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Spider
   (Spider, connectWS, close, addFoundNode, clearAll, getSnapshotSimple)
 import NetSpider.Graph (LinkAttributes(..), EFinds, NodeAttributes(..), VFoundNode)
-import NetSpider.Timestamp (Timestamp, fromS)
+import NetSpider.Timestamp (Timestamp, fromUTCTime)
 import NetSpider.Snapshot (nodeId, nodeTimestamp)
 import qualified NetSpider.Snapshot as Sn
 
@@ -57,7 +58,6 @@ instance LinkAttributes RxSignal where
     return $ gProperty "rx_signal" sv
   parseLinkAttributes props =
     pMapToFail $ RxSignal <$> lookupAs ("rx_signal" :: Key EFinds Double) props
-    
 
 
 data MeshLink = MeshLink deriving (Eq, Show, Ord)
@@ -67,6 +67,7 @@ data MeshNode = MeshNode
   , uptime :: DiffTime
   , routerRSSI :: Int
   , version :: Text
+  
   } deriving (Eq, Ord, Show, Generic)
 
 rootKey :: Key VFoundNode Bool
@@ -97,8 +98,8 @@ instance NodeAttributes MeshNode where
                  <*> lookupAs versionKey props
                )
 spiderStream :: forall t m n a c d. (IsStream t, MonadAsync m, Address n)
-  => (Spider Text c d -> (n, a) -> m ())
-  -> Spider Text c d
+  => (Spider n c d -> (n, a) -> m ())
+  -> Spider n c d
   -> t m (n, a)
   -> m ()
 spiderStream save spider xs = S.drain
@@ -107,35 +108,31 @@ spiderStream save spider xs = S.drain
   $ fmap (save spider) xs
 
 
-rsStream :: (IsStream t, MonadAsync m) => Spider Text MeshNode RxSignal
+rsStream :: (IsStream t, MonadAsync m) => Spider NodeMAC MeshNode RxSignal
   -> t m (NodeMAC, N.RuntimeStats) -> m ()
 rsStream = (spiderStream fromRTS)
 
-rtsFinding :: (Address n) => n -> N.RuntimeStats
-  -> FoundNode n MeshNode RxSignal
-rtsFinding n rts = FoundNode n timestamp links node
-  where
-    timestamp = undefined
-    links = undefined
-    node = undefined
 
-fromRTS :: (MonadIO m, Address n)
-        => Spider Text MeshNode RxSignal
-        -> (n, N.RuntimeStats)
+fromRTS :: (MonadIO m)
+        => Spider NodeMAC MeshNode RxSignal
+        -> (NodeMAC, N.RuntimeStats)
         -> m ()
 fromRTS spider (n, rts) = liftIO $ addFoundNode spider finding
   where
-    toText = pack . show
-    finding = FoundNode { subjectNode= toText n
-                        , foundAt = fromS ""
+    finding = FoundNode { subjectNode= n
+                        , foundAt = fromUTCTime . utcTimeNow $ rts ^. N.cpuTime
                         , neighborLinks = [link]
-                        , nodeAttributes = node
+                        , nodeAttributes = parseRTSToNode rts
                         }
-    node = MeshNode { uptime = (fromIntegral $ rts ^. N.uptime)
-                    , isRoot = (rts ^. N.isRoot)
-                    , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
-                    , version = (rts ^. N.version) } 
-    link = FoundLink { targetNode= toText n
-                     , linkState=LinkBidirectional
+    
+    link = FoundLink { targetNode = NodeId (rts ^. N.parent ^. N.macAddr)
+                     , linkState=LinkToSubject
                      , linkAttributes = RxSignal (fromIntegral $ rts ^. N.meshParentStrength)
                      }
+
+parseRTSToNode :: N.RuntimeStats -> MeshNode
+parseRTSToNode rts = MeshNode
+  { uptime = (fromIntegral $ rts ^. N.uptime)
+  , isRoot = (rts ^. N.isRoot)
+  , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
+  , version = (rts ^. N.version) }

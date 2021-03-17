@@ -3,12 +3,13 @@
 module Chopaan.Comm.Address where
 
 import Chopaan.Node.NodeId
-import Data.Hashable
+import Data.Hashable (Hashable)
 import qualified Network.MQTT.Topic as MQ
 import Data.Text (Text)
+import Data.Aeson (FromJSON, ToJSON)
 import Chopaan.Kibbutz.AWS.Things
 
-class (Ord a, Hashable a, Show a) => Address a where
+class (Ord a, Hashable a, Show a, FromJSON a, ToJSON a) => Address a where
   stateTopic :: a -> MQ.Topic
   controlTopic :: a -> MQ.Topic
   logTopic :: a -> MQ.Topic

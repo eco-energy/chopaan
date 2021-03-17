@@ -28,12 +28,9 @@ import Lens.Micro
 
 import Streamly
 import qualified Streamly.Prelude as S
-import qualified Streamly.Data.Fold as FL
 
 import Control.Monad.Bayes.Class
-import Control.Monad.Bayes.Sampler
 
-import Unsafe.Coerce
 
 
 

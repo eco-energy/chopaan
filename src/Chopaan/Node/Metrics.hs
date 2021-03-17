@@ -1,8 +1,9 @@
-{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies #-}
 module Chopaan.Node.Metrics where
 
 import GHC.Generics hiding (R)
+import Control.DeepSeq (NFData)
 
 import Data.Time
 import Data.Aeson hiding (encode, decode)
@@ -18,7 +19,6 @@ import Data.Maybe (isJust)
 import Numeric.Compensated
 
 import Data.ProtoLens
-import Data.ProtoLens.TextFormat
 import Lens.Micro
 import Text.Printf
 
@@ -29,15 +29,29 @@ import Chopaan.Utils.JSON
 import Chopaan.Utils.Time
 
 
-import Proto.NodeMessageSchema.NodeMessages hiding (SensorId)
+import Proto.NodeMessageSchema.NodeMessages hiding (NodeId)
 import Proto.NodeMessageSchema.NodeMessages_Fields
 import ConCat.Misc (R)
 
+{---- NetSpider Imports ----}
+import Data.Greskell (Key, lookupAs, pMapToFail, FromGraphSON(..), parseGraphSON)
+import Data.Greskell.Extra (writeKeyValues, (<=:>))
+import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
+
+
+import NetSpider.Graph (NodeAttributes(..), VFoundNode)
+import NetSpider.Timestamp (fromS)
+import NetSpider.Snapshot (nodeId, nodeTimestamp)
+
 {----- Basic Types ------}
 
-newtype WattSeconds = WS { unWs :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
+newtype WattSeconds = WS { unWs :: Compensated Double }
+  deriving stock (Eq, Ord, Generic)
+  deriving newtype (Num, Fractional, Real, RealFrac, NFData)
 
-newtype Watts = W { unW :: Compensated Double } deriving (Eq, Ord, Num, Generic, Fractional, Real, RealFrac)
+newtype Watts = W { unW :: Compensated Double }
+  deriving stock (Eq, Ord, Generic)
+  deriving newtype (Num, Fractional, Real, RealFrac, NFData)
 
 instance Show WattSeconds where
   show = (printf ("%.2g")) . fromWattSeconds
@@ -79,16 +93,19 @@ instance FromJSON WattSeconds where
 instance FromJSON Watts where
   parseJSON x = toWatts <$> (A.parseJSON x)
 
+instance FromGraphSON WattSeconds where
+  parseGraphSON = parseJSON . unwrapOne
 
+instance FromGraphSON Watts where
+  parseGraphSON = parseJSON . unwrapOne
 
 -- Episodic Metrics
 
 data Node a = Node
-  { txIn :: !a
-  , txOut :: !a
+  { tx :: ! a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Ord, Generic, Functor)
+  } deriving (Eq, Ord, Generic, Functor, NFData)
 
 instance (ToJSON a) => ToJSON (Node a)
 instance (FromJSON a) => FromJSON (Node a)
@@ -98,8 +115,7 @@ instance (Show a) => Show (Node a) where
   show Node{..} = 
     "Generated : " <> (rs generated)
     <> "Consumed : " <> (rs consumed)
-    <> "Incoming : " <> (rs txIn)
-    <> "Outgoing : " <> (rs txOut)
+    <> "Grid Transfer (Inflow is positive) : " <> (rs tx)
     where
       nl = "\n"
       rs x = show x <> nl
@@ -107,30 +123,27 @@ instance (Show a) => Show (Node a) where
 instance (ToField a) => ToNamedRecord (Node a)
 
 instance DefaultOrdered (Node a) where
-  headerOrder _ = Vec.fromList ["txIn", "txOut", "consumed", "generated"]
+  headerOrder _ = Vec.fromList ["tx", "consumed", "generated"]
 
 instance Applicative Node where
   pure v = Node
-    { txIn = v
-    , txOut = v
+    { tx = v
     , consumed = v
     , generated = v
     }
   f <*> v = Node
-              { txIn = txIn f $ txIn v
-              , txOut = txOut f $ txOut v
+              { tx = tx f $ tx v
               , consumed = consumed f $ consumed v
               , generated = generated f $ generated v
               }
 
 initEA :: (Num a) => Node a
-initEA = Node 0 0 0 0
+initEA = Node 0 0 0
 
 -- Check associativity
 instance (Num a) => Semigroup (Node a) where
   v1 <> v2 = Node
-    { txIn = txIn v1 + txIn v2
-    , txOut = txOut v1 + txOut v2
+    { tx = tx v1 + tx v2
     , consumed = consumed v1 + consumed v2
     , generated = generated v1 + generated v2
     }
@@ -138,25 +151,82 @@ instance (Num a) => Semigroup (Node a) where
 instance (Num a) => Monoid (Node a) where
   mempty = initEA
 
+type GreskellC a = (ToJSON a, FromJSON a, FromGraphSON a)
 
+txKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+txKey = "tx"
 
+consumedKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+consumedKey = "consumed"
 
+generatedKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+generatedKey = "generated"
 
---instance (Num a) => VS.V R (Power a) where
+               
+instance (GreskellC a) => NodeAttributes (Node a) where
+  writeNodeAttributes node = fmap writeKeyValues $ sequence $
+    [ txKey <=:> tx node
+    , consumedKey <=:> consumed node
+    , generatedKey <=:> generated node
+    ]
+  parseNodeAttributes props = pMapToFail (Node
+                                          <$> lookupAs txKey props
+                                          <*> lookupAs consumedKey props
+                                          <*> lookupAs generatedKey props
+                                         )
+
+instance (GreskellC a) => FromGraphSON (Node a) where
+  parseGraphSON = parseJSON . unwrapAll
+
 
 data SensorMetrics e p = SensorMetrics
   { _time :: !(Maybe UTCTime)
   , lastTimeDiff :: !DiffTime
   , _powerT :: !(Node p)
   , _energyT :: !(Node e)
-  , _sensorsT :: !EnergyState
   , _battery :: !(Battery R R)
   , _demand :: !e
-  } deriving (Eq, Ord, Generic)
+  } deriving (Eq, Ord, Generic, NFData)
 
 
 instance (ToJSON e, ToJSON p) => ToJSON (SensorMetrics e p)
---instance (FromJSON e, FromJSON p) => FromJSON (SensorMetrics e p)
+
+timeKey :: Key VFoundNode (Maybe UTCTime)
+timeKey = "time"
+
+timeDiffKey :: Key VFoundNode (DiffTime)
+timeDiffKey = "timeDiff"
+
+powerKey :: (GreskellC p) => Key VFoundNode (Node p)
+powerKey = "power"
+
+energyKey :: (GreskellC e) => Key VFoundNode (Node e)
+energyKey = "energy"
+
+batteryKey :: (GreskellC e, GreskellC p) => Key VFoundNode (Battery e p)
+batteryKey = "battery"
+
+demandKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+demandKey = "demand"
+
+instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
+  writeNodeAttributes SensorMetrics{..} = fmap writeKeyValues $ sequence $
+    [ timeKey <=:> _time
+    , timeDiffKey <=:> lastTimeDiff
+    , powerKey <=:> _powerT
+    , energyKey <=:> _energyT
+    , batteryKey <=:> _battery
+    , demandKey <=:> _demand
+    ]
+  parseNodeAttributes props = pMapToFail (SensorMetrics
+                                          <$> lookupAs timeKey props
+                                          <*> lookupAs timeDiffKey props
+                                          <*> lookupAs powerKey props
+                                          <*> lookupAs energyKey props
+                                          <*> lookupAs batteryKey props
+                                          <*> lookupAs demandKey props
+                                         )
+
 
 instance ToJSON (EnergyState) where
   toJSON a = object $ zipWith (A..=) esFieldNamesJSON (fieldAccessorsJSON a)
@@ -227,25 +297,32 @@ instance DefaultOrdered EnergyState where
 instance ToField UTCTime where
   toField t = pack (show t)
 
+instance FromGraphSON UTCTime where
+  parseGraphSON = parseJSON . unwrapOne
+
+instance FromGraphSON DiffTime where
+  parseGraphSON = parseJSON . unwrapOne
+
 instance (ToField e, ToField p) => ToNamedRecord (SensorMetrics e p) where
   toNamedRecord (SensorMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
     [ toNamedRecord _battery,
       toNamedRecord _powerT,
       toNamedRecord _energyT,
-      toNamedRecord _sensorsT,
+      --toNamedRecord _sensorsT,
       HM.fromList [("demand", toField _demand)]
     ]
 
+showDec :: R -> String
 showDec = (printf ("%.2g"))
 
 instance (Show e, Show p, RealFrac e, RealFrac p) => Show (SensorMetrics e p) where
   show SensorMetrics{..} = ("last connection: " <> show _time)
     <> sep <> ("battery energy stored (Ws): " <> sep <> showDec (socPercentage _battery * totalCapacity _battery))
-    <> sep <> ("runtime estimate :" <> sep <> showDec (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
+    -- <> sep <> ("runtime estimate :" <> sep <> showDec (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
     <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
     <> sep <> ("current energy:" <> sep <> show _energyT)
-    <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensorsT)))
+    -- <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensorsT)))
     where
       sep = "\n"
 
@@ -265,10 +342,43 @@ data Battery e p = Battery
   , chargeLim :: !p
   , dischargeLim :: !p
   , totalCapacity :: !e
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, NFData)
 
 instance (ToJSON e, ToJSON p) => ToJSON (Battery e p)
 instance (FromJSON e, FromJSON p) => FromJSON (Battery e p)
+
+
+instance (GreskellC e, GreskellC p) => FromGraphSON (Battery e p) where
+  parseGraphSON = parseJSON . unwrapAll
+
+socKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+socKey = "soc"
+
+chargeLimKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+chargeLimKey = "chargeLim"
+
+dischargeLimKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+dischargeLimKey = "dischargeLim"
+
+totalCapacityKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+totalCapacityKey = "batteryCapacity"
+
+
+
+instance (GreskellC e, GreskellC p) => NodeAttributes (Battery e p) where
+  writeNodeAttributes b = fmap writeKeyValues $ sequence $
+    [ socKey <=:> soc b
+    , chargeLimKey <=:> chargeLim b
+    , dischargeLimKey <=:> dischargeLim b
+    , totalCapacityKey <=:> totalCapacity b
+    ]
+  parseNodeAttributes props = pMapToFail (Battery
+                                          <$> lookupAs socKey props
+                                          <*> lookupAs chargeLimKey props
+                                          <*> lookupAs dischargeLimKey props
+                                          <*> lookupAs totalCapacityKey props
+                                         )
+
 
 emptyB :: (Fractional e, Fractional p) => Battery e p
 emptyB = Battery 0 0 0 0
@@ -321,8 +431,7 @@ storageSensors es = SensorVector
 
 power :: EnergyState -> Power
 power es = Node
-           { txIn = txIn'
-           , txOut = txOut'
+           { tx = txIn' - txOut'
            , consumed = cnsm'
            , generated = genP' }
   where
@@ -370,6 +479,3 @@ instance DefaultOrdered (TaggedNode n e p) where
                   <> (headerOrder (undefined :: EnergyState))
                   <> (headerOrder (undefined :: Power))
                   <> (headerOrder (undefined :: Energy))
-
-
-

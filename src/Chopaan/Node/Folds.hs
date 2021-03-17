@@ -79,10 +79,10 @@ energyFold = AppF (FL.Fold step begin end)
     end :: (Energy, Maybe UTCTime) -> m (Energy)
     end = pure . fst
     eAtT :: Power -> DiffTime -> (Energy)
-    eAtT p t = Node { txIn = (pToE t txIn)
-                         , txOut = (pToE t txOut)
-                         , consumed = (pToE t consumed)
-                         , generated = (pToE t generated)}
+    eAtT p t = Node { tx = (pToE t tx)
+                    , consumed = (pToE t consumed)
+                    , generated = (pToE t generated)
+                    }
       where
         Node{..} = p
 
@@ -115,7 +115,6 @@ sensorFold = SensorMetrics
              <*> (snd <$> timeFold)
              <*> unAppF powerFold
              <*> unAppF energyFold
-             <*> sensors
              <*> (batteryFold defBatteryParams)
              <*> demandFold 
     
@@ -131,4 +130,4 @@ sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure)
 type SensorS = SensorMetrics WattSeconds Watts 
 
 defSensorS :: SensorS
-defSensorS = SensorMetrics Nothing 0 mempty mempty zeroMsg mempty 0
+defSensorS = SensorMetrics Nothing 0 mempty mempty mempty 0
