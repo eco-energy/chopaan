@@ -132,6 +132,7 @@ runKibbutz Spiders{..} mqttOpts name = do
       gridS = (,) <$> (stream sensors) <*> ((S.yield . (curryTx mempty)) <$> txPlan)
       monS = (,) <$> (stream sensors) <*> ((fmap . fmap) (curryTx (Source, mempty)) txMonitor)
   spiderS _time gridSpider gridS
+  -- semantic editor combinator from http://conal.net/blog/posts/semantic-editor-combinators
   spiderS _time monitorSpider ((fmap . second . fmap . result) snd monS)
   rsStream meshSpider $ stream runtime
   return ()
