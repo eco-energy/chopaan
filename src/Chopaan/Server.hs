@@ -21,7 +21,7 @@ import           Servant.HTML.Blaze (HTML)
 import Servant.Links
 
 import Chopaan.Kibbutz.KbtzId
-import Chopaan.Kibbutz.Kibbutz (Kbtz(..), getNodes, scanKbtz, traceKbtz, runKbtz
+import Chopaan.Kibbutz.Kibbutz (Kbtz(..), getNodes, scanKbtz, traceKbtz, stream
                                , nodes, streams)
 import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, TransactionStatus(..), Stake(..))
 import Chopaan.Comm.Comm (Address)
@@ -239,6 +239,9 @@ wsClosed = preEscapedString $ [q|
            |]
 
 type MarkupAPI = "page" :> (Capture "resource" String) :> Get '[HTML] Markup
+
+--type HistoryAPI = "history" :> (Capture "graphType" GraphType) :> (Capture "startTime" Time) :> (Capture "endTime" Time) Graph
+
   
 type API n = MarkupAPI :<|> (WebSocketAPI n)
 
