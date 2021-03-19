@@ -11,12 +11,15 @@ module Chopaan.Kibbutz.Transactor ( runTransactor
                                   , TxState
                                   , Role(..)
                                   , TransactionStatus(..)
+                                  , foldTxState
                                   , mkStake
                                   , dispatchTx
                                   , asKbtz
                                   , planTx
                                   , monitorTx
                                   , curryTx
+                                  , stakeLinkDir
+                                  , txStatusLinkDir
                                   ) where
 
 import Prelude hiding (zip, zipWith)
@@ -345,7 +348,21 @@ instance LinkAttributes Stake where
                 <*> lookupAs powerKey props
                 <*> lookupAs durationKey props
       tup3 a b c = (a, b, c) 
-                      
+
+roleLinkDir :: Role -> LinkState
+roleLinkDir r = case r of
+  Source -> LinkToTarget
+  Sink -> LinkToSubject
+
+stakeLinkDir :: Stake -> LinkState
+stakeLinkDir (Stake (r, _, _)) = roleLinkDir r
+
+txStatusLinkDir :: TransactionStatus -> LinkState
+txStatusLinkDir TransactionStatus{energyDispatched, energyReceived} = if energyDispatched > 0 && energyDispatched == 0
+  then LinkToTarget
+  else if energyReceived > 0 && energyDispatched == 0
+       then LinkToSubject
+       else LinkBidirectional
 
 instance Semigroup Stake where
   (Stake (Source, w, t)) <> (Stake (Source, w', t')) = Stake (Source, w + w', t + t')
