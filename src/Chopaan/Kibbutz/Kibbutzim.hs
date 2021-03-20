@@ -2,12 +2,15 @@
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings, DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses, GADTs, FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Chopaan.Kibbutz.Kibbutzim where
 
 import GHC.Generics
 import qualified Data.Map.Lazy as M
 import Data.Map.Lazy (Map)
-import Data.Aeson (ToJSON)
+import Data.Aeson (ToJSON, FromJSON)
+import Data.Greskell (FromGraphSON)
+import Data.Hashable (Hashable)
 import Data.Maybe (fromMaybe)
 import Data.Time (UTCTime)
 
@@ -15,6 +18,8 @@ import Chopaan.Types
 import Kbtz
 
 import Control.Arrow (first, second)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Reader
 import ConCat.Misc (result)
 import Control.Monad.IO.Class
 import qualified Control.Concurrent.Async as A
@@ -46,39 +51,59 @@ import Chopaan.Node.NodeId (NodeId(..), NodeMAC)
 import Chopaan.Node.Folds (SensorS)
 import Chopaan.Node.Node (nodeS)
 import Chopaan.Node.Metrics (SensorMetrics(_time))
-import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, HardwareConfig, EnergyState)
+import Chopaan.Node.HW
+
+import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, EnergyState)
 import Chopaan.Comm.Mqtt (runMqtt)
 import Chopaan.Comm.Comm (MessageQs(..)
                          , mkCallback
                          , WriteChan
                          )
 import System.IO (stdout)
-import NetSpider.Spider
-  (Spider, addFoundNode)
 
-import NetSpider.Graph (NodeAttributes, LinkAttributes)
+import NetSpider.Spider (Spider, addFoundNode, getSnapshot, getSnapshotSimple)
+import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Timestamp (fromUTCTime, now, Timestamp)
-import NetSpider.Snapshot (nodeId, nodeTimestamp, linkNodePair, linkTimestamp)
+import NetSpider.Snapshot (SnapshotGraph, nodeId, nodeTimestamp, linkNodePair, linkTimestamp)
+import NetSpider.Query (defQuery
+                       , startsFrom
+                       , unifyLinkSamples
+                       , timeInterval
+                       , foundNodePolicy
+                       , Extended(NegInf, Finite)
+                       , (<=..<=))
 
 import Streamly
 import qualified Streamly.Prelude as S
 
+
 data Spiders n = Spiders
-  { gridSpider :: GridSpider n
-  , monitorSpider :: MonitorSpider n
+  { gridSpider :: StakeGridSpider n
+  , monitorSpider :: StatusGridSpider n
   , meshSpider :: MeshSpider n
   }
 
 
-type GridSpider n = Spider n SensorS Stake
+type StakeGridSpider n = Spider n SensorS Stake
 
-type MonitorSpider n = Spider n SensorS TransactionStatus
+type StakeGridSnapshot n = SnapshotGraph n SensorS Stake
+
+type StatusGridSpider n = Spider n SensorS TransactionStatus
+
+type StatusGridSnapshot n = SnapshotGraph n SensorS TransactionStatus
 
 type MeshSpider n = Spider n MeshNode RxSignal
 
-type SpiderConn n v e = (ToJSON n, NodeAttributes v, LinkAttributes e)
+type MeshSnapshot n = SnapshotGraph n MeshNode RxSignal
 
+type HWGridSpider n = Spider n HW Wire
+
+type HWGridSnapshot n = SnapshotGraph n HW Wire 
+
+type SpiderConn n v e = (SpiderNodeId n, NodeAttributes v, LinkAttributes e)
+
+type SpiderNodeId n = (ToJSON n)
 
 sensorKbtz :: forall t m. (IsStream t, MonadAsync m)
   => [NodeMAC]
@@ -150,3 +175,38 @@ addGrid s gridNode getTimestamp getDirection = S.drain . adapt . (fmap (uncurry 
                 , linkState = (getDirection e)
                 , linkAttributes = e
                 }
+
+
+type SnapshotId n = (FromGraphSON n, ToJSON n, Ord n, Hashable n, Show n)
+
+getGrid :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadIO m)
+  => Spider n v e
+  -> ReaderT (GridRoot n) m (SnapshotGraph n v e)
+getGrid s = do
+  (liftIO . (getSnapshot s)) =<< (pure . query . getRoot =<< ask)
+  where
+    query gridRoot = defQuery [gridRoot]
+
+newtype GridRoot n = GridRoot { getRoot :: n }
+
+getStakeGrid :: forall m n. (SnapshotId n, MonadIO m)
+  => StakeGridSpider n
+  -> ReaderT (GridRoot n) m (StakeGridSnapshot n)
+getStakeGrid = getGrid @m @n @SensorS @Stake
+
+getStatusGrid :: (SnapshotId n, MonadIO m)
+  => StatusGridSpider n
+  -> ReaderT (GridRoot n) m (StatusGridSnapshot n)
+getStatusGrid = getGrid
+
+getMesh :: (SnapshotId n, MonadIO m)
+  => MeshSpider n
+  -> ReaderT (GridRoot n) m (MeshSnapshot n)
+getMesh = getGrid
+
+getHWGrid :: (SnapshotId n, MonadIO m)
+  => HWGridSpider n
+  -> ReaderT (GridRoot n) m (HWGridSnapshot n)
+getHWGrid = getGrid
+
+
