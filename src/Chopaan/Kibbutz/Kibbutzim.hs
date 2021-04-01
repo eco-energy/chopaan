@@ -5,10 +5,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Chopaan.Kibbutz.Kibbutzim where
 
-import GHC.Generics
-import qualified Data.Map.Lazy as M
-import Data.Map.Lazy (Map)
-import Data.Aeson (ToJSON, FromJSON)
+
+import Data.Aeson (ToJSON)
 import Data.Greskell (FromGraphSON)
 import Data.Hashable (Hashable)
 import Data.Maybe (fromMaybe)
@@ -17,8 +15,7 @@ import Data.Time (UTCTime)
 import Chopaan.Types
 import Kbtz
 
-import Control.Arrow (first, second)
-import Control.Monad.Trans.Class (lift)
+import Control.Arrow (second)
 import Control.Monad.Trans.Reader
 import ConCat.Misc (result)
 import Control.Monad.IO.Class
@@ -32,14 +29,14 @@ import Chopaan.Kibbutz.Kibbutz
 
 import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
 import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
-import Chopaan.Kibbutz.Transactor (runTransactor
-                                  , planTx
+import Chopaan.Kibbutz.Transactor (--runTransactor
+                                  planTx
                                   , monitorTx
                                   , dispatchTx
                                   , TransactionStatus
-                                  , TxPlan
+                                  --, TxPlan
                                   , Stake
-                                  , Tx(..)
+                                  --, Tx(..)
                                   , Role(..)
                                   , curryTx
                                   , stakeLinkDir
@@ -61,7 +58,7 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          )
 import System.IO (stdout)
 
-import NetSpider.Spider (Spider, addFoundNode, getSnapshot, getSnapshotSimple)
+import NetSpider.Spider (Spider, addFoundNode, getSnapshot)
 import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Timestamp (fromUTCTime, now, Timestamp)
@@ -74,8 +71,7 @@ import NetSpider.Query (defQuery
                        , Extended(NegInf, Finite)
                        , (<=..<=))
 
-import Streamly
-import qualified Streamly.Prelude as S
+import Streamly (IsStream, MonadAsync)
 
 
 data Spiders n = Spiders
@@ -124,7 +120,7 @@ data KbtzOpts = KbtzOpts { txHorizon :: Int }
 runKibbutz :: forall m. (KbtzM m NodeMAC) => Spiders NodeMAC -> MQTTOpts -> KbtzName -> m ()
 runKibbutz Spiders{..} mqttOpts name = do
   ns <- kbtzNodes name
-  let gridNode = (NodeId ("grid_" <> (unKbtzId name)) :: NodeMAC)
+  let gridNode = (GridRoot (NodeId ("grid_" <> (unKbtzId name)) :: NodeMAC))
   lg <- liftIO $ newLogger Debug stdout
   qs' <-  (liftIO $ A.async (liftIO $ mqtt lg ns))
   MessageQs{stateChan, statsChan, outbox} <- liftIO $ A.wait qs'
@@ -145,15 +141,17 @@ runKibbutz Spiders{..} mqttOpts name = do
          (runMqtt mqttOpts ns mkCallback)
     horizon = 60
 
+newtype GridRoot n = GridRoot { getRoot :: n } deriving (Eq, Ord, Show)
+
 addGrid :: forall t m n v e.
   (KbtzConn t m n, SpiderConn n v e)
   => Spider n v e
-  -> n                      -- $ Node Representing the Grid
+  -> GridRoot n             -- $ NodeId Representing the Grid Root
   -> (v -> Maybe UTCTime)   -- $ How to get a timestamp from the vertex
   -> (e -> LinkState)       -- $ How to get the edge direction
   -> t m ((n, v), t m (n -> e)) -- $ a stream of nodes and a stream of edges for each node
   -> m ()
-addGrid s gridNode getTimestamp getDirection = S.drain . adapt . (fmap (uncurry addNode))
+addGrid s (GridRoot gn) getTimestamp getDirection = S.drain . adapt . (fmap (uncurry addNode))
   where
     addNode :: (n, v) -> t m (n -> e) -> m ()
     addNode nv edges = do
@@ -165,7 +163,7 @@ addGrid s gridNode getTimestamp getDirection = S.drain . adapt . (fmap (uncurry 
           toFN t' (n, v) lx = FoundNode
             { subjectNode = n
             , foundAt = (fromMaybe t') $ (return . fromUTCTime) =<< getTimestamp v 
-            , neighborLinks = ((toLink gridNode) <$> lx)
+            , neighborLinks = ((toLink gn) <$> lx)
             , nodeAttributes = v
             }
             where
@@ -187,7 +185,6 @@ getGrid s = do
   where
     query gridRoot = defQuery [gridRoot]
 
-newtype GridRoot n = GridRoot { getRoot :: n }
 
 getStakeGrid :: forall m n. (SnapshotId n, MonadIO m)
   => StakeGridSpider n

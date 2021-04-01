@@ -46,15 +46,6 @@ import ConCat.Regress
 
 -- $ Data Structures
 
-
-data BatteryM a where
-  Hysteresis :: (v ~ a, i ~ a, Additive f) => f v -> f i -> BatteryM a
-  Sensor :: (v ~ a, i ~ a, Additive f) => f v -> f i -> BatteryM a
-  Resistance :: (v ~ a, i ~ a, Additive f) => f v -> f i -> BatteryM a
-
-r :: (Fractional a, Applicative f) => f a -> f a -> f a
-r v i = (/) <$> v <*> i
-
 data BatteryParams a = BatteryParams
   { gamma :: !a -- unitless constant γ adjusts how quickly the hysteresis state changes with a change in cell SOC
   , efficiency :: !a
@@ -371,26 +362,3 @@ sensorPrediction battery SensorVector{..} = SensorVector
 
 innovationCorrection :: (ParamType a) => SensorVector (a, KM a) -> CovM a -> KF a -> (KI a, KF a)
 innovationCorrection measurementModel obsCov prior = measure measurementModel obsCov prior
-
-
-{--
-batteryFold :: forall m. (Monad m, MonadSample m) => BatteryParams R -> FL.Fold m EnergyState (Battery R R)
-batteryFold bat@BatteryParams{..} = FL.Fold step begin end
-  where
-    step :: (Maybe UTCTime, Maybe (KF R)) -> EnergyState -> m (Maybe UTCTime, Maybe (KF R))
-    step (t, kf) sensorReadings = ((\(_, b) -> (Just tnow, Just b)) . snd) <$>
-        (runKalmanState (tdiff t) (cState kf) (runEstimator bat (tdiff t) $ storageSensors sensorReadings))
-      where
-        cState (Just (KalmanFilter currState _)) = currState
-        cState Nothing = initDynamic {soC = ocvToSoC bat (sensorTerminalV . storageSensors $ sensorReadings)}
-        tnow = utcTimeES sensorReadings
-        tdiff (Just t') = realToFrac $ Time.diffUTCTime tnow t'
-        tdiff Nothing = 0
-        
-    begin :: m (Maybe UTCTime, Maybe (KF R))
-    begin = return $ (Nothing, Nothing)
-    end :: (Maybe UTCTime, Maybe (KF R)) -> m (Battery R R)
-    end (_, Just (KalmanFilter (StateVector{..}) _)) = return $ (emptyB @R @R) { soc = soC
-                                                                               , totalCapacity = chargeCapacity}
-    end (_, Nothing) = return $ emptyB @R @R
---}
