@@ -52,6 +52,7 @@ extra-deps:
    subdirs:
      - core
      - backends/pardiff
+     - backends/static
      - html
      - widgets
      - router
@@ -89,6 +90,9 @@ extra-deps:
  - fusion-plugin-0.2.1@sha256:f72d7393d2c39909050cae46173e0218bf533a899be05b448ae55f9d4a81be9c,2349
  - perfect-vector-shuffle-0.1.1.1@sha256:8656a3f1f491d1d79aba9e0a5dbb08589613202b08c7a9b92570d6bec7390093,3668
  - servant-websockets-2.0.0@sha256:6e9e3600bced90fd52ed3d1bf632205cb21479075b20d6637153cc4567000234,2253
+ - servant-client-js-0.1.0.0@sha256:e066d7cb57e0c29e8171206bb979dca27f9ba690c70b1bb606ab5baa80e36549,1013
+ - servant-rawm-server-1.0.0.1@sha256:bdbc14572a3ca58a8468b1ea1ccb160d77aa56702007c19b55e01e0a4a87ef11,1869
+ - servant-rawm-1.0.0.0@sha256:abee186db4f9eaeaf66bc6a442abfdc27ca31871f8e945c8b74244cded001836,1380
  - compactable-0.1.2.3@sha256:1dccae8bcf6aa4cfd01e2fd0ec36c98d6efdd3247b6ab1a49a7cfdede4d27d95,1707
  - ghcjs-dom-0.9.4.0
  - ghcjs-dom-jsaddle-0.9.4.0

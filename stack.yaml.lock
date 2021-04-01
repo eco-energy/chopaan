@@ -333,6 +333,27 @@ packages:
   original:
     hackage: servant-websockets-2.0.0@sha256:6e9e3600bced90fd52ed3d1bf632205cb21479075b20d6637153cc4567000234,2253
 - completed:
+    hackage: servant-client-js-0.1.0.0@sha256:e066d7cb57e0c29e8171206bb979dca27f9ba690c70b1bb606ab5baa80e36549,1013
+    pantry-tree:
+      size: 279
+      sha256: e71968f0571116322a3ade2762a19615dde4ac201263f1e8c900d51ab384102c
+  original:
+    hackage: servant-client-js-0.1.0.0@sha256:e066d7cb57e0c29e8171206bb979dca27f9ba690c70b1bb606ab5baa80e36549,1013
+- completed:
+    hackage: servant-rawm-server-1.0.0.1@sha256:bdbc14572a3ca58a8468b1ea1ccb160d77aa56702007c19b55e01e0a4a87ef11,1869
+    pantry-tree:
+      size: 285
+      sha256: bcf7ba89ef60c8d02378ceffb32580370a5a97b17fc4edc05ea420d4e8430bc4
+  original:
+    hackage: servant-rawm-server-1.0.0.1@sha256:bdbc14572a3ca58a8468b1ea1ccb160d77aa56702007c19b55e01e0a4a87ef11,1869
+- completed:
+    hackage: servant-rawm-1.0.0.0@sha256:abee186db4f9eaeaf66bc6a442abfdc27ca31871f8e945c8b74244cded001836,1380
+    pantry-tree:
+      size: 318
+      sha256: 7bad600dbf5b01e46c309033e4c87fab8e71b6cbc9edaee2334cdfc68eaf1903
+  original:
+    hackage: servant-rawm-1.0.0.0@sha256:abee186db4f9eaeaf66bc6a442abfdc27ca31871f8e945c8b74244cded001836,1380
+- completed:
     hackage: compactable-0.1.2.3@sha256:1dccae8bcf6aa4cfd01e2fd0ec36c98d6efdd3247b6ab1a49a7cfdede4d27d95,1707
     pantry-tree:
       size: 275

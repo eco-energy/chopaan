@@ -9,15 +9,19 @@ let
 
   chopaan = import(./default.nix);
   raspiArgs = nixpkgsArgs // {
-    crossSystem = pkgsNative.lib.systems.examples.raspberryPi;
+    crossSystem = pkgs.lib.systems.examples.raspberryPi;
   };
+  #ghcjsArgs = nixpkgsArgs // {
+  #  crossSystem = pkgs.lib.systems.examples.ghcjs;
+  #};
   pkgsNative = pkgs;
   pkgsRaspberryPi = import nixpkgsSrc raspiArgs; 
-
+  #pkgsGhcjs = import nixpkgsSrc ghcjsArgs;
   native = chopaan { pkgs = pkgsNative; };
   crossRaspberryPi = chopaan { pkgs = pkgsRaspberryPi; };
-
+  #crossGhcjs = chopaan { pkgs = pkgsGhcjs; };
 in {
   chopaan-native = native.chopaan.components.exes.chopaan-exe;
   chopaan-raspberry-pi = crossRaspberryPi.chopaan.components.exes.chopaan-exe;
+  #chopaan-ghcjs = crossGhcjs.chopaan.components.exes.ui;
 }

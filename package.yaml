@@ -27,13 +27,11 @@ description:         Please see the README on Github at <https://github.com/faez
 
 dependencies:
 - base >= 4.11 && < 10
-- proto-lens-runtime
-- proto-lens-protoc
 - rio >= 0.1.8.0
 - async
 - exceptions
 - deepseq
-- safe
+- ghc-prim
 - amazonka
 - amazonka-iot
 - amazonka-s3
@@ -42,6 +40,8 @@ dependencies:
 - unagi-chan
 - aeson
 - proto-lens
+- proto-lens-runtime
+#- proto-lens-protoc
 - text
 - bytestring
 - connection
@@ -57,23 +57,19 @@ dependencies:
 - time-compat >= 1.9.2.2
 - ulid
 - convertible
-- time-lens
 - directory
 - microlens
-- generic-lens
 - streamly >= 0.7.2
 - mtl
 - transformers
 - resourcet
 - hashable
-- hmatrix
 - estimator
 - cassava
 - compensated
 - distributive
 - linear
 - ad
-- numeric-limits
 - dhall
 - keys
 - vector
@@ -82,17 +78,11 @@ dependencies:
 - retry
 - algebraic-graphs
 - katip
-- beam-core
-- beam-postgres
-- beam-migrate
-- postgresql-simple
-- postgresql-libpq
 - resource-pool
 - concat-classes
 - concat-examples
 - concat-plugin
 - monad-bayes
-- ghc-prim
 - base64-bytestring
 - wai
 - warp
@@ -106,9 +96,7 @@ dependencies:
 - diagrams-lib
 - diagrams-svg >= 1.4.3
 - diagrams-contrib >= 1.4.4
-- diagrams-graphviz >= 1.4.1.1
-- ekg
-- ekg-core
+- SVGFonts
 - comonad
 - pointed
 - interpolatedstring-perl6
@@ -119,6 +107,8 @@ dependencies:
 - Shpadoinkle-backend-pardiff
 - Shpadoinkle-html
 - Shpadoinkle-widgets
+- Shpadoinkle-router
+- Shpadoinkle-lens
 - jsaddle
 - ghcjs-dom
 - net-spider
@@ -126,6 +116,16 @@ dependencies:
 - greskell-core
 - network
 - newtype-generics
+- lens
+- raw-strings-qq
+when:
+  - condition: '!(impl(ghcjs))'
+    dependencies:
+      - beam-core
+      - beam-postgres
+      - beam-migrate
+      - postgresql-simple
+
 ghc-options:
 - -Wall
 - -Wcompat
@@ -142,7 +142,7 @@ library:
 
 
 executables:
-  chopaan-exe:
+  server:
     main:                Main.hs
     source-dirs:         app
     dependencies:
@@ -157,21 +157,6 @@ executables:
       - -rtsopts
       - -with-rtsopts=-N
       - -with-rtsopts=-T
-  tx-test-exe:
-    main:                Tx.hs
-    source-dirs:         app
-    dependencies:
-    - chopaan
-    - optparse-simple
-    - base
-    other-modules:
-    - Paths_chopaan
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    - -fplugin=ConCat.Plugin
-    - -O2
   ui:
     main:                Snapshot.hs
     source-dirs:         app

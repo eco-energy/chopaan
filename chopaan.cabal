@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d71c3a780417f6a3b9b199541b8da0fb8a6757e01fefd4be3c4f1616cdac56f9
+-- hash: a3bca1841f045581053f0f6ab22a1445e7ecf002fdc9a6fe80def62cc6d4f18e
 
 name:           chopaan
 version:        0.1.0.0
@@ -29,20 +29,24 @@ source-repository head
 
 library
   exposed-modules:
+      Chopaan.Client
       Chopaan.Comm.Address
       Chopaan.Comm.Comm
       Chopaan.Comm.Dispatch
       Chopaan.Comm.Mqtt
       Chopaan.Comm.Queues
       Chopaan.Comm.Socket
+      Chopaan.CRUD
       Chopaan.DB
       Chopaan.DB.Nodes
       Chopaan.DB.Sensors
+      Chopaan.Graph
       Chopaan.Kibbutz.Allocate
       Chopaan.Kibbutz.AWS.Common
       Chopaan.Kibbutz.AWS.Hydration
       Chopaan.Kibbutz.AWS.Things
       Chopaan.Kibbutz.KbtzId
+      Chopaan.Kibbutz.KbtzimT
       Chopaan.Kibbutz.Kibbutz
       Chopaan.Kibbutz.Kibbutzim
       Chopaan.Kibbutz.LinOpt
@@ -62,6 +66,7 @@ library
       Chopaan.Node.NodeId
       Chopaan.Node.NodeOpts
       Chopaan.Node.NodeSensors
+      Chopaan.Node.NodeT
       Chopaan.Node.SoC
       Chopaan.Node.Storage
       Chopaan.Node.Structure
@@ -70,14 +75,17 @@ library
       Chopaan.Server
       Chopaan.Testing
       Chopaan.Types
-      Chopaan.Ui
       Chopaan.Ui.Foreign.Utils
       Chopaan.Ui.Foreign.WebSocket
+      Chopaan.Ui.GraphView
+      Chopaan.Ui.Three
       Chopaan.Ui.WebSocket
+      Chopaan.UiTypes
       Chopaan.Utils.JSON
       Chopaan.Utils.Retry
       Chopaan.Utils.StreamsInterop
       Chopaan.Utils.Time
+      Chopaan.View
       Kbtz
       Proto.NodeMessageSchema.NodeMessages
       Proto.NodeMessageSchema.NodeMessages_Fields
@@ -90,9 +98,12 @@ library
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2
   build-depends:
-      Shpadoinkle >=0.3.0.0
+      SVGFonts
+    , Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -103,9 +114,6 @@ library
     , async
     , base >=4.11 && <10
     , base64-bytestring
-    , beam-core
-    , beam-migrate
-    , beam-postgres
     , blaze-markup
     , bytestring
     , cassava
@@ -122,27 +130,23 @@ library
     , deepseq
     , dhall
     , diagrams-contrib >=1.4.4
-    , diagrams-graphviz >=1.4.1.1
     , diagrams-lib
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
     , distributive
-    , ekg
-    , ekg-core
     , estimator
     , exceptions
-    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell
     , greskell-core
     , hashable
-    , hmatrix
     , interpolatedstring-perl6
     , jsaddle
     , katip
     , keys
+    , lens
     , linear
     , microlens
     , monad-bayes
@@ -152,18 +156,14 @@ library
     , network
     , network-uri
     , newtype-generics
-    , numeric-limits
     , pointed
-    , postgresql-libpq
-    , postgresql-simple
     , proto-lens
-    , proto-lens-protoc
     , proto-lens-runtime
+    , raw-strings-qq
     , resource-pool
     , resourcet
     , retry
     , rio >=0.1.8.0
-    , safe
     , sbv
     , servant
     , servant-blaze
@@ -176,7 +176,6 @@ library
     , text
     , time
     , time-compat >=1.9.2.2
-    , time-lens
     , tls
     , transformers
     , ulid
@@ -189,9 +188,15 @@ library
     , websockets
     , x509-store
     , x509-validation
+  if !(impl(ghcjs))
+    build-depends:
+        beam-core
+      , beam-migrate
+      , beam-postgres
+      , postgresql-simple
   default-language: Haskell2010
 
-executable chopaan-exe
+executable server
   main-is: Main.hs
   other-modules:
       Paths_chopaan
@@ -199,9 +204,12 @@ executable chopaan-exe
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -eventlog -rtsopts -with-rtsopts=-N -with-rtsopts=-T
   build-depends:
-      Shpadoinkle >=0.3.0.0
+      SVGFonts
+    , Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -212,9 +220,6 @@ executable chopaan-exe
     , async
     , base
     , base64-bytestring
-    , beam-core
-    , beam-migrate
-    , beam-postgres
     , blaze-markup
     , bytestring
     , cassava
@@ -232,27 +237,23 @@ executable chopaan-exe
     , deepseq
     , dhall
     , diagrams-contrib >=1.4.4
-    , diagrams-graphviz >=1.4.1.1
     , diagrams-lib
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
     , distributive
-    , ekg
-    , ekg-core
     , estimator
     , exceptions
-    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell
     , greskell-core
     , hashable
-    , hmatrix
     , interpolatedstring-perl6
     , jsaddle
     , katip
     , keys
+    , lens
     , linear
     , microlens
     , monad-bayes
@@ -262,19 +263,15 @@ executable chopaan-exe
     , network
     , network-uri
     , newtype-generics
-    , numeric-limits
     , optparse-simple
     , pointed
-    , postgresql-libpq
-    , postgresql-simple
     , proto-lens
-    , proto-lens-protoc
     , proto-lens-runtime
+    , raw-strings-qq
     , resource-pool
     , resourcet
     , retry
     , rio >=0.1.8.0
-    , safe
     , sbv
     , servant
     , servant-blaze
@@ -287,7 +284,6 @@ executable chopaan-exe
     , text
     , time
     , time-compat >=1.9.2.2
-    , time-lens
     , tls
     , transformers
     , ulid
@@ -300,117 +296,12 @@ executable chopaan-exe
     , websockets
     , x509-store
     , x509-validation
-  default-language: Haskell2010
-
-executable tx-test-exe
-  main-is: Tx.hs
-  other-modules:
-      Paths_chopaan
-  hs-source-dirs:
-      app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
-  build-depends:
-      Shpadoinkle >=0.3.0.0
-    , Shpadoinkle-backend-pardiff
-    , Shpadoinkle-html
-    , Shpadoinkle-widgets
-    , ad
-    , aeson
-    , algebraic-graphs
-    , amazonka
-    , amazonka-iot
-    , amazonka-s3
-    , async
-    , base
-    , base64-bytestring
-    , beam-core
-    , beam-migrate
-    , beam-postgres
-    , blaze-markup
-    , bytestring
-    , cassava
-    , chopaan
-    , comonad
-    , compensated
-    , concat-classes
-    , concat-examples
-    , concat-plugin
-    , conduit
-    , connection
-    , containers
-    , convertible
-    , data-default-class
-    , deepseq
-    , dhall
-    , diagrams-contrib >=1.4.4
-    , diagrams-graphviz >=1.4.1.1
-    , diagrams-lib
-    , diagrams-svg >=1.4.3
-    , dimensional
-    , directory
-    , distributive
-    , ekg
-    , ekg-core
-    , estimator
-    , exceptions
-    , generic-lens
-    , ghc-prim
-    , ghcjs-dom
-    , greskell
-    , greskell-core
-    , hashable
-    , hmatrix
-    , interpolatedstring-perl6
-    , jsaddle
-    , katip
-    , keys
-    , linear
-    , microlens
-    , monad-bayes
-    , mtl
-    , net-mqtt >=0.7.0
-    , net-spider
-    , network
-    , network-uri
-    , newtype-generics
-    , numeric-limits
-    , optparse-simple
-    , pointed
-    , postgresql-libpq
-    , postgresql-simple
-    , proto-lens
-    , proto-lens-protoc
-    , proto-lens-runtime
-    , resource-pool
-    , resourcet
-    , retry
-    , rio >=0.1.8.0
-    , safe
-    , sbv
-    , servant
-    , servant-blaze
-    , servant-js
-    , servant-server
-    , servant-websockets
-    , stm
-    , streamly >=0.7.2
-    , suavemente
-    , text
-    , time
-    , time-compat >=1.9.2.2
-    , time-lens
-    , tls
-    , transformers
-    , ulid
-    , unagi-chan
-    , unordered-containers
-    , vector
-    , vector-sized
-    , wai
-    , warp
-    , websockets
-    , x509-store
-    , x509-validation
+  if !(impl(ghcjs))
+    build-depends:
+        beam-core
+      , beam-migrate
+      , beam-postgres
+      , postgresql-simple
   default-language: Haskell2010
 
 executable ui
@@ -421,9 +312,12 @@ executable ui
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
   build-depends:
-      Shpadoinkle >=0.3.0.0
+      SVGFonts
+    , Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -434,9 +328,6 @@ executable ui
     , async
     , base
     , base64-bytestring
-    , beam-core
-    , beam-migrate
-    , beam-postgres
     , blaze-markup
     , bytestring
     , cassava
@@ -454,27 +345,23 @@ executable ui
     , deepseq
     , dhall
     , diagrams-contrib >=1.4.4
-    , diagrams-graphviz >=1.4.1.1
     , diagrams-lib
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
     , distributive
-    , ekg
-    , ekg-core
     , estimator
     , exceptions
-    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell
     , greskell-core
     , hashable
-    , hmatrix
     , interpolatedstring-perl6
     , jsaddle
     , katip
     , keys
+    , lens
     , linear
     , microlens
     , monad-bayes
@@ -484,19 +371,15 @@ executable ui
     , network
     , network-uri
     , newtype-generics
-    , numeric-limits
     , optparse-simple
     , pointed
-    , postgresql-libpq
-    , postgresql-simple
     , proto-lens
-    , proto-lens-protoc
     , proto-lens-runtime
+    , raw-strings-qq
     , resource-pool
     , resourcet
     , retry
     , rio >=0.1.8.0
-    , safe
     , sbv
     , servant
     , servant-blaze
@@ -509,7 +392,6 @@ executable ui
     , text
     , time
     , time-compat >=1.9.2.2
-    , time-lens
     , tls
     , transformers
     , ulid
@@ -522,6 +404,12 @@ executable ui
     , websockets
     , x509-store
     , x509-validation
+  if !(impl(ghcjs))
+    build-depends:
+        beam-core
+      , beam-migrate
+      , beam-postgres
+      , postgresql-simple
   default-language: Haskell2010
 
 test-suite chopaan-test
@@ -541,9 +429,12 @@ test-suite chopaan-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
   build-depends:
       QuickCheck
+    , SVGFonts
     , Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -554,9 +445,6 @@ test-suite chopaan-test
     , async
     , base >=4.11 && <10
     , base64-bytestring
-    , beam-core
-    , beam-migrate
-    , beam-postgres
     , blaze-markup
     , bytestring
     , cassava
@@ -575,28 +463,24 @@ test-suite chopaan-test
     , deepseq
     , dhall
     , diagrams-contrib >=1.4.4
-    , diagrams-graphviz >=1.4.1.1
     , diagrams-lib
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
     , distributive
-    , ekg
-    , ekg-core
     , estimator
     , exceptions
-    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell
     , greskell-core
     , hashable
-    , hmatrix
     , hspec
     , interpolatedstring-perl6
     , jsaddle
     , katip
     , keys
+    , lens
     , linear
     , microlens
     , monad-bayes
@@ -606,21 +490,17 @@ test-suite chopaan-test
     , network
     , network-uri
     , newtype-generics
-    , numeric-limits
     , pointed
-    , postgresql-libpq
-    , postgresql-simple
     , proto-lens
     , proto-lens-arbitrary
-    , proto-lens-protoc
     , proto-lens-runtime
     , quickcheck-instances
     , quickspec
+    , raw-strings-qq
     , resource-pool
     , resourcet
     , retry
     , rio >=0.1.8.0
-    , safe
     , sbv
     , servant
     , servant-blaze
@@ -633,7 +513,6 @@ test-suite chopaan-test
     , text
     , time
     , time-compat >=1.9.2.2
-    , time-lens
     , tls
     , transformers
     , ulid
@@ -646,4 +525,10 @@ test-suite chopaan-test
     , websockets
     , x509-store
     , x509-validation
+  if !(impl(ghcjs))
+    build-depends:
+        beam-core
+      , beam-migrate
+      , beam-postgres
+      , postgresql-simple
   default-language: Haskell2010

@@ -14,12 +14,12 @@
 
 # import nixpkgs with overlays
 , pkgs ? import nixpkgsSrc nixpkgsArgs
+
+, withHoogle ? false
 }:
 
-let
-  hsPkgs = import ./default.nix {};
-in
-  hsPkgs.shellFor {
+with pkgs;
+chopaanHaskellPackages.shellFor {
     # Include only the *local* packages of your project.
     packages = ps: with ps; [
       chopaan
@@ -42,4 +42,4 @@ in
     # Prevents cabal from choosing alternate plans, so that
     # *all* dependencies are provided by Nix.
     exactDeps = false;
-  }
+}
