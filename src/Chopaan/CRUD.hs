@@ -1,0 +1,118 @@
+{-# LANGUAGE KindSignatures, TypeOperators, DataKinds, FlexibleContexts, TypeFamilies, FlexibleInstances, LambdaCase, TypeApplications, ScopedTypeVariables, MultiParamTypeClasses, UndecidableInstances, InstanceSigs, RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving
+, DerivingStrategies, DeriveAnyClass, StandaloneDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
+module Chopaan.CRUD where
+
+import GHC.Generics
+
+import Control.DeepSeq (NFData)
+import Data.Aeson (ToJSON, FromJSON)
+import Data.Maybe (fromMaybe)
+import Data.Function (on)
+
+import Shpadoinkle (Html, MonadJSM)
+import Shpadoinkle.Widgets.Table (Tabular(..), Column, Row, SortCol(..), Sort(..))
+import Shpadoinkle.Widgets.Types (Humanize (..), Present(present))
+
+
+import Control.Monad.Trans.Class
+import Chopaan.Node.NodeId
+import Chopaan.Node.NodeT
+import Chopaan.Kibbutz.KbtzimT
+import Chopaan.Kibbutz.KbtzId
+
+
+
+
+class CRUDChopaan m where
+  listKibbutzim :: m (KbtzList)
+  listNodezim :: KbtzName -> m (NodeList)
+  nodeDetails :: NodeMAC -> m (Nodezim)
+  --sensorMonitor :: (IsStream t) => NodeMAC -> t m SensorS
+
+instance (MonadTrans t, Monad m, CRUDChopaan m) => CRUDChopaan (t m) where
+  listKibbutzim = lift listKibbutzim
+  listNodezim = lift . listNodezim
+  nodeDetails = lift . nodeDetails
+  --sensorMonitor :: (IsStream t') => NodeMAC -> t' (t m) SensorS
+  --sensorMonitor = lift . sensorMonitor
+
+newtype NodeList = NodeList { unNodeList :: [Nodezim] }
+  deriving (Eq, Ord, Show, Generic)
+  deriving newtype (NFData, ToJSON, FromJSON)
+
+data instance Column NodeList = NId | NMac | NHW
+  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+
+newtype instance Row NodeList = NodezimRow { unNodezimRow :: Nodezim }
+  deriving (Eq, Ord, Show, Generic)
+  deriving newtype (NFData)
+
+instance Humanize (Column NodeList) where
+  humanize = \case
+    NId -> "Node Id"
+    NMac -> "MAC Address"
+    NHW -> "Hardware Configuration"
+
+
+instance Tabular NodeList where
+  type Effect NodeList m = (MonadJSM m, CRUDChopaan m)
+  toRows = (fmap NodezimRow) . unNodeList
+  toCell :: forall m. Effect NodeList m
+    => NodeList
+    -> Row NodeList
+    -> Column NodeList
+    -> [Html m NodeList]
+  toCell _ (NodezimRow Node{..}) = \case
+    NId -> present (show <$> _nodeId)
+    NMac -> present _nodeMAC
+    NHW -> present _hardwareConfig
+  sortTable (SortCol c d) = f $ case c of
+    NId -> g _nodeId
+    NMac -> g _nodeMAC
+    NHW -> g _hardwareConfig
+    where
+      f = case d of
+        ASC -> id
+        DESC -> flip
+      g l = compare `on` l . unNodezimRow
+
+
+newtype KbtzList = KbtzList { unKbtzList :: [Kbtzim] }
+  deriving (Eq, Ord, Show, Generic)
+  deriving newtype (NFData, ToJSON, FromJSON)
+
+data instance Column KbtzList = KId | KName | KDesc
+  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+
+newtype instance Row KbtzList = KbtzimRow { unKbtzimRow :: Kbtzim }
+  deriving (Eq, Ord, Show, Generic)
+  deriving newtype (NFData)
+
+instance Humanize (Column KbtzList) where
+  humanize = \case
+    KId -> "Kibbutz Id"
+    KName -> "Name"
+    KDesc -> "Description"
+
+
+instance Tabular KbtzList where
+  type Effect KbtzList m = (MonadJSM m, CRUDChopaan m)
+  toRows = (fmap KbtzimRow) . unKbtzList
+  toCell :: forall m. Effect KbtzList m
+    => KbtzList
+    -> Row KbtzList
+    -> Column KbtzList
+    -> [Html m KbtzList]
+  toCell _ (KbtzimRow Kbtzim {..}) = \case
+    KId -> present (show <$> _kbtzId)
+    KName -> present _kbtzName
+    KDesc -> present . fromMaybe "No Description Available" $ _kbtzDesc
+  sortTable (SortCol c d) = f $ case c of
+    KId -> g _kbtzId
+    where
+      f = case d of
+        ASC -> id
+        DESC -> flip
+      g l = compare `on` l . unKbtzimRow
