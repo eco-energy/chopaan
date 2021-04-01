@@ -54,12 +54,10 @@ import Text.Blaze.Renderer.String (renderMarkup)
 import ConCat.Misc
 import Control.Monad.Trans.Reader
 
-import Algebra.Graph.Labelled.AdjacencyMap
 
 instance HasLink WebSocket where
   type MkLink (WebSocket) r = r 
   toLink toA _ = toA
-
 
 -- Existentialized Kbtz
 data SomeKbtz t m n where
@@ -67,6 +65,8 @@ data SomeKbtz t m n where
   Mesh :: Kbtz t m n RuntimeStats -> SomeKbtz t m n
   Market :: Kbtz t m (TxPlan n) TransactionStatus -> SomeKbtz t m n
   Game :: Kbtz t m n R -> SomeKbtz t m' n -> (SomeKbtz t m n -> a) -> SomeKbtz t m (n, a)
+
+
 
 pageMap ::
   (IsStream t, MonadAsync m, Address n, IsName n, FromHttpApiData n)
@@ -114,7 +114,7 @@ defGrid n = inOrder n
 drawGrid :: forall n. NodeKey n => GridL n -> Diagram B
 drawGrid GridL{nodesL, edgesL} = let
   dia = gridSnake (drawNode <$> nodesL)
-  in dia --applyAll [connectOutside i j | (i, j) <- edgesL] dia    
+  in applyAll [connectOutside i j | (i, j) <- edgesL] dia    
   where
     drawNode :: n  -> Diagram B
     drawNode n = mkNode n "This is not here yet"
@@ -143,9 +143,6 @@ instance Show Page where
   show (MeshP) = "mesh"
   show (TxP) = "tx"
 
-
-
-  
 instance FromHttpApiData Page where
   parseUrlPiece :: T.Text -> Either T.Text Page 
   parseUrlPiece = parseUrlPiece
@@ -240,7 +237,7 @@ wsClosed = preEscapedString $ [q|
 
 type MarkupAPI = "page" :> (Capture "resource" String) :> Get '[HTML] Markup
 
---type HistoryAPI = "history" :> (Capture "graphType" GraphType) :> (Capture "startTime" Time) :> (Capture "endTime" Time) Graph
+
 
   
 type API n = MarkupAPI :<|> (WebSocketAPI n)
