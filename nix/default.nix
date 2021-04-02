@@ -12,7 +12,7 @@ let
   haskellNix = import sources."haskell.nix" { inherit system sourcesOverride; };
   # use our own nixpkgs if it exist in our sources,
   # otherwise use iohkNix default nixpkgs.
-  nixpkgs = haskellNix.sources.nixpkgs-2009 or
+  nixpkgs = haskellNix.sources.nixpkgs-2003 or
     (builtins.trace "Using IOHK default nixpkgs" iohKNix.nixpkgs);
 
   hasktorchOverlays = [
@@ -63,14 +63,14 @@ let
 
   shpadoinkleOverlays = []; #[shpadoinkle-overlay];
   
-  #stackhack = [
-  #    (pkgsNew: pkgsOld: let inherit (pkgsNew) lib; in {
-  #      haskell-nix = pkgsOld.haskell-nix // {
-  #        hackageSrc = sources.hackage-nix;
-  #        stackageSrc = sources.stackage-nix;
-  #      };
-  #    })   
-  #];
+  stackhack = [
+      (pkgsNew: pkgsOld: let inherit (pkgsNew) lib; in {
+        haskell-nix = pkgsOld.haskell-nix // {
+          hackageSrc = sources.hackage-nix;
+          stackageSrc = sources.stackage-nix;
+        };
+      })   
+  ];
   
   # for inclusion in pkgs:
   overlays =

@@ -46,5 +46,41 @@
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs-channels/archive/75f4ba05c63be3f147bcc2f7bd4ba1f029cedcb1.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "pytorch-world": {
+        "branch": "unstable",
+        "description": "nix scripts for pytorch-related libraries",
+        "homepage": "https://pytorch.org/",
+        "owner": "stites",
+        "repo": "pytorch-world",
+        "rev": "e40fc2133b169b72eb8d772f98b1484dc1d3903f",
+        "sha256": "0zb0h19aqi31gl4nqhf161wx27v8brf9y2w2psaqqxwbk02f9wp8",
+        "type": "tarball",
+        "url": "https://github.com/stites/pytorch-world/archive/e40fc2133b169b72eb8d772f98b1484dc1d3903f.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "hackage-nix": {
+        "branch": "master",
+        "description": "Automatically generated Nix expressions for Hackage",
+        "homepage": "",
+        "owner": "input-output-hk",
+        "repo": "hackage.nix",
+        "rev": "c080111c7fd939bfb162790885496a0c8c504d69",
+        "sha256": "10v39n2kha7zr8bl2nvvdlxk2kldr7l9gvlwfpbha1wv94b3bj92",
+        "type": "tarball",
+        "url": "https://github.com/input-output-hk/hackage.nix/archive/c080111c7fd939bfb162790885496a0c8c504d69.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "stackage-nix": {
+        "branch": "master",
+        "description": "Automatically generated Nix expressions of Stackage snapshots",
+        "homepage": "",
+        "owner": "input-output-hk",
+        "repo": "stackage.nix",
+        "rev": "542e9900adbbe3ac445d4a84392cf8b7172d9980",
+        "sha256": "1aj34gp9qgdcw5iqjmjcphrkwvm5nb35jpnalsa7vapga92i51sl",
+        "type": "tarball",
+        "url": "https://github.com/input-output-hk/stackage.nix/archive/542e9900adbbe3ac445d4a84392cf8b7172d9980.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

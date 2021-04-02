@@ -87,6 +87,9 @@ let
       # Misc. build fixes for dependencies
       {
 
+        # Disable shpadoinkle tests
+        packages.Shpadoinkle-html.doCheck = false;
+
         # Katip has Win32 (>=2.3 && <2.6) constraint
         packages.katip.doExactConfig = true;
 
@@ -112,6 +115,7 @@ let
 
         # Make sure we use a buildPackages version of happy
         packages.pretty-show.components.library.build-tools = [ buildPackages.haskell-nix.haskellPackages.happy ];
+
 
         # Remove hsc2hs build-tool dependencies (suitable version will be available as part of the ghc derivation)
         packages.network.components.library.build-tools = lib.mkForce [];
