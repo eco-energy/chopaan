@@ -88,7 +88,7 @@ let
       {
 
         # Disable shpadoinkle tests
-        packages.Shpadoinkle-html.doCheck = false;
+        packages.Shpadoinkle-html.components.tests.doCheck = false;
 
         # Katip has Win32 (>=2.3 && <2.6) constraint
         packages.katip.doExactConfig = true;
