@@ -22,3 +22,8 @@ source-repository-package
     tag: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
     subdir: inline known satisfy classes plugin examples graphics
     --sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
+
+
+constraints:
+  mmorph <= 1.1.3,
+  unliftio-core < 0.2.0.0
