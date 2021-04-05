@@ -118,7 +118,7 @@ let
 
         # split data output for ekg to reduce closure size
         packages.ekg.components.library.enableSeparateDataOutput = true;
-
+        
         # some packages are missing identifier.name:
         packages.cryptonite-openssl.package.identifier.name = "cryptonite-openssl";
         packages.file-embed-lzma.package.identifier.name = "file-embed-lzma";
@@ -135,6 +135,10 @@ let
         packages.lens.package.buildType = lib.mkForce "Simple";
         packages.nonempty-vector.package.buildType = lib.mkForce "Simple";
         packages.semigroupoids.package.buildType = lib.mkForce "Simple";
+        packages.free.package.buildType = lib.mkForce "Simple";
+        packages.streamly.package.buildType = lib.mkForce "Simple";
+        packages.streamly.components.library.doCheck = false;
+        packages.streamly.components.library.doHaddock = false;
         packages.newtype-generics.package.doHaddock = false;
         packages.numtype-dk.package.doHaddock = false;
         packages.MemoTrie.package.doHaddock = false;
@@ -144,7 +148,6 @@ let
         packages.data-default.package.doHaddock = false;
         #packages.data-default-old-locale.package.doHaddock = false;
         packages.integration.package.doHaddock = false;
-        #packages.old-time.package.buildType = lib.mkForce "Simple";
         # Make sure we use a buildPackages version of happy
         packages.pretty-show.components.library.build-tools = [ buildPackages.haskell-nix.haskellPackages.happy ];
 

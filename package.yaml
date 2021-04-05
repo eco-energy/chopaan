@@ -40,7 +40,6 @@ dependencies:
 - bytestring
 - data-default-class
 - containers
-- convertible
 - unordered-containers
 - stm
 - time
@@ -48,7 +47,6 @@ dependencies:
 - ulid
 - directory
 - microlens
-- streamly >= 0.7.2
 - mtl
 - transformers
 - resourcet
@@ -58,7 +56,6 @@ dependencies:
 - distributive
 - linear
 - ad
-- dhall <= 1.33.0
 - keys
 - vector
 - vector-sized
@@ -71,7 +68,6 @@ dependencies:
 - base64-bytestring
 - servant
 - servant-js
-- sbv
 - diagrams-lib
 - diagrams-svg >= 1.4.3
 - diagrams-contrib >= 1.4.4
@@ -88,39 +84,49 @@ dependencies:
 - Shpadoinkle-widgets
 - Shpadoinkle-router
 - Shpadoinkle-lens
-- jsaddle
 - ghcjs-dom
 - newtype-generics
 - lens
 - raw-strings-qq
-- beam-core
-- beam-postgres
-- beam-migrate
-- postgresql-simple
-- concat-classes
-- concat-examples
-- concat-plugin
-- network-uri
-- network
-- websockets
-- servant-server
-- servant-websockets
-- amazonka
-- amazonka-iot
-- amazonka-s3
-- net-mqtt >= 0.7.0
-- wai
-- warp
-- connection
-- conduit
-- tls
-- x509-store
-- x509-validation
-- net-spider
-- greskell
-- greskell-core
-- suavemente
-- compensated
+when:
+  condition: "!impl(ghcjs >= 0.1)"
+  dependencies:
+    - jsaddle
+    - beam-core
+    - beam-postgres
+    - beam-migrate
+    - postgresql-simple
+    - concat-classes
+    - concat-examples
+    - concat-plugin
+    - network-uri
+    - network
+    - websockets
+    - servant-server
+    - servant-websockets
+    - amazonka
+    - amazonka-iot
+    - amazonka-s3
+    - net-mqtt >= 0.7.0
+    - wai
+    - warp
+    - connection
+    - conduit
+    - tls
+    - x509-store
+    - x509-validation
+    - net-spider
+    - greskell
+    - greskell-core
+    - suavemente
+    - compensated
+    - convertible
+    - dhall <= 1.33.0
+    - sbv
+    - streamly >= 0.7.2
+  ghc-options:
+    - -fplugin=ConCat.Plugin
+
 
 ghc-options:
 - -Wall
@@ -130,43 +136,57 @@ ghc-options:
 - -Wincomplete-uni-patterns
 - -Wpartial-fields
 - -Wredundant-constraints
+- -threaded
 - -O2
+
 
 library:
   source-dirs: src
-  ghc-options:
-    - -fplugin=ConCat.Plugin
 
 executables:
   server:
     main:                Main.hs
     source-dirs:         app
-    dependencies:
-    - chopaan
-    - optparse-simple
-    - base
-    other-modules:
-    - Paths_chopaan
-    ghc-options:
-      - -threaded
-      - -O2
-      - -eventlog
-      - -fplugin=ConCat.Plugin
+    when:
+      condition: "impl(ghcjs >= 0.1)"
+      then:
+        buildable: false
+      else:
+        dependencies:
+          - chopaan
+          - optparse-simple
+          - base
+        other-modules:
+          - Paths_chopaan
+        ghc-options:
+          - -threaded
+          - -O2
+
 
 tests:
   chopaan-test:
     main:                Spec.hs
     source-dirs:         test
-    dependencies:
-    - chopaan
-    - hspec
-    - QuickCheck
-    - checkers
-    - proto-lens-arbitrary
-    - quickspec
-    - quickcheck-instances
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    - -O2
+    when:
+      condition: "impl(ghcjs >= 0.1)"
+      then:
+        dependencies:
+          base
+        buildable: false
+      else:
+        dependencies:
+          - chopaan
+          - hspec
+          - QuickCheck
+          - checkers
+          - proto-lens-arbitrary
+          - quickspec
+          - quickcheck-instances
+        ghc-options:
+          - -threaded
+          - -rtsopts
+          - -with-rtsopts=-N
+          - -O2
+
+
+
