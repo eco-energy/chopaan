@@ -10,8 +10,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Main (main) where
-
+module RTS (main) where
+{--
 import Chopaan.Run (monitorRS)
 import RIO
 import RIO.Process
@@ -30,3 +30,6 @@ main = do
           , appOptions = options
           }
      in runRIO app monitorRS
+--}
+
+main = print "bye"
