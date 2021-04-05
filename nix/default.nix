@@ -12,7 +12,7 @@ let
   haskellNix = import sources."haskell.nix" { inherit system sourcesOverride; };
   # use our own nixpkgs if it exist in our sources,
   # otherwise use iohkNix default nixpkgs.
-  nixpkgs = haskellNix.sources.nixpkgs-2003 or
+  nixpkgs = haskellNix.sources.nixpkgs-2009 or
     (builtins.trace "Using IOHK default nixpkgs" iohKNix.nixpkgs);
 
   hasktorchOverlays = [
@@ -52,16 +52,21 @@ let
       )
   ];
 
-  #shpadoinkle = builtins.fetchGit { 
-  #  url    = https://gitlab.com/platonic/shpadoinkle.git;
-  #  rev    = "8e0efbb11857a1af47038dae07b8140291c251ed";
-    #sha256 = "113qkrx817g5scijhjv5i58ji0lgz7c3sj30dzjyshjxx78hqs1i";
-  #};
+  shpadoinkle = builtins.fetchGit { 
+    url    = https://gitlab.com/platonic/shpadoinkle.git;
+    rev    = "8e0efbb11857a1af47038dae07b8140291c251ed";
+  };
 
-  #shpadoinkle-overlay = 
-  #  import (shpadoinkle + "/nix/overlay.nix") { compiler = "ghc865"; isJS = false; };
+  shpadoinkle-overlay = 
+    import (shpadoinkle + "/nix/overlay.nix") {
+      chan = nixpkgs.rev;
+      compiler = "ghc865";
+      isJS = false;
+      enableLibraryProfiling = false;
+      enableExecutableProfiling = false;
+    };
 
-  shpadoinkleOverlays = []; #[shpadoinkle-overlay];
+  shpadoinkleOverlays = [ shpadoinkle-overlay ];
   
   stackhack = [
       (pkgsNew: pkgsOld: let inherit (pkgsNew) lib; in {

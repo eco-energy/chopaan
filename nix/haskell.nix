@@ -41,9 +41,9 @@ let
     modules = [
       {
         compiler.nix-name = compiler;
-        packages.chopaan.configureFlags = [ "--ghc-option=-Werror" ];
+        #packages.chopaan.configureFlags = [ "--ghc-option=-Werror" ];
         enableLibraryProfiling = profiling;
-        
+        doCoverage = false;
          # Fixes for libtorch-ffi
         packages.libtorch-ffi = {
           configureFlags = [
@@ -63,7 +63,7 @@ let
         
         packages.chopaan = {
           #components.tests.chopaan-tests.build-tools = [ ]; # jormungandr
-
+          doCoverage = false;
           # How to set environment variables for builds
           #preBuild = "export NETWORK=testnet";
 
@@ -89,6 +89,29 @@ let
 
         # Disable shpadoinkle tests
         packages.Shpadoinkle-html.components.tests.doCheck = false;
+        # create fake sample.css file
+        packages.Shpadoinkle-html.components.library.preBuild = ''
+        cat << EOF > sample.css
+        .txt-rt, span.foo{
+          text-align:right;
+        }
+        
+        .pos-relative{
+        position:relative;
+        }
+
+        #foo[type="bar"]{
+        background: #123233;
+        }
+
+        @media print (min-width:200px){
+          .bar{
+             width: #EFEFEF;
+             content: '.qux and #stuff';
+          }
+        }
+        EOF
+        '';
 
         # Katip has Win32 (>=2.3 && <2.6) constraint
         packages.katip.doExactConfig = true;
@@ -105,14 +128,23 @@ let
         packages.ekg.package.identifier.name = "ekg";
       }
 
-      (lib.optionalAttrs stdenv.hostPlatform.isWindows {
+      (lib.optionalAttrs stdenv.hostPlatform.isGhcjs {
         # Disable cabal-doctest tests by turning off custom setups
         packages.comonad.package.buildType = lib.mkForce "Simple";
         packages.distributive.package.buildType = lib.mkForce "Simple";
         packages.lens.package.buildType = lib.mkForce "Simple";
         packages.nonempty-vector.package.buildType = lib.mkForce "Simple";
         packages.semigroupoids.package.buildType = lib.mkForce "Simple";
-
+        packages.newtype-generics.package.doHaddock = false;
+        packages.numtype-dk.package.doHaddock = false;
+        packages.MemoTrie.package.doHaddock = false;
+        packages.exact-pi.package.doHaddock = false;
+        #packages.old-locale.package.doHaddock = false;
+        packages.parallel.package.doHaddock = false;
+        packages.data-default.package.doHaddock = false;
+        #packages.data-default-old-locale.package.doHaddock = false;
+        packages.integration.package.doHaddock = false;
+        #packages.old-time.package.buildType = lib.mkForce "Simple";
         # Make sure we use a buildPackages version of happy
         packages.pretty-show.components.library.build-tools = [ buildPackages.haskell-nix.haskellPackages.happy ];
 
