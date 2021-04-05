@@ -20,11 +20,8 @@
 
 module Chopaan.View where
 
-import           Data.Coerce                       (Coercible)
-import           Data.Maybe                        (fromMaybe, isNothing)
-import           Data.String                       (IsString)
 import qualified Data.Text                         as T
-import Data.Aeson (ToJSON, FromJSON)
+import Data.Aeson (ToJSON)
 
 import Control.PseudoInverseCategory
 import           Shpadoinkle                       (Html, MonadJSM, text)
@@ -78,7 +75,7 @@ view fe = case fe of
     , H.a [ H.onClickM_ . navigate @(SPA m) $ RKibbutzim ] ["View Kibbutzim"]
     ]
   
-  
+
 
 graphView :: forall m n a e. (MonadJSM m, CRUDChopaan m, HistoryConn n a e) => SnapshotGraph n a e -> Html m (SnapshotGraph n a e)
 graphView g = H.div "container-graph"
