@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8a75477e7ec6121ae24cef3c27f00dc041aac6e3cff22853607a09b365c21d87
+-- hash: 2e734e84d5a3d0c905e15a979d104ad7992e46ac8e98de655d3c37c8c545ccbf
 
 name:           chopaan
 version:        0.1.0.0
@@ -96,7 +96,7 @@ library
       Paths_chopaan
   hs-source-dirs:
       src
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -O2
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -O2 -fplugin=ConCat.Plugin
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
@@ -108,14 +108,27 @@ library
     , ad
     , aeson
     , algebraic-graphs >=0.5
+    , amazonka
+    , amazonka-iot
+    , amazonka-s3
     , async
     , base >=4.11 && <10
     , base64-bytestring
+    , beam-core
+    , beam-migrate
+    , beam-postgres
     , blaze-markup
     , bytestring
     , cassava
     , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , conduit
+    , connection
     , containers
+    , convertible
     , data-default-class
     , deepseq
     , dhall <=1.33.0
@@ -129,6 +142,8 @@ library
     , exceptions
     , ghc-prim
     , ghcjs-dom
+    , greskell
+    , greskell-core
     , hashable
     , interpolatedstring-perl6
     , jsaddle
@@ -139,8 +154,13 @@ library
     , microlens
     , monad-bayes
     , mtl
+    , net-mqtt >=0.7.0
+    , net-spider
+    , network
+    , network-uri
     , newtype-generics
     , pointed
+    , postgresql-simple
     , proto-lens
     , proto-lens-runtime
     , raw-strings-qq
@@ -152,49 +172,26 @@ library
     , servant
     , servant-blaze
     , servant-js
+    , servant-server
+    , servant-websockets
     , stm
     , streamly >=0.7.2
+    , suavemente
     , text
     , time
     , time-compat >=1.9.2.2
+    , tls
     , transformers
     , ulid
     , unagi-chan
     , unordered-containers
     , vector
     , vector-sized
-  if !impl(ghcjs)
-    build-depends:
-        amazonka
-      , amazonka-iot
-      , amazonka-s3
-      , beam-core
-      , beam-migrate
-      , beam-postgres
-      , compensated
-      , concat-classes
-      , concat-examples
-      , concat-plugin
-      , conduit
-      , connection
-      , greskell
-      , greskell-core
-      , net-mqtt >=0.7.0
-      , net-spider
-      , network
-      , network-uri
-      , postgresql-simple
-      , servant-server
-      , servant-websockets
-      , suavemente
-      , tls
-      , wai
-      , warp
-      , websockets
-      , x509-store
-      , x509-validation
-  if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    , wai
+    , warp
+    , websockets
+    , x509-store
+    , x509-validation
   default-language: Haskell2010
 
 executable server
@@ -203,7 +200,7 @@ executable server
       Paths_chopaan
   hs-source-dirs:
       app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -O2 -threaded -O2 -eventlog
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -O2 -threaded -O2 -eventlog -fplugin=ConCat.Plugin
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
@@ -215,15 +212,28 @@ executable server
     , ad
     , aeson
     , algebraic-graphs >=0.5
+    , amazonka
+    , amazonka-iot
+    , amazonka-s3
     , async
     , base
     , base64-bytestring
+    , beam-core
+    , beam-migrate
+    , beam-postgres
     , blaze-markup
     , bytestring
     , cassava
     , chopaan
     , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , conduit
+    , connection
     , containers
+    , convertible
     , data-default-class
     , deepseq
     , dhall <=1.33.0
@@ -237,6 +247,8 @@ executable server
     , exceptions
     , ghc-prim
     , ghcjs-dom
+    , greskell
+    , greskell-core
     , hashable
     , interpolatedstring-perl6
     , jsaddle
@@ -247,9 +259,14 @@ executable server
     , microlens
     , monad-bayes
     , mtl
+    , net-mqtt >=0.7.0
+    , net-spider
+    , network
+    , network-uri
     , newtype-generics
     , optparse-simple
     , pointed
+    , postgresql-simple
     , proto-lens
     , proto-lens-runtime
     , raw-strings-qq
@@ -261,154 +278,26 @@ executable server
     , servant
     , servant-blaze
     , servant-js
+    , servant-server
+    , servant-websockets
     , stm
     , streamly >=0.7.2
+    , suavemente
     , text
     , time
     , time-compat >=1.9.2.2
+    , tls
     , transformers
     , ulid
     , unagi-chan
     , unordered-containers
     , vector
     , vector-sized
-  if !impl(ghcjs)
-    build-depends:
-        amazonka
-      , amazonka-iot
-      , amazonka-s3
-      , beam-core
-      , beam-migrate
-      , beam-postgres
-      , compensated
-      , concat-classes
-      , concat-examples
-      , concat-plugin
-      , conduit
-      , connection
-      , greskell
-      , greskell-core
-      , net-mqtt >=0.7.0
-      , net-spider
-      , network
-      , network-uri
-      , postgresql-simple
-      , servant-server
-      , servant-websockets
-      , suavemente
-      , tls
-      , wai
-      , warp
-      , websockets
-      , x509-store
-      , x509-validation
-  default-language: Haskell2010
-
-executable ui
-  main-is: Snapshot.hs
-  other-modules:
-      Paths_chopaan
-  hs-source-dirs:
-      app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -O2 -threaded -rtsopts -with-rtsopts=-N -O2
-  build-depends:
-      SVGFonts
-    , Shpadoinkle >=0.3.0.0
-    , Shpadoinkle-backend-pardiff
-    , Shpadoinkle-html
-    , Shpadoinkle-lens
-    , Shpadoinkle-router
-    , Shpadoinkle-widgets
-    , ad
-    , aeson
-    , algebraic-graphs >=0.5
-    , async
-    , base
-    , base64-bytestring
-    , blaze-markup
-    , bytestring
-    , cassava
-    , chopaan
-    , comonad
-    , containers
-    , data-default-class
-    , deepseq
-    , dhall <=1.33.0
-    , diagrams-contrib >=1.4.4
-    , diagrams-lib
-    , diagrams-svg >=1.4.3
-    , dimensional
-    , directory
-    , distributive
-    , estimator
-    , exceptions
-    , ghc-prim
-    , ghcjs-dom
-    , hashable
-    , interpolatedstring-perl6
-    , jsaddle
-    , katip
-    , keys
-    , lens
-    , linear
-    , microlens
-    , monad-bayes
-    , mtl
-    , newtype-generics
-    , optparse-simple
-    , pointed
-    , proto-lens
-    , proto-lens-runtime
-    , raw-strings-qq
-    , resource-pool
-    , resourcet
-    , retry
-    , rio >=0.1.8.0
-    , sbv
-    , servant
-    , servant-blaze
-    , servant-js
-    , stm
-    , streamly >=0.7.2
-    , text
-    , time
-    , time-compat >=1.9.2.2
-    , transformers
-    , ulid
-    , unagi-chan
-    , unordered-containers
-    , vector
-    , vector-sized
-  if !impl(ghcjs)
-    build-depends:
-        amazonka
-      , amazonka-iot
-      , amazonka-s3
-      , beam-core
-      , beam-migrate
-      , beam-postgres
-      , compensated
-      , concat-classes
-      , concat-examples
-      , concat-plugin
-      , conduit
-      , connection
-      , greskell
-      , greskell-core
-      , net-mqtt >=0.7.0
-      , net-spider
-      , network
-      , network-uri
-      , postgresql-simple
-      , servant-server
-      , servant-websockets
-      , suavemente
-      , tls
-      , wai
-      , warp
-      , websockets
-      , x509-store
-      , x509-validation
+    , wai
+    , warp
+    , websockets
+    , x509-store
+    , x509-validation
   default-language: Haskell2010
 
 test-suite chopaan-test
@@ -438,16 +327,29 @@ test-suite chopaan-test
     , ad
     , aeson
     , algebraic-graphs >=0.5
+    , amazonka
+    , amazonka-iot
+    , amazonka-s3
     , async
     , base >=4.11 && <10
     , base64-bytestring
+    , beam-core
+    , beam-migrate
+    , beam-postgres
     , blaze-markup
     , bytestring
     , cassava
     , checkers
     , chopaan
     , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , conduit
+    , connection
     , containers
+    , convertible
     , data-default-class
     , deepseq
     , dhall <=1.33.0
@@ -461,6 +363,8 @@ test-suite chopaan-test
     , exceptions
     , ghc-prim
     , ghcjs-dom
+    , greskell
+    , greskell-core
     , hashable
     , hspec
     , interpolatedstring-perl6
@@ -472,11 +376,17 @@ test-suite chopaan-test
     , microlens
     , monad-bayes
     , mtl
+    , net-mqtt >=0.7.0
+    , net-spider
+    , network
+    , network-uri
     , newtype-generics
     , pointed
+    , postgresql-simple
     , proto-lens
     , proto-lens-arbitrary
     , proto-lens-runtime
+    , quickcheck-instances
     , quickspec
     , raw-strings-qq
     , resource-pool
@@ -487,48 +397,24 @@ test-suite chopaan-test
     , servant
     , servant-blaze
     , servant-js
+    , servant-server
+    , servant-websockets
     , stm
     , streamly >=0.7.2
+    , suavemente
     , text
     , time
     , time-compat >=1.9.2.2
+    , tls
     , transformers
     , ulid
     , unagi-chan
     , unordered-containers
     , vector
     , vector-sized
-  if !impl(ghcjs)
-    build-depends:
-        amazonka
-      , amazonka-iot
-      , amazonka-s3
-      , beam-core
-      , beam-migrate
-      , beam-postgres
-      , compensated
-      , concat-classes
-      , concat-examples
-      , concat-plugin
-      , conduit
-      , connection
-      , greskell
-      , greskell-core
-      , net-mqtt >=0.7.0
-      , net-spider
-      , network
-      , network-uri
-      , postgresql-simple
-      , servant-server
-      , servant-websockets
-      , suavemente
-      , tls
-      , wai
-      , warp
-      , websockets
-      , x509-store
-      , x509-validation
-  if !impl(ghcjs)
-    build-depends:
-        quickcheck-instances
+    , wai
+    , warp
+    , websockets
+    , x509-store
+    , x509-validation
   default-language: Haskell2010

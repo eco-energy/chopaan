@@ -40,6 +40,7 @@ dependencies:
 - bytestring
 - data-default-class
 - containers
+- convertible
 - unordered-containers
 - stm
 - time
