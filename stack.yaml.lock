@@ -514,6 +514,13 @@ packages:
       sha256: 24ebfb7cf9c83e4840f1897104554233c3a29c1cdc83e0082b87e5b564fcc44b
   original:
     hackage: greskell-core-0.1.3.5@sha256:1a0734d82a84435fae296019d21f3dd9fc2f6d88b46fe969103841853fc47909,3473
+- completed:
+    hackage: algebraic-graphs-0.5@sha256:6eeec5ed1687ff7aa916e7bf9f02f51aaabde6f314dc0b7b1a84156974d7da73,8071
+    pantry-tree:
+      size: 4128
+      sha256: cca4a0348bb126506cacd8436948a68aad62e75d45df8c71f4090a00e69b45ee
+  original:
+    hackage: algebraic-graphs-0.5@sha256:6eeec5ed1687ff7aa916e7bf9f02f51aaabde6f314dc0b7b1a84156974d7da73,8071
 snapshots:
 - completed:
     size: 524799
