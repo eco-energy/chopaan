@@ -8,6 +8,7 @@ module Chopaan.UiTypes where
 import GHC.Generics
 
 import Control.Lens (makePrisms)
+import Control.DeepSeq (NFData)
 
 import Data.Text (Text)
 import Data.Aeson (ToJSON, FromJSON)
@@ -26,7 +27,7 @@ import Servant.API (Capture, Delete
                    , ReqBody, ToHttpApiData
                    , (:<|>) (..), (:>))
 
-import Shpadoinkle (Html, MonadJSM, NFData)
+import Shpadoinkle (Html, MonadJSM)
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Router (HasRouter ((:>>))
                           , Redirect (Redirect)
