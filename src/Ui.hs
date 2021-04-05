@@ -6,12 +6,12 @@
 {-# LANGUAGE LambdaCase, TypeOperators, TypeApplications, TupleSections #-}
 module Ui where
 
-import ConCat.Misc (inNew, inNew2, (:*), (:+))
+import ConCat.Misc (inNew2)
 import Control.PseudoInverseCategory (pimap, EndoIso(..), PseudoInverseCategory(..))
 import qualified Control.Newtype.Generics as N
 import Control.DeepSeq (NFData)
 import Data.Monoid (Sum(..))
-import Data.Text (Text, pack, unpack)
+import Data.Text (Text, pack)
 import Data.Bifunctor
 import GHC.Generics (Generic, Generic1)
 
@@ -19,15 +19,14 @@ import Shpadoinkle.Backend.ParDiff (runParDiff)
 
 import Shpadoinkle (Html(..), liftC, text)
 import Shpadoinkle.Run (runJSorWarp, simple)
-import Shpadoinkle.Html (div_, getBody, input', onInput
-                        , onOption, option, select, value, Prop(..))
+import Shpadoinkle.Html (div_, getBody, Prop) --, input', onInput
 
 import Shpadoinkle.Widgets.Types.Core
 import qualified Shpadoinkle.Widgets.Table as T
 
 
 import Algebra.Graph.Labelled
-import Algebra.Graph.Label
+
 
 data Op = Op1 | Op2 | Op3 | Op4 | Op5
   deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic, NFData)
@@ -73,8 +72,6 @@ newtype Gr flow state = Gr { unGr :: (Graph flow state) }
   deriving newtype (Num, NFData, Functor, Bifunctor)
 
 
-deriving instance (NFData state, NFData flow) => NFData (Graph flow state)
-deriving instance Generic (Graph flow state)
 deriving instance Generic1 (Graph flow)
 
 
