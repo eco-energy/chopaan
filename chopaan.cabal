@@ -1,8 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 7c9f95d67c16788b0df2cc4bd113c382e076cca13c3bcc98f0ea55b7b3b47793
 
 name:           chopaan
 version:        0.1.0.0
@@ -128,25 +130,27 @@ library
     , ghcjs-dom
     , hashable
     , interpolatedstring-perl6
+    , jsaddle
     , katip
     , keys
+    , lens
     , linear
     , microlens
     , monad-bayes
     , mtl
+    , newtype-generics
     , pointed
     , proto-lens
     , proto-lens-runtime
+    , raw-strings-qq
     , resource-pool
     , resourcet
     , retry
     , rio >=0.1.8.0
-    , sbv
     , servant
     , servant-blaze
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -175,17 +179,15 @@ library
       , dhall <=1.33.0
       , greskell
       , greskell-core
-      , jsaddle
-      , lens
       , net-mqtt >=0.7.0
       , net-spider
       , network
       , network-uri
-      , newtype-generics
       , postgresql-simple
-      , raw-strings-qq
+      , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -193,6 +195,9 @@ library
       , websockets
       , x509-store
       , x509-validation
+  else
+    build-depends:
+        ghcjs-three
   default-language: Haskell2010
 
 executable server
@@ -237,25 +242,27 @@ executable server
     , ghcjs-dom
     , hashable
     , interpolatedstring-perl6
+    , jsaddle
     , katip
     , keys
+    , lens
     , linear
     , microlens
     , monad-bayes
     , mtl
+    , newtype-generics
     , pointed
     , proto-lens
     , proto-lens-runtime
+    , raw-strings-qq
     , resource-pool
     , resourcet
     , retry
     , rio >=0.1.8.0
-    , sbv
     , servant
     , servant-blaze
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -284,17 +291,15 @@ executable server
       , dhall <=1.33.0
       , greskell
       , greskell-core
-      , jsaddle
-      , lens
       , net-mqtt >=0.7.0
       , net-spider
       , network
       , network-uri
-      , newtype-generics
       , postgresql-simple
-      , raw-strings-qq
+      , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -302,6 +307,9 @@ executable server
       , websockets
       , x509-store
       , x509-validation
+  else
+    build-depends:
+        ghcjs-three
   if impl(ghcjs >= 0.1)
     buildable: False
   else
@@ -362,25 +370,27 @@ test-suite chopaan-test
     , ghcjs-dom
     , hashable
     , interpolatedstring-perl6
+    , jsaddle
     , katip
     , keys
+    , lens
     , linear
     , microlens
     , monad-bayes
     , mtl
+    , newtype-generics
     , pointed
     , proto-lens
     , proto-lens-runtime
+    , raw-strings-qq
     , resource-pool
     , resourcet
     , retry
     , rio >=0.1.8.0
-    , sbv
     , servant
     , servant-blaze
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -409,17 +419,15 @@ test-suite chopaan-test
       , dhall <=1.33.0
       , greskell
       , greskell-core
-      , jsaddle
-      , lens
       , net-mqtt >=0.7.0
       , net-spider
       , network
       , network-uri
-      , newtype-generics
       , postgresql-simple
-      , raw-strings-qq
+      , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -427,6 +435,9 @@ test-suite chopaan-test
       , websockets
       , x509-store
       , x509-validation
+  else
+    build-depends:
+        ghcjs-three
   if impl(ghcjs >= 0.1)
     build-depends:
         base

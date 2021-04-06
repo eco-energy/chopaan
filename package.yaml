@@ -88,44 +88,48 @@ dependencies:
 - newtype-generics
 - lens
 - raw-strings-qq
+- jsaddle
 when:
   condition: "!impl(ghcjs >= 0.1)"
-  dependencies:
-    - jsaddle
-    - beam-core
-    - beam-postgres
-    - beam-migrate
-    - postgresql-simple
-    - concat-classes
-    - concat-examples
-    - concat-plugin
-    - network-uri
-    - network
-    - websockets
-    - servant-server
-    - servant-websockets
-    - amazonka
-    - amazonka-iot
-    - amazonka-s3
-    - net-mqtt >= 0.7.0
-    - wai
-    - warp
-    - connection
-    - conduit
-    - tls
-    - x509-store
-    - x509-validation
-    - net-spider
-    - greskell
-    - greskell-core
-    - suavemente
-    - compensated
-    - convertible
-    - dhall <= 1.33.0
-    - sbv
-    - streamly >= 0.7.2
-  ghc-options:
-    - -fplugin=ConCat.Plugin
+  then:
+    dependencies:
+      - beam-core
+      - beam-postgres
+      - beam-migrate
+      - postgresql-simple
+      - concat-classes
+      - concat-examples
+      - concat-plugin
+      - network-uri
+      - network
+      - websockets
+      - servant-server
+      - servant-websockets
+      - amazonka
+      - amazonka-iot
+      - amazonka-s3
+      - net-mqtt >= 0.7.0
+      - wai
+      - warp
+      - connection
+      - conduit
+      - tls
+      - x509-store
+      - x509-validation
+      - net-spider
+      - greskell
+      - greskell-core
+      - suavemente
+      - compensated
+      - convertible
+      - dhall <= 1.33.0
+      - sbv
+      - streamly >= 0.7.2
+    ghc-options:
+      - -fplugin=ConCat.Plugin
+  else:
+    dependencies:
+     - ghcjs-three
 
 
 ghc-options:

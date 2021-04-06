@@ -109,6 +109,17 @@ packages:
     git: https://github.com/conal/concat.git
     commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
 - completed:
+    name: ghcjs-three
+    version: 0.1.0.0
+    git: https://github.com/faezs/ghcjs-three.git
+    pantry-tree:
+      size: 3272
+      sha256: 28941c60ed67b832065001c493bcd0d2b3dd13546410a905ff581fad8e7c92cd
+    commit: 90c034a27c756f59e06fb29628106183527c8c86
+  original:
+    git: https://github.com/faezs/ghcjs-three.git
+    commit: 90c034a27c756f59e06fb29628106183527c8c86
+- completed:
     hackage: amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
     pantry-tree:
       size: 992
