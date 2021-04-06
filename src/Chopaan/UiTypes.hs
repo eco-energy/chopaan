@@ -60,7 +60,9 @@ data Frontend = MEcho (Maybe Text)
               | MKibbutzim (RosterKbtzim)
               | MKibbutz (RosterNodezim)
               | MAddNode (KbtzName) (Maybe NodeMAC) (NodeUpdate 'Edit)
-              deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+              deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
+
+deriving instance NFData Frontend
 
 type SPA m = "app" :> "echo" :> QueryParam "echo" Text :> View m Text
         :<|> "app" :> "kibbutzim" :> View m Frontend

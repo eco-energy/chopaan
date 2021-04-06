@@ -36,6 +36,7 @@ defHW :: HW
 defHW = HW (SingBC BatteryConf) (SingPC PVConf) (SingLC LoadConf)
 
 instance Semigroup HW
+
 instance Monoid HW
 
 instance Humanize HW

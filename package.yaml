@@ -88,7 +88,7 @@ dependencies:
 - newtype-generics
 - lens
 - raw-strings-qq
-- jsaddle
+- jsaddle >= 0.9.7.1
 when:
   condition: "!impl(ghcjs >= 0.1)"
   then:

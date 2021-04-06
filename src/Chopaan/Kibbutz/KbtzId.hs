@@ -2,7 +2,7 @@
 , DerivingStrategies, StandaloneDeriving, DeriveFunctor #-}
 module Chopaan.Kibbutz.KbtzId where
 
-import Servant
+import Servant.API
 import Data.Hashable (Hashable(..))
 import Data.Csv (ToField(..))
 import GHC.Generics

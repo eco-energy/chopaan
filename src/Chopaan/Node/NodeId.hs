@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveFunctor #-}
 module Chopaan.Node.NodeId where
 
-import Servant
+import Servant.API
 import Data.Hashable (Hashable(..))
 import Data.Csv (ToField(..))
 import GHC.Generics

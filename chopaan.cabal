@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7c9f95d67c16788b0df2cc4bd113c382e076cca13c3bcc98f0ea55b7b3b47793
+-- hash: 098402bc95121ea6b62abc6dca8a7af212c07ccd2aefc3c5b6e9229e79d7bdc2
 
 name:           chopaan
 version:        0.1.0.0
@@ -130,7 +130,7 @@ library
     , ghcjs-dom
     , hashable
     , interpolatedstring-perl6
-    , jsaddle
+    , jsaddle >=0.9.7.1
     , katip
     , keys
     , lens
@@ -242,7 +242,7 @@ executable server
     , ghcjs-dom
     , hashable
     , interpolatedstring-perl6
-    , jsaddle
+    , jsaddle >=0.9.7.1
     , katip
     , keys
     , lens
@@ -370,7 +370,7 @@ test-suite chopaan-test
     , ghcjs-dom
     , hashable
     , interpolatedstring-perl6
-    , jsaddle
+    , jsaddle >=0.9.7.1
     , katip
     , keys
     , lens
