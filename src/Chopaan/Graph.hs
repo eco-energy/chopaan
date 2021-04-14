@@ -60,8 +60,8 @@ class (Monad m, Address n, LinkAttributes e, NodeAttributes a) => PersistedGraph
 data GraphType = Mesh | Plan | BilledReality | HWConfig
   deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
 
-instance FromHttpApiData GraphType
-instance ToHttpApiData GraphType
+deriving instance FromHttpApiData GraphType
+deriving instance ToHttpApiData GraphType
 
 newtype GraphApp r a = GraphApp { runApp :: ReaderT r IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader r)
@@ -105,18 +105,7 @@ query :: (MonadIO m, IsoGConn n a e)
   -> m (SnapshotGraph n a e)
 query s q = liftIO $ getSnapshot s q
 
---toGS :: SnapshotGraph n e a -> GraphS n e a
---toGS (es, ns) = GraphS $ foldr overlay mempty (edge <$> es) --, isoA <$> ns)
---  where
---    isoE = undefined
---    isoA = undefined
 
-class Iso a b where
-  fwd :: a -> b
-  rev :: b -> a
-
-
-newtype GraphS n a e = GraphS (n, Graph e a)
 
 
 type IsoGConn n a e = (Address n
