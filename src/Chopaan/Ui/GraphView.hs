@@ -12,7 +12,8 @@ import qualified Control.Newtype.Generics as N
 import Control.DeepSeq (NFData)
 
 import Data.Text hiding (empty)
-import Data.Map
+import qualified Data.Map as M
+import Data.Map (Map)
 import Data.Bifunctor
 import Data.Typeable
 
@@ -20,6 +21,7 @@ import Shpadoinkle (Html(..), liftC, text)
 import Shpadoinkle.Run (runJSorWarp, simple)
 import Shpadoinkle.Html (div_, getBody, input', onInput
                         , onOption, option, select, value, Prop(..))
+import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Widgets.Types.Core
 
 --import Algebra.Graph.Labelled
@@ -35,21 +37,20 @@ import Graphics.SVGFonts
 import Chopaan.Kibbutz.Kibbutz
 import Chopaan.Graph
 
-{--
+
+
 -- $ Constraints for edge labels and nodes
 type GrConn f s = (Bounded s, Show s, Ord s, Eq s, Enum s, Show f, Monoid f, Ord f)
 
 -- $ Constraints for edge labels and nodes, along with monad constraints
 type GrConnM m f s = (Monad m, GrConn f s)
 
+deriving instance Generic1 (Graph flow)
+
 newtype Gr flow state = Gr { unGr :: (Graph flow state) }
   deriving stock (Eq, Ord, Show, Generic, Generic1)
-  deriving newtype (Num, NFData, Functor, Bifunctor)
+  deriving newtype (Num, Functor, Bifunctor)
 
-
-deriving instance (NFData state, NFData flow) => NFData (Graph flow state)
-deriving instance Generic (Graph flow state)
-deriving instance Generic1 (Graph flow)
 
 emptyGr :: (GrConn flow state) => Gr flow state
 emptyGr = Gr empty
@@ -68,8 +69,16 @@ instance (Show state, Show flow) => Humanize (Gr flow state)
 
 newtype GrNode = GrNode Int deriving (Eq, Ord, Typeable, Show, Num)
 
-renderGraph :: forall flow state. (GrConn flow state) => Gr flow state -> Diagram B
-renderGraph (Gr graph) = snd . render' $ graph
+
+
+
+graphView :: forall m flow state. (Applicative m, GrConn flow state)
+  => Gr flow state -> Html m (Gr flow state)
+graphView = (H.div grProps) . renderGraph' --render' $ graph
+  where
+    renderGraph' :: _
+    renderGraph' = undefined
+{--
   where
     render' :: Graph flow (GrNode, state) -> (GrNode, Diagram B) 
     render' = foldg mempty renderNode renderEdge
@@ -78,14 +87,15 @@ renderGraph (Gr graph) = snd . render' $ graph
       t :: Diagram B
       t = text' s
       r = (E.radius (V2 0 0) t)
-      in (circle r `atop` t) # named @GrNode n
-    renderEdge :: flow -> (GrNode, Diagram B) -> (GrNode, Diagram B) -> Diagram B
-    renderEdge _ (x, _) (y, _) = undefined -- connectOutside x y -- $ \[xn, yn] ->
-      --atop (boundaryFrom xn unit_Y ~~ boundaryFrom yn unitY)
+      in (n, (circle r `atop` t) # named @GrNode n)
+    renderEdge :: flow -> (GrNode, Diagram B) -> (GrNode, Diagram B) -> (GrNode, Diagram B)
+    renderEdge _ (x, n) (y, n') = (y, connectOutside x y $ gridCat [n, n']) -- $ \[xn, yn] ->
+      --atop (boundaryFrom xn unit_Y ~~ boundaryFrom yn unitY))
     text' :: Show s => s -> Diagram B
     text' s = stroke $ textSVG (show s) 1
 
 --}
+{--
 
 renderKbtz :: forall t m n a. (KbtzConn t m n, IsName n, Show a, Monad (t m))
   => Kbtz t m n a
@@ -100,3 +110,4 @@ renderKbtz = (fmap (gridCat . elems . (mapWithKey renderNode))) . kbtzState
       in (circle r `atop` t) # named n
     text' :: Show s => s -> Diagram B
     text' s = stroke $ textSVG (show s) 1
+--}
