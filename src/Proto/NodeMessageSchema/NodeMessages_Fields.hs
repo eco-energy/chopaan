@@ -87,12 +87,6 @@ child ::
         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "child" a) =>
         Lens.Family2.LensLike' f s a
 child = Data.ProtoLens.Field.field @"child"
-children ::
-         forall f s a .
-           (Prelude.Functor f,
-            Data.ProtoLens.Field.HasField s "children" a) =>
-           Lens.Family2.LensLike' f s a
-children = Data.ProtoLens.Field.field @"children"
 control ::
         forall f s a .
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "control" a) =>
@@ -417,17 +411,17 @@ otastatus ::
              Data.ProtoLens.Field.HasField s "otastatus" a) =>
             Lens.Family2.LensLike' f s a
 otastatus = Data.ProtoLens.Field.field @"otastatus"
-parenJoiningRssi ::
-                 forall f s a .
-                   (Prelude.Functor f,
-                    Data.ProtoLens.Field.HasField s "parenJoiningRssi" a) =>
-                   Lens.Family2.LensLike' f s a
-parenJoiningRssi = Data.ProtoLens.Field.field @"parenJoiningRssi"
 parent ::
        forall f s a .
          (Prelude.Functor f, Data.ProtoLens.Field.HasField s "parent" a) =>
          Lens.Family2.LensLike' f s a
 parent = Data.ProtoLens.Field.field @"parent"
+parentJoiningRssi ::
+                  forall f s a .
+                    (Prelude.Functor f,
+                     Data.ProtoLens.Field.HasField s "parentJoiningRssi" a) =>
+                    Lens.Family2.LensLike' f s a
+parentJoiningRssi = Data.ProtoLens.Field.field @"parentJoiningRssi"
 parentRssiThreshold ::
                     forall f s a .
                       (Prelude.Functor f,
@@ -554,11 +548,6 @@ uptime ::
          (Prelude.Functor f, Data.ProtoLens.Field.HasField s "uptime" a) =>
          Lens.Family2.LensLike' f s a
 uptime = Data.ProtoLens.Field.field @"uptime"
-uuid ::
-     forall f s a .
-       (Prelude.Functor f, Data.ProtoLens.Field.HasField s "uuid" a) =>
-       Lens.Family2.LensLike' f s a
-uuid = Data.ProtoLens.Field.field @"uuid"
 vMPPT ::
       forall f s a .
         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "vMPPT" a) =>
@@ -574,12 +563,6 @@ value ::
         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "value" a) =>
         Lens.Family2.LensLike' f s a
 value = Data.ProtoLens.Field.field @"value"
-vec'children ::
-             forall f s a .
-               (Prelude.Functor f,
-                Data.ProtoLens.Field.HasField s "vec'children" a) =>
-               Lens.Family2.LensLike' f s a
-vec'children = Data.ProtoLens.Field.field @"vec'children"
 version ::
         forall f s a .
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "version" a) =>
