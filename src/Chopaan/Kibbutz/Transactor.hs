@@ -20,6 +20,7 @@ module Chopaan.Kibbutz.Transactor ( runTransactor
                                   , curryTx
                                   , stakeLinkDir
                                   , txStatusLinkDir
+                                  , dispatchNodeTx
                                   ) where
 
 import Prelude hiding (zip, zipWith)
@@ -188,6 +189,16 @@ dispatchTx q tx = do
   t0 <- liftIO $ Time.getCurrentTime
   let txDispatch = mkTxDispatch uid t0 tx
   liftIO $ (writeToPubQ q) (rootTopic @n (undefined)) $ txDispatch
+
+dispatchNodeTx :: forall m n. (MonadIO m, Address n)
+  => PubQueue
+  -> TxPlan n
+  -> m ()
+dispatchNodeTx q (Tx tx) = do
+  uid <- liftIO $ (Text.pack . show) <$> getULID
+  t0 <- liftIO $ Time.getCurrentTime
+  let txDispatches =  (\(nid, st) -> (stateTopic nid, fromStake st)) <$> (M.toList tx)
+  sequence_ $ (\(t, s) -> liftIO $ writeToPubQ q t s) <$> txDispatches
 
 
 foldTxState :: (Monad m) => TxState n -> m TransactionStatus
@@ -384,7 +395,6 @@ mkStake r p t = Stake (r, toWatts p, fromIntegral t)
 
 mkTxDispatch :: (Address n) => Text.Text -> Time.UTCTime -> TxPlan n -> NM.Transaction
 mkTxDispatch uid stime (Tx txns) = defMessage
-                         & NM.uuid .~ uid
                          & NM.start .~ (utcToWord64 stime)
                          & NM.etrs .~ (M.mapKeys (toRemoteId) $ fromStake <$> txns) 
   where
