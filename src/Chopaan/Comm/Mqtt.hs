@@ -93,9 +93,9 @@ client MQTTOpts{..} msgCB MQTTCreds{..} = do
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
            , MQ._connID=Text.unpack $ connId
-           , MQ._port=443
+           , MQ._port=8883
            , MQ._msgCB=msgCB
-           , MQ._connectTimeout=18000000
+           , MQ._connectTimeout=180000000
            , MQ._tlsSettings=tlsConf}
   MQ.connectURI conf uri
 

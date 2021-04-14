@@ -134,8 +134,13 @@ chopaanId (KbtzId k) = k
 
 withMqttAuth :: Logger -> KbtzName -> (MQTTCreds -> IO c) -> IO c
 withMqttAuth lgr k = bracket
-  ((inIotContext lgr) . registerChopaan $ k)
-  ((inIotContext lgr) . (deregisterChopaan k))
+  (registerChopaanIO lgr k)
+  (deregisterChopaanIO lgr k)
+  
+
+
+registerChopaanIO lgr k = ((inIotContext lgr) . registerChopaan $ k)
+deregisterChopaanIO lgr k = ((inIotContext lgr) . (deregisterChopaan k))
 
 registerChopaan :: KbtzName -> AWSC (MQTTCreds)
 registerChopaan k = createCertAndKey >>= (\mc@MQTTCreds{certId} ->
