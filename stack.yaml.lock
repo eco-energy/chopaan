@@ -113,12 +113,12 @@ packages:
     version: 0.1.0.0
     git: https://github.com/faezs/ghcjs-three.git
     pantry-tree:
-      size: 3272
-      sha256: 28941c60ed67b832065001c493bcd0d2b3dd13546410a905ff581fad8e7c92cd
-    commit: 90c034a27c756f59e06fb29628106183527c8c86
+      size: 3271
+      sha256: e18509b2938e3fbade2ad20adb2339b8f484359310968892ce5a39d6105e8f19
+    commit: 2b4b1c6867c09aaec430cba39a98a765b5b79437
   original:
     git: https://github.com/faezs/ghcjs-three.git
-    commit: 90c034a27c756f59e06fb29628106183527c8c86
+    commit: 2b4b1c6867c09aaec430cba39a98a765b5b79437
 - completed:
     hackage: amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
     pantry-tree:
@@ -393,12 +393,12 @@ packages:
   original:
     hackage: http2-1.6.5@sha256:f1743ba4a267f525106c218894e4bd2acf28fa047a9ba660b4a317a97382a877,13999
 - completed:
-    hackage: jsaddle-0.9.7.0@sha256:b848f626aede158a4ac9c1129699a44b7e5fa7d3ed9778b6df3390f2a4706412,4418
+    hackage: jsaddle-0.9.7.1@sha256:711e48fa92c04d373fc18f058743dd9a53aecd048c851a47c932ff7d9bff2c82,4418
     pantry-tree:
       size: 4329
-      sha256: cb014d869efacee64d8c313d814b50e13427027f5754881f5e91c8a4441dd181
+      sha256: 5d47086288813d1b0387a37c7b4095eaf90b40150913548b2da43f54fce1f74a
   original:
-    hackage: jsaddle-0.9.7.0@sha256:b848f626aede158a4ac9c1129699a44b7e5fa7d3ed9778b6df3390f2a4706412,4418
+    hackage: jsaddle-0.9.7.1@sha256:711e48fa92c04d373fc18f058743dd9a53aecd048c851a47c932ff7d9bff2c82,4418
 - completed:
     hackage: jsaddle-dom-0.9.4.1@sha256:c769ab7d568c6fa9d0ecc9fa1c83091bfd3277c48e7f109a056cd088f399505f,75700
     pantry-tree:

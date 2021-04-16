@@ -27,8 +27,8 @@ source-repository-package
 source-repository-package
     type: git
     location: https://github.com/faezs/ghcjs-three
-    tag: 11d732b554b522d8a7b634b350886cd2a9ab70ed
-    --sha256: 0ivknigkrng4d91h1m0n06dzq9b3qr3pw0vnkpc6qypms14x1wqr
+    tag: 2b4b1c6867c09aaec430cba39a98a765b5b79437
+    --sha256: 0q5g6s6m706apm3cc9r77rjx0wznzyc30xi40vkv838c7gn1j011
 
 constraints:
   mmorph <= 1.1.3,
