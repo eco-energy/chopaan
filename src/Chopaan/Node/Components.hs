@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia #-}
 
 module Chopaan.Node.Components where
 
@@ -6,14 +6,32 @@ import GHC.Generics
 import ConCat.Pair
 import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON, FromJSON)
+import Data.Text
+
+import Shpadoinkle.Widgets.Types (Humanize, Present)
+
+data BatteryType = LeadAcidFlooded | LeadAcidSealed | LithiumIon
+  deriving (Eq, Ord, Enum, Bounded, Read, Show, Humanize, Present,
+            Generic, ToJSON, FromJSON, NFData)
+
+instance Semigroup BatteryType where (<>) = min
+instance Monoid BatteryType where mempty = maxBound
+
 
 data BatteryConf a = BatteryConf
-  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+  { minV :: a
+  , maxV :: a
+  , capacityAH :: a
+  , batType :: BatteryType
+  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
+
+defBC :: Num a => BatteryConf a
+defBC = BatteryConf 0 0 0 LeadAcidFlooded
 
 data BatteryTop a = ParBC (BatteryConf a) (BatteryConf a)
                   | SeqBC (BatteryConf a) (BatteryConf a)
                   | SingBC (BatteryConf a)
-                  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+                  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
 
 type VI a = Pair a
 
@@ -37,13 +55,21 @@ combinePar = undefined
 combineSeq :: VI a -> VI a -> VI a
 combineSeq = undefined
 
+
 data PVConf a = PVConf
-  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+  { openCircuitV :: a
+  , vAtMPP :: a
+  , iAtMPP :: a
+  , pvPower :: a
+  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
+
+defPC :: Num a => PVConf a
+defPC = PVConf 0 0 0 0
 
 data PVTop a = ParPC (PVConf a) (PVConf a)
              | SeqPC (PVConf a) (PVConf a)
              | SingPC (PVConf a)
-             deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+             deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
 
 
 data PVEnv a = PVEnv deriving (Eq, Ord, Show, Generic, NFData)
@@ -65,7 +91,12 @@ runPV (APV bConf evolve) p = evolve bConf p
 
 
 data LoadConf a = LoadConf
-  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+  { loadPower :: a
+  , loadName :: Text
+  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
+
+defLC :: Num a => LoadConf a
+defLC = LoadConf 0 ""
 
 data Load a where
   ParLoad :: Load a -> Load a -> Load a
@@ -75,5 +106,6 @@ data Load a where
 
 data LoadTop a = ParLC (LoadConf a) (LoadConf a)
                | SingLC (LoadConf a)
-  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
+
   

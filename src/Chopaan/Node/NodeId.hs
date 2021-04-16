@@ -1,7 +1,8 @@
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveFunctor, DerivingStrategies, DeriveAnyClass #-}
 module Chopaan.Node.NodeId where
 
 import Servant.API
+import Data.String
 import Data.Hashable (Hashable(..))
 import Data.Csv (ToField(..))
 import GHC.Generics
@@ -10,18 +11,20 @@ import Diagrams.Names
 import Data.Typeable
 import Data.Aeson
 import Control.DeepSeq (NFData)
-import Shpadoinkle.Widgets.Types (Humanize (..))
+import Shpadoinkle.Widgets.Types (Humanize (..), Present)
 
 type ThingName = Text.Text
 
 type NodeMAC = NodeId ThingName
 
 newtype NodeId a = NodeId { unNodeId :: a }
-  deriving (Eq, Ord, Generic, Typeable, FromJSON, ToJSON, NFData, Functor)
-
+  deriving stock (Generic, Functor)
+  deriving newtype (Eq, Ord, Show, Read, IsString, Typeable, FromJSON, ToJSON, Humanize, Semigroup, Monoid)
+  deriving anyclass (Present, NFData)
+{--
 instance (Show a) => Show (NodeId a) where
   show (NodeId a) = show a
-
+--}
 instance (Hashable a) => Hashable (NodeId a)
 
 instance (ToField a) => ToField (NodeId a) where
@@ -35,4 +38,3 @@ instance (ToHttpApiData a) => ToHttpApiData (NodeId a) where
 
 instance (Typeable a, Ord a, Show a) => IsName (NodeId a)
 
-deriving instance (Show a, Humanize a) => Humanize (NodeId a)
