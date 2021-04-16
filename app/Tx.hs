@@ -4,9 +4,12 @@ module Main where
 import Dhall
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.AWS.Common
-import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
+import Chopaan.Kibbutz.AWS.Things (withMqttAuth
+                                  , registerChopaanIO
+                                  , deregisterChopaanIO
+                                  , MQTTCreds(..))
 import Chopaan.Kibbutz.KbtzId
-import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchTx, Stake(..))
+import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchNodeTx, Stake(..))
 import Chopaan.Comm.Mqtt (pub, client)
 import Chopaan.Comm.Comm (initPubQ, trivialCallback)
 import Chopaan.Types
@@ -15,27 +18,39 @@ import Control.Concurrent.STM (atomically)
 import Control.Concurrent
 import Control.Monad
 import Proto.NodeMessageSchema.NodeMessages
-
-
+import qualified Data.ByteString as B
+import qualified Data.Text.Encoding as T
 import System.IO
 
 
 srcs :: [NodeMAC]
-srcs = NodeId <$> [ "7c:9e:bd:f6:5a:08"
-                  , "7c:9e:bd:f5:c6:cc"
+srcs = NodeId <$> [ "3c:71:bf:79:a4:24"]
+  --"7c:9e:bd:f6:5a:08"
+                  --, "7c:9e:bd:f5:c6:cc"
                   --, "7c:9e:bd:f5:07:c8"
                   --, "7c:9e:bd:f6:42:68"
-                  ]
-
+                 
+kname = "chopaan-tx-pilot"
 
 main = do
+  lgr <- newLogger Debug stdout
+  --creds <- registerChopaanIO lgr (KbtzId kname)
+  --print creds
+  cid <- B.readFile "certId" --(T.decodeUtf8 . certId $ creds)
+  cert <- B.readFile "cert.pem" --(cert creds)
+  pk <- B.readFile "key.pem" --(privateKey creds)
+  let creds = MQTTCreds (T.decodeUtf8 cid) cert pk ""
+  runTx creds
+  --_ <- deregisterChopaanIO lgr (KbtzId kname) creds
+  return ()
+
+runTx mqttCreds = do
   Options{mqttOpts} <- input auto "./txOpts.dhall"
-  lg <- newLogger Debug stdout
   outbox <- atomically $ initPubQ
-  cl <- withMqttAuth lg (KbtzId "pilot") (client mqttOpts trivialCallback)
+  cl <- client mqttOpts{connId = kname} trivialCallback mqttCreds
   _ <- forkIO $ forever $ (pub cl outbox)
-  mapM_ (\t -> (dispatchTx outbox t)
-          >> print ("Dispatched! " <> show t)
+  mapM_ (\tx -> (dispatchNodeTx outbox tx)
+          >> print ("Dispatched! " <> show tx)
           >> (threadDelay delay)) $ loop srcs
 
 
@@ -83,3 +98,4 @@ testConvEff1 f = (\p -> Tx $ Map.fromList [ (f, mkStake Source p t) ])
   where
     powers = [10,20..120]
     t = 60
+

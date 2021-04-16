@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 098402bc95121ea6b62abc6dca8a7af212c07ccd2aefc3c5b6e9229e79d7bdc2
+-- hash: ac0ece45b82079b8c3f7a51aca9c486b4291028dc7d6ac335cc35ecc0d308f83
 
 name:           chopaan
 version:        0.1.0.0
@@ -75,8 +75,10 @@ library
       Chopaan.Server
       Chopaan.Testing
       Chopaan.Types
+      Chopaan.Ui.AddKbtz
       Chopaan.Ui.Foreign.Utils
       Chopaan.Ui.Foreign.WebSocket
+      Chopaan.Ui.FormCommon
       Chopaan.Ui.GraphView
       Chopaan.Ui.Three
       Chopaan.Ui.WebSocket
@@ -96,7 +98,9 @@ library
       Paths_chopaan
   hs-source-dirs:
       src
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -O2
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+  install-includes:
+      src/Chopaan/Node/UpdateInst.inc
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
@@ -111,6 +115,7 @@ library
     , async
     , base >=4.11 && <10
     , base64-bytestring
+    , binary
     , blaze-markup
     , bytestring
     , cassava
@@ -160,7 +165,7 @@ library
     , unordered-containers
     , vector
     , vector-sized
-  if !impl(ghcjs >= 0.1)
+  if !impl(ghcjs)
     ghc-options: -fplugin=ConCat.Plugin
     build-depends:
         amazonka
@@ -200,15 +205,11 @@ library
         ghcjs-three
   default-language: Haskell2010
 
-executable server
-  main-is: Main.hs
-  other-modules:
-      RTS
-      Snapshot
-      Tx
+executable dev
+  main-is: Dev.hs
   hs-source-dirs:
       app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -O2
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
@@ -223,6 +224,7 @@ executable server
     , async
     , base >=4.11 && <10
     , base64-bytestring
+    , binary
     , blaze-markup
     , bytestring
     , cassava
@@ -272,7 +274,7 @@ executable server
     , unordered-containers
     , vector
     , vector-sized
-  if !impl(ghcjs >= 0.1)
+  if !impl(ghcjs)
     ghc-options: -fplugin=ConCat.Plugin
     build-depends:
         amazonka
@@ -310,7 +312,125 @@ executable server
   else
     build-depends:
         ghcjs-three
-  if impl(ghcjs >= 0.1)
+  if !impl(ghcjs)
+    ghc-options: -threaded -O2
+    build-depends:
+        base
+      , chopaan
+      , optparse-simple
+    buildable: True
+  else
+    buildable: False
+  default-language: Haskell2010
+
+executable server
+  main-is: Main.hs
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      SVGFonts
+    , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-widgets
+    , ad
+    , aeson
+    , algebraic-graphs >=0.5
+    , async
+    , base >=4.11 && <10
+    , base64-bytestring
+    , binary
+    , blaze-markup
+    , bytestring
+    , cassava
+    , comonad
+    , containers
+    , data-default-class
+    , deepseq
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , estimator
+    , exceptions
+    , ghc-prim
+    , ghcjs-dom
+    , hashable
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
+    , katip
+    , keys
+    , lens
+    , linear
+    , microlens
+    , monad-bayes
+    , mtl
+    , newtype-generics
+    , pointed
+    , proto-lens
+    , proto-lens-runtime
+    , raw-strings-qq
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , servant
+    , servant-blaze
+    , servant-js
+    , stm
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , transformers
+    , ulid
+    , unagi-chan
+    , unordered-containers
+    , vector
+    , vector-sized
+  if !impl(ghcjs)
+    ghc-options: -fplugin=ConCat.Plugin
+    build-depends:
+        amazonka
+      , amazonka-iot
+      , amazonka-s3
+      , beam-core
+      , beam-migrate
+      , beam-postgres
+      , compensated
+      , concat-classes
+      , concat-examples
+      , concat-plugin
+      , conduit
+      , connection
+      , convertible
+      , dhall <=1.33.0
+      , greskell
+      , greskell-core
+      , net-mqtt >=0.7.0
+      , net-spider
+      , network
+      , network-uri
+      , postgresql-simple
+      , sbv
+      , servant-server
+      , servant-websockets
+      , streamly >=0.7.2
+      , suavemente
+      , tls
+      , wai
+      , warp
+      , websockets
+      , x509-store
+      , x509-validation
+  else
+    build-depends:
+        ghcjs-three
+  if impl(ghcjs)
     buildable: False
   else
     other-modules:
@@ -320,6 +440,241 @@ executable server
         base
       , chopaan
       , optparse-simple
+  default-language: Haskell2010
+
+executable tx
+  main-is: Tx.hs
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      SVGFonts
+    , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-widgets
+    , ad
+    , aeson
+    , algebraic-graphs >=0.5
+    , async
+    , base >=4.11 && <10
+    , base64-bytestring
+    , binary
+    , blaze-markup
+    , bytestring
+    , cassava
+    , comonad
+    , containers
+    , data-default-class
+    , deepseq
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , estimator
+    , exceptions
+    , ghc-prim
+    , ghcjs-dom
+    , hashable
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
+    , katip
+    , keys
+    , lens
+    , linear
+    , microlens
+    , monad-bayes
+    , mtl
+    , newtype-generics
+    , pointed
+    , proto-lens
+    , proto-lens-runtime
+    , raw-strings-qq
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , servant
+    , servant-blaze
+    , servant-js
+    , stm
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , transformers
+    , ulid
+    , unagi-chan
+    , unordered-containers
+    , vector
+    , vector-sized
+  if !impl(ghcjs)
+    ghc-options: -fplugin=ConCat.Plugin
+    build-depends:
+        amazonka
+      , amazonka-iot
+      , amazonka-s3
+      , beam-core
+      , beam-migrate
+      , beam-postgres
+      , compensated
+      , concat-classes
+      , concat-examples
+      , concat-plugin
+      , conduit
+      , connection
+      , convertible
+      , dhall <=1.33.0
+      , greskell
+      , greskell-core
+      , net-mqtt >=0.7.0
+      , net-spider
+      , network
+      , network-uri
+      , postgresql-simple
+      , sbv
+      , servant-server
+      , servant-websockets
+      , streamly >=0.7.2
+      , suavemente
+      , tls
+      , wai
+      , warp
+      , websockets
+      , x509-store
+      , x509-validation
+  else
+    build-depends:
+        ghcjs-three
+  if impl(ghcjs)
+    buildable: False
+  else
+    ghc-options: -threaded -O2
+    build-depends:
+        base
+      , chopaan
+      , optparse-simple
+  default-language: Haskell2010
+
+executable ui
+  main-is: Ui.hs
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      SVGFonts
+    , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-widgets
+    , ad
+    , aeson
+    , algebraic-graphs >=0.5
+    , async
+    , base >=4.11 && <10
+    , base64-bytestring
+    , binary
+    , blaze-markup
+    , bytestring
+    , cassava
+    , comonad
+    , containers
+    , data-default-class
+    , deepseq
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , estimator
+    , exceptions
+    , ghc-prim
+    , ghcjs-dom
+    , hashable
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
+    , katip
+    , keys
+    , lens
+    , linear
+    , microlens
+    , monad-bayes
+    , mtl
+    , newtype-generics
+    , pointed
+    , proto-lens
+    , proto-lens-runtime
+    , raw-strings-qq
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , servant
+    , servant-blaze
+    , servant-js
+    , stm
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , transformers
+    , ulid
+    , unagi-chan
+    , unordered-containers
+    , vector
+    , vector-sized
+  if !impl(ghcjs)
+    ghc-options: -fplugin=ConCat.Plugin
+    build-depends:
+        amazonka
+      , amazonka-iot
+      , amazonka-s3
+      , beam-core
+      , beam-migrate
+      , beam-postgres
+      , compensated
+      , concat-classes
+      , concat-examples
+      , concat-plugin
+      , conduit
+      , connection
+      , convertible
+      , dhall <=1.33.0
+      , greskell
+      , greskell-core
+      , net-mqtt >=0.7.0
+      , net-spider
+      , network
+      , network-uri
+      , postgresql-simple
+      , sbv
+      , servant-server
+      , servant-websockets
+      , streamly >=0.7.2
+      , suavemente
+      , tls
+      , wai
+      , warp
+      , websockets
+      , x509-store
+      , x509-validation
+  else
+    build-depends:
+        ghcjs-three
+  if impl(ghcjs)
+    ghcjs-options: -threaded -O2
+    build-depends:
+        base
+      , chopaan
+      , optparse-simple
+    buildable: True
+  else
+    buildable: False
   default-language: Haskell2010
 
 test-suite chopaan-test
@@ -336,7 +691,7 @@ test-suite chopaan-test
       Paths_chopaan
   hs-source-dirs:
       test
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -O2
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
@@ -351,6 +706,7 @@ test-suite chopaan-test
     , async
     , base >=4.11 && <10
     , base64-bytestring
+    , binary
     , blaze-markup
     , bytestring
     , cassava
@@ -400,7 +756,7 @@ test-suite chopaan-test
     , unordered-containers
     , vector
     , vector-sized
-  if !impl(ghcjs >= 0.1)
+  if !impl(ghcjs)
     ghc-options: -fplugin=ConCat.Plugin
     build-depends:
         amazonka
@@ -438,7 +794,7 @@ test-suite chopaan-test
   else
     build-depends:
         ghcjs-three
-  if impl(ghcjs >= 0.1)
+  if impl(ghcjs)
     build-depends:
         base
     buildable: False
