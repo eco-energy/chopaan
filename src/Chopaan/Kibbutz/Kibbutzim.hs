@@ -93,9 +93,9 @@ type MeshSpider n = Spider n MeshNode RxSignal
 
 type MeshSnapshot n = SnapshotGraph n MeshNode RxSignal
 
-type HWGridSpider n = Spider n HW Wire
+--type HWGridSpider n = Spider n HW Wire
 
-type HWGridSnapshot n = SnapshotGraph n HW Wire 
+--type HWGridSnapshot n = SnapshotGraph n HW Wire 
 
 type SpiderConn n v e = (SpiderNodeId n, NodeAttributes v, LinkAttributes e)
 
@@ -200,10 +200,10 @@ getMesh :: (SnapshotId n, MonadIO m)
   => MeshSpider n
   -> ReaderT (GridRoot n) m (MeshSnapshot n)
 getMesh = getGrid
-
+{--
 getHWGrid :: (SnapshotId n, MonadIO m)
   => HWGridSpider n
   -> ReaderT (GridRoot n) m (HWGridSnapshot n)
 getHWGrid = getGrid
-
+--}
 
