@@ -27,7 +27,7 @@ import qualified Streamly.Prelude as S
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Kibbutz
 
-import Chopaan.Kibbutz.AWS.Things (withMqttAuth)
+import Chopaan.Comm.Mqtt.AWS (withMqttAuth)
 import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
 import Chopaan.Kibbutz.Transactor (--runTransactor
                                   planTx

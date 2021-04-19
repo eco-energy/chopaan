@@ -21,25 +21,25 @@ import qualified Network.MQTT.Types as MQTy
 
 import Network.Connection
 import Network.TLS
-import Data.X509.CertificateStore (readCertificateStore)
-import Data.X509.Validation (validateDefault)
+--import Data.X509.CertificateStore (readCertificateStore)
+--import Data.X509.Validation (validateDefault)
 
 import Data.Default.Class
-import Data.Maybe (fromJust)
 import Network.TLS.Extra.Cipher
 import Network.URI
 
 import Control.Exception (Handler (..), catches)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
 
 import Data.ProtoLens (encodeMessage)
 
-import Chopaan.Kibbutz.AWS.Things (MQTTCreds(..), withMqttAuth)
+import Chopaan.Kibbutz.AWS.Things (ThingCreds(..))
+import Chopaan.Comm.Mqtt.AWS (MQTTCreds) --, withMqttAuth)
 import Chopaan.Types (MQTTOpts(..))
-import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue, initMessageQs, MessageQs(..))
+import Chopaan.Comm.Comm (Address(..), PubQueue, initMessageQs, MessageQs(..))
 import Chopaan.Comm.Queues (NodeQueue(..))
 import Chopaan.Utils.Retry
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame)
@@ -50,8 +50,8 @@ import Proto.NodeMessageSchema.NodeMessages (MeshFrame)
 
 
 -- https://stackoverflow.com/questions/40081508/how-to-provide-a-client-certificate-to-http-client-tls
-mkTLSSettings :: B.ByteString -> B.ByteString -> B.ByteString -> Text.Text -> Text.Text -> TLSSettings
-mkTLSSettings cert key caPath hostName name = let
+mkTLSSettingsFromMemory :: B.ByteString -> B.ByteString -> B.ByteString -> Text.Text -> Text.Text -> TLSSettings
+mkTLSSettingsFromMemory cert key caPath hostName name = let
   creds = either (const Nothing) (Just) (credentialLoadX509FromMemory cert key)
   --caCreds <- fromJust (error "CA Certificate Not Found") (readCertificateStore caPath)
   hooks = def { onCertificateRequest = \_ -> return creds
@@ -62,6 +62,20 @@ mkTLSSettings cert key caPath hostName name = let
                  , clientSupported = def {supportedCiphers=ciphersuite_strong}
                  }
   in (TLSSettings clientParams)
+
+mkTLSSettingsFromDisk :: FilePath -> FilePath -> FilePath -> Text.Text -> Text.Text -> TLSSettings
+mkTLSSettingsFromDisk cert key caPath hostName name = let
+  creds = either (const Nothing) (Just) (credentialLoadX509FromMemory cert key)
+  --caCreds <- fromJust (error "CA Certificate Not Found") (readCertificateStore caPath)
+  hooks = def { onCertificateRequest = \_ -> return creds
+              , onServerCertificate = \_ _ _ _ -> mempty -- validateDefault caCreds a b c
+              }
+  clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
+                 { clientHooks=hooks
+                 , clientSupported = def {supportedCiphers=ciphersuite_strong}
+                 }
+  in (TLSSettings clientParams)
+
 
 -- need reader for creds and logs
 runMqtt ::
@@ -77,7 +91,7 @@ runMqtt opts ts msgCB creds = do
   _ <- liftIO . forkIO $ forever $ catches (pub mc outbox) [(Handler errorHandler)]
   connStatus <- liftIO $ sequence $ (resub mc) <$> ts
   liftIO $ print connStatus
-  liftIO . forkIO $ recoverC 10 (MQ.waitForClient mc)
+  void . liftIO . forkIO $ recoverC 10 (MQ.waitForClient mc)
   return qs
 
 
@@ -86,9 +100,9 @@ client ::
   -> MQ.MessageCallback
   -> MQTTCreds
   -> IO (MQ.MQTTClient)
-client MQTTOpts{..} msgCB MQTTCreds{..} = do
+client MQTTOpts{..} msgCB ThingCreds{..} = do
   let
-    tlsConf = mkTLSSettings cert privateKey undefined mqttURI connId
+    tlsConf = mkTLSSettingsFromDisk certPath keyPath caPath mqttURI connId
     (Just uri) = parseURI $ Text.unpack $ mqttURI <> "#" <> connId
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
@@ -125,4 +139,5 @@ errorHandler (MQ.Timeout) = printError "Timeout"
 errorHandler (MQ.BadData) = printError "BadData" 
 errorHandler (MQ.Discod d) = printError d  
 errorHandler (MQ.MQTTException e) =  printError e
+printError :: Show e => e -> IO ()
 printError e = print $ "MQTT Publisher Exception:\n" <> (show e)
