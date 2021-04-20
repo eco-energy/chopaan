@@ -61,7 +61,14 @@ extra-deps:
  - git: https://github.com/faezs/ghcjs-three.git
    commit: 2b4b1c6867c09aaec430cba39a98a765b5b79437
    # nix-sha256: 0q5g6s6m706apm3cc9r77rjx0wznzyc30xi40vkv838c7gn1j011
-
+   
+ - git: https://github.com/hasktorch/hasktorch.git
+   commit: be74a1eaabc2a6b56e21bbb24c870299d8e3bdb6
+   subdirs:
+     - libtorch-ffi-helper
+     - libtorch-ffi
+     - hasktorch
+  # nix-sha256: 17d8pm2sh6y0ld1z62v483kp6smdp6ck6aydi6i664qj2r2xv0nc
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
  - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
  - amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135

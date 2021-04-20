@@ -91,6 +91,7 @@ dependencies:
 - raw-strings-qq
 - jsaddle >= 0.9.7.1
 - haxl
+- hasktorch
 when:
   condition: "!impl(ghcjs)"
   then:
