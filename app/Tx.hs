@@ -2,12 +2,14 @@
 module Main where
 
 import Dhall
+import qualified Data.ByteString.Base64 as B64
 import Chopaan.Node.NodeId
+import Chopaan.Kibbutz.AWS.Things (ThingCreds(..))
 import Chopaan.Kibbutz.AWS.Common
-import Chopaan.Kibbutz.AWS.Things (withMqttAuth
-                                  , registerChopaanIO
-                                  , deregisterChopaanIO
-                                  , MQTTCreds(..))
+import Chopaan.Comm.Mqtt.AWS (withMqttAuth
+                             , registerChopaanIO
+                             , deregisterChopaanIO
+                             )
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchNodeTx, Stake(..))
 import Chopaan.Comm.Mqtt (pub, client)
@@ -30,24 +32,17 @@ srcs = NodeId <$> [ "3c:71:bf:79:a4:24"]
                   --, "7c:9e:bd:f5:07:c8"
                   --, "7c:9e:bd:f6:42:68"
                  
-kname = "chopaan-tx-pilot"
+kname = KbtzId "chopaan-pilot-tx-1"
 
 main = do
-  lgr <- newLogger Debug stdout
-  --creds <- registerChopaanIO lgr (KbtzId kname)
-  --print creds
-  cid <- B.readFile "certId" --(T.decodeUtf8 . certId $ creds)
-  cert <- B.readFile "cert.pem" --(cert creds)
-  pk <- B.readFile "key.pem" --(privateKey creds)
-  let creds = MQTTCreds (T.decodeUtf8 cid) cert pk ""
-  runTx creds
-  --_ <- deregisterChopaanIO lgr (KbtzId kname) creds
-  return ()
+  lgr <- newLogger Info stdout
+  withMqttAuth lgr kname runTx
 
 runTx mqttCreds = do
+  print mqttCreds
   Options{mqttOpts} <- input auto "./txOpts.dhall"
   outbox <- atomically $ initPubQ
-  cl <- client mqttOpts{connId = kname} trivialCallback mqttCreds
+  cl <- client mqttOpts{connId = unKbtzId kname} trivialCallback mqttCreds
   _ <- forkIO $ forever $ (pub cl outbox)
   mapM_ (\tx -> (dispatchNodeTx outbox tx)
           >> print ("Dispatched! " <> show tx)
@@ -69,7 +64,7 @@ stakeLL :: [NodeMAC] -> [[Stake]]
 stakeLL ns = fmap (\(i, s) -> case mod @Int i 2 of
                       0 -> s
                       _ -> switchStakePolarity <$> s
-                  ) $ zip [1..] $ repeat $ stakeL ns
+                  ) $ zip [1..5] $ repeat $ stakeL ns
 
 stakeL :: [NodeMAC] -> [Stake]
 stakeL ns = [mkStake (getRole i) p t | (i, _) <- zip [1..] ns]
