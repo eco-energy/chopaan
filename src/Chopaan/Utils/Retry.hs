@@ -1,16 +1,19 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Chopaan.Utils.Retry where
 
 import Control.Retry
-import Control.Exception
-import Control.Monad.Catch
+import qualified Control.Exception as E
+import qualified Control.Monad.Catch as C
 import Data.Either
 import Control.Monad.IO.Class
 
 chopaanPolicy :: (MonadIO m) => Int -> RetryPolicyM m
 chopaanPolicy n = exponentialBackoff 10 <> limitRetries n
 
-recoverC :: (MonadIO m, MonadMask m) => Int -> m a -> m a
-recoverC n action = recoverAll (chopaanPolicy n) (\_ -> (liftIO $ print "retrying") >> action)
+recoverC :: (MonadIO m, C.MonadMask m, Show e) => e -> Int -> m a -> m a
+recoverC msg n action = recovering (chopaanPolicy n) [logDef] (\_ -> action)
+  where
+    logDef r = logRetries (\_ -> return True) (\b (C.SomeException e) rr -> liftIO $ print $ defaultLogMsg b e rr) r
 
 retryEither :: (MonadIO m) => n -> (n -> m (Either a b)) -> m (Either a b)
 retryEither n f = retrying (chopaanPolicy 10) shouldRetryEither (\retryStatus ->  (liftIO $ print retryStatus) >> f n)
@@ -23,3 +26,4 @@ retryBool action = retrying retryPolicyDefault (\_ a -> return $ a == True) (\re
                                                                                 x <- action
                                                                                 return x
                                                                             )
+--logDef :: (MonadIO m, C.MonadMask m, C.Exception e) => RetryStatus -> C.Handler m Bool
