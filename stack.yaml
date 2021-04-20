@@ -47,8 +47,8 @@ extra-deps:
      - graphics
      - hardware
    # nix-sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
- - git: https://gitlab.com/fresheyeball/Shpadoinkle.git
-   commit: 36539b9c5abff22381618fad3deec6387531cae0
+ - git: https://github.com/Fresheyeball/Shpadoinkle.git
+   commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
    subdirs:
      - core
      - backends/pardiff

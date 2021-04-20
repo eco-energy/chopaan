@@ -32,9 +32,10 @@ source-repository-package
 
 source-repository-package
     type: git
-    location: https://gitlab.com/fresheyeball/Shpadoinkle
-    tag: 36539b9c5abff22381618fad3deec6387531cae0
+    location: https://github.com/Fresheyeball/Shpadoinkle.git
+    tag: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
     subdir: core backends/pardiff backends/static html widgets router lens disembodied
+    --sha256: 020463rgxffkrilgms2354z3j9qiy1gv72n9agmii6xiq52wdmck
   
 constraints:
   mmorph <= 1.1.3,
