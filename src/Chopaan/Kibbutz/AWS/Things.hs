@@ -135,7 +135,7 @@ createCertAndKey = do
     , certARN = fromJust (c ^. Cert.ckacrsCertificateARN)
     }
     where
-      toPEM = B64.encode . encodeUtf8
+      toPEM = encodeUtf8
 
 
 
