@@ -109,6 +109,110 @@ packages:
     git: https://github.com/conal/concat.git
     commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
 - completed:
+    subdir: core
+    name: Shpadoinkle
+    version: 0.3.0.0
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    pantry-tree:
+      size: 632
+      sha256: b4fb0f494fac6d77c0570936ea76e296bfdf5263942312854d744b6aa4cf2f37
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+  original:
+    subdir: core
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+- completed:
+    subdir: backends/pardiff
+    name: Shpadoinkle-backend-pardiff
+    version: 0.3.0.0
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    pantry-tree:
+      size: 348
+      sha256: 772f75f0ce98a33dd3640f8bf369ea4e253a823c77e929cc3f94710061ebd77c
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+  original:
+    subdir: backends/pardiff
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+- completed:
+    subdir: backends/static
+    name: Shpadoinkle-backend-static
+    version: 0.2.0.0
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    pantry-tree:
+      size: 292
+      sha256: 0208e335af500cc50bed677f57de2d4dd17a5019aaf50da282d7abe2fe94aa9f
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+  original:
+    subdir: backends/static
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+- completed:
+    subdir: html
+    name: Shpadoinkle-html
+    version: 0.3.0.0
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    pantry-tree:
+      size: 1349
+      sha256: 7bbd669730de65200b8b7c50a73a43ed8862338e93eab420677d6e740d88ad98
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+  original:
+    subdir: html
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+- completed:
+    subdir: widgets
+    name: Shpadoinkle-widgets
+    version: 0.2.0.0
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    pantry-tree:
+      size: 1399
+      sha256: bc3082e2915710572d8bb0a5a4863fde084e7f523950507c3df3f992ab5aeeef
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+  original:
+    subdir: widgets
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+- completed:
+    subdir: router
+    name: Shpadoinkle-router
+    version: 0.3.0.0
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    pantry-tree:
+      size: 416
+      sha256: 24b01761faacc4bf966b287bdb3aebe28817abef99d57586e1fc4ea2add9caa3
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+  original:
+    subdir: router
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+- completed:
+    subdir: lens
+    name: Shpadoinkle-lens
+    version: 0.0.0.3
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    pantry-tree:
+      size: 317
+      sha256: 65bf7e21c7670e29255d29b1284099f5ae3ddb046bb0e4d45b727d3e8c9cc7b5
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+  original:
+    subdir: lens
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+- completed:
+    subdir: disembodied
+    name: Shpadoinkle-disembodied
+    version: 0.0.0.1
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    pantry-tree:
+      size: 360
+      sha256: ebfe49e6e21f669c4f655c0ca8220fdfcd04f8e01956709e12644eee76477182
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+  original:
+    subdir: disembodied
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+- completed:
     name: ghcjs-three
     version: 0.1.0.0
     git: https://github.com/faezs/ghcjs-three.git
