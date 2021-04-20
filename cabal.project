@@ -34,4 +34,5 @@ constraints:
   mmorph <= 1.1.3,
   unliftio-core < 0.2.0.0,
   jsaddle >= 0.9.7.1,
-  dhall <= 1.33.0
+  dhall <= 1.33.0,
+  deepseq == 1.4.4.0
