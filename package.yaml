@@ -252,6 +252,8 @@ tests:
           - -rtsopts
           - -with-rtsopts=-N
           - -O2
+        build-tools:
+          hspec-discover:hspec-discover
 
 
 
