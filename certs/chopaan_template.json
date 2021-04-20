@@ -1,0 +1,43 @@
+{
+    "Parameters" : {
+        "ThingName" : {
+            "Type" : "String"
+        },
+        "CommonName" : {
+            "Type" : "String"
+        },
+        "Kibbutz" : {
+            "Type" : "String",
+            "Default" : "Test"
+        },
+        "CertificateId" : {
+            "Type" : "String"
+        }
+    },
+    "Resources" : {
+        "thing" : {
+            "Type" : "AWS::IoT::Thing",
+            "Properties" : {
+                "ThingName" : {"Ref" : "ThingName"},
+                "AttributePayload" : { "version" : "v1", "kibbutz": {"Ref" : "Kibbutz"}, "commonName" :  {"Ref" : "CommonName"}},
+                "ThingTypeName" :  "kibbutz-pilot-chopaan",
+                "ThingGroups" : ["kibbutz-pilot-v1"]
+            }
+        },
+        "certificate" : {
+            "Type" : "AWS::IoT::Certificate",
+            "Properties" : {
+                "CertificateId": {"Ref" : "CertificateId"}
+            },
+            "OverrideSettings" : {
+                "Status" : "DO_NOTHING"
+            }
+        },
+        "policy" : {
+            "Type" : "AWS::IoT::Policy",
+            "Properties" : {
+                "PolicyName" : "kibbutz-node-comm"
+            }
+        }
+    }
+}
