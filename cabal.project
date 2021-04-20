@@ -35,10 +35,12 @@ source-repository-package
     location: https://github.com/Fresheyeball/Shpadoinkle.git
     tag: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
     subdir: core backends/pardiff backends/static html widgets router lens disembodied
-    --sha256: 020463rgxffkrilgms2354z3j9qiy1gv72n9agmii6xiq52wdmck
+    --sha256: 0vvykghlf3d289ni3817zl4h3d49xxwrc6xxcjdygawbsng0v4yf
   
 constraints:
   mmorph <= 1.1.3,
   unliftio-core < 0.2.0.0,
   jsaddle >= 0.9.7.1,
-  dhall == 1.38.0
+  dhall == 1.38.0,
+  proto-lens >= 0.5.1.0,
+  proto-lens-runtime >= 0.5.0.0
