@@ -90,6 +90,7 @@ dependencies:
 - lens
 - raw-strings-qq
 - jsaddle >= 0.9.7.1
+- haxl
 when:
   condition: "!impl(ghcjs)"
   then:
@@ -123,7 +124,7 @@ when:
       - suavemente
       - compensated
       - convertible
-      - dhall <= 1.33.0
+      - dhall >= 1.33.0
       - sbv
       - streamly >= 0.7.2
     ghc-options:

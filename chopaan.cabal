@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b4be6b09cade19c64acdef83adb67d18d292f49471f6316fd812378a819e1c16
+-- hash: 4d9d6995a955d6328ed94d916a491b5cd6114ddad7ddd98b8de31e309496bf5c
 
 name:           chopaan
 version:        0.1.0.0
@@ -135,6 +135,7 @@ library
     , ghc-prim
     , ghcjs-dom
     , hashable
+    , haxl
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , katip
@@ -182,7 +183,7 @@ library
       , conduit
       , connection
       , convertible
-      , dhall <=1.33.0
+      , dhall >=1.33.0
       , greskell
       , greskell-core
       , net-mqtt >=0.7.0
@@ -244,6 +245,7 @@ executable dev
     , ghc-prim
     , ghcjs-dom
     , hashable
+    , haxl
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , katip
@@ -291,7 +293,7 @@ executable dev
       , conduit
       , connection
       , convertible
-      , dhall <=1.33.0
+      , dhall >=1.33.0
       , greskell
       , greskell-core
       , net-mqtt >=0.7.0
@@ -362,6 +364,7 @@ executable server
     , ghc-prim
     , ghcjs-dom
     , hashable
+    , haxl
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , katip
@@ -409,7 +412,7 @@ executable server
       , conduit
       , connection
       , convertible
-      , dhall <=1.33.0
+      , dhall >=1.33.0
       , greskell
       , greskell-core
       , net-mqtt >=0.7.0
@@ -481,6 +484,7 @@ executable tx
     , ghc-prim
     , ghcjs-dom
     , hashable
+    , haxl
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , katip
@@ -528,7 +532,7 @@ executable tx
       , conduit
       , connection
       , convertible
-      , dhall <=1.33.0
+      , dhall >=1.33.0
       , greskell
       , greskell-core
       , net-mqtt >=0.7.0
@@ -598,6 +602,7 @@ executable ui
     , ghc-prim
     , ghcjs-dom
     , hashable
+    , haxl
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , katip
@@ -645,7 +650,7 @@ executable ui
       , conduit
       , connection
       , convertible
-      , dhall <=1.33.0
+      , dhall >=1.33.0
       , greskell
       , greskell-core
       , net-mqtt >=0.7.0
@@ -726,6 +731,7 @@ test-suite chopaan-test
     , ghc-prim
     , ghcjs-dom
     , hashable
+    , haxl
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , katip
@@ -773,7 +779,7 @@ test-suite chopaan-test
       , conduit
       , connection
       , convertible
-      , dhall <=1.33.0
+      , dhall >=1.33.0
       , greskell
       , greskell-core
       , net-mqtt >=0.7.0

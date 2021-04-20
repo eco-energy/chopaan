@@ -10,11 +10,11 @@ data PVConfig = PVConfig
   , iMPP :: !Double
   , power :: !Double } deriving (Eq, Generic, Show)
 
-instance Interpret PVConfig
+instance FromDhall PVConfig
 
 data BatteryType = LAFlooded | LASealed | LIon deriving (Eq, Generic, Show, Enum)
 
-instance Interpret BatteryType
+instance FromDhall BatteryType
 
 data BatteryConfig = BatteryConfig
   { _type :: !BatteryType
@@ -23,7 +23,7 @@ data BatteryConfig = BatteryConfig
   , ampHours :: !Double
   } deriving (Eq, Generic, Show)
 
-instance Interpret BatteryConfig
+instance FromDhall BatteryConfig
 
 data NodeConfig = NodeConfig
   { macAddress :: !Text
@@ -31,4 +31,4 @@ data NodeConfig = NodeConfig
   , pv :: ![PVConfig]
   } deriving (Generic, Show)
 
-instance Interpret NodeConfig
+instance FromDhall NodeConfig

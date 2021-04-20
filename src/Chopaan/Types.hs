@@ -18,7 +18,7 @@ data DBOpts = DBOpts
   , password :: !Text
   } deriving (Eq, Ord, Show, Generic)
 
-instance Interpret DBOpts
+instance FromDhall DBOpts
 
 data MQTTOpts = MQTTOpts
   { connId :: !Text
@@ -33,8 +33,8 @@ data KibbutzOpts = KibbutzOpts
   } deriving (Generic, Show)
 
 
-instance Interpret MQTTOpts
-instance Interpret KibbutzOpts
+instance FromDhall MQTTOpts
+instance FromDhall KibbutzOpts
 
 -- | Command line arguments
 data Options = Options
@@ -45,7 +45,7 @@ data Options = Options
   , dbOpts :: !DBOpts
   } deriving (Generic, Show)
 
-instance Interpret Options
+instance FromDhall Options
 
 data App = App
   { appLogFunc :: !LogFunc
