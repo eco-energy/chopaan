@@ -60,9 +60,8 @@ data Frontend = MEcho (Maybe Text)
               | MKibbutzim (RosterKbtzim)
               | MKibbutz (RosterNodezim)
               | MAddNode (KbtzName) (Maybe NodeMAC) (NodeUpdate 'Edit)
-              deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
+              deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
-deriving instance NFData Frontend
 
 type SPA m = "app" :> "echo" :> QueryParam "echo" Text :> View m Text
         :<|> "app" :> "kibbutzim" :> View m Frontend
@@ -113,29 +112,15 @@ data RosterKbtzim = RosterKbtzim
   { _sortK :: SortCol KbtzList
   , _searchK :: Input Search
   , _tableK :: KbtzList
-  }
-deriving instance Eq (RosterKbtzim)
-deriving instance Ord (RosterKbtzim)
-deriving instance Show (RosterKbtzim)
-deriving instance Generic (RosterKbtzim)
+  } deriving (Generic, Eq, Ord, Show, NFData, ToJSON, FromJSON)
 
-instance NFData (RosterKbtzim)
-instance ToJSON (RosterKbtzim)
-instance FromJSON (RosterKbtzim)
+
 
 data RosterNodezim = RosterNodezim
   { _sortN :: SortCol NodeList
   , _searchN :: Input Search
   , _tableN :: NodeList
-  }
-deriving instance Eq (RosterNodezim)
-deriving instance Ord (RosterNodezim)
-deriving instance Show (RosterNodezim)
-deriving instance Generic (RosterNodezim)
-
-instance NFData (RosterNodezim)
-instance ToJSON (RosterNodezim)
-instance FromJSON (RosterNodezim)
+  } deriving (Generic, Eq, Ord, Show, NFData, ToJSON, FromJSON)
 
 
 {-------------- DB Stuff ----------------}
