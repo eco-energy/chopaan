@@ -39,7 +39,7 @@ run = do
   --kibbutzim = []
   --dbpool <- liftIO . (recoverC 100) $ dbPool dbOpts
   --liftIO . print $ "DB Connection Pool Initialized"
-  liftIO . print =<< (liftIO . (recoverC 500) . getSchema $ dbOpts)
+  liftIO . print =<< (liftIO . (recoverC "Get Schema" 500) . getSchema $ dbOpts)
   --liftIO $ mapM (runKibbutz @AheadT @IO mqttOpts{connId=name}) kibbutzim
   --liftIO $ print ("Running Monitor...")
   --liftIO $ mon id (defGrid nodes) sensors runtime
