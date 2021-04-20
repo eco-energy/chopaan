@@ -1,21 +1,22 @@
 {-# LANGUAGE QuasiQuotes, NamedFieldPuns, OverloadedStrings  #-}
 module Chopaan.Comm.Mqtt.AWS where
 
-import Chopaan.Node.NodeId
-import Chopaan.Kibbutz.KbtzId
-import Chopaan.Kibbutz.AWS.Things
 
 import qualified Data.Text as Text
 
 
 import Control.Monad.Trans.AWS
 import Control.Exception (bracket)
-
+import Lens.Micro
 
 import Text.InterpolatedString.Perl6
 
+import qualified Network.AWS.IoT.DescribeEndpoint as DE
+import Control.Monad.Trans.AWS
 
-
+import Chopaan.Node.NodeId
+import Chopaan.Kibbutz.KbtzId
+import Chopaan.Kibbutz.AWS.Things
 
 
 type ChopaanId = Text.Text
@@ -54,7 +55,11 @@ deregisterChopaan k ThingCreds{certARN, certId} = do
   deleteThing (chopaanId k)
 
 
-
+getIoTEndpoint :: AWSC (Maybe Text.Text)
+getIoTEndpoint = do
+  e <- send $ DE.describeEndpoint & DE.deEndpointType .~ (Just "iot:Data-ATS")
+  return $ e ^. DE.dersEndpointAddress 
+  
 chopaanTemplate :: Text.Text
 chopaanTemplate = [q|
 {

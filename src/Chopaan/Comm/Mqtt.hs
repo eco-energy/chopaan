@@ -63,18 +63,19 @@ mkTLSSettingsFromMemory cert key caPath hostName name = let
                  }
   in (TLSSettings clientParams)
 
-mkTLSSettingsFromDisk :: FilePath -> FilePath -> FilePath -> Text.Text -> Text.Text -> TLSSettings
-mkTLSSettingsFromDisk cert key caPath hostName name = let
-  creds = either (const Nothing) (Just) (credentialLoadX509FromMemory cert key)
+mkTLSSettingsFromDisk :: FilePath -> FilePath -> FilePath -> Text.Text -> Text.Text -> IO TLSSettings
+mkTLSSettingsFromDisk cert key caPath hostName name = do
+  creds <- either (const Nothing) (Just) <$> (credentialLoadX509 cert key)
   --caCreds <- fromJust (error "CA Certificate Not Found") (readCertificateStore caPath)
-  hooks = def { onCertificateRequest = \_ -> return creds
+  let
+    hooks = def { onCertificateRequest = \_ -> return creds
               , onServerCertificate = \_ _ _ _ -> mempty -- validateDefault caCreds a b c
               }
-  clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
+    clientParams = (defaultParamsClient (Text.unpack hostName :: HostName) ((BSC.pack . Text.unpack) name))
                  { clientHooks=hooks
                  , clientSupported = def {supportedCiphers=ciphersuite_strong}
                  }
-  in (TLSSettings clientParams)
+  return (TLSSettings clientParams)
 
 
 -- need reader for creds and logs
@@ -91,7 +92,7 @@ runMqtt opts ts msgCB creds = do
   _ <- liftIO . forkIO $ forever $ catches (pub mc outbox) [(Handler errorHandler)]
   connStatus <- liftIO $ sequence $ (resub mc) <$> ts
   liftIO $ print connStatus
-  void . liftIO . forkIO $ recoverC 10 (MQ.waitForClient mc)
+  void . liftIO . forkIO $ recoverC "waiting for client" 10 (MQ.waitForClient mc)
   return qs
 
 
@@ -100,16 +101,16 @@ client ::
   -> MQ.MessageCallback
   -> MQTTCreds
   -> IO (MQ.MQTTClient)
-client MQTTOpts{..} msgCB ThingCreds{..} = do
+client fileOpts msgCB awsCreds = do
+  tlsConf <- return $ mkTLSSettingsFromMemory (cert awsCreds) (privateKey awsCreds) undefined (mqttURI fileOpts) (connId fileOpts)
   let
-    tlsConf = mkTLSSettingsFromDisk certPath keyPath caPath mqttURI connId
-    (Just uri) = parseURI $ Text.unpack $ mqttURI <> "#" <> connId
+    (Just uri) = parseURI $ Text.unpack $ (mqttURI fileOpts) <> "#" <> (connId fileOpts)
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
-           , MQ._connID=Text.unpack $ connId
-           , MQ._port=8883
+           , MQ._connID=Text.unpack $ (connId fileOpts)
+           --, MQ._port=8883
            , MQ._msgCB=msgCB
-           , MQ._connectTimeout=180000000
+           , MQ._connectTimeout=18000000
            , MQ._tlsSettings=tlsConf}
   MQ.connectURI conf uri
 
@@ -123,10 +124,11 @@ subTopic n = (stateTopic n, MQ.subOptions { MQ._subQoS = MQ.QoS1 })
     -- not stateful.
 pub :: MQ.MQTTClient -> PubQueue -> IO ()
 pub c tv = do
-  (\s -> recoverC 10 (pub' s)) =<< (atomically $ do readTBQueue (runNodeQueue tv))
+  (\s -> recoverC (getMsgLog s) 10 (pub' s)) =<< (atomically $ do readTBQueue (runNodeQueue tv))
     where
+      getMsgLog (nId, _) = "Message Publish: " <> show nId 
       pub' :: (MQ.Topic, MeshFrame) -> IO ()
-      pub' (nId, mf) = --putStrLn ("Publishing Message for topic: " <> (show $ nId)) >>
+      pub' (nId, mf) =
         MQ.publish c nId (encode mf) False
       encode = BL.fromStrict . encodeMessage
 
