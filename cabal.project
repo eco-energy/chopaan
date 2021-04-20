@@ -20,7 +20,7 @@ source-repository-package
     type: git
     location: https://github.com/conal/concat
     tag: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
-    subdir: inline known satisfy classes plugin examples graphics
+    subdir: inline known satisfy classes plugin examples
     --sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
 
 
