@@ -1,7 +1,7 @@
 {-# LANGUAGE KindSignatures, TypeOperators, DataKinds, FlexibleContexts, TypeFamilies, FlexibleInstances, LambdaCase, TypeApplications, ScopedTypeVariables, MultiParamTypeClasses, UndecidableInstances, InstanceSigs, RecordWildCards, NamedFieldPuns #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving
 , DerivingStrategies, DeriveAnyClass, StandaloneDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, CPP #-}
 module Chopaan.Node.NodeT where
 
 import GHC.Generics
@@ -27,7 +27,7 @@ import Shpadoinkle.Widgets.Validation ( between
                                       , nonMEmpty
                                       , nonZero
                                       , positive)
-
+#include "UpdateInst.inc"
 
 import Chopaan.Node.NodeId
 import Chopaan.Node.HW
@@ -51,8 +51,6 @@ deriving instance Humanize (NodeT Identity)
 type Nodezim = NodeT Identity
 
 
-
-
 data NodeUpdate s = NodeUpdate
   { _nodeMACU :: Field s Text Input (NodeMAC)
   , _hardwareConfigU :: HWUpdate s
@@ -62,19 +60,8 @@ instance ( NFDataHW s
          , NFData (Field s Text Input NodeMAC)
          ) => NFData (NodeUpdate s)
 
-deriving instance Eq       (NodeUpdate 'Valid)
-deriving instance Ord      (NodeUpdate 'Valid)
-deriving instance Show     (NodeUpdate 'Valid)
-deriving instance ToJSON   (NodeUpdate 'Valid)
-deriving instance FromJSON (NodeUpdate 'Valid)
+UpdateInstances(NodeUpdate)
 
-deriving instance Eq       (NodeUpdate 'Edit)
-deriving instance Ord      (NodeUpdate 'Edit)
-deriving instance Show     (NodeUpdate 'Edit)
-deriving instance ToJSON   (NodeUpdate 'Edit)
-deriving instance FromJSON (NodeUpdate 'Edit)
-
-deriving instance Show     (NodeUpdate 'Errors)
 
 emptyNodeForm :: NodeUpdate 'Edit
 emptyNodeForm = NodeUpdate
