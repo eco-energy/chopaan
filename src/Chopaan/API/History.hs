@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia #-}
 module Chopaan.Graph (Spider, SnapshotGraph, connectWS, close, addFoundNode, getSnapshot
                      , module Chopaan.Graph
                      , module Algebra.Graph.Labelled
@@ -26,7 +26,7 @@ import NetSpider.Snapshot
 
 
 import Algebra.Graph.Labelled
-
+import qualified Data.Text as Text
 import Data.Time (UTCTime)
 
 import Chopaan.Comm.Address
@@ -35,10 +35,9 @@ import Streamly
 
 import           Servant (Server, Get, Handler, Capture, Proxy(..), (:<|>)(..), (:>)
                          , serve, JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer)
-import           Servant.API.WebSocket (WebSocket (..))
+
 
 import Data.Aeson (ToJSON, FromJSON)
-data Backend
 
 
 -- $ This has two obvious instances.
@@ -53,15 +52,17 @@ type HistoryAPI n e a = "history"
   :> Get '[JSON] (SnapshotGraph n e a)
 
 
-class (Monad m, Address n, LinkAttributes e, NodeAttributes a) => PersistedGraph m n e a where
-  fetch :: (IsStream t) => Backend -> UTCTime -> UTCTime -> t m (n, UTCTime, Graph e a)
-  save :: Backend -> Query n a e e -> n -> UTCTime -> Graph e a -> m ()
-
 data GraphType = Mesh | Plan | BilledReality | HWConfig
-  deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
+  deriving (Eq, Ord, Show, Read, Generic, ToJSON, FromJSON, Bounded, Enum)
 
-deriving instance FromHttpApiData GraphType
-deriving instance ToHttpApiData GraphType
+genericToUrlPieceViaShow :: Show a =>  a -> Text.Text
+genericToUrlPieceViaShow = Text.pack . show
+
+instance ToHttpApiData GraphType where
+  toUrlPiece = genericToUrlPieceViaShow
+
+instance FromHttpApiData GraphType where
+  parseUrlPiece = read . Text.unpack
 
 newtype GraphApp r a = GraphApp { runApp :: ReaderT r IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader r)
