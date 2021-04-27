@@ -1,4 +1,12 @@
-{-# LANGUAGE DeriveGeneric, DeriveFunctor, GeneralizedNewtypeDeriving, DeriveFoldable, DeriveTraversable, DerivingStrategies, NamedFieldPuns #-}
+{-# LANGUAGE DeriveGeneric
+, DeriveFunctor
+, GeneralizedNewtypeDeriving
+, DeriveFoldable
+, DeriveTraversable
+, DerivingStrategies
+, DeriveGeneric
+, DeriveAnyClass
+#-}
 {-# LANGUAGE ScopedTypeVariables
 , TypeOperators
 , TypeApplications
@@ -6,19 +14,20 @@
 , FlexibleContexts
 , InstanceSigs
 , OverloadedStrings
+, NamedFieldPuns
 #-}
 module Chopaan.Kibbutz.Mesh where
 
 import Prelude
 
+import Control.DeepSeq
 import Control.Monad.IO.Class
-import Data.ProtoLens
 import Lens.Micro
 import qualified Proto.NodeMessageSchema.NodeMessages as N
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N
 import GHC.Generics
 
-import Data.Time (DiffTime, LocalTime)
+import Data.Time (DiffTime)
 import Data.Text
 import Data.Aeson (FromJSON, ToJSON)
 import Chopaan.Comm.Comm (Address(..))
@@ -27,30 +36,19 @@ import Chopaan.Utils.Time (utcTimeNow)
 
 import qualified Streamly.Prelude as S
 import Streamly
-import qualified Streamly.Data.Fold as FL
-import qualified Streamly.Internal.Data.Fold as FL
-
 
 import Data.Greskell (newBind, gProperty, lookupAs, Key, pMapToFail)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Spider
-  (Spider, connectWS, close, addFoundNode, clearAll, getSnapshotSimple)
+  (Spider, addFoundNode)
 import NetSpider.Graph (LinkAttributes(..), EFinds, NodeAttributes(..), VFoundNode)
-import NetSpider.Timestamp (Timestamp, fromUTCTime)
-import NetSpider.Snapshot (nodeId, nodeTimestamp)
-import qualified NetSpider.Snapshot as Sn
+import NetSpider.Timestamp (fromUTCTime)
 
-{--
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.isRoot' @:: Lens' RuntimeStats Prelude.Bool@
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.connectedChildren' @:: Lens' RuntimeStats Data.Word.Word32@
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.wifiStrength' @:: Lens' RuntimeStats Data.Word.Word32@
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.meshParentStrength' @:: Lens' RuntimeStats Data.Word.Word32@
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.version' @:: Lens' RuntimeStats Data.Text.Text@
-    * 'Proto.NodeMessageSchema.NodeMessages_Fields.uptime' @:: Lens' RuntimeStats Data.Word.Word64@
- -}
 
 newtype RxSignal = RxSignal Double
+  deriving stock (Generic)
+  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON, NFData)
 
 instance LinkAttributes RxSignal where
   writeLinkAttributes (RxSignal s) = do
@@ -60,15 +58,15 @@ instance LinkAttributes RxSignal where
     pMapToFail $ RxSignal <$> lookupAs ("rx_signal" :: Key EFinds Double) props
 
 
-data MeshLink = MeshLink deriving (Eq, Show, Ord)
+data MeshLink = MeshLink
+  deriving (Eq, Show, Ord, Generic, ToJSON, FromJSON, NFData)
 
 data MeshNode = MeshNode
   { isRoot :: Bool
   , uptime :: DiffTime
   , routerRSSI :: Int
   , version :: Text
-  
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
 
 rootKey :: Key VFoundNode Bool
 rootKey = "isRoot"
@@ -108,16 +106,11 @@ spiderStream save spider xs = S.drain
   $ fmap (save spider) xs
 
 
-rsStream :: (IsStream t, MonadAsync m) => Spider NodeMAC MeshNode RxSignal
-  -> t m (NodeMAC, N.RuntimeStats) -> m ()
-rsStream = (spiderStream fromRTS)
-
-
-fromRTS :: (MonadIO m)
+addRTS :: (MonadIO m)
         => Spider NodeMAC MeshNode RxSignal
         -> (NodeMAC, N.RuntimeStats)
         -> m ()
-fromRTS spider (n, rts) = liftIO $ addFoundNode spider finding
+addRTS spider (n, rts) = liftIO $ addFoundNode spider finding
   where
     finding = FoundNode { subjectNode= n
                         , foundAt = fromUTCTime . utcTimeNow $ rts ^. N.cpuTime
