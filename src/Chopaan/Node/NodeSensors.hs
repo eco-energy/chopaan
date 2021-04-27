@@ -141,12 +141,14 @@ diffUTC a b = s . realToFrac $ diffUTCTime a b
 
 newtype Terminal s = Terminal (Voltage s, Current s) deriving (Eq, Ord, Show, Generic)
 
-data Bus' s = Gen (Terminal s)
-           | Storage (Terminal s)
-           | TxIn (Terminal s)
-           | TxOut (Terminal s)
-           | Load (Terminal s)
-           deriving (Eq, Ord, Show, Generic) 
+data BusP s = Gen (Terminal s)
+            | Storage (Terminal s)
+            | Tx (Terminal s)
+            | Load (Terminal s)
+            deriving (Eq, Ord, Show, Generic) 
+
+
+
 {--
 data Bus a b where
   B2G :: s -> s -> (Bus Gen (Terminal s) (Storage (Terminal s)))
