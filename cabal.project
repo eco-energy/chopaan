@@ -8,21 +8,12 @@ with-compiler: ghc-8.6.5
 package chopaan
   ghc-options: -Wall -fwarn-redundant-constraints
 
-
-source-repository-package
-    type: git
-    location: https://github.com/hasktorch/hasktorch
-    tag: be74a1eaabc2a6b56e21bbb24c870299d8e3bdb6
-    subdir: libtorch-ffi-helper libtorch-ffi hasktorch
-    --sha256: 17d8pm2sh6y0ld1z62v483kp6smdp6ck6aydi6i664qj2r2xv0nc
-
 source-repository-package
     type: git
     location: https://github.com/conal/concat
     tag: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
     subdir: inline known satisfy classes plugin examples
     --sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
-
 
 source-repository-package
     type: git

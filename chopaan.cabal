@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0f6a0a4056667eee1472fcf9f08ef3d7a58aca1d7b55caa74a9004d430d7fd6f
+-- hash: 7e5fc8af2320bc8eeb204e5fbf90e499d829a9f97e17e52e5c23cafbd9050f4a
 
 name:           chopaan
 version:        0.1.0.0
@@ -29,6 +29,7 @@ source-repository head
 
 library
   exposed-modules:
+      Chopaan
       Chopaan.Client
       Chopaan.Comm.Address
       Chopaan.Comm.Comm
@@ -42,6 +43,8 @@ library
       Chopaan.DB.Nodes
       Chopaan.DB.Sensors
       Chopaan.Graph
+      Chopaan.Haxl.Kbtz
+      Chopaan.Kibbutz
       Chopaan.Kibbutz.Allocate
       Chopaan.Kibbutz.AWS.Common
       Chopaan.Kibbutz.AWS.Hydration
@@ -49,7 +52,6 @@ library
       Chopaan.Kibbutz.KbtzId
       Chopaan.Kibbutz.KbtzimT
       Chopaan.Kibbutz.Kibbutz
-      Chopaan.Kibbutz.Kibbutzim
       Chopaan.Kibbutz.LinOpt
       Chopaan.Kibbutz.Mesh
       Chopaan.Kibbutz.NetSpider
@@ -690,7 +692,6 @@ test-suite chopaan-test
       Common
       KbtzSpec
       NodeSpec
-      RegistrySpec
       StorageSpec
       SubscriberSpec
       TransactorSpec
