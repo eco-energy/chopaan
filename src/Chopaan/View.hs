@@ -45,7 +45,8 @@ import           Shpadoinkle.Widgets.Types         (Consideration, Considered,
                                                     fullset, fuzzySearch,
                                                     getValid, humanize, present,
                                                     validate, withOptions')
-
+import NetSpider.Snapshot
+import Chopaan.API.History
 import Chopaan.UiTypes
 import Chopaan.Graph
 import Chopaan.CRUD
@@ -78,11 +79,12 @@ view fe = case fe of
 
 
 graphView :: forall m n a e. (MonadJSM m, CRUDChopaan m, HistoryConn n a e) => SnapshotGraph n a e -> Html m (SnapshotGraph n a e)
-graphView g = H.div "container-graph"
+graphView (nodes, links) = H.div "container-graph"
   [ H.canvas [] []
   ]
 
 
+{--
 renderGraph :: forall m n e a. (MonadJSM m, HistoryConn n e a)
   => (a -> Html m (Graph e a))
   -> (e -> Html m (Graph e a) -> Html m (Graph e a) -> Html m (Graph e a))
@@ -99,6 +101,7 @@ tradGraph = renderGraph @m @n (n . render @a) edgeH
 
 class Renderable a where
   render :: forall m. a -> Html m a
+
 
 vertexGIso :: (Show a, Show e) => EndoIso a (Graph e a) 
 vertexGIso = EndoIso id vertex (\g -> case g of
@@ -126,3 +129,4 @@ sphereH a = H.canvas [H.onClick id] [ render a ]
 
 edgeH :: (Renderable e) => e -> Html m (Graph e a) -> Html m (Graph e a) -> Html m (Graph e a)
 edgeH = undefined
+--}

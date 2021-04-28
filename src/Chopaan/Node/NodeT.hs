@@ -15,7 +15,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding
 
 
-import Database.Beam (Beamable, Columnar) --Table (..), TableEntity)
+import Database.Beam (Beamable, Columnar)
 
 
 import Shpadoinkle.Widgets.Types (Field, Humanize (..)

@@ -16,10 +16,6 @@ import Data.Aeson (ToJSON, FromJSON)
 import Data.Proxy (Proxy (Proxy))
 
 
-import Database.Beam (Beamable, Columnar
-                     , Database, DatabaseSettings
-                     , Nullable, Table (..), TableEntity)
-
 
 import Servant.API (Capture, Delete
                    , FromHttpApiData, Get, JSON
@@ -27,8 +23,7 @@ import Servant.API (Capture, Delete
                    , ReqBody, ToHttpApiData
                    , (:<|>) (..), (:>))
 
-import Shpadoinkle (Html, MonadJSM)
-import qualified Shpadoinkle.Html as H
+
 import Shpadoinkle.Router (HasRouter ((:>>))
                           , Redirect (Redirect)
                           , Routed (..), View, navigate)
@@ -67,7 +62,6 @@ type SPA m = "app" :> "echo" :> QueryParam "echo" Text :> View m Text
         :<|> "app" :> "kibbutzim" :> View m Frontend
         :<|> "app" :> "kibbutz" :> Capture "id" KbtzName :> View m Frontend
         :<|> "app" :> "kibbutz" :> Capture "id" KbtzName :> "addNode" :> View m Frontend
-        -- :<|> "app" :> QueryParam "search" Search :> View m Frontend
         :<|> Raw
 
 
@@ -76,7 +70,6 @@ data Route
   | RKibbutzim
   | RKibbutz (KbtzName)
   | RAddNode (KbtzName)
-  -- | RSearch (Input Search)
   deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 routes :: SPA m :>> Route
@@ -94,15 +87,6 @@ instance Routed (SPA m) Route where
     RKibbutzim -> Redirect (Proxy @("app" :> "kibbutzim" :> View m Frontend)) id
     RKibbutz k -> Redirect (Proxy @("app" :> "kibbutz" :> Capture "id" KbtzName :> View m Frontend)) ($ k)
     RAddNode k -> Redirect (Proxy @("app" :> "kibbutz" :> Capture "id" KbtzName :> "addNode" :> View m Frontend)) ($ k)
-    --RSearch s -> Redirect (Proxy @("app" :> QueryParam "search" Search :> View m Frontend)) ($ Just (_value s))
-
-
-
-
-
-deriving newtype instance ToHttpApiData Search
-deriving newtype instance FromHttpApiData Search
-
 
 
 
@@ -121,10 +105,6 @@ data RosterNodezim = RosterNodezim
   , _searchN :: Input Search
   , _tableN :: NodeList
   } deriving (Generic, Eq, Ord, Show, NFData, ToJSON, FromJSON)
-
-
-{-------------- DB Stuff ----------------}
- 
 
 
 makePrisms ''Frontend
