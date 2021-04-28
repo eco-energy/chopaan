@@ -69,34 +69,5 @@ instance DataSource u ChopaanReq where
 sql = undefined
 
 
-newtype K a = K a
-  deriving (Eq,Show,Generic)
-  deriving anyclass (FromJSON, ToJSON, FromGraphSON, ElementData, Element, Vertex)
 
-newtype N a = N a
-  deriving (Eq,Show,Generic)
-  deriving anyclass (FromJSON, ToJSON, FromGraphSON,
-                     ElementData,Element,Vertex)
-
-
-newtype HasHWConfig a = HasHWConfig AEdge
-  deriving (Eq,Show,Generic)
-  deriving anyclass (FromJSON, FromGraphSON,ElementData,Element,Edge)
-
-addHWConfig :: (HW Double) -> Binder (GTraversal SideEffect () VFoundNode)
-addHWConfig s = (writeNodeAttributes s)
-  <*.> (pure $ sAddV "hwConfig" $ source "g")
-
-
-
---addNodeToKbtz :: SensorS -> HW Double -> NodeMAC -> 
-
-allV :: GTraversal Transform () AVertex
-allV = source "g" & sV []
-
-allNodes :: (FromGraphSON a) => GTraversal Transform () (N a)
-allNodes = source "g" & sV [] &. gHasLabel "knode"
-
-allKbtz :: (FromGraphSON a) => GTraversal Transform () (K a)
-allKbtz = source "g" & sV [] &. gHasLabel "kbtz"
 
