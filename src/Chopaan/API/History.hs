@@ -1,40 +1,34 @@
 {-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia #-}
-module Chopaan.Graph (Spider, SnapshotGraph, connectWS, close, addFoundNode, getSnapshot
-                     , module Chopaan.Graph
-                     , module Algebra.Graph.Labelled
-                     )
-where
+module Chopaan.API.History where
+
 import GHC.Generics
 
-import Control.Applicative
 import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Class
+
 import Control.Monad.Reader.Class (MonadReader)
 import Control.Monad.IO.Class
 
-import Data.Greskell (newBind, gProperty, lookupAs, Key, pMapToFail, FromGraphSON)
-import Data.Greskell.Extra (writeKeyValues, (<=:>))
-import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
+import Data.Greskell (FromGraphSON)
+
 import NetSpider.Spider
-  (Spider, connectWS, close, addFoundNode, clearAll, getSnapshot)
-import NetSpider.Graph (LinkAttributes(..), EFinds, NodeAttributes(..), VFoundNode)
-import NetSpider.Timestamp (Timestamp, fromUTCTime)
+  (Spider, getSnapshot)
+import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..))
+import NetSpider.Timestamp (fromUTCTime)
 import NetSpider.Query
 import NetSpider.Snapshot
 --import qualified NetSpider.Snapshot as Sn
 
 
-import Algebra.Graph.Labelled
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
 
 import Chopaan.Comm.Address
-import Streamly
+import Streamly()
 
 
-import           Servant (Server, Get, Handler, Capture, Proxy(..), (:<|>)(..), (:>)
-                         , serve, JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer)
+import Servant (Server, Get, Capture, Proxy(..), (:>)
+               , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer)
 
 
 import Data.Aeson (ToJSON, FromJSON)
@@ -43,6 +37,21 @@ import Data.Aeson (ToJSON, FromJSON)
 -- $ This has two obvious instances.
 -- On the frontend, a servant api call
 -- On the backend, a greskell query
+
+
+type IsoGConn n a e = (Address n
+                      , LinkAttributes e
+                      , NodeAttributes a
+                      , Eq n
+                      , FromGraphSON n
+                      )
+
+type HistoryConn n a e =
+  ( ToHttpApiData n, FromHttpApiData n, ToJSON n, FromJSON n
+  , ToJSON e, FromJSON e
+  , ToJSON a, FromJSON a
+  , FromGraphSON n, IsoGConn n a e)
+
 
 type HistoryAPI n e a = "history"
   :> (Capture "graphType" GraphType)
@@ -70,11 +79,6 @@ newtype GraphApp r a = GraphApp { runApp :: ReaderT r IO a }
 toHandler :: MonadIO m => r -> GraphApp r a -> m a
 toHandler r a = liftIO $ runReaderT (runApp a) r
 
-type HistoryConn n a e =
-  ( ToHttpApiData n, FromHttpApiData n, ToJSON n, FromJSON n
-  , ToJSON e, FromJSON e
-  , ToJSON a, FromJSON a
-  , FromGraphSON n, IsoGConn n a e)
 
 serveApi :: forall n a e. (HistoryConn n a e) => Server (HistoryAPI n a e)
 serveApi = hoistServer (Proxy @ (HistoryAPI n a e)) (toHandler s) getHistory
@@ -105,15 +109,3 @@ query :: (MonadIO m, IsoGConn n a e)
   -> Query n a e e
   -> m (SnapshotGraph n a e)
 query s q = liftIO $ getSnapshot s q
-
-
-
-
-type IsoGConn n a e = (Address n
-                      , LinkAttributes e
-                      , Monoid e
-                      , NodeAttributes a
-                      , Monoid a
-                      , Eq n
-                      , FromGraphSON n
-                      )
