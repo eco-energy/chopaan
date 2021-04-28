@@ -1,6 +1,6 @@
 module TransactorSpec where
 
-import Chopaan.Transactor
+import Chopaan.Kibbutz.Transactor
 
 import Test.Hspec
 import Test.QuickCheck.Classes
@@ -10,13 +10,11 @@ import Test.QuickCheck.Instances.Time ()
 
 import qualified Data.Time as Time
 import qualified Data.Text as Text
-import Data.ULID (getULID)
-import Chopaan.Registry (NodeT)
-import Chopaan.Node (NodeId(..))
-import Lens.Micro
-import Proto.NodeMessageSchema.NodeMessages_Fields as NM
 
-import Test.QuickSpec
+import Lens.Micro
+
+
+import QuickSpec
 
 
 spec :: Spec

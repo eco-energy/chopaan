@@ -36,7 +36,7 @@ import Numeric.Compensated
 --  arbitrary = arbitraryMessage
 
 instance (Arbitrary a) => Arbitrary (Node a) where
-  arbitrary = Node <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary 
+  arbitrary = Node <$> arbitrary <*> arbitrary <*> arbitrary 
 
 
 instance (Eq a) => EqProp (Node a) where

@@ -38,6 +38,8 @@ spec :: Spec
 spec = do
   describe "Trivial cases for process model" $ do
     it "processModel: on 0s." $ do
+      1 `shouldBe` 1
+      {--
       let
         bp :: BatteryParams Double
         bp = pure 0
@@ -48,7 +50,7 @@ spec = do
         sensorV = pure 0
         sensorNoiseV = pure 0
         dt = 0 :: Double
-      (_, (a, KalmanFilter state var)) <- runKalmanState dt stateV $ runProcessModel bp dt stateNoiseV sensorNoiseV sensorV
+      (_, (a, KalmanFilter state var)) <- runKalmanState dt stateV $ processModel bp dt stateNoiseV sensorNoiseV sensorV
       a `shouldBe` 0 
       isNaN <$> state `shouldBe` (pure True)
       (fmap.fmap) isNaN var `shouldBe` (pure.pure $ True)
@@ -63,7 +65,7 @@ spec = do
         sensorV = pure 1
         sensorNoiseV = pure 1
         dt = 1 :: Double
-      (_, (a, KalmanFilter state _)) <- runKalmanState dt stateV $ runProcessModel bp dt stateNoiseV sensorNoiseV sensorV
+      (_, (a, KalmanFilter state _)) <- runEstimator
       a `shouldBe` 1
       soC state `shouldBe` 0 -- z_next is 1 - ((1 / 1) * 1) = 0
       hysteresisVoltage state `shouldBe` 1
@@ -80,3 +82,4 @@ spec = do
       -- sgn = sgn 1 == 1
       -- h_kn = (e - 1 - e)
       -- diffusionCurrent 
+--}
