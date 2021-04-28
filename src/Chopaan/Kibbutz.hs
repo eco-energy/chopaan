@@ -205,6 +205,7 @@ getGrid s = do
     query gridRoot = defQuery [gridRoot]
 
 
+{--
 type StakeGridSpider n = Spider n SensorS Stake
 
 type StakeGridSnapshot n = SnapshotGraph n SensorS Stake
@@ -237,10 +238,6 @@ getMesh :: (SnapshotId n, MonadIO m)
   -> ReaderT (KbtzRoot n) m (MeshSnapshot n)
 getMesh = getGrid
 
-
-
-
-{--
 getHWGrid :: (SnapshotId n, MonadIO m)
   => HWGridSpider n
   -> ReaderT (KbtzRoot n) m (HWGridSnapshot n)
