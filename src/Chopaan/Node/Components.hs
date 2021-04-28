@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia #-}
+{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia, FlexibleInstances #-}
 
 module Chopaan.Node.Components where
 
@@ -8,11 +8,15 @@ import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Text
 
-import Shpadoinkle.Widgets.Types (Humanize, Present)
+import Shpadoinkle.Widgets.Types (Humanize(..), Present)
 
 data BatteryType = LeadAcidFlooded | LeadAcidSealed | LithiumIon
   deriving (Eq, Ord, Enum, Bounded, Read, Show, Humanize, Present,
             Generic, ToJSON, FromJSON, NFData)
+
+
+instance Humanize (Maybe BatteryType) where
+  humanize = maybe "select battery" humanize
 
 instance Semigroup BatteryType where (<>) = min
 instance Monoid BatteryType where mempty = maxBound

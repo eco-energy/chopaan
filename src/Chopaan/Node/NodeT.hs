@@ -2,12 +2,14 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving
 , DerivingStrategies, DeriveAnyClass, StandaloneDeriving #-}
 {-# LANGUAGE OverloadedStrings, CPP #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Chopaan.Node.NodeT where
 
 import GHC.Generics
 import Control.Monad.Identity (Identity)
 import Control.Monad.Except
-
+import Control.Lens (makeFieldsNoPrefix)
 import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Text (Text)
@@ -62,6 +64,7 @@ instance ( NFDataHW s
 
 UpdateInstances(NodeUpdate)
 
+makeFieldsNoPrefix ''NodeUpdate
 
 emptyNodeForm :: NodeUpdate 'Edit
 emptyNodeForm = NodeUpdate

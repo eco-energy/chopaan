@@ -1,18 +1,20 @@
 {-# LANGUAGE OverloadedStrings, KindSignatures, DataKinds, NamedFieldPuns, ConstraintKinds #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving
 , DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, DerivingVia #-}
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE CPP, TemplateHaskell #-}
 module Chopaan.Node.HW where
 
 #include "UpdateInst.inc"
 
+import Control.Lens
 import GHC.Generics
 
+import Control.Monad.Except (MonadError (throwError))
+import Control.DeepSeq (NFData)
 
 import Data.Text
 import Data.Aeson (ToJSON, FromJSON)
-import Control.DeepSeq (NFData)
 import Data.Greskell (Key, lookupAs, pMapToFail)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 
@@ -28,6 +30,7 @@ import Shpadoinkle.Widgets.Types (Field, Humanize (..)
                                  , Status (Edit, Errors, Valid)
                                  , Validate(..), Validated(..), Present
                                  , Pick (AtleastOne, One)
+                                 , fullOptions
                                  )
 
 import Shpadoinkle.Widgets.Form.Dropdown as Dropdown (Dropdown)
@@ -63,39 +66,39 @@ instance NodeAttributes (HW a) where
 
 newtype WattHours = WattHours Double
   deriving stock (Generic)
-  deriving newtype (Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
+  deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
   deriving anyclass (Humanize, Present, NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 newtype Volts = Volts Double
   deriving stock (Generic)
-  deriving newtype (Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
+  deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
   deriving anyclass (Humanize, Present, NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 newtype Amperes = Amperes Double
   deriving stock (Generic)
-  deriving newtype (Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
+  deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
   deriving anyclass (Humanize, Present, NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 newtype Watts = Watts Double
   deriving stock (Generic)
-  deriving newtype (Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
+  deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
   deriving anyclass (Humanize, Present, NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 newtype Hours = Hours Double
   deriving stock (Generic)
-  deriving newtype (Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
+  deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
   deriving anyclass (Humanize, Present, NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 data StorageUpdate (s :: Status) = StorageUpdate
-  { capacity :: Field s Text Input WattHours
-  , minVoltage :: Field s Text Input Volts
-  , maxVoltage :: Field s Text Input Volts
-  , batteryType :: Field s Text (Dropdown 'AtleastOne) BatteryType
+  { _capacity :: Field s Text Input WattHours
+  , _minVoltage :: Field s Text Input Volts
+  , _maxVoltage :: Field s Text Input Volts
+  , _batteryType :: Field s Text (Dropdown 'One) BatteryType
   } deriving (Generic)
 
 UpdateInstances(StorageUpdate)
@@ -103,25 +106,33 @@ UpdateInstances(StorageUpdate)
 instance ( NFData (Field s Text Input (WattHours))
          , NFData (Field s Text Input (Volts))
          , NFData (Field s Text Input (Watts))
-         , NFData (Field s Text (Dropdown 'AtleastOne) (BatteryType))
+         , NFData (Field s Text (Dropdown 'One) (BatteryType))
          ) => NFData (StorageUpdate s)
 
 instance Validate StorageUpdate where
   rules = StorageUpdate
-    { capacity = positive
-    , minVoltage = positive
-    , maxVoltage = positive
-    , batteryType = pure
+    { _capacity = positive
+    , _minVoltage = positive
+    , _maxVoltage = positive
+    , _batteryType = maybe (throwError "Cannot be empty") pure
     }
 
+storageForm :: StorageUpdate 'Edit
+storageForm = StorageUpdate
+    { _capacity = Input Clean 0
+    , _minVoltage = Input Clean 0
+    , _maxVoltage = Input Clean 0
+    , _batteryType = fullOptions
+    }
+
+makeFieldsNoPrefix ''StorageUpdate
 
 data GenerationUpdate (s :: Status) = GenerationUpdate
-  { genPower :: Field s Text Input Watts
-  , openCircuitVoltage :: Field s Text Input Volts
-  , voltageAtMPP :: Field s Text Input Volts
-  , currentAtMPP :: Field s Text Input Amperes 
+  { _genPower :: Field s Text Input Watts
+  , _openCircuitVoltage :: Field s Text Input Volts
+  , _voltageAtMPP :: Field s Text Input Volts
+  , _currentAtMPP :: Field s Text Input Amperes 
   } deriving (Generic)
-
 
 instance ( NFData (Field s Text Input (Amperes))
          , NFData (Field s Text Input (Volts))
@@ -132,16 +143,28 @@ UpdateInstances(GenerationUpdate)
 
 instance Validate GenerationUpdate where
   rules = GenerationUpdate
-    { genPower = positive
-    , openCircuitVoltage = positive
-    , voltageAtMPP = positive
-    , currentAtMPP = positive
+    { _genPower = positive
+    , _openCircuitVoltage = positive
+    , _voltageAtMPP = positive
+    , _currentAtMPP = positive
     }
 
+generationForm :: GenerationUpdate 'Edit
+generationForm = GenerationUpdate
+  { _genPower = Input Clean 0
+  , _openCircuitVoltage = Input Clean 0
+  , _voltageAtMPP = Input Clean 0
+  , _currentAtMPP = Input Clean 0 
+  }
+
+makeFieldsNoPrefix ''GenerationUpdate
+
 data LoadUpdate (s :: Status) = LoadUpdate
-  { loadPowerU :: Field s Text Input Watts
-  , loadDuration :: Field s Text Input Hours
+  { _loadPowerU :: Field s Text Input Watts
+  , _loadDuration :: Field s Text Input Hours
   } deriving (Generic)
+
+makeFieldsNoPrefix ''LoadUpdate
 
 instance ( NFData (Field s Text Input (Watts))
          , NFData (Field s Text Input (Hours))
@@ -150,15 +173,24 @@ instance ( NFData (Field s Text Input (Watts))
 UpdateInstances(LoadUpdate)
 
 instance Validate LoadUpdate where
-  rules = LoadUpdate { loadPowerU = positive
-                     , loadDuration = positive
+  rules = LoadUpdate { _loadPowerU = positive
+                     , _loadDuration = positive
                      }
 
+loadForm :: LoadUpdate 'Edit
+loadForm = LoadUpdate
+  { _loadPowerU = Input Clean 0
+  , _loadDuration = Input Clean 0
+  }
+
 data HWUpdate (s :: Status) = HWUpdate
-  { storageU :: StorageUpdate s
-  , generationU :: GenerationUpdate s
-  , loadU :: LoadUpdate s
+  { _storageU :: StorageUpdate s
+  , _generationU :: GenerationUpdate s
+  , _loadU :: LoadUpdate s
   } deriving (Generic)
+
+makeFieldsNoPrefix ''HWUpdate
+
 
 
 type NFDataHW s = (NFData (Field s Text Input (WattHours))
@@ -166,7 +198,7 @@ type NFDataHW s = (NFData (Field s Text Input (WattHours))
          , NFData (Field s Text Input (Volts))
          , NFData (Field s Text Input (Watts))
          , NFData (Field s Text Input (Hours))
-         , NFData (Field s Text (Dropdown 'AtleastOne) (BatteryType)))
+         , NFData (Field s Text (Dropdown 'One) (BatteryType)))
 
 instance ( NFDataHW s
          ) => NFData (HWUpdate s)
@@ -174,19 +206,30 @@ instance ( NFDataHW s
 UpdateInstances(HWUpdate)
 
 instance Validate HWUpdate where
-  rules = HWUpdate { storageU = rules, generationU = rules, loadU = rules }
-  validate (HWUpdate{storageU, generationU, loadU}) = HWUpdate
-    { storageU = validate storageU, generationU = validate generationU, loadU = validate loadU }
-  getValid (HWUpdate{storageU, generationU, loadU}) = case getValid storageU of
+  rules = HWUpdate { _storageU = rules, _generationU = rules, _loadU = rules }
+  validate (HWUpdate{_storageU, _generationU, _loadU}) = HWUpdate
+    { _storageU = validate _storageU
+    , _generationU = validate _generationU
+    , _loadU = validate _loadU
+    }
+  getValid (HWUpdate{_storageU,_generationU, _loadU}) = case getValid _storageU of
     Nothing -> Nothing
-    Just x -> case getValid generationU of
+    Just x -> case getValid _generationU of
       Nothing -> Nothing
-      Just y -> case getValid loadU of
+      Just y -> case getValid _loadU of
         Nothing -> Nothing
-        Just z -> Just (HWUpdate {storageU = x, generationU = y, loadU = z})
+        Just z -> Just (HWUpdate { _storageU = x
+                                 , _generationU = y
+                                 , _loadU = z})
 
 emptyHWForm :: HWUpdate 'Edit
-emptyHWForm = undefined
+emptyHWForm = HWUpdate
+  { _storageU = storageForm
+  , _generationU = generationForm
+  , _loadU = loadForm
+  }
+
+
 
 {--
 distanceKey :: Key EFinds Double
