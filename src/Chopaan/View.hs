@@ -24,6 +24,7 @@ import qualified Data.Text                         as T
 import Data.Aeson (ToJSON)
 
 import Control.PseudoInverseCategory
+import Control.Lens
 import           Shpadoinkle                       (Html, MonadJSM, text)
 import qualified Shpadoinkle.Html                  as H
 import           Shpadoinkle.Lens
@@ -51,6 +52,11 @@ import Chopaan.UiTypes
 import Chopaan.Graph
 import Chopaan.CRUD
 import Chopaan.Node.NodeT
+import Chopaan.Node.NodeId
+import Chopaan.Node.HW
+import Chopaan.Node.Components
+import Chopaan.Ui.FormCommon
+
 
 default (T.Text, [])
 
@@ -74,13 +80,58 @@ view fe = case fe of
   MEcho t -> H.div_
     [maybe (text "Eerie Silence") text t
     , H.a [ H.onClickM_ . navigate @(SPA m) $ RKibbutzim ] ["View Kibbutzim"]
+    ] 
+  MAddNode k n form -> onSum (_MAddNode . _3) $ H.div "row"
+    [ H.div "col-sm-8 offset-sm-2"
+      [ H.h2_ [ text $ maybe "Add New Node" (const "Edit Node") n
+              ]
+      , editForm n form
+      ]
     ]
+
   
+
+
+editForm :: (MonadJSM m) => Maybe NodeMAC -> NodeUpdate 'Edit -> Html m (NodeUpdate 'Edit) 
+editForm nid ef = H.div_
+  [ textControl @NodeMAC nodeMACU "MAC Address" errs ef
+  , realControl @WattHours (hardwareConfigU . storageU . capacity) "Battery Capacity" errs ef
+  , realControl @Volts (hardwareConfigU . storageU . minVoltage) "Minimum Battery Voltage" errs ef
+  , realControl @Volts (hardwareConfigU . storageU . maxVoltage) "Maximum Battery Voltage" errs ef
+  , selectControl @'One @BatteryType (hardwareConfigU . storageU . batteryType) "Battery Type" errs ef
+  , realControl @Watts (hardwareConfigU . generationU . genPower) "Panel Power" errs ef
+  , realControl @Volts (hardwareConfigU . generationU . openCircuitVoltage) "Open Circuit Voltage" errs ef
+  , realControl @Volts (hardwareConfigU . generationU . voltageAtMPP) "Voltage @ Max Power Point" errs ef
+  , realControl @Amperes (hardwareConfigU . generationU . currentAtMPP) "Current @ Max Power Point" errs ef
+  , realControl @Watts (hardwareConfigU . loadU . loadPowerU) "Load Power" errs ef
+  , realControl @Hours (hardwareConfigU . loadU . loadDuration) "Load Duration" errs ef
+  ]
+  where
+    errs = validate ef
+    isValid = getValid errs
 
 
 graphView :: forall m n a e. (MonadJSM m, CRUDChopaan m, HistoryConn n a e) => SnapshotGraph n a e -> Html m (SnapshotGraph n a e)
 graphView (nodes, links) = H.div "container-graph"
-  [ H.canvas [] []
+  [ H.canvas [] [] 
+  ]
+
+
+
+template :: Env -> Frontend -> Html m a -> Html m a
+template ev fe stage = H.html_
+  [ H.head_
+    [ H.link'
+      [ H.rel "stylesheet"
+      , H.href "https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
+      ]
+    , H.meta [ H.charset "ISO-8859-1" ] []
+    , toHydration fe
+    , H.script [ H.src $ entrypoint ev ] []
+    ]
+  , H.body_
+    [ stage
+    ]
   ]
 
 

@@ -43,12 +43,12 @@ formGroup = H.div "form-group row"
 textControl
   :: forall t m a
    . Eq t => IsString t => Coercible Text t => MonadJSM m
-  => (forall v. Lens' (a v) (Field v Text Input (Maybe t)))
+  => (forall v. Lens' (a v) (Field v Text Input t))
   -> Text -> a 'Errors -> a 'Edit -> Html m (a 'Edit)
 textControl l msg errs ef = formGroup
   [ H.label [ H.for' hName, H.class' "col-sm-2 col-form-label" ] [ text msg ]
   , H.div "col-sm-10" $
-    [ ef <% l . mapping (fromMaybe "" `iso` noEmpty) $ Input.text
+    [ ef <% l $ Input.text
       [ H.name' hName
       , H.class' ("form-control":controlClass (errs ^. l) (ef ^. l .hygiene))
       ]
@@ -75,6 +75,22 @@ intControl l msg errs ef = formGroup
     <> invalid (errs ^. l) (ef ^. l . hygiene)
   ] where hName = toHtmlName msg
 
+
+realControl
+  :: forall n m a
+   . MonadJSM m => Fractional n => Show n
+  => (forall v. Lens' (a v) (Field v Text Input n))
+  -> Text -> a 'Errors -> a 'Edit -> Html m (a 'Edit)
+realControl l msg errs ef = formGroup
+  [ H.label [ H.for' hName, H.class' "col-sm-2 col-form-label" ] [ text msg ]
+  , H.div "col-sm-10" $
+    [ ef <% l $ Input.fractional
+      [ H.name' hName, H.step "1", H.min "0"
+      , H.class' ("form-control":controlClass (errs ^. l) (ef ^. l .hygiene))
+      ]
+    ]
+    <> invalid (errs ^. l) (ef ^. l . hygiene)
+  ] where hName = toHtmlName msg
 
 selectControl
   :: forall p x m a
