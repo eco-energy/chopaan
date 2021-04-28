@@ -1,10 +1,8 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: b7f4bfc9796a3aa49cce2a9e1b4e2e782c7663f58ea1bc191552077ccfb9b61d
 
 name:           chopaan
 version:        0.1.0.0
@@ -135,8 +133,8 @@ library
     , exceptions
     , ghc-prim
     , ghcjs-dom
-    , greskell >=1.2.0.1
-    , greskell-core >=0.1.3.6
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
     , hashable
     , haxl
     , interpolatedstring-perl6
@@ -246,8 +244,8 @@ executable dev
     , exceptions
     , ghc-prim
     , ghcjs-dom
-    , greskell >=1.2.0.1
-    , greskell-core >=0.1.3.6
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
     , hashable
     , haxl
     , interpolatedstring-perl6
@@ -366,8 +364,8 @@ executable server
     , exceptions
     , ghc-prim
     , ghcjs-dom
-    , greskell >=1.2.0.1
-    , greskell-core >=0.1.3.6
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
     , hashable
     , haxl
     , interpolatedstring-perl6
@@ -487,8 +485,8 @@ executable tx
     , exceptions
     , ghc-prim
     , ghcjs-dom
-    , greskell >=1.2.0.1
-    , greskell-core >=0.1.3.6
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
     , hashable
     , haxl
     , interpolatedstring-perl6
@@ -606,8 +604,8 @@ executable ui
     , exceptions
     , ghc-prim
     , ghcjs-dom
-    , greskell >=1.2.0.1
-    , greskell-core >=0.1.3.6
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
     , hashable
     , haxl
     , interpolatedstring-perl6
@@ -735,8 +733,8 @@ test-suite chopaan-test
     , exceptions
     , ghc-prim
     , ghcjs-dom
-    , greskell >=1.2.0.1
-    , greskell-core >=0.1.3.6
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
     , hashable
     , haxl
     , interpolatedstring-perl6
