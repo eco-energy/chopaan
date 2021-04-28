@@ -11,8 +11,8 @@ import Control.Monad.IO.Class
 
 import Data.Greskell (FromGraphSON)
 
-import NetSpider.Spider
-  (Spider, getSnapshot)
+import NetSpider.Spider (Spider, getSnapshot)
+import NetSpider.Spider.Config (Config(..))
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..))
 import NetSpider.Timestamp (fromUTCTime)
 import NetSpider.Query
@@ -33,10 +33,6 @@ import Servant (Server, Get, Capture, Proxy(..), (:>)
 
 import Data.Aeson (ToJSON, FromJSON)
 
-
--- $ This has two obvious instances.
--- On the frontend, a servant api call
--- On the backend, a greskell query
 
 
 type IsoGConn n a e = (Address n
@@ -73,11 +69,11 @@ instance ToHttpApiData GraphType where
 instance FromHttpApiData GraphType where
   parseUrlPiece = read . Text.unpack
 
-newtype GraphApp r a = GraphApp { runApp :: ReaderT r IO a }
+newtype GraphApp r a = GraphApp { runGraphApp :: ReaderT r IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader r)
 
 toHandler :: MonadIO m => r -> GraphApp r a -> m a
-toHandler r a = liftIO $ runReaderT (runApp a) r
+toHandler r a = liftIO $ runReaderT (runGraphApp a) r
 
 
 serveApi :: forall n a e. (HistoryConn n a e) => Server (HistoryAPI n a e)
