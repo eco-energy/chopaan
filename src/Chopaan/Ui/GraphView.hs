@@ -24,7 +24,7 @@ import Shpadoinkle.Html (div_, getBody, input', onInput
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Widgets.Types.Core
 
---import Algebra.Graph.Labelled
+import Algebra.Graph.Labelled
 --import Algebra.Graph.Label
 
 import Diagrams.Prelude
@@ -74,9 +74,8 @@ newtype GrNode = GrNode Int deriving (Eq, Ord, Typeable, Show, Num)
 
 graphView :: forall m flow state. (Applicative m, GrConn flow state)
   => Gr flow state -> Html m (Gr flow state)
-graphView = (H.div grProps) . renderGraph' --render' $ graph
+graphView g = H.div grProps $ renderGraph' g --render' $ graph
   where
-    renderGraph' :: _
     renderGraph' = undefined
 {--
   where
