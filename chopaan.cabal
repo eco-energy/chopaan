@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 43ac76c0e42054d33e21c0121f5893b80a6610d436a7c03d8660705d38f7cb80
+-- hash: e8d6fc69ed6199c9afd14fe2ca602903a54fa669d7bb9a5f7e9a370f5688bff0
 
 name:           chopaan
 version:        0.1.0.0
@@ -162,7 +162,6 @@ library
     , servant-blaze
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -198,6 +197,7 @@ library
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -273,7 +273,6 @@ executable dev
     , servant-blaze
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -309,6 +308,7 @@ executable dev
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -393,7 +393,6 @@ executable server
     , servant-blaze
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -429,6 +428,7 @@ executable server
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -514,7 +514,6 @@ executable tx
     , servant-blaze
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -550,6 +549,7 @@ executable tx
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -633,7 +633,6 @@ executable ui
     , servant-blaze
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -669,6 +668,7 @@ executable ui
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -762,7 +762,6 @@ test-suite chopaan-test
     , servant-blaze
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -798,6 +797,7 @@ test-suite chopaan-test
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
