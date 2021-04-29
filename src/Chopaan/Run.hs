@@ -3,14 +3,12 @@
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings, DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses, GADTs, FlexibleInstances #-}
-module Chopaan.Run (run, mon) where
+module Chopaan.Run (run) where
 
 import GHC.Generics
 import Chopaan.Types
 import RIO hiding (view, async, withAsync, Async)
 
-
-import Chopaan.Server (mon)
 import Kbtz
 import Chopaan.Utils.Retry
 import Chopaan.Kibbutz
