@@ -1,8 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 43ac76c0e42054d33e21c0121f5893b80a6610d436a7c03d8660705d38f7cb80
 
 name:           chopaan
 version:        0.1.0.0
@@ -91,6 +93,7 @@ library
       Kbtz
       Proto.NodeMessageSchema.NodeMessages
       Proto.NodeMessageSchema.NodeMessages_Fields
+      Servant.Streamly
       SimNode
       TxModel
       Ui
@@ -159,6 +162,7 @@ library
     , servant-blaze
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -188,13 +192,12 @@ library
       , greskell-websocket >=0.1.2.5
       , net-mqtt >=0.7.0
       , net-spider
-      , network
+      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -270,6 +273,7 @@ executable dev
     , servant-blaze
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -299,13 +303,12 @@ executable dev
       , greskell-websocket >=0.1.2.5
       , net-mqtt >=0.7.0
       , net-spider
-      , network
+      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -390,6 +393,7 @@ executable server
     , servant-blaze
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -419,13 +423,12 @@ executable server
       , greskell-websocket >=0.1.2.5
       , net-mqtt >=0.7.0
       , net-spider
-      , network
+      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -511,6 +514,7 @@ executable tx
     , servant-blaze
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -540,13 +544,12 @@ executable tx
       , greskell-websocket >=0.1.2.5
       , net-mqtt >=0.7.0
       , net-spider
-      , network
+      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -630,6 +633,7 @@ executable ui
     , servant-blaze
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -659,13 +663,12 @@ executable ui
       , greskell-websocket >=0.1.2.5
       , net-mqtt >=0.7.0
       , net-spider
-      , network
+      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -759,6 +762,7 @@ test-suite chopaan-test
     , servant-blaze
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -788,13 +792,12 @@ test-suite chopaan-test
       , greskell-websocket >=0.1.2.5
       , net-mqtt >=0.7.0
       , net-spider
-      , network
+      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai

@@ -127,6 +127,7 @@ extra-deps:
  - greskell-websocket-0.1.2.5@sha256:1e2a9db2dac540452744940cdddd4f659a02c1667089e46cdd9c201e273dc459,5332
  - greskell-1.2.0.1@sha256:a330a20f5dcf6b28eda7bc301b44322470c3493dcd5c09c176f8c37b6aad9144,6674
  - greskell-core-0.1.3.6@sha256:8542953d972ff074db69ebc51fb5cdde3743c4c3bf18a43085c39444ab2d0f6d,3602
+ - network-3.1.2.1@sha256:188d6daea8cd91bc3553efd5a90a1e7c6d0425fa66a53baa74db5b6d9fd75c8b,4968
  #- z3-408.2@sha256:1f8b6ccbcc6d06a6701900a09fcfcbaf86ed8a8495615710bef4da5cdb073a3f,4226
 # Override default flag values for local packages and extra-deps
 flags:

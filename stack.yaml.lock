@@ -678,6 +678,13 @@ packages:
       sha256: e22e1869ab304cd30b7b2a6eb65534505e2e5bb190ca625723d07ff7340b0351
   original:
     hackage: greskell-core-0.1.3.6@sha256:8542953d972ff074db69ebc51fb5cdde3743c4c3bf18a43085c39444ab2d0f6d,3602
+- completed:
+    hackage: network-3.1.2.1@sha256:188d6daea8cd91bc3553efd5a90a1e7c6d0425fa66a53baa74db5b6d9fd75c8b,4968
+    pantry-tree:
+      size: 3971
+      sha256: b4130e25e85c786b91b8ad6137d8a7079859e4d7a9effa1fd4d3785a55b4a9cc
+  original:
+    hackage: network-3.1.2.1@sha256:188d6daea8cd91bc3553efd5a90a1e7c6d0425fa66a53baa74db5b6d9fd75c8b,4968
 snapshots:
 - completed:
     size: 524799
