@@ -38,7 +38,13 @@ instance MonadUnliftIO AppC where
   {-# INLINE askUnliftIO #-}
   askUnliftIO = do ctx <- askJSM; return $ UnliftIO $ \(AppC m) -> runJSM m ctx
 
-instance CRUDChopaan AppC
+instance CRUDChopaan AppC where
+  listKibbutzim = AppC $ runXHR listKibbutzimM
+  listNodezim = AppC . runXHR . listNodezimM
 
+
+(listKibbutzimM :<|> listNodezimM)
+  = client (Proxy @ API)
+  
 app :: JSM ()
 app = fullPageSPA @(SPA JSM) runAppC runParDiff (withHydration start) view getBody start routes
