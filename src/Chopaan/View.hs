@@ -24,7 +24,7 @@ import qualified Data.Text                         as T
 import Data.Aeson (ToJSON)
 
 import Control.PseudoInverseCategory
-import Control.Lens
+import Control.Lens hiding (view, simple)
 import           Shpadoinkle                       (Html, MonadJSM, text)
 import qualified Shpadoinkle.Html                  as H
 import           Shpadoinkle.Lens
@@ -35,7 +35,7 @@ import           Shpadoinkle.Widgets.Form.Dropdown as Dropdown (Dropdown (..),
                                                                 defConfig,
                                                                 dropdown)
 import qualified Shpadoinkle.Widgets.Form.Input    as Input
-import           Shpadoinkle.Widgets.Table         as Table
+import           Shpadoinkle.Widgets.Table         as Table hiding (view)
 import           Shpadoinkle.Widgets.Types         (Consideration, Considered,
                                                     ConsideredChoice,
                                                     Control (..), Field,
@@ -46,7 +46,14 @@ import           Shpadoinkle.Widgets.Types         (Consideration, Considered,
                                                     fullset, fuzzySearch,
                                                     getValid, humanize, present,
                                                     validate, withOptions')
+--import           Shpadoinkle.Console         (askJSM, trapper)
+import           Shpadoinkle.Run             (runJSorWarp, simple)
+import           Shpadoinkle.Backend.ParDiff (runParDiff)
+
+
+
 import NetSpider.Snapshot
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.API.History
 import Chopaan.UiTypes
 import Chopaan.Graph
@@ -60,6 +67,11 @@ import Chopaan.Ui.FormCommon
 
 default (T.Text, [])
 
+main :: IO ()
+main = runJSorWarp 8080 $ do
+  H.setTitle "Chopaan"
+  simple runParDiff (MAddNode (KbtzId "this") Nothing emptyNodeForm) view H.getBody
+
 
 
 start :: (Monad m, CRUDChopaan m) => Route -> m Frontend
@@ -71,7 +83,7 @@ start = \case
   -- RSearch k s -> MKibbutz . RosterNodezim (SortCol NId ASC) s <$> (listNodezim k) 
   
 
-view :: forall m. (MonadJSM m, CRUDChopaan m) => Frontend -> Html m Frontend
+view :: forall m. (MonadJSM m) => Frontend -> Html m Frontend
 view fe = case fe of
   MKibbutzim kbtzRoster -> onSum _MKibbutzim $ H.div "container-fluid"
     []
