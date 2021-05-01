@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e8d6fc69ed6199c9afd14fe2ca602903a54fa669d7bb9a5f7e9a370f5688bff0
+-- hash: e0ae9d943cc775f78298a09a772e1b250893c19a0fb37d0f9eaec769c98ad23b
 
 name:           chopaan
 version:        0.1.0.0
@@ -82,6 +82,7 @@ library
       Chopaan.Ui.Foreign.WebSocket
       Chopaan.Ui.FormCommon
       Chopaan.Ui.GraphView
+      Chopaan.Ui.Style
       Chopaan.Ui.Three
       Chopaan.Ui.WebSocket
       Chopaan.UiTypes
@@ -122,6 +123,8 @@ library
     , blaze-markup
     , bytestring
     , cassava
+    , clay
+    , colour
     , comonad
     , containers
     , data-default-class
@@ -233,6 +236,8 @@ executable dev
     , blaze-markup
     , bytestring
     , cassava
+    , clay
+    , colour
     , comonad
     , containers
     , data-default-class
@@ -353,6 +358,8 @@ executable server
     , blaze-markup
     , bytestring
     , cassava
+    , clay
+    , colour
     , comonad
     , containers
     , data-default-class
@@ -474,6 +481,8 @@ executable tx
     , blaze-markup
     , bytestring
     , cassava
+    , clay
+    , colour
     , comonad
     , containers
     , data-default-class
@@ -593,6 +602,8 @@ executable ui
     , blaze-markup
     , bytestring
     , cassava
+    , clay
+    , colour
     , comonad
     , containers
     , data-default-class
@@ -722,6 +733,8 @@ test-suite chopaan-test
     , blaze-markup
     , bytestring
     , cassava
+    , clay
+    , colour
     , comonad
     , containers
     , data-default-class
