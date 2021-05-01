@@ -1,11 +1,26 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, UndecidableInstances, DeriveAnyClass, DerivingStrategies #-}
-{-# LANGUAGE OverloadedStrings, NamedFieldPuns, ScopedTypeVariables, TypeApplications, FlexibleContexts #-}
-module Chopaan.Graph where
+{-# LANGUAGE GeneralizedNewtypeDeriving, UndecidableInstances, DeriveAnyClass, DerivingStrategies, StandaloneDeriving #-}
+{-# LANGUAGE OverloadedStrings, NamedFieldPuns, ScopedTypeVariables, TypeApplications, FlexibleContexts, TypeOperators, GADTs #-}
+{-# LANGUAGE FlexibleInstances, TypeFamilies, InstanceSigs
+, ConstraintKinds, ScopedTypeVariables, QuantifiedConstraints
+, RankNTypes, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable, DeriveDataTypeable #-}
+{-# LANGUAGE LambdaCase, TypeOperators, TypeApplications #-}
+module Chopaan.Graph (module Chopaan.Graph, module AG, module NG) where
 
 import Prelude hiding ((.), id)
-import Control.Category
-import Data.Function ((&))
 
+import Shpadoinkle.Html as H
+import ConCat.Misc (R, inNew, inNew2, (:*), (:+))
+import GHC.Generics (Generic, Generic1)
+import qualified Control.Newtype.Generics as N
+import Control.DeepSeq (NFData)
+
+import Control.Category
+import Data.Typeable
+import Data.Function ((&))
+import Data.Bifunctor
+import Data.Text as T
 import Data.Greskell.Graph (AVertex, AEdge, ElementData, Element, Vertex, Edge)
 import Data.Greskell.GraphSON (FromGraphSON)
 import Data.Greskell.Greskell (toGremlin)
@@ -14,12 +29,58 @@ import Data.Greskell.GTraversal
   ( GTraversal, Walk, Transform, SideEffect, Filter, WalkType, gAddV, gAddE, gOut, gOutE, gId, gIn, gInE, gHasLabel, gProperty,
     source, sV, sV', gV, (&.), unsafeCastStart, unsafeCastEnd, (<*.>), sAddV, gHas2, liftWalk, gFrom, gTo, gSideEffect, ToGTraversal, AddAnchor )
 
-import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..), VFoundNode(..))
+import NetSpider.Graph  as NG (NodeAttributes(..), LinkAttributes(..), VFoundNode(..))
+import qualified Algebra.Graph.Labelled as AG
 
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz
 import Chopaan.Node.NodeId
 import Chopaan.Node.HW
+
+import Shpadoinkle.Widgets.Types
+
+newtype M = M R
+
+type N = (VKbtz :+ VHH :+ VHW :+ VPerson)
+
+type E = (EKbtzIncludes :+ M :+ Watts :+ WattHours)
+
+data KbtzGraph where
+  Nod :: N -> KbtzGraph
+  Connect :: E -> KbtzGraph
+
+-- $ Constraints for edge labels and nodes
+type GrConn f s = (Bounded s, Show s, Ord s, Eq s, Enum s, Show f, Monoid f, Ord f)
+
+-- $ Constraints for edge labels and nodes, along with monad constraints
+type GrConnM m f s = (Monad m, GrConn f s)
+
+deriving instance Generic1 (AG.Graph flow)
+
+newtype Gr flow state = Gr { unGr :: (AG.Graph flow state) }
+  deriving stock (Eq, Ord, Show, Generic, Generic1)
+  deriving newtype (Num, Functor, Bifunctor)
+
+
+emptyGr :: (GrConn flow state) => Gr flow state
+emptyGr = Gr AG.empty
+
+grProps :: [(Text, Prop m (Gr flow state))]
+grProps = []
+
+grEdge :: (Show a, Show b, Show c) => (a, b, c) -> Text
+grEdge (l, e, e') = (pack . show $ l)
+
+instance N.Newtype (Gr flow state)
+
+-- $ Shpadoinkle Instances
+instance (Show state, Show flow) => Humanize (Gr flow state)
+
+
+newtype GrNode = GrNode Int deriving (Eq, Ord, Typeable, Show, Num)
+
+
+                         
 
 newtype VKbtz = VKbtz AVertex
   deriving (Eq, Show)
