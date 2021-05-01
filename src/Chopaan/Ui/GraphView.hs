@@ -11,7 +11,9 @@ import GHC.Generics (Generic, Generic1)
 import qualified Control.Newtype.Generics as N
 import Control.DeepSeq (NFData)
 
-import Data.Text hiding (empty)
+import Data.Aeson
+import Data.Text hiding (empty, zip)
+import Data.Text.Lazy (toStrict)
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Bifunctor
@@ -24,7 +26,8 @@ import Shpadoinkle.Html (div_, getBody, input', onInput
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Widgets.Types.Core
 
-import Algebra.Graph.Labelled
+import qualified Algebra.Graph.Labelled as AG
+import qualified Algebra.Graph as G
 --import Algebra.Graph.Label
 
 import Diagrams.Prelude
@@ -33,41 +36,41 @@ import Diagrams.Backend.SVG (B)
 import qualified Diagrams.TwoD.Text as DT
 import Diagrams.TwoD.Layout.Grid
 import Graphics.SVGFonts
+import qualified Clay as C
 
 import Chopaan.Kibbutz.Kibbutz
 import Chopaan.Graph
 
 
+data G l v = N v | E l v v
 
--- $ Constraints for edge labels and nodes
-type GrConn f s = (Bounded s, Show s, Ord s, Eq s, Enum s, Show f, Monoid f, Ord f)
+newtype Pos = Pos Double
+  deriving stock (Generic)
+  deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
+  deriving anyclass (Humanize, Present, NFData)
+  deriving (Semigroup, Monoid) via (Sum Double)
 
--- $ Constraints for edge labels and nodes, along with monad constraints
-type GrConnM m f s = (Monad m, GrConn f s)
-
-deriving instance Generic1 (Graph flow)
-
-newtype Gr flow state = Gr { unGr :: (Graph flow state) }
-  deriving stock (Eq, Ord, Show, Generic, Generic1)
-  deriving newtype (Num, Functor, Bifunctor)
+layout :: forall m l v a. (Monoid l, Monoid v) => Gr l v -> (Gr l v -> Text) -> (Gr l v -> [Html m a]) -> Html m a
+layout gr style mk =  H.div [H.class' (style gr)] $ mk gr -- 
 
 
-emptyGr :: (GrConn flow state) => Gr flow state
-emptyGr = Gr empty
-
-grProps :: [(Text, Prop m (Gr flow state))]
-grProps = []
-
-grEdge :: (Show a, Show b, Show c) => (a, b, c) -> Text
-grEdge (l, e, e') = (pack . show $ l)
-
-instance N.Newtype (Gr flow state)
-
--- $ Shpadoinkle Instances
-instance (Show state, Show flow) => Humanize (Gr flow state)
-
-
-newtype GrNode = GrNode Int deriving (Eq, Ord, Typeable, Show, Num)
+renderKbtzGraph :: (Applicative m, Monoid l, Eq l, Ord v, Show l, Show v) => Gr l v -> [Html m a]
+renderKbtzGraph (Gr g) = [
+  H.div (nodeClasses i) $ [ nodeHtml n ]
+  | (i, n) <- zip [0,(1 :: Double)..] $ AG.vertexList g
+  ] <> [
+  H.div (edgeClasses i) $ [ edgeHtml l v v' ]
+  | (i, (l, v, v')) <- zip [(0 :: Double), 1..] $ AG.edgeList g
+  ]
+  where
+    grNameC i = H.class' $ "graph-" <> (pack . show $ i) 
+    posCss = H.class' . toStrict . C.render . C.position $ C.static
+    nodeClasses i = [grNameC i, posCss]
+    edgeClasses i = [grNameC i,  posCss]
+    nodeHtml = H.text . pack . show
+    edgeHtml l v v' = H.div_ [ H.text . pack . show $ v
+                            , H.text . pack . show $ v'
+                            , H.text . pack . show $ l ]
 
 
 
@@ -77,36 +80,3 @@ graphView :: forall m flow state. (Applicative m, GrConn flow state)
 graphView g = H.div grProps $ renderGraph' g --render' $ graph
   where
     renderGraph' = undefined
-{--
-  where
-    render' :: Graph flow (GrNode, state) -> (GrNode, Diagram B) 
-    render' = foldg mempty renderNode renderEdge
-    renderNode :: (GrNode, state) -> (GrNode, Diagram B)
-    renderNode (n, s) = let
-      t :: Diagram B
-      t = text' s
-      r = (E.radius (V2 0 0) t)
-      in (n, (circle r `atop` t) # named @GrNode n)
-    renderEdge :: flow -> (GrNode, Diagram B) -> (GrNode, Diagram B) -> (GrNode, Diagram B)
-    renderEdge _ (x, n) (y, n') = (y, connectOutside x y $ gridCat [n, n']) -- $ \[xn, yn] ->
-      --atop (boundaryFrom xn unit_Y ~~ boundaryFrom yn unitY))
-    text' :: Show s => s -> Diagram B
-    text' s = stroke $ textSVG (show s) 1
-
---}
-{--
-
-renderKbtz :: forall t m n a. (KbtzConn t m n, IsName n, Show a, Monad (t m))
-  => Kbtz t m n a
-  -> t m (Diagram B)
-renderKbtz = (fmap (gridCat . elems . (mapWithKey renderNode))) . kbtzState
-  where
-    renderNode :: n -> a -> Diagram B
-    renderNode n s = let
-      t :: Diagram B
-      t = text' s
-      r = E.radius (V2 0 0) t
-      in (circle r `atop` t) # named n
-    text' :: Show s => s -> Diagram B
-    text' s = stroke $ textSVG (show s) 1
---}
