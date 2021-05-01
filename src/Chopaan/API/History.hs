@@ -1,30 +1,32 @@
-{-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables, GADTs, FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia #-}
 module Chopaan.API.History where
 
 import GHC.Generics
 
-import Control.Monad.Trans.Reader
-
-import Control.Monad.Reader.Class (MonadReader)
+import Control.DeepSeq (NFData)
 import Control.Monad.IO.Class
 
 import Data.Greskell (FromGraphSON)
 
-import NetSpider.Spider (Spider, getSnapshot)
+import NetSpider.Spider (getSnapshot, withSpider)
 import NetSpider.Spider.Config (Config(..))
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..))
 import NetSpider.Timestamp (fromUTCTime)
 import NetSpider.Query
 import NetSpider.Snapshot
---import qualified NetSpider.Snapshot as Sn
 
 
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
 
 import Chopaan.Comm.Address
-import Streamly()
+import Chopaan.Kibbutz.KbtzId
+import Chopaan.Node.NodeId
+import Chopaan.Kibbutz.Mesh
+import Chopaan.Node.Folds (SensorS)
+import Chopaan.Kibbutz.Transactor (Stake, TransactionStatus)
+import Chopaan.Kibbutz (stakeConfig, meshConfig, statusConfig, getGridRoot)
 
 
 import Servant (Server, Get, Capture, Proxy(..), (:>)
@@ -42,23 +44,23 @@ type IsoGConn n a e = (Address n
                       , FromGraphSON n
                       )
 
+
 type HistoryConn n a e =
   ( ToHttpApiData n, FromHttpApiData n, ToJSON n, FromJSON n
   , ToJSON e, FromJSON e
   , ToJSON a, FromJSON a
   , FromGraphSON n, IsoGConn n a e)
 
-
-type HistoryAPI n e a = "history"
+type HistoryAPI = "history"
   :> (Capture "graphType" GraphType)
-  :> (Capture "graphId" n)
+  :> (Capture "graphId" KbtzName)
   :> (Capture "startTime" UTCTime)
   :> (Capture "endTime" UTCTime)
-  :> Get '[JSON] (SnapshotGraph n e a)
+  :> Get '[JSON] (SG)
 
 
-data GraphType = Mesh | Plan | BilledReality | HWConfig
-  deriving (Eq, Ord, Show, Read, Generic, ToJSON, FromJSON, Bounded, Enum)
+data GraphType = Mesh | Plan | Status
+  deriving (Eq, Ord, Show, Read, Bounded, Enum, Generic, ToJSON, FromJSON, NFData)
 
 genericToUrlPieceViaShow :: Show a =>  a -> Text.Text
 genericToUrlPieceViaShow = Text.pack . show
@@ -69,31 +71,38 @@ instance ToHttpApiData GraphType where
 instance FromHttpApiData GraphType where
   parseUrlPiece = read . Text.unpack
 
-newtype GraphApp r a = GraphApp { runGraphApp :: ReaderT r IO a }
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader r)
 
-toHandler :: MonadIO m => r -> GraphApp r a -> m a
-toHandler r a = liftIO $ runReaderT (runGraphApp a) r
+serveHistoryApi :: Server (HistoryAPI)
+serveHistoryApi = hoistServer (Proxy @ HistoryAPI) liftIO getHistoryForGraph
 
+  
+data SG where
+  MeshSnapshot :: SnapshotGraph NodeMAC MeshNode RxSignal -> SG
+  StakeSnapshot :: SnapshotGraph NodeMAC SensorS Stake -> SG
+  StatusSnapshot :: SnapshotGraph NodeMAC SensorS TransactionStatus -> SG
+  deriving (Generic, ToJSON, FromJSON)
 
-serveApi :: forall n a e. (HistoryConn n a e) => Server (HistoryAPI n a e)
-serveApi = hoistServer (Proxy @ (HistoryAPI n a e)) (toHandler s) getHistory
-  where
-    s :: Spider n a e
-    s = undefined
-
-getHistory :: forall n a e. (IsoGConn n a e)
+getHistoryForGraph :: forall m. (MonadIO m)
   => GraphType
-  -> n
+  -> KbtzName
   -> UTCTime
   -> UTCTime
-  -> GraphApp (Spider n a e) (SnapshotGraph n a e)
-getHistory g n t t' =
-  GraphApp $ (\d -> query d q)
-  =<< ask
+  -> m (SG)
+getHistoryForGraph g kn t0 t1 = case g of
+  Mesh -> MeshSnapshot <$> getHistory meshConfig kn t0 t1
+  Plan -> StakeSnapshot <$> getHistory stakeConfig kn t0 t1
+  Status -> StatusSnapshot <$> getHistory statusConfig kn t0 t1
+
+getHistory :: forall m a e. (MonadIO m, IsoGConn NodeMAC a e)
+  => Config NodeMAC a e
+  -> KbtzName
+  -> UTCTime
+  -> UTCTime
+  -> m (SnapshotGraph NodeMAC a e)
+getHistory c k t t' = query c q
   where
-    q :: Query n a e e
-    q = (defQuery [n])
+    q :: Query NodeMAC a e e
+    q = (defQuery [getGridRoot k])
       { timeInterval =
         Finite (fromUTCTime t)
         <=..<=
@@ -101,7 +110,7 @@ getHistory g n t t' =
       }
 
 query :: (MonadIO m, IsoGConn n a e)
-  => Spider n a e
+  => Config n a e
   -> Query n a e e
   -> m (SnapshotGraph n a e)
-query s q = liftIO $ getSnapshot s q
+query c q = liftIO $ withSpider c (\sp -> liftIO $ getSnapshot sp q)

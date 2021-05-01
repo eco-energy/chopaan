@@ -2,11 +2,11 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards, NamedFieldPuns, NoMonomorphismRestriction  #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Chopaan.Kibbutz (runKibbutz, mkKbtzConf) where
+module Chopaan.Kibbutz (runKibbutz, mkKbtzConf, stakeConfig, meshConfig, statusConfig, getGridRoot) where
 
 import GHC.Generics
 
-import Data.Aeson (ToJSON)
+import Data.Aeson (ToJSON, FromJSON)
 import Data.Greskell
 import Data.Hashable (Hashable)
 import Data.Maybe (fromMaybe)
@@ -15,6 +15,7 @@ import Data.Time (UTCTime)
 import Chopaan.Types hiding (DBOpts)
 import Kbtz
 
+import Control.DeepSeq (NFData)
 import Control.Arrow (second)
 import ConCat.Misc (result)
 import Control.Monad.Trans.Reader
@@ -58,13 +59,13 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          )
 import System.IO (stdout)
 
-import NetSpider.Spider (Spider, addFoundNode, getSnapshot, connectWith, close)
+import NetSpider.Spider (Spider, addFoundNode, getSnapshot, getSnapshotSimple, connectWith, close)
 import NetSpider.Spider.Config (Config(..), defConfig)
 import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Timestamp (fromUTCTime, now, Timestamp)
 import NetSpider.Snapshot (SnapshotGraph)
-import NetSpider.Query (defQuery)
+import NetSpider.Query (defQuery, Query(..), Extended(..), (<=..<=))
 
 import Streamly (IsStream, MonadAsync)
 
@@ -75,7 +76,13 @@ type SpiderNodeId n = (ToJSON n)
 
 newtype KbtzRoot n = KbtzRoot { getRoot :: n }
   deriving (Eq, Ord, Show, Generic)
-  deriving anyclass (ToJSON)
+  deriving anyclass (ToJSON, FromJSON, NFData)
+
+mkKbtzRoot :: KbtzName -> KbtzRoot NodeMAC
+mkKbtzRoot (KbtzId k) = (KbtzRoot (NodeId ("grid_" <> k) :: NodeMAC))
+
+getGridRoot :: KbtzName -> NodeMAC
+getGridRoot = getRoot . mkKbtzRoot
 
 type GraphS t m n v e = (IsStream t, MonadAsync m, SpiderConn n v e) => t m ((n, v), t m (n -> e))
 
@@ -85,6 +92,7 @@ data KbtzConf = KbtzConf
   , spiderHost :: String
   , spiderPort :: Int
   } deriving (Eq, Ord, Show, Generic)
+
 
 
 
@@ -118,7 +126,6 @@ runKibbutz KbtzConf{mqttOpts, thisKbtz, spiderHost, spiderPort} = do
   where
     spConf :: forall v e. SpiderConn () v e => Config NodeMAC v e
     spConf = defConfig { wsHost = spiderHost, wsPort = spiderPort } 
-    gridNode = (KbtzRoot (NodeId ("grid_" <> (unKbtzId thisKbtz)) :: NodeMAC))
     sensorKbtz :: forall t. (IsStream t, MonadAsync m)
       => [NodeMAC]
       -> WriteChan NodeMAC EnergyState
@@ -131,7 +138,7 @@ runKibbutz KbtzConf{mqttOpts, thisKbtz, spiderHost, spiderPort} = do
     rsKbtz ns q = kbtz ns (sub @t @m @NodeMAC @RuntimeStats q) id
     ingestThisKbtz :: forall t e. (IsStream t, LinkAttributes e)
       => (e -> LinkState) -> GraphS t m NodeMAC SensorS e -> t m ()
-    ingestThisKbtz = ingestHyperGraph spConf gridNode _time
+    ingestThisKbtz = ingestHyperGraph spConf (mkKbtzRoot thisKbtz) _time
     -- semantic editor combinator
     editMonS :: (Functor (t m)) => (c -> d) -> t m (a, t m (b -> c)) -> t m (a, t m (b -> d))
     editMonS = (fmap . second . fmap . result)
@@ -186,60 +193,46 @@ writeSpiderStream conf f as = S.bracket
   (liftIO . close)
   (\s -> S.mapM (f s) as)
 
-readSpiderStream :: (IsStream t, MonadAsync m, MonadCatch m)
+getSnapshotStream :: (IsStream t, MonadAsync m, MonadCatch m)
   => Config n v e
-  -> (Spider n v e -> t m a)
-  -> t m a
-readSpiderStream conf = S.bracket
+  -> (Spider n v e -> m (SnapshotGraph n v e))
+  -> t m (SnapshotGraph n v e)
+getSnapshotStream conf f = S.bracket
   (liftIO $ connectWith conf)
   (liftIO . close)
+  (\s -> S.repeatM $ f s)
 
 type SnapshotId n = (FromGraphSON n, ToJSON n, Ord n, Hashable n, Show n)
 
-getGrid :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadIO m)
-  => Spider n v e
-  -> ReaderT (KbtzRoot n) m (SnapshotGraph n v e)
-getGrid s = do
-  (liftIO . (getSnapshot s)) =<< (pure . query . getRoot =<< ask)
+getGridSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadIO m)
+  => KbtzRoot n
+  -> Spider n v e
+  -> UTCTime
+  -> UTCTime
+  -> m (SnapshotGraph n v e)
+getGridSnapshot r s t t' = liftIO . (getSnapshot s) . (mkQuery . getRoot) $ r
   where
-    query gridRoot = defQuery [gridRoot]
+    mkQuery gridRoot = (defQuery [gridRoot]) {
+      timeInterval =
+        Finite (fromUTCTime t)
+        <=..<=
+        Finite (fromUTCTime t')
+      } 
 
 
-{--
-type StakeGridSpider n = Spider n SensorS Stake
-
-type StakeGridSnapshot n = SnapshotGraph n SensorS Stake
-
-type StatusGridSpider n = Spider n SensorS TransactionStatus
-
-type StatusGridSnapshot n = SnapshotGraph n SensorS TransactionStatus
-
-type MeshSpider n = Spider n MeshNode RxSignal
-
-type MeshSnapshot n = SnapshotGraph n MeshNode RxSignal
-
-type HWGridSpider n = Spider n (HW Double) Int
-
-type HWGridSnapshot n = SnapshotGraph n (HW Double) Int 
+subscribeSnapshot :: forall t m v e.
+  (IsStream t, MonadAsync m, MonadCatch m, SpiderConn () v e)
+  => KbtzName
+  -> Config NodeMAC v e
+  -> t m (SnapshotGraph NodeMAC v e)
+subscribeSnapshot k c = getSnapshotStream c (\s -> liftIO $ getSnapshotSimple s (getRoot . mkKbtzRoot $ k))
 
 
-getStakeGrid :: forall m n. (SnapshotId n, MonadIO m)
-  => StakeGridSpider n
-  -> ReaderT (KbtzRoot n) m (StakeGridSnapshot n)
-getStakeGrid = getGrid @m @n @SensorS @Stake
+stakeConfig :: Config NodeMAC SensorS Stake
+stakeConfig = defConfig
 
-getStatusGrid :: (SnapshotId n, MonadIO m)
-  => StatusGridSpider n
-  -> ReaderT (KbtzRoot n) m (StatusGridSnapshot n)
-getStatusGrid = getGrid
+statusConfig :: Config NodeMAC SensorS TransactionStatus
+statusConfig = defConfig
 
-getMesh :: (SnapshotId n, MonadIO m)
-  => MeshSpider n
-  -> ReaderT (KbtzRoot n) m (MeshSnapshot n)
-getMesh = getGrid
-
-getHWGrid :: (SnapshotId n, MonadIO m)
-  => HWGridSpider n
-  -> ReaderT (KbtzRoot n) m (HWGridSnapshot n)
-getHWGrid = getGrid
---}
+meshConfig :: Config NodeMAC MeshNode RxSignal
+meshConfig = defConfig

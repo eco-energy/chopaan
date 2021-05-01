@@ -39,8 +39,8 @@ import           Shpadoinkle.Run           (Env (Prod))
 
 import Chopaan.UiTypes
 import Chopaan.CRUD
---import Chopaan.API.History
-import Chopaan.View (view, template, start)
+import Chopaan.API.History
+import Chopaan.View (view, template, onRouteChange)
 
 
 
@@ -67,7 +67,8 @@ instance CRUDChopaan App
 
 
 app :: Env -> FilePath -> Application
-app ev root = serve (Proxy @ (API :<|> SPA App)) $ serveAPI :<|> serveSPA
+app ev root = serve (Proxy @ (API :<|> SPA App :<|> HistoryAPI)) $
+              serveAPI :<|> serveSPA :<|> serveHistoryApi
   where
     serveAPI :: Server API
     serveAPI = hoistServer (Proxy @API) (toHandler Opts) $ listKibbutzim
@@ -76,7 +77,7 @@ app ev root = serve (Proxy @ (API :<|> SPA App)) $ serveAPI :<|> serveSPA
     serveSPA :: Server (SPA App)
     serveSPA = serveUI @ (SPA App) root
       (\r -> toHandler Opts $ do
-          i <- start r
+          i <- onRouteChange r
           return . template ev i $ view @ Noop i) routes
 
 

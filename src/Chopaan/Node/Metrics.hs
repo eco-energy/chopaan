@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving #-}
 module Chopaan.Node.Metrics where
 
 import GHC.Generics hiding (R)
@@ -44,6 +44,7 @@ import NetSpider.Timestamp (fromS)
 import NetSpider.Snapshot (nodeId, nodeTimestamp)
 
 {----- Basic Types ------}
+
 
 newtype WattSeconds = WS { unWs :: Compensated Double }
   deriving stock (Eq, Ord, Generic)
@@ -186,10 +187,12 @@ data SensorMetrics e p = SensorMetrics
   , _energyT :: !(Node e)
   , _battery :: !(Battery R R)
   , _demand :: !e
-  } deriving (Eq, Ord, Generic, NFData)
+  } deriving (Eq, Ord, Generic, NFData, ToJSON, FromJSON)
 
 
-instance (ToJSON e, ToJSON p) => ToJSON (SensorMetrics e p)
+--instance (ToJSON e, ToJSON p) => ToJSON (SensorMetrics e p)
+
+--instance (FromJSON e, FromJSON p) => ToJSON (SensorMetrics e p)
 
 timeKey :: Key VFoundNode (Maybe UTCTime)
 timeKey = "time"
