@@ -26,7 +26,9 @@ import           Shpadoinkle.Router.Client   (client, runXHR)
 import           Chopaan.CRUD
 import           Chopaan.UiTypes              (API, SPA,
                                               routes, Route)
-import           Chopaan.View                   (start, view)
+import           Chopaan.View                   (init, onRouteChange, view)
+
+import           Shpadoinkle.Run             (runJSorWarp)
 
 newtype AppC a = AppC { runAppC :: JSM a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow)
@@ -47,4 +49,9 @@ instance CRUDChopaan AppC where
   = client (Proxy @ API)
   
 app :: JSM ()
-app = fullPageSPA @(SPA JSM) runAppC runParDiff (withHydration start) view getBody start routes
+app = fullPageSPA @(SPA JSM) runAppC runParDiff Chopaan.View.init view getBody onRouteChange routes
+
+main :: IO ()
+main = runJSorWarp 8080 app
+  --where
+  --  init = (MAddNode (KbtzId "this") Nothing emptyNodeForm)
