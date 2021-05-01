@@ -12,6 +12,7 @@ import Data.Typeable
 import Data.Aeson
 import Control.DeepSeq (NFData)
 import Shpadoinkle.Widgets.Types (Humanize (..), Present)
+import Data.Greskell (FromGraphSON)
 
 type ThingName = Text.Text
 
@@ -19,7 +20,7 @@ type NodeMAC = NodeId ThingName
 
 newtype NodeId a = NodeId { unNodeId :: a }
   deriving stock (Generic, Functor)
-  deriving newtype (Eq, Ord, Show, Read, IsString, Typeable, FromJSON, ToJSON, Humanize, Semigroup, Monoid)
+  deriving newtype (Eq, Ord, Show, Read, IsString, Typeable, FromJSON, ToJSON, Humanize, Semigroup, Monoid, FromGraphSON)
   deriving anyclass (Present, NFData)
 {--
 instance (Show a) => Show (NodeId a) where
@@ -37,4 +38,3 @@ instance (ToHttpApiData a) => ToHttpApiData (NodeId a) where
   toUrlPiece (NodeId ns) = (toUrlPiece ns)
 
 instance (Typeable a, Ord a, Show a) => IsName (NodeId a)
-
