@@ -80,4 +80,4 @@ idFold :: (Monad m, Monoid a) => FL.Fold m a a
 idFold = liftF mempty (\_ a -> a)
 
 liftF :: (Monad m) => b -> (b -> a -> b) -> FL.Fold m a b
-liftF b f = FL.Fold (\a b -> pure $ f a b) (pure b) pure
+liftF b f = FL.Fold (\a b -> pure . FL.Partial $ f a b) (pure b) pure

@@ -80,7 +80,7 @@ import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Graph (LinkAttributes(..), EFinds)
 
 
-newtype Tx n a = Tx (M.Map n a)
+newtype Tx n a = Tx { unTx :: M.Map n a }
   deriving stock (Eq, Ord, Show, Generic, Traversable)
   deriving newtype (ToJSON, FromJSON, NFData, Functor, Foldable)
 
@@ -90,7 +90,7 @@ instance (Ord n) => Semigroup (Tx n a) where
 instance (Ord n) => Monoid (Tx n a) where
   mempty = Tx mempty
 
-  
+
 
 type TxPlan n = Tx n Stake
 
@@ -213,10 +213,15 @@ transactionFold :: forall m n. (Monad m, Address n, Ord n) => TxPlan n
   -> FL.Fold m (NodeStates n) (TxState n)
 transactionFold (Tx participants) = FL.Fold step start end
   where
-    step :: TxState n -> NodeStates n -> m (TxState n)
+    step :: TxState n -> NodeStates n -> m (FL.Step (TxState n) (TxState n))
     -- Zip instance for Map is defined as intersection with, so we don't need
     -- to filter the NodeStates.
-    step (Tx ts) (Tx ns) = return . Tx $ zipWith updateTS ts ns 
+    step (Tx ts) (Tx ns) = pure . shouldQuit $ t''
+      where
+        shouldQuit t = if (all ((\x -> energyRemaining x <= 0) . snd . snd) (M.toList t))
+                   then (FL.Done . Tx $ t)
+                   else (FL.Partial . Tx $ t)
+        t'' = zipWith updateTS ts ns 
     start :: m (TxState n)
     start = return . Tx $
       (\(Stake (px, w, t))-> (px, mempty{ timeRemaining = t
@@ -257,12 +262,12 @@ transactionFold (Tx participants) = FL.Fold step start end
 transactionPlanner :: forall m n. (MonadIO m, Show n, Address n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (TxPlan n)
 transactionPlanner timeHorizon = FL.Fold step start end
   where
-    step ::  TxPlan n -> NodeStates n -> m (TxPlan n)
+    step ::  TxPlan n -> NodeStates n -> m (FL.Step (TxPlan n) (TxPlan n))
     step (Tx _) (Tx nodes) = do
       s <- schedule
       case s of
-        (ValidPlan sc c) -> return $ sc
-        Wait -> return $ mempty
+        (ValidPlan sc c) -> pure . FL.Partial $ sc
+        Wait -> pure . FL.Partial $ mempty
       where
         consumption = M.toAscList $ fmap _demand nodes
         storage = M.toAscList $ fmap (\n -> toWattSeconds $ (totalCapacity . _battery $ n) * (soc . _battery $ n)) nodes
