@@ -61,6 +61,10 @@ extra-deps:
  - git: https://github.com/faezs/ghcjs-three.git
    commit: 2b4b1c6867c09aaec430cba39a98a765b5b79437
    # nix-sha256: 0q5g6s6m706apm3cc9r77rjx0wznzyc30xi40vkv838c7gn1j011
+
+ - git: https://github.com/composewell/streamly.git
+   commit: 4e48b52e8709390a47e99c107ebed2d1c9420076
+   # nix-sha256: 1824vqnx9ncs8f1vzgl08r5bd274vhabsdkirqqa88fxl0f2jyw5
    
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
  - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
@@ -83,7 +87,6 @@ extra-deps:
  - total-map-0.1.3@sha256:081b917276323564e6d6ebaaf20c14d8ffc0a260cf3f29113c2577f774a272f1,983
  - semiring-num-1.6.0.4@sha256:ea73b7ec4980add625dedfe159dbeea9a37aa540a2a9df0f36263455b1654cc1,2943
  - key-0.1.2.0@sha256:3bdfda94f99b8f2e01498ddf5f704cd84ce93315b532df50420ded94cbf5ba2e,1767
- - streamly-0.7.2@sha256:173a415316e230e2117365dcd0432f1a7992d42c89b79017df57c9f6581205e3,27421
  - fusion-plugin-types-0.1.0@sha256:0f11bbc445ab8ae3dbbb3d5d2ea198bdb1ac020518b7f4f7579035dc89182438,1506
  - dependent-map-0.2.4.0@sha256:21d35c1eba3f2afa3af3c4c5d8998fd14ac76f596f951c280bd83d1d5a19ae28,1739
  - dependent-sum-0.5@sha256:da0cb690c900e3a94197770e4d86c9b7b19a13f4f2e3844fc5e990b2c44eafef,1900

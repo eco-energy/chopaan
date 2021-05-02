@@ -224,6 +224,17 @@ packages:
     git: https://github.com/faezs/ghcjs-three.git
     commit: 2b4b1c6867c09aaec430cba39a98a765b5b79437
 - completed:
+    name: streamly
+    version: 0.7.2
+    git: https://github.com/composewell/streamly.git
+    pantry-tree:
+      size: 19308
+      sha256: 56fc3d68dd274d7c6e355647d2203143a40b7f814fe9705abb1aa05a457d12d8
+    commit: 4e48b52e8709390a47e99c107ebed2d1c9420076
+  original:
+    git: https://github.com/composewell/streamly.git
+    commit: 4e48b52e8709390a47e99c107ebed2d1c9420076
+- completed:
     hackage: amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
     pantry-tree:
       size: 992
@@ -370,13 +381,6 @@ packages:
       sha256: 060f9ee89c9e2da91350f237921ff4a88ee10ac6d6cada68a3916a695e938158
   original:
     hackage: key-0.1.2.0@sha256:3bdfda94f99b8f2e01498ddf5f704cd84ce93315b532df50420ded94cbf5ba2e,1767
-- completed:
-    hackage: streamly-0.7.2@sha256:173a415316e230e2117365dcd0432f1a7992d42c89b79017df57c9f6581205e3,27421
-    pantry-tree:
-      size: 12739
-      sha256: 72de2ea866d31d0fc6d8008987c014cc2cd2d6d1dcff173702741df3bcd02eb3
-  original:
-    hackage: streamly-0.7.2@sha256:173a415316e230e2117365dcd0432f1a7992d42c89b79017df57c9f6581205e3,27421
 - completed:
     hackage: fusion-plugin-types-0.1.0@sha256:0f11bbc445ab8ae3dbbb3d5d2ea198bdb1ac020518b7f4f7579035dc89182438,1506
     pantry-tree:
