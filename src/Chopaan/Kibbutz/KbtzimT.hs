@@ -2,7 +2,8 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving
 , DerivingStrategies, DeriveAnyClass, StandaloneDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Chopaan.Kibbutz.KbtzimT where
 
 
@@ -11,7 +12,7 @@ import Control.Monad.Identity (Identity)
 import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Text (Text)
-
+import Control.Lens (makeFieldsNoPrefix)
 import Database.Beam (Beamable, Columnar, Nullable) --, Table (..), TableEntity)
 
 
@@ -39,4 +40,4 @@ deriving instance Humanize (KbtzimT Identity)
 
 type Kbtzim = KbtzimT Identity
 
-
+makeFieldsNoPrefix ''KbtzimT

@@ -115,7 +115,7 @@ scanfn :: forall t m n a a'. (KbtzConn t m n)
 scanfn k f i = scanKbtz k $ pureFold f i id 
 
 pureFold :: forall m a a'. (Applicative m) => (a' -> a -> a') -> a' -> (a' -> a') -> FL.Fold m a a'
-pureFold f i e = FL.Fold (\x y -> pure $ f x y) (pure i) (pure . e)
+pureFold f i e = FL.Fold (\x y -> pure . FL.Partial $ f x y) (pure i) (pure . e)
 
 stream' :: forall t m n a. (IsStream t, MonadAsync m, Ord n) => Kbtz t m n a -> t m a
 stream' = (M.foldl parallel mempty) . unKibbutz
