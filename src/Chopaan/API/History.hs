@@ -1,10 +1,8 @@
 {-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables, GADTs, FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia #-}
+
 module Chopaan.API.History where
 
-import GHC.Generics
-
-import Control.DeepSeq (NFData)
 import Control.Monad.IO.Class
 
 import Data.Greskell (FromGraphSON)
@@ -20,14 +18,12 @@ import NetSpider.Snapshot
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
 
+
 import Chopaan.Comm.Address
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
-import Chopaan.Kibbutz.Mesh
-import Chopaan.Node.Folds (SensorS)
-import Chopaan.Kibbutz.Transactor (Stake, TransactionStatus)
 import Chopaan.Kibbutz (stakeConfig, meshConfig, statusConfig, getGridRoot)
-
+import Chopaan.Graph
 
 import Servant (Server, Get, Capture, Proxy(..), (:>)
                , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer)
@@ -59,9 +55,6 @@ type HistoryAPI = "history"
   :> Get '[JSON] (SG)
 
 
-data GraphType = Mesh | Plan | Status
-  deriving (Eq, Ord, Show, Read, Bounded, Enum, Generic, ToJSON, FromJSON, NFData)
-
 genericToUrlPieceViaShow :: Show a =>  a -> Text.Text
 genericToUrlPieceViaShow = Text.pack . show
 
@@ -75,12 +68,7 @@ instance FromHttpApiData GraphType where
 serveHistoryApi :: Server (HistoryAPI)
 serveHistoryApi = hoistServer (Proxy @ HistoryAPI) liftIO getHistoryForGraph
 
-  
-data SG where
-  MeshSnapshot :: SnapshotGraph NodeMAC MeshNode RxSignal -> SG
-  StakeSnapshot :: SnapshotGraph NodeMAC SensorS Stake -> SG
-  StatusSnapshot :: SnapshotGraph NodeMAC SensorS TransactionStatus -> SG
-  deriving (Generic, ToJSON, FromJSON)
+
 
 getHistoryForGraph :: forall m. (MonadIO m)
   => GraphType

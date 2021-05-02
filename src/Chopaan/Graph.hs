@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable, DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase, TypeOperators, TypeApplications #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Chopaan.Graph (module Chopaan.Graph, module AG, module NG) where
 
 import Prelude hiding ((.), id)
@@ -17,10 +18,13 @@ import qualified Control.Newtype.Generics as N
 import Control.DeepSeq (NFData)
 
 import Control.Category
+import Data.Aeson
 import Data.Typeable
 import Data.Function ((&))
 import Data.Bifunctor
-import Data.Text as T
+import Data.Maybe (fromJust)
+import qualified Data.Map.Strict as Map
+import Data.Text as T hiding (zip)
 import Data.Greskell.Graph (AVertex, AEdge, ElementData, Element, Vertex, Edge)
 import Data.Greskell.GraphSON (FromGraphSON)
 import Data.Greskell.Greskell (toGremlin)
@@ -30,11 +34,17 @@ import Data.Greskell.GTraversal
     source, sV, sV', gV, (&.), unsafeCastStart, unsafeCastEnd, (<*.>), sAddV, gHas2, liftWalk, gFrom, gTo, gSideEffect, ToGTraversal, AddAnchor )
 
 import NetSpider.Graph  as NG (NodeAttributes(..), LinkAttributes(..), VFoundNode(..))
+import NetSpider.Snapshot
+import NetSpider.Timestamp (fromUTCTime, Timestamp(..))
 import qualified Algebra.Graph.Labelled as AG
 
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz
 import Chopaan.Node.NodeId
+import Chopaan.Kibbutz.Mesh
+import Chopaan.Node.Folds (SensorS)
+import Chopaan.Kibbutz.Transactor (Stake, TransactionStatus)
+import Chopaan.Kibbutz (stakeConfig, meshConfig, statusConfig, getGridRoot)
 import Chopaan.Node.HW
 
 import Shpadoinkle.Widgets.Types
@@ -48,6 +58,23 @@ type E = (EKbtzIncludes :+ M :+ Watts :+ WattHours)
 data KbtzGraph where
   Nod :: N -> KbtzGraph
   Connect :: E -> KbtzGraph
+
+deriving instance Generic Timestamp
+deriving instance NFData Timestamp
+deriving instance (NFData n, NFData a) => NFData (SnapshotNode n a)
+deriving instance (NFData n, NFData e) => NFData (SnapshotLink n e)
+
+
+data SG where
+  MeshSnapshot :: SnapshotGraph NodeMAC MeshNode RxSignal -> SG
+  StakeSnapshot :: SnapshotGraph NodeMAC SensorS Stake -> SG
+  StatusSnapshot :: SnapshotGraph NodeMAC SensorS TransactionStatus -> SG
+  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+
+
+data GraphType = Mesh | Plan | Status
+  deriving (Eq, Ord, Show, Read, Bounded, Enum, Generic, ToJSON, FromJSON, NFData, Humanize)
+
 
 -- $ Constraints for edge labels and nodes
 type GrConn f s = (Bounded s, Show s, Ord s, Eq s, Enum s, Show f, Monoid f, Ord f)
@@ -76,11 +103,18 @@ instance N.Newtype (Gr flow state)
 -- $ Shpadoinkle Instances
 instance (Show state, Show flow) => Humanize (Gr flow state)
 
+fromSnapshot :: forall n l v. (Monoid l, Ord n) => SnapshotGraph n v l -> Gr l v
+fromSnapshot (nodes, links) = Gr . AG.edges $ castLink <$> links
+  where
+    castLink l = (linkAttributes l, sourceAttrs l, destAttrs l)
+    nmap = Map.fromList $ zip (nodeId <$> nodes) (nodeAttributes <$> nodes)
+    sourceAttrs l = fromJust $ nmap Map.! (sourceNode l)
+    destAttrs l = fromJust $ nmap Map.! (destinationNode l) 
+    
+newtype GrNode = GrNode Int
+  deriving (Eq, Ord, Typeable, Show)
+  deriving newtype (Num)
 
-newtype GrNode = GrNode Int deriving (Eq, Ord, Typeable, Show, Num)
-
-
-                         
 
 newtype VKbtz = VKbtz AVertex
   deriving (Eq, Show)
