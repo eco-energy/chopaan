@@ -104,12 +104,14 @@ instance N.Newtype (Gr flow state)
 instance (Show state, Show flow) => Humanize (Gr flow state)
 
 fromSnapshot :: forall n l v. (Monoid l, Ord n) => SnapshotGraph n v l -> Gr l v
-fromSnapshot (nodes, links) = Gr . AG.edges $ castLink <$> links
+fromSnapshot g = Gr . AG.edges $ fmap (\(x, (_, y), (_, z)) -> (x, y, z)) $ castLinks g
+
+castLinks :: forall n v l. (Monoid l, Ord n) => SnapshotGraph n v l -> [(l, (n, v), (n, v))]
+castLinks (nodes, links) = (\l -> (linkAttributes l, sourceAttrs l, destAttrs l)) <$> links
   where
-    castLink l = (linkAttributes l, sourceAttrs l, destAttrs l)
     nmap = Map.fromList $ zip (nodeId <$> nodes) (nodeAttributes <$> nodes)
-    sourceAttrs l = fromJust $ nmap Map.! (sourceNode l)
-    destAttrs l = fromJust $ nmap Map.! (destinationNode l) 
+    sourceAttrs l = (sourceNode l, fromJust $ nmap Map.! (sourceNode l))
+    destAttrs l = (destinationNode l, fromJust $ nmap Map.! (destinationNode l))
     
 newtype GrNode = GrNode Int
   deriving (Eq, Ord, Typeable, Show)
