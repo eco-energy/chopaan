@@ -13,7 +13,7 @@ import Data.Function ((&))
 import Control.Monad.Catch
 
 import Streamly
-import Streamly.Internal.Memory.Array.Types (Array)
+import Streamly.Data.Array.Storable.Foreign (Array)
 import qualified Streamly.Prelude as S
 import qualified Streamly.Network.Socket as SK
 import Streamly.Network.Socket (SockSpec(..))
