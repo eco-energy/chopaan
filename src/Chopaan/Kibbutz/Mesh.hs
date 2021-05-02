@@ -6,6 +6,7 @@
 , DerivingStrategies
 , DeriveGeneric
 , DeriveAnyClass
+, DerivingVia
 #-}
 {-# LANGUAGE ScopedTypeVariables
 , TypeOperators
@@ -33,9 +34,9 @@ import Data.Aeson (FromJSON, ToJSON)
 import Chopaan.Comm.Comm (Address(..))
 import Chopaan.Node.NodeId
 import Chopaan.Utils.Time (utcTimeNow)
-
+import Data.Monoid (Sum(..))
 import qualified Streamly.Prelude as S
-import Streamly
+import Streamly.Prelude (IsStream, MonadAsync, adapt)
 
 import Data.Greskell (newBind, gProperty, lookupAs, Key, pMapToFail)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
@@ -49,6 +50,7 @@ import NetSpider.Timestamp (fromUTCTime)
 newtype RxSignal = RxSignal Double
   deriving stock (Generic)
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON, NFData)
+  deriving (Semigroup, Monoid) via (Sum Double)
 
 instance LinkAttributes RxSignal where
   writeLinkAttributes (RxSignal s) = do
