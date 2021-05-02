@@ -52,11 +52,20 @@ import Chopaan.API.History
 type API = "api" :> "kibbutzim" :> Get '[JSON] KbtzList
       :<|> "api" :> "kibbutz" :> Capture "id" KbtzName :> Get '[JSON] NodeList
 
+data GView = GView
+  { _whichK :: KbtzName
+  , _whichG :: GraphType
+  , _sg :: SG
+  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+
+makeFieldsNoPrefix ''GView
+
+
 
 data Frontend = MHomePage
               | MKibbutzim (RosterKbtzim)
               | MKibbutz (RosterNodezim)
-              | MGraph KbtzName
+              | MGraph GView
               | MAddNode (KbtzName) (Maybe NodeMAC) (NodeUpdate 'Edit)
               deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 

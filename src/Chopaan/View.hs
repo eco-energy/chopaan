@@ -151,8 +151,7 @@ view fe = case fe of
     ]
     where
       sectionTitle cr ed = H.h3_ [ text $ maybe cr (const ed) n ]
-  MGraph k -> onSum (_MGraph) $ H.div
-    [H.listenC undefined undefined] []
+  MGraph gv -> onSum (_MGraph) $ gView gv
 
 addBattery :: (MonadJSM m) => StorageUpdate 'Edit -> Html m (StorageUpdate 'Edit)
 addBattery bc = H.div [ H.onClick (\a-> undefined) ]
@@ -252,75 +251,14 @@ fuzzyK = flip (^.) <$>
   ]
 
 
-    
-data GView = GView
-  { _whichK :: KbtzName
-  , _whichG :: GraphType
-  , _sg :: SG
-  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
-
-makeFieldsNoPrefix ''GView
 
 gView :: (MonadJSM m) => GView -> Html m GView
-gView gv = H.div_ [
-  (H.div_ $ renderKbtzGraph (gv ^. sg)
-  , [
-      H.button [
-        H.onClick $ (\v -> v & whichG .~ g)
-        , H.class' "btn btn-primary"
-        ] [ text . humanize $ g ]
-    | g <- [(minBound @GraphType)..maxBound]
-  ]
-  ]
+gView gv = H.div_
+  [ onRecord sg $ renderKbtzGraph (gv ^. sg)
+  , onRecord whichG $ graphSelectButtons ]
   where
-    unwrapG (MeshSnapshot x) = fromSnapshot x 
-    unwrapG' (StakeSnapshot x) = fromSnapshot x
-    unwrapG'' (StatusSnapshot x) = fromSnapshot x
-
-
-{--
-renderGraph :: forall m n e a. (MonadJSM m, HistoryConn n e a)
-  => (a -> Html m (Graph e a))
-  -> (e -> Html m (Graph e a) -> Html m (Graph e a) -> Html m (Graph e a))
-  -> Graph e a
-  -> Html m (Graph e a)
-renderGraph = foldg (H.div' [ H.onClick id ]) 
-
-
-tradGraph :: forall n m e a. (MonadJSM m, HistoryConn n e a, ToJSON e, ToJSON a
-                           , Renderable a, Renderable e, Show a, Show e)
-  => Graph e a
-  -> Html m (Graph e a)
-tradGraph = renderGraph @m @n (n . render @a) edgeH
-
-class Renderable a where
-  render :: forall m. a -> Html m a
-
-
-vertexGIso :: (Show a, Show e) => EndoIso a (Graph e a) 
-vertexGIso = EndoIso id vertex (\g -> case g of
-                                   (Vertex a) -> a
-                                   x ->
-                                     error
-                                      ("Cannot deal with any node other than a vertex: Recieved\n"
-                                       <> show x))
-
-edgeGIso :: (Ord a, Eq e, Monoid e) => EndoIso (e, a, a) (Graph e a)
-edgeGIso = EndoIso id (\c -> edges [c]) (head . edgeList)
-
-
-
-n :: (Applicative m, Show a, Show e) => Html m a -> Html m (Graph e a)
-n = pimap vertexGIso
-
-e :: (Applicative m, Ord a, Eq e, Monoid e) => Html m (e, a, a) -> Html m (Graph e a)
-e = pimap edgeGIso
-
-
-sphereH :: Renderable a => a -> Html m a
-sphereH a = H.canvas [H.onClick id] [ render a ]
-
-
-edgeH :: (Renderable e) => e -> Html m (Graph e a) -> Html m (Graph e a) -> Html m (Graph e a)
-edgeH = undefined
---}
+    graphSelectButtons :: Html m (GraphType)
+    graphSelectButtons = H.div_ [
+      H.button [ H.onClick $ (const g)
+               , H.class' "btn btn-primary" ] [ text . humanize $ g ]
+      | g <- [(minBound @GraphType)..maxBound] ]

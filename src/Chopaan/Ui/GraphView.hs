@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, TypeFamilies, InstanceSigs
 , ConstraintKinds, ScopedTypeVariables, QuantifiedConstraints
-, RankNTypes, FlexibleContexts #-}
+, RankNTypes, FlexibleContexts, AllowAmbiguousTypes, ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable, DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase, TypeOperators, TypeApplications #-}
@@ -10,7 +10,7 @@ import ConCat.Misc (inNew, inNew2, (:*), (:+))
 import GHC.Generics (Generic, Generic1)
 import qualified Control.Newtype.Generics as N
 import Control.DeepSeq (NFData)
-
+import Control.PseudoInverseCategory
 import Data.Aeson
 import Data.Text hiding (empty, zip)
 import Data.Text.Lazy (toStrict)
@@ -38,9 +38,14 @@ import Diagrams.TwoD.Layout.Grid
 import Graphics.SVGFonts
 import qualified Clay as C
 
+import Chopaan.Kibbutz.Mesh
+import Chopaan.Node.Folds
+import Chopaan.Kibbutz.Transactor
 import Chopaan.Kibbutz.Kibbutz
 import Chopaan.Graph
-
+import Chopaan.Node.NodeId
+import NetSpider.Graph
+import NetSpider.Snapshot
 
 data G l v = N v | E l v v
 
@@ -54,18 +59,43 @@ layout :: forall m l v a. (Monoid l, Monoid v) => Gr l v -> (Gr l v -> Text) -> 
 layout gr style mk =  H.div [H.class' (style gr)] $ mk gr -- 
 
 
-renderKbtzGraph :: (Applicative m, Monoid l, Eq l, Ord v, Show l, Show v) => SG -> Html m SG
-renderKbtzGraph sg = case sg of
-  (MeshSnapshot ms) -> MeshSnapshot <$> renderThis (fromSnapshot ms)
-  (StakeSnapshot ms) -> StakeSnapshot <$> renderThis (fromSnapshot ms)
-  (StatusSnapshot ms) -> StatusSnapshot <$> renderThis (fromSnapshot ms)
+
+meshEndo :: EndoIso (SnapshotGraph NodeMAC MeshNode RxSignal) SG
+meshEndo = EndoIso id fwd back
   where
-    renderThis (Gr g) = [
+    fwd = MeshSnapshot
+    back (MeshSnapshot a) = a
+
+stakeEndo :: EndoIso (SnapshotGraph NodeMAC SensorS Stake) SG
+stakeEndo = EndoIso id fwd back
+  where
+    fwd = StakeSnapshot
+    back (StakeSnapshot a) = a
+
+statusEndo :: EndoIso (SnapshotGraph NodeMAC SensorS TransactionStatus) SG
+statusEndo = EndoIso id fwd back
+  where
+    fwd = StatusSnapshot
+    back (StatusSnapshot a) = a
+
+renderKbtzGraph :: forall m.(Applicative m) => SG -> Html m SG
+renderKbtzGraph sg = case sg of
+  (MeshSnapshot ms) -> pimap meshEndo $ renderM ms
+  (StakeSnapshot ms) -> pimap stakeEndo $ renderSk ms
+  (StatusSnapshot ms) -> pimap statusEndo $ renderSt ms
+  where
+    renderM = renderThis @NodeMAC @MeshNode @RxSignal
+    renderSk = renderThis @NodeMAC @SensorS @Stake 
+    renderSt = renderThis @NodeMAC @SensorS @TransactionStatus
+    renderThis :: forall n v l.
+      (Monoid l, Eq l, Ord v, Show l, Show v, Ord n, Show n)
+      =>  SnapshotGraph n v l -> Html m (SnapshotGraph n v l)
+    renderThis (ns, ls) = H.div [] $ [
       H.div (nodeClasses i) $ [ nodeHtml n ]
-      | (i, n) <- zip [0,(1 :: Double)..] $ AG.vertexList g
+      | (i, n) <- zip [0,(1 :: Double)..] $ ns
       ] <> [
       H.div (edgeClasses i) $ [ edgeHtml l v v' ]
-      | (i, (l, v, v')) <- zip [(0 :: Double), 1..] $ AG.edgeList g
+      | (i, (l, (n, v), (n', v'))) <- zip [(0 :: Double), 1..] $ castLinks (ns, ls)
       ]
       where
         grNameC i = H.class' $ "graph-" <> (pack . show $ i) 
@@ -76,10 +106,3 @@ renderKbtzGraph sg = case sg of
         edgeHtml l v v' = H.div_ [ H.text . pack . show $ v
                                  , H.text . pack . show $ v'
                                  , H.text . pack . show $ l ]
-
-
-graphView :: forall m flow state. (Applicative m, GrConn flow state)
-  => Gr flow state -> Html m (Gr flow state)
-graphView g = H.div grProps $ renderGraph' g --render' $ graph
-  where
-    renderGraph' = undefined
