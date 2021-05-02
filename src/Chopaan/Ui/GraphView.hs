@@ -54,25 +54,28 @@ layout :: forall m l v a. (Monoid l, Monoid v) => Gr l v -> (Gr l v -> Text) -> 
 layout gr style mk =  H.div [H.class' (style gr)] $ mk gr -- 
 
 
-renderKbtzGraph :: (Applicative m, Monoid l, Eq l, Ord v, Show l, Show v) => Gr l v -> [Html m a]
-renderKbtzGraph (Gr g) = [
-  H.div (nodeClasses i) $ [ nodeHtml n ]
-  | (i, n) <- zip [0,(1 :: Double)..] $ AG.vertexList g
-  ] <> [
-  H.div (edgeClasses i) $ [ edgeHtml l v v' ]
-  | (i, (l, v, v')) <- zip [(0 :: Double), 1..] $ AG.edgeList g
-  ]
+renderKbtzGraph :: (Applicative m, Monoid l, Eq l, Ord v, Show l, Show v) => SG -> Html m SG
+renderKbtzGraph sg = case sg of
+  (MeshSnapshot ms) -> MeshSnapshot <$> renderThis (fromSnapshot ms)
+  (StakeSnapshot ms) -> StakeSnapshot <$> renderThis (fromSnapshot ms)
+  (StatusSnapshot ms) -> StatusSnapshot <$> renderThis (fromSnapshot ms)
   where
-    grNameC i = H.class' $ "graph-" <> (pack . show $ i) 
-    posCss = H.class' . toStrict . C.render . C.position $ C.static
-    nodeClasses i = [grNameC i, posCss]
-    edgeClasses i = [grNameC i,  posCss]
-    nodeHtml = H.text . pack . show
-    edgeHtml l v v' = H.div_ [ H.text . pack . show $ v
-                            , H.text . pack . show $ v'
-                            , H.text . pack . show $ l ]
-
-
+    renderThis (Gr g) = [
+      H.div (nodeClasses i) $ [ nodeHtml n ]
+      | (i, n) <- zip [0,(1 :: Double)..] $ AG.vertexList g
+      ] <> [
+      H.div (edgeClasses i) $ [ edgeHtml l v v' ]
+      | (i, (l, v, v')) <- zip [(0 :: Double), 1..] $ AG.edgeList g
+      ]
+      where
+        grNameC i = H.class' $ "graph-" <> (pack . show $ i) 
+        posCss = H.class' . toStrict . C.render . C.position $ C.static
+        nodeClasses i = [grNameC i, posCss]
+        edgeClasses i = [grNameC i,  posCss]
+        nodeHtml = H.text . pack . show
+        edgeHtml l v v' = H.div_ [ H.text . pack . show $ v
+                                 , H.text . pack . show $ v'
+                                 , H.text . pack . show $ l ]
 
 
 graphView :: forall m flow state. (Applicative m, GrConn flow state)
