@@ -16,16 +16,19 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingStrategies, DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE TemplateHaskell, FunctionalDependencies #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 
 module Chopaan.View where
 
+import GHC.Generics (Generic)
 import qualified Data.Text                         as T
-import Data.Aeson (ToJSON)
+import Data.Aeson (ToJSON, FromJSON)
 import Data.Maybe (isNothing)
 
+import Control.DeepSeq (NFData)
 import Control.PseudoInverseCategory
 import Control.Newtype.Generics
 
@@ -87,9 +90,9 @@ default (T.Text, [])
 main :: IO ()
 main = runJSorWarp 8080 $ do
   H.setTitle "Chopaan"
-  simple runParDiff init ((template Dev init) . view) H.getBody
+  simple runParDiff initial ((template Dev initial) . view) H.getBody
   where
-    init = (MAddNode (KbtzId "this") Nothing emptyNodeForm)
+    initial = (MAddNode (KbtzId "this") Nothing emptyNodeForm)
 
 init :: (MonadJSM m) => Route -> m Frontend
 init _ = return (MAddNode (KbtzId "this") Nothing emptyNodeForm)
@@ -125,7 +128,7 @@ view fe = case fe of
   MKibbutz nodeRoster -> onSum _MKibbutz $ H.div "container-fluid"
     []
   MHomePage -> H.div_
-    [text "Welcome To Chopaan"
+    [ H.h1_ ["Welcome To Chopaan"]
     , H.a [ H.onClickM_ . navigate @(SPA m) $ RKibbutzim ] ["Add Kibbutz"]
     , H.a [ H.onClickM_ . navigate @(SPA m) $ RKibbutzim ] ["View Kibbutzim"]
     ] 
@@ -148,7 +151,8 @@ view fe = case fe of
     ]
     where
       sectionTitle cr ed = H.h3_ [ text $ maybe cr (const ed) n ]
-
+  MGraph k -> onSum (_MGraph) $ H.div
+    [H.listenC undefined undefined] []
 
 addBattery :: (MonadJSM m) => StorageUpdate 'Edit -> Html m (StorageUpdate 'Edit)
 addBattery bc = H.div [ H.onClick (\a-> undefined) ]
@@ -159,7 +163,7 @@ addBattery bc = H.div [ H.onClick (\a-> undefined) ]
       ]
   where
     errs = validate bc
-    isValid = getValid errs  
+    isValid = getValid errs
 
 addGeneration :: (MonadJSM m) => GenerationUpdate 'Edit -> Html m (GenerationUpdate 'Edit)
 addGeneration ef = H.div genProps [
@@ -249,6 +253,29 @@ fuzzyK = flip (^.) <$>
 
 
     
+data GView = GView
+  { _whichK :: KbtzName
+  , _whichG :: GraphType
+  , _sg :: SG
+  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+
+makeFieldsNoPrefix ''GView
+
+gView :: (MonadJSM m) => GView -> Html m GView
+gView gv = H.div_ [
+  (H.div_ $ renderKbtzGraph (gv ^. sg)
+  , [
+      H.button [
+        H.onClick $ (\v -> v & whichG .~ g)
+        , H.class' "btn btn-primary"
+        ] [ text . humanize $ g ]
+    | g <- [(minBound @GraphType)..maxBound]
+  ]
+  ]
+  where
+    unwrapG (MeshSnapshot x) = fromSnapshot x 
+    unwrapG' (StakeSnapshot x) = fromSnapshot x
+    unwrapG'' (StatusSnapshot x) = fromSnapshot x
 
 
 {--
