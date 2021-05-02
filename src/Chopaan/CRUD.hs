@@ -43,7 +43,7 @@ newtype NodeList = NodeList { unNodeList :: [Nodezim] }
   deriving newtype (NFData, ToJSON, FromJSON)
 
 data instance Column NodeList = NId | NMac | NHW
-  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+  deriving (Eq, Ord, Show, Bounded, Enum, Generic, NFData, ToJSON, FromJSON)
 
 newtype instance Row NodeList = NodezimRow { unNodezimRow :: Nodezim }
   deriving (Eq, Ord, Show, Generic)
@@ -84,7 +84,7 @@ newtype KbtzList = KbtzList { unKbtzList :: [Kbtzim] }
   deriving newtype (NFData, ToJSON, FromJSON)
 
 data instance Column KbtzList = KId | KName | KDesc
-  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+  deriving (Eq, Ord, Show, Generic, Bounded, Enum, NFData, ToJSON, FromJSON)
 
 newtype instance Row KbtzList = KbtzimRow { unKbtzimRow :: Kbtzim }
   deriving (Eq, Ord, Show, Generic)
@@ -98,7 +98,7 @@ instance Humanize (Column KbtzList) where
 
 
 instance Tabular KbtzList where
-  type Effect KbtzList m = (MonadJSM m, CRUDChopaan m)
+  type Effect KbtzList m = (MonadJSM m)
   toRows = (fmap KbtzimRow) . unKbtzList
   toCell :: forall m. Effect KbtzList m
     => KbtzList
