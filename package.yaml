@@ -228,7 +228,23 @@ executables:
           - -O2
       else:
         buildable: false
-
+  hydrate:
+    main:                Hydrate.hs
+    other-modules: []
+    source-dirs:         app
+    when:
+      condition: "!impl(ghcjs)"
+      then:
+        buildable: true
+        dependencies:
+          - chopaan
+          - optparse-simple
+          - base
+        ghc-options:
+          - -threaded
+          - -O2
+      else:
+        buildable: false
 
 
 tests:
