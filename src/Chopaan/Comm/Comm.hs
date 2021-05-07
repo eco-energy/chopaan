@@ -15,6 +15,7 @@ module Chopaan.Comm.Comm (Chopaan.Comm.Dispatch.Dispatch(..)
                          , initQs
                          , initMessageQs
                          , initPubQ
+                         , initPubQIO
                          , MessageQs(..)
                          , PubQueue
                          , WriteChan(..)
@@ -68,6 +69,9 @@ data MessageQs n = MessageQs
 
 initPubQ :: STM (PubQueue)
 initPubQ = initNodeQueue
+
+initPubQIO :: IO (PubQueue)
+initPubQIO = atomically initPubQ
 
 initQs :: IO (MessageQs NodeMAC)
 initQs = initMessageQs @NodeMAC
