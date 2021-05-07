@@ -46,7 +46,6 @@ import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.KbtzimT ()
 import Chopaan.CRUD
 import Chopaan.Graph
-import Chopaan.API.History
 
 
 type API = "api" :> "kibbutzim" :> Get '[JSON] KbtzList
