@@ -57,15 +57,15 @@ instance (Monad m) => Applicative (AppF m a) where
   pure = AppF . pure
   (AppF f) <*> (AppF xs) = AppF $ f <*> xs
 
-powerFold :: forall m. Applicative m => AppF m EnergyState (Power)
+powerFold :: forall m. Applicative m => AppF m EnergyState (PowerN)
 powerFold = AppF (FL.Fold (\_ b-> pure . FL.Partial . power $ b) (pure $ mempty) pure) 
 
 
-energyFold :: forall m. Applicative m => AppF m (EnergyState) (Energy)
+energyFold :: forall m. Applicative m => AppF m (EnergyState) (EnergyN)
 energyFold = AppF (FL.Fold step begin end)
   where
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
-    step :: (Energy, Maybe UTCTime) -> EnergyState -> m (FL.Step (Energy, Maybe UTCTime) Energy)
+    step :: (EnergyN, Maybe UTCTime) -> EnergyState -> m (FL.Step (EnergyN, Maybe UTCTime) EnergyN)
     step (esPrev, (Just tPrev)) cur = pure . FL.Partial $
       (esPrev <> eAtT (power cur) (diffUTC tn tPrev), Just tn)
       where
@@ -74,11 +74,11 @@ energyFold = AppF (FL.Fold step begin end)
       (esPrev <> (eAtT (power cur) 0), Just tn)
       where
         tn = utcTimeES cur
-    begin :: m (Energy, Maybe UTCTime)
+    begin :: m (EnergyN, Maybe UTCTime)
     begin = pure $ (mempty, Nothing)
-    end :: (Energy, Maybe UTCTime) -> m (Energy)
+    end :: (EnergyN, Maybe UTCTime) -> m (EnergyN)
     end = pure . fst
-    eAtT :: Power -> DiffTime -> (Energy)
+    eAtT :: PowerN -> DiffTime -> (EnergyN)
     eAtT p t = Node { tx = (pToE t tx)
                     , consumed = (pToE t consumed)
                     , generated = (pToE t generated)

@@ -37,10 +37,10 @@ import Chopaan.Node.Metrics
 ---------------------------------------------------------------------------------------------------------------}
 
 
-powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Power
+powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m PowerN
 powerS = S.postscan . unAppF $ powerFold
 
-energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Energy
+energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m EnergyN
 energyS = S.postscan . unAppF $ energyFold
 
 nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m SensorS

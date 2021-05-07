@@ -20,6 +20,7 @@ import Numeric.Compensated
 
 import Data.ProtoLens
 import Lens.Micro
+import qualified Data.Text as T
 import Text.Printf
 
 
@@ -252,7 +253,7 @@ instance FromJSON (EnergyState) where
                          & solarInputCurrent .~ si
   parseJSON _ = mempty
 
-
+esFieldNamesJSON :: [T.Text]
 esFieldNamesJSON = ["batteryV",
                      "gridV",
                      "battery2LoadC",
@@ -418,9 +419,9 @@ socPercentage Battery{..} = (soc * 100 / totalCapacity)
                                           Helper Functions
 ---------------------------------------------------------------------------------------------------------------------}
 
-type Power = Node (Watts)
+type PowerN = Node (Watts)
 
-type Energy = Node (WattSeconds)
+type EnergyN = Node (WattSeconds)
 
 
 storageSensors :: EnergyState -> SensorVector R
@@ -432,7 +433,7 @@ storageSensors es = SensorVector
     i = - (es ^. gridToBatteryCurrent + es ^. solarInputCurrent)
     o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
 
-power :: EnergyState -> Power
+power :: EnergyState -> PowerN
 power es = Node
            { tx = txIn' - txOut'
            , consumed = cnsm'
@@ -480,5 +481,5 @@ instance (ToField n, ToField e, ToField p) => ToNamedRecord (TaggedNode n e p) w
 instance DefaultOrdered (TaggedNode n e p) where
   headerOrder _ = (Vec.fromList $ ["NodeId", "time"])
                   <> (headerOrder (undefined :: EnergyState))
-                  <> (headerOrder (undefined :: Power))
-                  <> (headerOrder (undefined :: Energy))
+                  <> (headerOrder (undefined :: PowerN))
+                  <> (headerOrder (undefined :: EnergyN))

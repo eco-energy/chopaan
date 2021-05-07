@@ -54,6 +54,11 @@ defHW = HW (SingBC defBC) (SingPC defPC) (SingLC defLC)
 
 instance (Show a) => Humanize (HW a)
 
+
+storageKey :: Key VFoundNode (BatteryTop Double)
+storageKey = "hw_storage"
+
+
 instance NodeAttributes (HW a) where
   writeNodeAttributes hw = fmap writeKeyValues $ sequence $
     [ 
