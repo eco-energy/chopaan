@@ -178,34 +178,22 @@ addKbtz k = do
     addId = return $ gProperty "@kbtz_id" kid
   addId <*.> (pure $ sAddV "kbtz" $ source "g")
 
-addNode :: KbtzName -> ANode -> Binder (GTraversal SideEffect () EKbtzIncludes)
-addNode k ANode{anId} = do
+addNode :: ANode -> Binder (GTraversal SideEffect () VHH)
+addNode ANode{anId} = do
   n <- newBind anId
-  kb <- gGetKbtzByKbtzId k
-  let
-    addId :: Walk SideEffect VHH VHH
-    addId = gProperty "@knode_id" n
-    addV :: Walk SideEffect VKbtz VHH
-    addV = gAddV "knode"
-    withNode :: Walk SideEffect VKbtz VHH
-    withNode = (addId . addV)
-    no :: Walk SideEffect VKbtz VKbtz
-    no = (gSideEffect withNode) . (liftWalk kb)
-  x <- gKbtzNodes k
-  x' <- gHasNodeId anId
-  let
-    thisN :: Walk Transform VKbtz VHH
-    thisN = x' . x . (liftWalk kb)
-    anc :: AddAnchor VKbtz VHH
-    anc = gTo thisN
-    ac = gFrom (liftWalk kb)
-    ed :: Walk SideEffect VKbtz EKbtzIncludes
-    ed = gAddE "kbtzIncludes" anc
-  return $ (liftWalk allKbtz) &. (liftWalk no) &. ed
+  let addId = return $ gProperty "@knode_id" n
+  addId <*.> (pure $ sAddV "knode" $ source "g")
+
+addKnowsE :: KbtzName -> ANode -> Binder (Walk SideEffect VKbtz EKbtzIncludes)
+addKnowsE k ANode{anId} = do
+  n <- newBind anId
+  return $
+    gAddE "kbtzIncludes" (gTo (gV @VHH [] >>> gHas2 "@knode_id" n)) 
 
 
-emitsAEdge :: ToGTraversal g => g c s AEdge -> g c s AEdge
-emitsAEdge = id
+--addNodeToKbtz :: KbtzName -> ANode -> _
+--addNodeToKbtz k n = (addKnowsE k n) <*.> (addNode n)
+
 
 writeHWConfig :: HW Double -> Binder (Walk SideEffect VHW VHW)
 writeHWConfig hw = (unsafeCastStart . unsafeCastEnd) <$> (writeNodeAttributes hw)
