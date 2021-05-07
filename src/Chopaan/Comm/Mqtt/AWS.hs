@@ -12,12 +12,12 @@ import Lens.Micro
 import Text.InterpolatedString.Perl6
 
 import qualified Network.AWS.IoT.DescribeEndpoint as DE
-import Control.Monad.Trans.AWS
+import Control.Monad.Trans.AWS ()
 
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.AWS.Things
-
+import Chopaan.Kibbutz.AWS.Common
 
 type ChopaanId = Text.Text
 type MQTTCreds = ThingCreds
