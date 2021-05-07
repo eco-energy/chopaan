@@ -42,7 +42,6 @@ import Data.Text.Encoding (encodeUtf8)
 import qualified Data.ByteString.Base64 as B64
 
 
-
 -- Streamly
 import qualified Streamly.Prelude as S
 
@@ -92,7 +91,7 @@ success = (== 200)
 iotApi :: Service
 iotApi = iot "execute-api"
 
-type AWSC b = AWST' Env (ResourceT IO) b
+
 
 inIotContext :: Logger -> AWST' Env (ResourceT IO) b -> IO b
 inIotContext lgr = inAwsContext lgr iotApi

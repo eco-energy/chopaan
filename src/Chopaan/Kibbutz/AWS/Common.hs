@@ -4,6 +4,7 @@ module Chopaan.Kibbutz.AWS.Common
   , pageUF
   , newLogger
   , LogLevel (..)
+  , AWSC
   ) where
 
 import Control.Monad.Trans.AWS
@@ -14,8 +15,9 @@ import qualified Streamly.Data.Unfold as UF
 import qualified Streamly.Internal.Data.Unfold.Types as UF
 import qualified Streamly.Internal.Data.Stream.StreamD.Type as STy
 
+type AWSC b = AWST' Env (ResourceT IO) b
 
-inAwsContext :: Logger -> Service -> AWST' Env (ResourceT IO) b -> IO b
+inAwsContext :: Logger -> Service -> AWSC b -> IO b
 inAwsContext lgr svc ma = do
   env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure svc  
   runResourceT . runAWST env $ ma
