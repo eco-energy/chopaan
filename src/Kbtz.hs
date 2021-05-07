@@ -37,7 +37,7 @@ class (MonadAsync m, Address n) => KbtzM m n | m -> n where
 
 
 instance KbtzM (ReaderT App IO) NodeMAC where
-  kbtzNodes = liftIO . runReaderT getNodes
+  kbtzNodes = liftIO . getNodes
   kbtzQueues = liftIO initMessageQs
   subscribe = sub
   publish p s = S.mapM_ (\(n, a) -> liftIO $ writeToPubQ p (controlTopic n) a) $ adapt s
