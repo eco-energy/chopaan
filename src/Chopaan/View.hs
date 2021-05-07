@@ -23,14 +23,9 @@
 
 module Chopaan.View where
 
-import GHC.Generics (Generic)
 import qualified Data.Text                         as T
-import Data.Aeson (ToJSON, FromJSON)
 import Data.Maybe (isNothing)
 
-import Control.DeepSeq (NFData)
-import Control.PseudoInverseCategory
-import Control.Newtype.Generics
 
 import Control.Lens hiding (view, simple)
 import Control.Lens.Unsound (lensProduct)
@@ -41,23 +36,14 @@ import qualified Shpadoinkle.Html                  as H
 import           Shpadoinkle.Lens
 import           Shpadoinkle.Router                (navigate, toHydration)
 import           Shpadoinkle.Run                   (Env, entrypoint)
-import           Shpadoinkle.Widgets.Form.Dropdown as Dropdown (Dropdown (..),
-                                                                Theme (..),
-                                                                defConfig,
-                                                                dropdown)
+
 import qualified Shpadoinkle.Widgets.Form.Input    as Input
 import           Shpadoinkle.Widgets.Table         as Table hiding (view)
-import           Shpadoinkle.Widgets.Types         (Consideration, Considered,
-                                                    ConsideredChoice,
-                                                    Control (..), Field,
-                                                    Hygiene (..), Input (..),
-                                                    Pick (..), Present,
-                                                    Selected, Status (..),
-                                                    Toggle (..), Validated (..),
-                                                    fullset, fuzzySearch,
-                                                    getValid, humanize, present,
-                                                    validate, withOptions')
---import           Shpadoinkle.Console         (askJSM, trapper)
+import           Shpadoinkle.Widgets.Types         (Control (..),
+                                                    Pick (..), Status (..),
+                                                    fuzzySearch,
+                                                    getValid, humanize,
+                                                    validate)
 import           Shpadoinkle.Run             (runJSorWarp, simple, Env(Dev))
 import           Shpadoinkle.Backend.ParDiff (runParDiff)
 
@@ -75,14 +61,9 @@ import Chopaan.Node.HW
 import Chopaan.Node.Components
 import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Ui.FormCommon
-import Chopaan.Graph
 import Chopaan.Ui.GraphView
-import Data.Map
 import qualified Clay as C
 import Data.Colour
-import qualified Algebra.Graph.Labelled as AG
-
-import qualified Algebra.Graph as G
 
 
 default (T.Text, [])
@@ -104,6 +85,7 @@ onRouteChange = \case
   RKibbutzim -> MKibbutzim . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
   RKibbutz k -> MKibbutz . RosterNodezim (SortCol NId ASC) mempty <$> (listNodezim k)
   RAddNode k -> return $ MAddNode k Nothing emptyNodeForm
+  --RGraph k -> return $ MGraph
   -- RSearch k s -> MKibbutz . RosterNodezim (SortCol NId ASC) s <$> (listNodezim k) 
   
 
