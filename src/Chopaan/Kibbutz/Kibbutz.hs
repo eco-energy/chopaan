@@ -6,7 +6,7 @@ module Chopaan.Kibbutz.Kibbutz where
 import Prelude hiding (zipWith)
 
 
-import Streamly
+import Streamly.Prelude (IsStream, MonadAsync, parallel)
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
@@ -20,7 +20,6 @@ import Data.Map.Lazy (Map)
 import Data.Key
 
 import Data.Bifunctor
-import Control.Applicative (liftA2)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Trans.Reader
 
@@ -30,7 +29,7 @@ import Chopaan.Comm.Comm ( Address
                          , WriteChan
                          )
        
-import Chopaan.Node.Node ( nodeS, SensorS )
+
 import Chopaan.Node.NodeId ( NodeMAC
                            , NodeId(..)
                            )
@@ -41,11 +40,6 @@ import Chopaan.Kibbutz.AWS.Things ( getThings
                                   , inIotContext
                                   )
 import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
-
-import Proto.NodeMessageSchema.NodeMessages ( RuntimeStats
-                                            , EnergyState
-                                            )
-
 
 import ConCat.Scan
 import ConCat.Misc
@@ -60,9 +54,7 @@ instance KbtzConn t m n => LScan (Kbtz t m n) where
   lscan f = (f, mempty)
 
 
-newtype Kbtz (t :: (* -> *) -> * -> *) (m :: * -> *) n a = Kbtz {
-  unKibbutz :: Map n (t m a)
-  }
+newtype Kbtz (t :: (* -> *) -> * -> *) (m :: * -> *) n a = Kbtz { unKibbutz :: Map n (t m a) }
   deriving (Eq, Ord, Show, Generic, Generic1)
   deriving newtype (NFData)
 
@@ -137,6 +129,7 @@ kbtz ::
   -> (t m b -> t m a)
   -> m (Kbtz t m n a)
 kbtz ns subscribe process = do
+  liftIO . print $ ("Kbtz Subscribing: " <> show ns)
   ss <- mapM subscribe ns
   return $ Kbtz . M.fromList $ [(n, process s) | n <- ns, s <- ss]
 
@@ -151,10 +144,9 @@ sub :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a)
   -> m (t m a)
 sub = flip (subStream @t @m @n @a) 
 
-getNodes :: (MonadIO m) => ReaderT KbtzName m [NodeMAC]
-getNodes = do
+getNodes :: (MonadIO m) => KbtzName -> m [NodeMAC]
+getNodes (KbtzId n) = do
   lgr <- liftIO $ newLogger Debug stdout
-  (KbtzId n) <- ask
   ((fmap $ NodeId . fromJust . thingName)
               <$> (liftIO . (inIotContext lgr) . getThings $ n))
 

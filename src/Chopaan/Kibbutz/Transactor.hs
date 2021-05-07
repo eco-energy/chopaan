@@ -28,11 +28,10 @@ import Prelude hiding (zip, zipWith)
 import Control.Monad.IO.Class
 import Control.DeepSeq (NFData)
 
-import Chopaan.Kibbutz.Kibbutz (Kbtz(..), kbtzState, scanKbtz, stream)
-import Chopaan.Comm.Comm (Address(..), Dispatch(..), PubQueue, writeToPubQ)
+import Chopaan.Kibbutz.Kibbutz (Kbtz(..), kbtzState)
+import Chopaan.Comm.Comm (Address(..), PubQueue, writeToPubQ)
 import Chopaan.Node.Node (SensorS)
-import Chopaan.Node.Metrics (Power
-                            , toWattSeconds, toWatts
+import Chopaan.Node.Metrics (toWattSeconds, toWatts
                             , fromWattSeconds, fromWatts
                             , Watts, WattSeconds
                             , SensorMetrics(..)
@@ -61,7 +60,7 @@ import Data.Aeson (ToJSON, FromJSON, parseJSON)
 import GHC.Generics (Generic)
 
 import qualified Streamly.Prelude as S
-import Streamly
+import Streamly.Prelude (IsStream, MonadAsync, adapt)
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 
@@ -75,8 +74,8 @@ import ConCat.Misc (R)
 
 import Data.Greskell (lookupAs, Key, pMapToFail, FromGraphSON(..), parseGraphSON)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
-import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
-import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
+import Data.Greskell.GraphSON.GValue (unwrapOne)
+import NetSpider.Found (LinkState(..))
 import NetSpider.Graph (LinkAttributes(..), EFinds)
 
 
@@ -91,7 +90,6 @@ instance (Ord n) => Monoid (Tx n a) where
   mempty = Tx mempty
 
 
-
 type TxPlan n = Tx n Stake
 
 type TxState n = Tx n (Role, TransactionStatus)
@@ -100,7 +98,7 @@ type NodeStates n = Tx n SensorS
 
 
 
-asKbtz :: forall t m n a. (IsStream t, MonadAsync m, Ord n)
+asKbtz :: forall t m n. (IsStream t, MonadAsync m, Ord n)
   => t m (TxPlan n, t m TransactionStatus)
   -> m (Kbtz t m (TxPlan n) TransactionStatus)
 asKbtz txs = do
@@ -164,7 +162,8 @@ planTx horizon k = S.trace (\p -> liftIO . print $ "Plan For Interval:\n" <> sho
 
 monitorTx :: (MonadAsync m, Address n, Ord n, IsStream t, Monad (t m)) => TxPlan n -> Kbtz t m n SensorS -> t m (TxState n)
 monitorTx tx k = S.postscan (transactionFold tx)
-                 $ S.trace (\tx -> liftIO . print $ "Entering Tx Monitor" <> "\n" <> show tx)  
+                 $ S.trace (\t -> liftIO . print
+                                  $ "Entering Tx Monitor" <> "\n" <> show t)  
                  $ toNodeStates k
 
 
@@ -178,7 +177,6 @@ runTransactor q horizon k = (,) <$> txs <*> statuses
   where
     txs = S.trace (dispatchTx q) $ planTx horizon k
     statuses = S.map (flip monitorTx $ k) txs
-    withLog f q = f q >> \tx -> putStrLn ("Tx:\n" <> show tx) 
 
 dispatchTx :: forall m n. (MonadIO m, Address n)
   => PubQueue
@@ -195,8 +193,6 @@ dispatchNodeTx :: forall m n. (MonadIO m, Address n)
   -> TxPlan n
   -> m ()
 dispatchNodeTx q (Tx tx) = do
-  uid <- liftIO $ (Text.pack . show) <$> getULID
-  t0 <- liftIO $ Time.getCurrentTime
   let txDispatches =  (\(nid, st) -> (stateTopic nid, fromStake st)) <$> (M.toList tx)
   sequence_ $ (\(t, s) -> liftIO $ writeToPubQ q t s) <$> txDispatches
 
@@ -214,14 +210,12 @@ transactionFold :: forall m n. (Monad m, Address n, Ord n) => TxPlan n
 transactionFold (Tx participants) = FL.Fold step start end
   where
     step :: TxState n -> NodeStates n -> m (FL.Step (TxState n) (TxState n))
-    -- Zip instance for Map is defined as intersection with, so we don't need
-    -- to filter the NodeStates.
     step (Tx ts) (Tx ns) = pure . shouldQuit $ t''
       where
-        shouldQuit t = if (all ((\x -> energyRemaining x <= 0) . snd . snd) (M.toList t))
+        shouldQuit t = if (all ((\x -> timeRemaining x <= 0) . snd . snd) (M.toList t))
                    then (FL.Done . Tx $ t)
                    else (FL.Partial . Tx $ t)
-        t'' = zipWith updateTS ts ns 
+        t'' = zipWith updateTS ts ns
     start :: m (TxState n)
     start = return . Tx $
       (\(Stake (px, w, t))-> (px, mempty{ timeRemaining = t
@@ -256,7 +250,7 @@ transactionFold (Tx participants) = FL.Fold step start end
         hasStarted Sink = (abs $ tx _powerT) >= eta
         hasEnded Source =  shouldHaveEnded && (abs $ tx _powerT) <= eta
         hasEnded Sink = shouldHaveEnded && (abs $ tx _powerT) <= eta
-        shouldHaveEnded = (energyRemaining txn - txEnergy) <= 0
+        shouldHaveEnded = (timeRemaining txn) <= 0
         eta = 0.5
 
 transactionPlanner :: forall m n. (MonadIO m, Show n, Address n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (TxPlan n)
@@ -266,7 +260,7 @@ transactionPlanner timeHorizon = FL.Fold step start end
     step (Tx _) (Tx nodes) = do
       s <- schedule
       case s of
-        (ValidPlan sc c) -> pure . FL.Partial $ sc
+        (ValidPlan sc _) -> pure . FL.Partial $ sc
         Wait -> pure . FL.Partial $ mempty
       where
         consumption = M.toAscList $ fmap _demand nodes
@@ -320,8 +314,6 @@ solveTP timeHorizon sources sinks cs = do
       e2p :: Time.DiffTime -> WattSeconds -> Watts
       e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
 
-isValidPlan :: [a] -> Bool
-isValidPlan plan = length plan > 0
 
 
 {---
