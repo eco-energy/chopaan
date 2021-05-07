@@ -31,7 +31,7 @@ run = do
     KibbutzOpts{..} = kibbutzOpts
     kibbutzim = []
     kbtzOpts =
-      fmap (\n -> mkKbtzConf (KbtzId n) mqttOpts{connId=n} janusHost janusPort) kibbutzim 
+      fmap (\n -> mkKbtzConf (KbtzId n) [] (Left $ mqttOpts{connId=n}) janusHost janusPort) kibbutzim 
   liftIO $ mapM_ runKibbutz kbtzOpts
   --liftIO $ print ("Running Monitor...")
   --liftIO $ mon id (defGrid nodes) sensors runtime
