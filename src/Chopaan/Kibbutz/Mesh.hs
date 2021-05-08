@@ -7,6 +7,7 @@
 , DeriveGeneric
 , DeriveAnyClass
 , DerivingVia
+, StandaloneDeriving
 #-}
 {-# LANGUAGE ScopedTypeVariables
 , TypeOperators
@@ -28,8 +29,9 @@ import qualified Proto.NodeMessageSchema.NodeMessages as N
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N
 import GHC.Generics
 
-import Data.Time (DiffTime)
+import Data.Time (DiffTime(..))
 import Data.Text
+import Data.Binary
 import Data.Aeson (FromJSON, ToJSON)
 import Chopaan.Comm.Comm (Address(..))
 import Chopaan.Node.NodeId
@@ -49,7 +51,7 @@ import NetSpider.Timestamp (fromUTCTime)
 
 newtype RxSignal = RxSignal Double
   deriving stock (Generic)
-  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON, NFData)
+  deriving newtype (Eq, Ord, Show, ToJSON, FromJSON, NFData, Binary)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 instance LinkAttributes RxSignal where
@@ -63,17 +65,23 @@ instance LinkAttributes RxSignal where
 data MeshLink = MeshLink
   deriving (Eq, Show, Ord, Generic, ToJSON, FromJSON, NFData)
 
+--deriving instance Generic DiffTime
+--instance Binary DiffTime
+
 data MeshNode = MeshNode
   { isRoot :: Bool
-  , uptime :: DiffTime
+  , uptime :: Integer
   , routerRSSI :: Int
   , version :: Text
-  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
+  }
+  deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
+  deriving anyclass (Binary) 
+
 
 rootKey :: Key VFoundNode Bool
 rootKey = "isRoot"
 
-uptimeKey :: Key VFoundNode Int
+uptimeKey :: Key VFoundNode Integer
 uptimeKey = "uptime"
 
 routerRSSIKey :: Key VFoundNode Int
@@ -86,7 +94,7 @@ instance NodeAttributes MeshNode where
   writeNodeAttributes n = fmap writeKeyValues $
                           sequence $
                           [ rootKey <=:> isRoot n
-                          , uptimeKey <=:> (truncate $ uptime n)
+                          , uptimeKey <=:> (uptime n)
                           , routerRSSIKey <=:> routerRSSI n
                           , versionKey <=:> version n
                           ]
@@ -114,7 +122,7 @@ addRTS :: (MonadIO m)
         -> m ()
 addRTS spider (n, rts) = liftIO $ addFoundNode spider finding
   where
-    finding = FoundNode { subjectNode= n
+    finding = FoundNode { subjectNode = n
                         , foundAt = fromUTCTime . utcTimeNow $ rts ^. N.cpuTime
                         , neighborLinks = [link]
                         , nodeAttributes = parseRTSToNode rts
@@ -122,7 +130,7 @@ addRTS spider (n, rts) = liftIO $ addFoundNode spider finding
     
     link = FoundLink { targetNode = NodeId (rts ^. N.parent ^. N.macAddr)
                      , linkState=LinkToSubject
-                     , linkAttributes = RxSignal (fromIntegral $ rts ^. N.meshParentStrength)
+                     , linkAttributes = parseRxSignal rts
                      }
 
 parseRTSToNode :: N.RuntimeStats -> MeshNode
@@ -131,3 +139,9 @@ parseRTSToNode rts = MeshNode
   , isRoot = (rts ^. N.isRoot)
   , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
   , version = (rts ^. N.version) }
+
+parseRxSignal :: N.RuntimeStats -> RxSignal
+parseRxSignal rts = RxSignal . fromIntegral $ rts ^. N.meshParentStrength
+
+nodeLinkPair :: N.RuntimeStats -> (MeshNode, RxSignal)
+nodeLinkPair rts = (parseRTSToNode rts, parseRxSignal rts)
