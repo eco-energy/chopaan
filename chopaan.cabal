@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f80b95247940a4b71cccf4e7b4a0d45fbaec1bbb1c8a80fbed9af059e6d4d6ef
+-- hash: 739fd3e16e8590281104ee5b2e1f7fb21d609aec811cfbf85547edbdcd5ad82b
 
 name:           chopaan
 version:        0.1.0.0
@@ -96,6 +96,7 @@ library
       Proto.NodeMessageSchema.NodeMessages_Fields
       Servant.Streamly
       SimNode
+      Streamly.Binary
       TxModel
       Ui
   other-modules:
