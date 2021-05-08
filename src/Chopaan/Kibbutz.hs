@@ -170,14 +170,14 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
   let
       powerK = _powerT <$> sensorKbtz
       energyK = _energyT <$> sensorKbtz
-      txPlan = S.trace (liftIO . print) $ planTx horizon sensorKbtz
+      txPlan = planTx horizon sensorKbtz
       txMonitor = (flip monitorTx sensorKbtz) <$> txPlan
       --dispatcher = S.mapM (dispatchTx outbox) txPlan
       planHG = ingestSensorKbtz stakeLinkDir $ (,)
                <$> stream sensorKbtz
                <*> (S.yield . (curryTx mempty) <$> txPlan)
       monHG = ingestSensorKbtz txStatusLinkDir $ editMonS snd $ (,)
-        <$> (S.trace (liftIO . print) $ stream sensorKbtz)
+        <$> stream sensorKbtz
         <*> ((fmap . fmap) (curryTx (Source, mempty)) txMonitor)
   meshHG <- pure . writeSpiderStream spConf addRTS . stream $ rsKbtz
   -- dispatcher `parallel` 
@@ -239,7 +239,7 @@ writeSpiderStream :: (IsStream t, MonadAsync m, MonadCatch m)
 writeSpiderStream conf f as = S.bracket
   (liftIO $ connectWith conf)
   (liftIO . close)
-  (\s -> S.mapM (f s) as)
+  (\s -> S.mapM (\x -> (liftIO . print $ "writing to spider") >> f s x) as)
 
 getSnapshotStream :: (IsStream t, MonadAsync m, MonadCatch m)
   => Config n v e
