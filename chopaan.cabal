@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 739fd3e16e8590281104ee5b2e1f7fb21d609aec811cfbf85547edbdcd5ad82b
+-- hash: 9bf4907887d08bdd63c4197500440b1131b532861fa5b36a6a49aaf1ac63aa44
 
 name:           chopaan
 version:        0.1.0.0
@@ -82,6 +82,7 @@ library
       Chopaan.Ui.Foreign.WebSocket
       Chopaan.Ui.FormCommon
       Chopaan.Ui.GraphView
+      Chopaan.Ui.ImageV
       Chopaan.Ui.Style
       Chopaan.Ui.Three
       Chopaan.Ui.WebSocket
@@ -187,6 +188,7 @@ library
       , compensated
       , concat-classes
       , concat-examples
+      , concat-graphics
       , concat-plugin
       , conduit
       , connection
@@ -300,6 +302,7 @@ executable dev
       , compensated
       , concat-classes
       , concat-examples
+      , concat-graphics
       , concat-plugin
       , conduit
       , connection
@@ -422,6 +425,7 @@ executable hydrate
       , compensated
       , concat-classes
       , concat-examples
+      , concat-graphics
       , concat-plugin
       , conduit
       , connection
@@ -544,6 +548,7 @@ executable server
       , compensated
       , concat-classes
       , concat-examples
+      , concat-graphics
       , concat-plugin
       , conduit
       , connection
@@ -667,6 +672,7 @@ executable tx
       , compensated
       , concat-classes
       , concat-examples
+      , concat-graphics
       , concat-plugin
       , conduit
       , connection
@@ -788,6 +794,7 @@ executable ui
       , compensated
       , concat-classes
       , concat-examples
+      , concat-graphics
       , concat-plugin
       , conduit
       , connection
@@ -919,6 +926,7 @@ test-suite chopaan-test
       , compensated
       , concat-classes
       , concat-examples
+      , concat-graphics
       , concat-plugin
       , conduit
       , connection

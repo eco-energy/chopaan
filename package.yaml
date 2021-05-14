@@ -108,6 +108,7 @@ when:
       - concat-classes
       - concat-examples
       - concat-plugin
+      - concat-graphics
       - network-uri
       - websockets
       - servant-server
