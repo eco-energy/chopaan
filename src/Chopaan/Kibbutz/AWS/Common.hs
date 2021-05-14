@@ -5,6 +5,7 @@ module Chopaan.Kibbutz.AWS.Common
   , newLogger
   , LogLevel (..)
   , AWSC
+  , Logger
   ) where
 
 import Control.Monad.Trans.AWS

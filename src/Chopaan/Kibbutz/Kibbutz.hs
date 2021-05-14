@@ -146,7 +146,7 @@ sub = flip (subStream @t @m @n @a)
 
 getNodes :: (MonadIO m) => KbtzName -> m [NodeMAC]
 getNodes (KbtzId n) = do
-  lgr <- liftIO $ newLogger Debug stdout
+  lgr <- liftIO $ newLogger Info stdout
   ((fmap $ NodeId . fromJust . thingName)
               <$> (liftIO . (inIotContext lgr) . getThings $ n))
 

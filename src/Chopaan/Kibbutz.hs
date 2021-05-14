@@ -59,11 +59,12 @@ import Chopaan.Kibbutz.Transactor (planTx
                                   , txStatusLinkDir
                                   )
 import Chopaan.Kibbutz.Mesh
+import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
 
 import Chopaan.Node.NodeId (NodeId(..), NodeMAC)
 import Chopaan.Node.Folds (SensorS)
 import Chopaan.Node.Node (nodeS)
-import Chopaan.Node.Metrics (SensorMetrics(_time, _powerT, _energyT), Node(..))
+import Chopaan.Node.Metrics (SensorMetrics(..), Node(..))
 import Chopaan.Node.HW
 
 import Chopaan.Comm.Mqtt (runMqtt)
@@ -144,15 +145,16 @@ kbtzimFromS3 :: forall t m. (KbtzConn t m NodeMAC)
   -> S3Opts
   -> m (Kbtz t m NodeMAC SensorS, Kbtz t m NodeMAC RuntimeStats, PubQueue)
 kbtzimFromS3 ns bucket = do
-  sk <- sensorKbtzS3
-  rk <- rsKbtzS3
+  l <- liftIO $ newLogger Info stdout
+  sk <- sensorKbtzS3 l
+  rk <- rsKbtzS3 l
   outbox <- liftIO $ initPubQIO
   return ( sk
          , rk
          , outbox )
   where
-    sensorKbtzS3 = kbtz ns (\n -> pure $ (sensorS3 bucket n)) nodeS
-    rsKbtzS3 = kbtz ns (\n -> pure $ (rsS3 bucket n)) id
+    sensorKbtzS3 l = kbtz ns (\n -> pure $ (sensorS3 l bucket n)) nodeS
+    rsKbtzS3 l = kbtz ns (\n -> pure $ (rsS3 l bucket n)) id
 
 
 runKibbutz :: forall m. (MonadAsync m, MonadCatch m) => KbtzC NodeMAC -> m ()
@@ -170,6 +172,8 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
   let
       powerK = _powerT <$> sensorKbtz
       energyK = _energyT <$> sensorKbtz
+      storage = _battery <$> sensorKbtz
+      
       txPlan = planTx horizon sensorKbtz
       txMonitor = (flip monitorTx sensorKbtz) <$> txPlan
       --dispatcher = S.mapM (dispatchTx outbox) txPlan
@@ -194,6 +198,7 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
     editMonS :: (Functor (t m)) => (c -> d) -> t m (a, t m (b -> c)) -> t m (a, t m (b -> d))
     editMonS = (fmap . second . fmap . result)
     horizon = 60
+
 
 
 ingestHyperGraph :: forall t m n v e.
@@ -284,3 +289,5 @@ statusConfig = defConfig
 
 meshConfig :: Config NodeMAC MeshNode RxSignal
 meshConfig = defConfig
+
+

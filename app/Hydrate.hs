@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeApplications, ScopedTypeVariables, ExplicitForAll #-}
 module Main where
 
 import Control.Arrow (first, second)
@@ -9,8 +9,10 @@ import Chopaan.Kibbutz
 import Chopaan.Kibbutz.Kibbutz (getNodes)
 import Chopaan.Kibbutz.Mesh
 import Chopaan.Node.NodeSensors
+import Chopaan.Node.NodeId
 import Chopaan.Utils.Time
-
+import Chopaan.Comm.Address
+import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..), Logger)
 import Data.Greskell
 import Data.Either
 import Data.Bifunctor hiding (second)
@@ -35,41 +37,68 @@ import qualified Data.ByteString.Lazy as BSL (toStrict)
 import Data.Binary as B
 
 main :: IO ()
-main = S.drain $ S.trace (print) $ s3Paths bucketN (Just "/kibbutz/node/246f28a83588/state")
-  where{--
-    (FH.write f)
-      $.|$ S.concatMap (S.unfoldr (BS.uncons))
-      S.|$ S.map (BSL.toStrict . B.encode . bimap (fst) (either encodeMessage encodeMessage))
-      S.|$ process
-      S.|$ S.asyncly $ s3frames bucketN
-      S.|$--} 
+main = do
+  tings <- getNodes thingType
+  l <- newLogger Info I.stdout
+  S.drain $ S.parallely $ S.mapM (downloadNode l) $ S.fromList tings
+  --S.parallely (downloadNode @S.AheadT <$>
+  where
     thingType = KbtzId "kibbutz-pilot-node"
     janusHost = "localhost"
     janusPort = 8182
-    writeFold = FL.Fold step start en
-      where
-        start :: IO (I.Handle, S3.ObjectKey)
-        start = do
-          f <- I.openFile "data/s3Paths.chopaan" I.WriteMode
-          return (f, S3.ObjectKey "")
-        step :: (I.Handle, S3.ObjectKey)
-          -> S3.ObjectKey
-          -> IO (FL.Step (I.Handle, S3.ObjectKey) S3.ObjectKey)
-        step (h, _) (S3.ObjectKey n) =
-          ((I.hPutStrLn h) . T.unpack $ n) >> (return . FL.Partial $ (h, S3.ObjectKey $ n))
-        en (h, s) = (I.hClose h) >> (print "Paths Written!") >> pure s
-    {--mege
-    writeFileFold :: Handle -> _
-    writeFileFold p = unArr . arr $ wc
-      where
-        unArr = FL.lmap (Ar.toStream)
-        wc = FH.writeChunks p
-        arr :: Fold IO Text ()  
-        arr = fmap (Ar.write . (fmap (\(S3.ObjectKey n) -> n)))
-    --nota = bimap nodeLinkPair id
---}
+    -- (\n ->
+    --          S.fold (writePathsFold n)
+    --          $ s3Paths bucketN (nodePrefix n))
 
-{-
-addMeshFrame :: Spider n m EnergyState -> Spider NodeMAC MeshFrame -> 
-addMeshFrame = undefined
-o-}
+
+downloadNode :: Logger -> NodeMAC -> IO () -- forall t. (S.IsStream t) => t IO ()  
+downloadNode l n = S.drain $ S.bracket opF cF $ \h -> S.scan (FH.write h)
+  S.|$ S.concatMap (S.unfoldr (BS.uncons))
+  S.|$ S.map (BSL.toStrict . B.encode . bimap (fst) (either encodeMessage encodeMessage))
+  --S.|$ S.trace print
+  S.|$ process
+  S.|$ S.asyncly $ s3frames l bucketN
+  S.|$ S.tap (writePathsFold n)
+  --S.|$ S.trace print
+  S.|$ S.parallely $ s3Paths l bucketN $ nodePrefix n
+  where
+    opF = I.openFile fp I.WriteMode
+    cF = I.hClose
+    fp = "data/nodes/"
+         <> mac2Path n
+         <> ".data"
+
+mac2Path :: NodeMAC -> String
+mac2Path (NodeId n) = T.unpack .  (T.replace ":" "_") . (T.replace "\"" "") $ n
+
+nodePrefix :: (Address a) => a -> Maybe T.Text
+nodePrefix n = Just $ stateTopic n
+
+--writeDataFold :: (Monad m) =>T.Text -> FL.Fold m
+writeDataFold n = FL.Fold step start en
+  where
+    start :: IO (I.Handle, S3.ObjectKey)
+    start = do
+      f <- I.openFile fp I.WriteMode
+      return (f, S3.ObjectKey "")
+    step :: (I.Handle, S3.ObjectKey)
+         -> S3.ObjectKey
+         -> IO (FL.Step (I.Handle, S3.ObjectKey) S3.ObjectKey)
+    step (h, _) (S3.ObjectKey n) =
+      ((I.hPutStrLn h) . T.unpack $ n) >> (return . FL.Partial $ (h, S3.ObjectKey $ n))
+    en (h, s) = (I.hClose h) >> (print "Paths Written!") >> pure s
+    fp = "data/" <> (mac2Path n) <> ".s3path"
+
+writePathsFold n = FL.Fold step start en
+  where
+    start :: IO (I.Handle, S3.ObjectKey)
+    start = do
+      f <- I.openFile fp I.WriteMode
+      return (f, S3.ObjectKey "")
+    step :: (I.Handle, S3.ObjectKey)
+         -> S3.ObjectKey
+         -> IO (FL.Step (I.Handle, S3.ObjectKey) S3.ObjectKey)
+    step (h, _) (S3.ObjectKey n) =
+      ((I.hPutStrLn h) . T.unpack $ n) >> (return . FL.Partial $ (h, S3.ObjectKey $ n))
+    en (h, s) = (I.hClose h) >> (print "Paths Written!") >> pure s
+    fp = "data/" <> (show n) <> ".s3path"

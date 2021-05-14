@@ -7,4 +7,4 @@ import           Shpadoinkle.Run (Env (Dev), liveWithBackend)
 
 
 main :: IO ()
-main = V.main --liveWithBackend 8080 C.app $ S.application Dev "./static"
+main = C.main --liveWithBackend 8080 C.app $ S.application Dev "./static"

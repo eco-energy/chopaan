@@ -22,6 +22,7 @@ data ChopaanState = ChopaanState
   , serverHandle :: Bool
   } deriving (Eq, Ord, Show, Generic)
 
+data KbtzType = Monitor | Ui
 
 run :: RIO App ()
 run = do
@@ -29,7 +30,7 @@ run = do
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
-    kibbutzim = []
+    kibbutzim = ["g"]
     kbtzOpts =
       fmap (\n -> mkKbtzConf (KbtzId n) [] (Left $ mqttOpts{connId=n}) janusHost janusPort) kibbutzim 
   liftIO $ mapM_ runKibbutz kbtzOpts

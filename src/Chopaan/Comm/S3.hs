@@ -43,8 +43,8 @@ import Chopaan.Comm.Address
 import Chopaan.Comm.Dispatch
 import Chopaan.Kibbutz.Kibbutz
 
-inS3Context :: AWST' Env (ResourceT IO) b -> IO b
-inS3Context x = ((newLogger Error stdout) >>= (\l-> inAwsContext l s3 x))  
+inS3Context :: Logger -> AWST' Env (ResourceT IO) b -> IO b
+inS3Context l x = inAwsContext l s3 x  
 
 toNodeMAC :: S3.ObjectKey -> Maybe (NodeMAC, Time.UTCTime)
 toNodeMAC (S3.ObjectKey txt) = do
@@ -56,33 +56,35 @@ toNodeMAC (S3.ObjectKey txt) = do
 cleanMAC :: T.Text -> Maybe (T.Text, T.Text)
 cleanMAC = Just . (T.breakOnEnd ("/")) . (T.replace " " "")
 
-toMeshframe :: LBS.ByteString -> (Either String MeshFrame)
-toMeshframe = decodeMessage . BS.concat . LBS.toChunks
+toMeshframe :: BS.ByteString -> (Either String MeshFrame)
+toMeshframe = decodeMessage
 
 
-downloadFromKey :: (MonadAsync m) => S3.BucketName
+downloadFromKey :: (MonadAsync m) => Logger
+               -> S3.BucketName
                -> S3.ObjectKey
                -> m ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame)
-downloadFromKey bucket n = do 
-                mf <- (pure . toMeshframe =<< readObject bucket n)
+downloadFromKey l bucket n = do 
+                mf <- (pure . toMeshframe =<< readObject l bucket n)
                 return $ ((nodeMAC, nodeTime), mf)
   where
     nt = toNodeMAC n
     nodeMAC = fmap fst nt
     nodeTime = fmap snd nt
 
-readObject :: (MonadIO m) => S3.BucketName -> S3.ObjectKey -> m LBS.ByteString
-readObject bucket k = liftIO . inS3Context $ do
+readObject :: (MonadIO m) => Logger -> S3.BucketName -> S3.ObjectKey -> m BS.ByteString
+readObject l bucket k = liftIO . (inS3Context l) $ do
       x <- send $ S3.getObject bucket k
-      (x ^. S3.gorsBody) `sinkBody` sinkLazy
+      BS.concat . LBS.toChunks <$> (x ^. S3.gorsBody) `sinkBody` sinkLazy
 
         
 listObjects :: forall t m. (IsStream t, MonadAsync m)
-              => S3.BucketName
+              => Logger
+              -> S3.BucketName
               -> Maybe T.Text
               -> t m (S3.ListObjectsV2Response)
-listObjects bucket prefix = hoist (liftIO . inS3Context) $
-                     S.unfold pageUF $ S3.listObjectsV2 bucket
+listObjects l bucket prefix = hoist (liftIO . inS3Context l) $
+                     S.asyncly $ S.unfold pageUF $ S3.listObjectsV2 bucket
                                      & S3.lovPrefix
                                      .~ prefix
 
@@ -91,14 +93,14 @@ bucketN = S3.BucketName "dosti-datastream"
 
 
 s3Paths :: forall t m. (IsStream t, MonadAsync m)
-        => S3.BucketName
+        => Logger
+        -> S3.BucketName
         -> Maybe T.Text
         -> t m (S3.ObjectKey)
-s3Paths bucket prefix =
-  S.trace (liftIO . print) $
-  S.concatMapWith (S.mergeBy comparator) sortConsume
+s3Paths l bucket prefix =
+  S.concatMapWith S.parallel sortConsume
    S.|$ fmap (((^. S3.oKey) <$>) . (^. S3.lovrsContents))
-   S.|$ listObjects bucket prefix
+   S.|$ listObjects l bucket prefix
   where
     -- S.|$ S.trace (liftIO . print) 
     comparator = (\a b -> fromMaybe EQ $ liftA2 compare (x a) (x b) )
@@ -107,10 +109,11 @@ s3Paths bucket prefix =
     x = fmap snd . toNodeMAC
 
 s3frames :: forall t m. (IsStream t, MonadAsync m)
-         => S3.BucketName
+         => Logger
+         -> S3.BucketName
          -> t m (S3.ObjectKey)
          -> t m ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame)
-s3frames bucket = S.mapM (downloadFromKey bucket)
+s3frames l bucket = S.mapM (downloadFromKey l bucket)
 
 
 
@@ -143,21 +146,22 @@ process = S.map ((fromRight undefined))
               Just r -> Right $ ((n, t), Left r)
               Nothing -> Left ()
 
-nodeS3 :: forall t m. (IsStream t, MonadAsync m) => S3.BucketName
+nodeS3 :: forall t m. (IsStream t, MonadAsync m) => Logger
+       -> S3.BucketName
        -> NodeMAC
        -> t m ((NodeMAC, Maybe Time.UTCTime), Either RuntimeStats EnergyState)
-nodeS3 bucket n = process S.|$ s3frames bucket
+nodeS3 l bucket n = process S.|$ (s3frames l) bucket
                   -- $ S.trace (liftIO . print)
-                  $ s3Paths bucket (s3Prefix n)
+                  $ s3Paths l bucket $ s3Prefix n
     
 
-sensorS3 :: (IsStream t, MonadAsync m) => S3.BucketName -> NodeMAC -> t m (EnergyState)
-sensorS3 bucket n = S.map ((fromRight undefined) . snd)
+sensorS3 :: (IsStream t, MonadAsync m) =>  Logger -> S3.BucketName -> NodeMAC -> t m (EnergyState)
+sensorS3 l bucket n = S.map ((fromRight undefined) . snd)
                   S.|$ S.filter (isRight . snd)
-                  S.|$ nodeS3 bucket n
+                  S.|$ nodeS3 l bucket n
 
-rsS3 :: (IsStream t, MonadAsync m) => S3.BucketName -> NodeMAC -> t m (RuntimeStats)
-rsS3 bucket n = S.map ((fromLeft undefined) . snd)
+rsS3 :: (IsStream t, MonadAsync m) => Logger -> S3.BucketName -> NodeMAC -> t m (RuntimeStats)
+rsS3 l bucket n = S.map ((fromLeft undefined) . snd)
          $ S.filter (isLeft . snd)
-         $ nodeS3 bucket n
+         $ nodeS3 l bucket n
 
