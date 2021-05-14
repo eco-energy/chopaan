@@ -35,8 +35,8 @@ packages:
 # forks / in-progress versions pinned to a git hash. For example:
 #
 extra-deps:
- - git: https://github.com/conal/concat.git
-   commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+ - git: https://github.com/faezs/concat.git
+   commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
    subdirs:
      - inline
      - known
