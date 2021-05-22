@@ -37,24 +37,27 @@ in
 
       networking.firewall.allowedTCPPorts = [ 80 8093 ];
 
-      services.postgresql = {
-        enable = true;
-        extraPlugins = [ pkgs.timescaledb ];
-        settings = { shared_preload_libraries = "timescaledb"; };
-        authentication = ''
-          local all all ident map=mapping
-        '';
+      # services.postgresql = {
+      #   enable = true;
+      #   extraPlugins = [ pkgs.timescaledb ];
+      #   settings = { shared_preload_libraries = "timescaledb"; };
+      #   authentication = ''
+      #     local all all ident map=mapping
+      #   '';
 
-        identMap = ''
-          mapping root     postgres
-          mapping postgres postgres
-        '';
+      #   identMap = ''
+      #     mapping root     postgres
+      #     mapping postgres postgres
+      #   '';
 
-        package = pkgs.postgresql_11;
+      #   package = pkgs.postgresql_11;
 
-        initialScript = ./db_migrations/1.psql;
+      #   initialScript = ./db_migrations/1.psql;
+      # };
+      docker-containers."janusgraph" = {
+        image = "docker.io/janusgraph/janusgraph:latest";
+        ports = [ "8182:8182" ];
       };
-
       systemd.services.chopaan = {
         wantedBy = [ "multi-user.target" ];
 
