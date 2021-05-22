@@ -8,106 +8,106 @@ packages:
     subdir: inline
     name: concat-inline
     version: 0.1.0.0
-    git: https://github.com/conal/concat.git
+    git: https://github.com/faezs/concat.git
     pantry-tree:
       size: 319
       sha256: 54fc1efd925d33e67eddaf121419ebd59f15b775c84d8e381a58832f17680fda
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
   original:
     subdir: inline
-    git: https://github.com/conal/concat.git
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    git: https://github.com/faezs/concat.git
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
 - completed:
     subdir: known
     name: concat-known
     version: 0.1.0.0
-    git: https://github.com/conal/concat.git
+    git: https://github.com/faezs/concat.git
     pantry-tree:
       size: 168
       sha256: 32bfd2141c47e73bb9f7caea8866a62490913cea7c48eced10dc77f547cec134
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
   original:
     subdir: known
-    git: https://github.com/conal/concat.git
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    git: https://github.com/faezs/concat.git
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
 - completed:
     subdir: satisfy
     name: concat-satisfy
     version: 0.1.0.0
-    git: https://github.com/conal/concat.git
+    git: https://github.com/faezs/concat.git
     pantry-tree:
       size: 374
-      sha256: d346aa66a7ac18fc3290c3fde3498a3511b86147686f152e5d1a1c25d8bc74fa
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+      sha256: df29f69a7de26903a919007a5f604a1ff70951b01d7fbf72daa190a2c9d7abf0
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
   original:
     subdir: satisfy
-    git: https://github.com/conal/concat.git
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    git: https://github.com/faezs/concat.git
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
 - completed:
     subdir: classes
     name: concat-classes
     version: 0.3.0.0
-    git: https://github.com/conal/concat.git
+    git: https://github.com/faezs/concat.git
     pantry-tree:
-      size: 1067
-      sha256: d820c85a5ec00c4a88b07d32b739cc6e3e8242550120b088b5d81c56822bcfed
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+      size: 1124
+      sha256: 4c3fd995708f8bac24e7022669826b64febad1398fa2793d9d3c50c0b4778661
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
   original:
     subdir: classes
-    git: https://github.com/conal/concat.git
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    git: https://github.com/faezs/concat.git
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
 - completed:
     subdir: plugin
     name: concat-plugin
     version: 0.3.0.0
-    git: https://github.com/conal/concat.git
+    git: https://github.com/faezs/concat.git
     pantry-tree:
       size: 460
-      sha256: b94e28a01445292bf0d04caf4345da7f63570082c20796dadf19e132e231c21c
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+      sha256: 4459f39bb764219bdfbcedafee5c9aef017bd6a98b959259aa1aef1f2793e72e
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
   original:
     subdir: plugin
-    git: https://github.com/conal/concat.git
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    git: https://github.com/faezs/concat.git
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
 - completed:
     subdir: examples
     name: concat-examples
     version: 0.3.0.0
-    git: https://github.com/conal/concat.git
+    git: https://github.com/faezs/concat.git
     pantry-tree:
-      size: 9186
-      sha256: 10807fd30c1406e08ac12950ebb6a21bcbaac8381764b74dac9165468383623d
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+      size: 9679
+      sha256: 5eef01ad6de1d86810f6e39d3912b5b339da816c0ce67b29ba13092138ab7bd5
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
   original:
     subdir: examples
-    git: https://github.com/conal/concat.git
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    git: https://github.com/faezs/concat.git
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
 - completed:
     subdir: graphics
     name: concat-graphics
     version: 0.1.0.0
-    git: https://github.com/conal/concat.git
+    git: https://github.com/faezs/concat.git
     pantry-tree:
       size: 641
-      sha256: 9eaf49ce2586bfea4927f415ab3361e562009e2289a5fc3f5c2ea8eb61b56e8b
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+      sha256: 364ae28ef4ea0ddcf2c989bc08ee217907e2b0cbdc86eb17b21a826adf43d5d7
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
   original:
     subdir: graphics
-    git: https://github.com/conal/concat.git
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    git: https://github.com/faezs/concat.git
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
 - completed:
     subdir: hardware
     name: concat-hardware
     version: 0.1.0.0
-    git: https://github.com/conal/concat.git
+    git: https://github.com/faezs/concat.git
     pantry-tree:
       size: 500
-      sha256: 5a6cd83d166111497d9068e76f929665d2f2081142a86f81f817fa5e69f2c203
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+      sha256: a638206be5f573f7d82af885831d89a52ed324d3f63223ae5e529e585e004c43
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
   original:
     subdir: hardware
-    git: https://github.com/conal/concat.git
-    commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+    git: https://github.com/faezs/concat.git
+    commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
 - completed:
     subdir: core
     name: Shpadoinkle
