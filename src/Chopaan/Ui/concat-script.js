@@ -1,24 +1,3 @@
-function debounce (func, threshold, execAsap) {
-    var timeout;
- 
-    return function debounced () {
-        var obj = this, args = arguments;
-        function delayed () {
-            if (!execAsap)
-                func.apply(obj, args);
-            timeout = null; 
-        };
- 
-        if (timeout)
-            clearTimeout(timeout);
-        else if (execAsap)
-            func.apply(obj, args);
- 
-        timeout = setTimeout(delayed, threshold || 100);
-    };
- 
-}
-
 function get_shader(gl,source,type) {
     var shader = gl.createShader(type);
     gl.shaderSource(shader, source);
@@ -85,7 +64,7 @@ function install_effect(canvas,effect_frag_source) {
       }
       // gl.clear(gl.COLOR_BUFFER_BIT);
       // gl.clear(0);
-      
+  
       gl.bindBuffer(gl.ARRAY_BUFFER, TRIANGLE_VERTEX);
       gl.vertexAttribPointer(_position, 2, gl.FLOAT, false,4*2,0) ;
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, TRIANGLE_FACES);
@@ -101,7 +80,7 @@ function install_effect(canvas,effect_frag_source) {
       var mi = Math.min(w,h), ma = Math.max(w,h);
       gl.viewport((w-ma)/2, (h-ma)/2, ma,ma);
       gl.uniform1f(_zoom, mi/ma);
-      pixel_size = 2/ma;  
+      pixel_size = 2/ma;
       queue_draw();
   };
   canvas.onresize = onresize;
