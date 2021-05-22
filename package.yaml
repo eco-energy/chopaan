@@ -51,6 +51,7 @@ dependencies:
 - mtl
 - transformers
 - resourcet
+- unliftio
 - hashable
 - estimator
 - cassava
@@ -200,16 +201,17 @@ executables:
     other-modules: []
     source-dirs:         app
     when:
-      condition: "impl(ghcjs)"
+      condition: "!impl(ghcjs)"
       then:
         buildable: true
         dependencies:
           - chopaan
           - optparse-simple
           - base
-        ghcjs-options:
+        ghc-options:
           - -threaded
           - -O2
+          - -fplugin=ConCat.Plugin
       else:
         buildable: false
   dev:

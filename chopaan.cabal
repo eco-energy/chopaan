@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9bf4907887d08bdd63c4197500440b1131b532861fa5b36a6a49aaf1ac63aa44
+-- hash: 4fde334045dce18d7dd92fe6a410ed47d086d36c9ac18f54a8888d374d237b9e
 
 name:           chopaan
 version:        0.1.0.0
@@ -173,6 +173,7 @@ library
     , transformers
     , ulid
     , unagi-chan
+    , unliftio
     , unordered-containers
     , vector
     , vector-sized
@@ -287,6 +288,7 @@ executable dev
     , transformers
     , ulid
     , unagi-chan
+    , unliftio
     , unordered-containers
     , vector
     , vector-sized
@@ -410,6 +412,7 @@ executable hydrate
     , transformers
     , ulid
     , unagi-chan
+    , unliftio
     , unordered-containers
     , vector
     , vector-sized
@@ -533,6 +536,7 @@ executable server
     , transformers
     , ulid
     , unagi-chan
+    , unliftio
     , unordered-containers
     , vector
     , vector-sized
@@ -657,6 +661,7 @@ executable tx
     , transformers
     , ulid
     , unagi-chan
+    , unliftio
     , unordered-containers
     , vector
     , vector-sized
@@ -779,6 +784,7 @@ executable ui
     , transformers
     , ulid
     , unagi-chan
+    , unliftio
     , unordered-containers
     , vector
     , vector-sized
@@ -820,8 +826,8 @@ executable ui
   else
     build-depends:
         ghcjs-three
-  if impl(ghcjs)
-    ghcjs-options: -threaded -O2
+  if !impl(ghcjs)
+    ghc-options: -threaded -O2 -fplugin=ConCat.Plugin
     build-depends:
         base
       , chopaan
@@ -911,6 +917,7 @@ test-suite chopaan-test
     , transformers
     , ulid
     , unagi-chan
+    , unliftio
     , unordered-containers
     , vector
     , vector-sized
