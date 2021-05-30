@@ -33,23 +33,10 @@ import Data.Aeson (ToJSON, FromJSON)
 
 
 
-type IsoGConn n a e = (Address n
-                      , LinkAttributes e
-                      , NodeAttributes a
-                      , Eq n
-                      , FromGraphSON n
-                      )
-
-
-type HistoryConn n a e =
-  ( ToHttpApiData n, FromHttpApiData n, ToJSON n, FromJSON n
-  , ToJSON e, FromJSON e
-  , ToJSON a, FromJSON a
-  , FromGraphSON n, IsoGConn n a e)
 
 type HistoryAPI = "history"
+  :> (Capture "kbtzId" KbtzName)
   :> (Capture "graphType" GraphType)
-  :> (Capture "graphId" KbtzName)
   :> (Capture "startTime" UTCTime)
   :> (Capture "endTime" UTCTime)
   :> Get '[JSON] (SG)
@@ -65,18 +52,32 @@ instance FromHttpApiData GraphType where
   parseUrlPiece = read . Text.unpack
 
 
+type IsoGConn n a e = (Address n
+                      , LinkAttributes e
+                      , NodeAttributes a
+                      , Eq n
+                      , FromGraphSON n
+                      )
+
+
+type HistoryConn n a e =
+  ( ToHttpApiData n, FromHttpApiData n, ToJSON n, FromJSON n
+  , ToJSON e, FromJSON e
+  , ToJSON a, FromJSON a
+  , FromGraphSON n, IsoGConn n a e)
+
+
 serveHistoryApi :: Server (HistoryAPI)
 serveHistoryApi = hoistServer (Proxy @ HistoryAPI) liftIO getHistoryForGraph
 
 
-
 getHistoryForGraph :: forall m. (MonadIO m)
-  => GraphType
-  -> KbtzName
+  => KbtzName
+  -> GraphType
   -> UTCTime
   -> UTCTime
   -> m (SG)
-getHistoryForGraph g kn t0 t1 = case g of
+getHistoryForGraph kn g t0 t1 = case g of
   Mesh -> MeshSnapshot <$> getHistory meshConfig kn t0 t1
   Plan -> StakeSnapshot <$> getHistory stakeConfig kn t0 t1
   Status -> StatusSnapshot <$> getHistory statusConfig kn t0 t1
