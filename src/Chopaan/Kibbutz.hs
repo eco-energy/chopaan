@@ -2,7 +2,9 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards, NamedFieldPuns, NoMonomorphismRestriction  #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Chopaan.Kibbutz (runKibbutz, mkKbtzConf, stakeConfig, meshConfig, statusConfig, getGridRoot) where
+module Chopaan.Kibbutz where
+
+-- (runKibbutz, mkKbtzConf, stakeConfig, meshConfig, statusConfig, getGridRoot)
 
 import GHC.Generics
 
@@ -59,7 +61,6 @@ import Chopaan.Kibbutz.Transactor (planTx
                                   , txStatusLinkDir
                                   )
 import Chopaan.Kibbutz.Mesh
-import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
 
 import Chopaan.Node.NodeId (NodeId(..), NodeMAC)
 import Chopaan.Node.Folds (SensorS)
@@ -176,7 +177,7 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
       
       txPlan = planTx horizon sensorKbtz
       txMonitor = (flip monitorTx sensorKbtz) <$> txPlan
-      --dispatcher = S.mapM (dispatchTx outbox) txPlan
+      dispatcher = S.mapM (dispatchTx outbox) txPlan
       planHG = ingestSensorKbtz stakeLinkDir $ (,)
                <$> stream sensorKbtz
                <*> (S.yield . (curryTx mempty) <$> txPlan)
@@ -184,9 +185,9 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
         <$> stream sensorKbtz
         <*> ((fmap . fmap) (curryTx (Source, mempty)) txMonitor)
   meshHG <- pure . writeSpiderStream spConf addRTS . stream $ rsKbtz
-  -- dispatcher `parallel` 
+   
   S.drain . adapt $
-    monHG `parallel` planHG `parallel` meshHG
+    monHG `parallel` planHG `parallel` meshHG `parallel` dispatcher
   where
     spConf :: forall v e. SpiderConn () v e => Config NodeMAC v e
     spConf = defConfig { wsHost = spiderHost, wsPort = spiderPort } 
