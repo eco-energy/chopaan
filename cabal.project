@@ -12,8 +12,8 @@ source-repository-package
     type: git
     location: https://github.com/faezs/concat
     tag: 58dd9e82914bd1eaa2ff048f5477510892598a00
-    subdir: inline known satisfy classes plugin examples
-    --sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
+    subdir: inline known satisfy classes plugin examples graphics
+    --sha256: 0savkim89mplld2xpfi65j17kdhv5n9dspyggqvvm7lxgivkispq
 
 source-repository-package
     type: git
