@@ -13,22 +13,26 @@ import Data.Monoid (Sum(..))
 import Control.Monad.IO.Class
 import qualified Data.Text as Text
 
-instance (KbtzConn t m n, Arbitrary n, Arbitrary a) => Arbitrary (Kbtz t m n a) --where
-  --arbitrary = do -- Kbtz <$> (fmap arbitrary)
-    --ns <- arbitrary @([n])
-    --kbtz ns (\n -> return $ S.repeatM (arbitrary @a)) id
+{--
+instance (IsStream t, Show n, Ord n, Arbitrary n, Arbitrary a) => Arbitrary (Kbtz t (GenT IO) n a) where
+  arbitrary = do -- Kbtz <$> (fmap arbitrary)
+    ns <- arbitrary @([n])
+    kbtz ns (\n -> return $ S.repeatM (arbitrary @a)) id
 
 instance Arbitrary NodeMAC where
   arbitrary = (NodeId . Text.pack) <$> arbitrary
+--}
 
 trivial = 1 `shouldBe` 1
+
+type SI = Sum Int
 
 spec :: Spec
 spec = do
   describe "Kbtz can do these things" $ do
-    it "Kbtz is a applicative" $
-      --verboseBatch (monoid (undefined :: (Kbtz SerialT Gen Int (Double, Double, Double))))
-      --verboseBatch (applicative (undefined :: Kbtz SerialT IO (NodeMAC) (Double, Double, Double)))
+    it "Kbtz is a applicative" $ do
+      --verboseBatch (monoid (undefined :: (Kbtz SerialT Gen Int Int)))
+      --verboseBatch (applicative (undefined :: Kbtz SerialT (GenT IO) SI (SI, SI, SI)))
       trivial
     --it "Kbtz is an applicative" $ trivial
     --it "Kbtz is a Monoid" $ trivial

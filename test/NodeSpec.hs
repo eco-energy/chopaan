@@ -43,14 +43,14 @@ instance (Eq a) => EqProp (Node a) where
   a =-= b = eq a b
 
 
-
 spec :: Spec
 spec = do
   describe "This is how we use node streams" $ do
-    it "power is a monoid and an applicative" $ do
-      verboseBatch (monoid (undefined :: (Node Double)))
+    it "Node is applicative" $ do
       verboseBatch (applicative (undefined :: Node (Double, Double, Double)))
-
+    it "Node is monoidal" $ do
+      verboseBatch (monoid (undefined :: (Node Int)))
+      
 {--    it "a stream at a 1 sec interval with a fixed power has an energy after n steps equivalent to the sum of the powers" $ do
       let
         len = 102 :: Int
