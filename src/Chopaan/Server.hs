@@ -43,12 +43,6 @@ import Chopaan.API.History
 import Chopaan.View (view, template, onRouteChange)
 
 
-
-instance HasLink WebSocket where
-  type MkLink (WebSocket) r = r 
-  toLink toA _ = toA
-
-
 data Opts = Opts
 
 newtype App a = App { runApp :: ReaderT Opts IO a }
@@ -63,8 +57,10 @@ newtype Noop a = Noop (JSM a)
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadJSM)
   deriving anyclass CRUDChopaan
 
-instance CRUDChopaan App
-
+instance CRUDChopaan App where
+  listNodezim = undefined
+  listKibbutzim = undefined
+  nodeDetails = undefined
 
 app :: Env -> FilePath -> Application
 app ev root = serve (Proxy @ (API :<|> SPA App :<|> HistoryAPI)) $
