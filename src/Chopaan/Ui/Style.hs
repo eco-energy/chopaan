@@ -1,10 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Chopaan.Ui.Style where
 
-import Clay
+import Shpadoinkle.Html.TH.CSS
 
-
-homePageSection :: Selector
-homePageSection = "home-page-section"
+$(extractNamespace "./assets/tailwind.min.css")
 
 

@@ -52,30 +52,28 @@ addShader :: MonadJSM m => ShaderEff -> m ()
 addShader = H.addScriptSrc . unShaderEff
 
 
-deltaDiskPlot :: --forall f.
-  --(Foldable f, Applicative f, Zip f) =>
+deltaDiskPlot :: forall f.
+  (Foldable f, Functor f, Zip f) =>
   (R -> C.Color)
-  -> RBin N2 R
-  -> RBin N2 R
+  -> f R
+  -> f R
   -> ImageC
 deltaDiskPlot toC xs ys = (toC . fst) `C.over` im
   where
     im = toImageC $ deltaPlot disk xs ys
 
-deltaPlot :: --forall f.
-  --(Foldable f, Applicative f, Zip f) =
-  (R -> Region)
-  -> RBin N2 R
-  -> RBin N2 R
+deltaPlot :: forall f.
+  (Foldable f, Functor f, Zip f)
+  => (R -> Region)
+  -> f R
+  -> f R
   -> Region
 deltaPlot toR xs ys = foldl xorR noThing $
                       (\(x, d) -> translate (x, 0) d)
                       <$> Data.Key.zip xs deltas 
-  --fmap (\pos -> if inRegion pos then f pos else C.white)
   where
     noThing :: Region
     noThing = nothing
-    --deltas :: _--f Region
     deltas = fmap toR ys
 
 
@@ -114,7 +112,7 @@ wait :: Num n => n
 wait = 3000000
 
 view :: ShaderEff -> Html m ShaderEff
-view s = H.div "thing" [text . T.pack . show $ s]
+view s = H.canvas "thing" [text . T.pack . show $ s]
 
 
 {--

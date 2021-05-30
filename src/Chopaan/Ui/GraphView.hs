@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, TypeFamilies, InstanceSigs
 , ConstraintKinds, ScopedTypeVariables, QuantifiedConstraints
-, RankNTypes, FlexibleContexts, AllowAmbiguousTypes, ScopedTypeVariables #-}
+, RankNTypes, FlexibleContexts, AllowAmbiguousTypes, ScopedTypeVariables, GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable, DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase, TypeOperators, TypeApplications #-}
@@ -38,25 +38,22 @@ import Diagrams.TwoD.Layout.Grid
 import Graphics.SVGFonts
 import qualified Clay as C
 
+import NetSpider.Snapshot
+
 import Chopaan.Kibbutz.Mesh
 import Chopaan.Node.Folds
 import Chopaan.Kibbutz.Transactor
-import Chopaan.Kibbutz.Kibbutz
 import Chopaan.Graph
 import Chopaan.Node.NodeId
-import NetSpider.Graph
-import NetSpider.Snapshot
+import qualified Chopaan.Ui.Style as Css 
 
-data G l v = N v | E l v v
+
 
 newtype Pos = Pos Double
   deriving stock (Generic)
   deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
   deriving anyclass (Humanize, Present, NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
-
-layout :: forall m l v a. (Monoid l, Monoid v) => Gr l v -> (Gr l v -> Text) -> (Gr l v -> [Html m a]) -> Html m a
-layout gr style mk =  H.div [H.class' (style gr)] $ mk gr -- 
 
 
 
@@ -78,25 +75,28 @@ statusEndo = EndoIso id fwd back
     fwd = StatusSnapshot
     back (StatusSnapshot a) = a
 
-renderKbtzGraph :: forall m.(Applicative m) => SG -> Html m SG
+
+renderKbtzGraph :: forall m.(Applicative m) => SG -> Html m () -- SG
 renderKbtzGraph sg = case sg of
-  (MeshSnapshot ms) -> pimap meshEndo $ renderM ms
-  (StakeSnapshot ms) -> pimap stakeEndo $ renderSk ms
-  (StatusSnapshot ms) -> pimap statusEndo $ renderSt ms
+  (MeshSnapshot ms) -> renderM ms -- (pimap meshEndo $) 
+  (StakeSnapshot ms) -> renderSk ms -- pimap stakeEndo $ 
+  (StatusSnapshot ms) -> renderSt ms -- pimap statusEndo $ 
   where
     renderM = renderThis @NodeMAC @MeshNode @RxSignal
     renderSk = renderThis @NodeMAC @SensorS @Stake 
     renderSt = renderThis @NodeMAC @SensorS @TransactionStatus
     renderThis :: forall n v l.
       (Monoid l, Eq l, Ord v, Show l, Show v, Ord n, Show n)
-      =>  SnapshotGraph n v l -> Html m (SnapshotGraph n v l)
-    renderThis (ns, ls) = H.div [] $ [
-      H.div (nodeClasses i) $ [ nodeHtml n ]
-      | (i, n) <- zip [0,(1 :: Double)..] $ ns
-      ] <> [
-      H.div (edgeClasses i) $ [ edgeHtml l v v' ]
-      | (i, (l, (n, v), (n', v'))) <- zip [(0 :: Double), 1..] $ castLinks (ns, ls)
-      ]
+      =>  SnapshotGraph n v l -> Html m ()--(SnapshotGraph n v l)
+    renderThis (ns, ls) = H.div
+      [ H.class' $ Css.flex <> Css.flex_grow]
+      (
+        [ H.div (nodeClasses i) $ [ nodeHtml n ] | (i, n) <- zip [0,(1 :: Double)..] $ ns]
+        <>
+        [ H.div (edgeClasses i) $ [ edgeHtml l v v' ]
+        | (i, (l, (n, v), (n', v'))) <- zip [(0 :: Double), 1..] $ castLinks (ns, ls)
+        ]
+      )
       where
         grNameC i = H.class' $ "graph-" <> (pack . show $ i) 
         posCss = H.class' . toStrict . C.render . C.position $ C.static
