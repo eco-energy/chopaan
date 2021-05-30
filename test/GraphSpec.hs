@@ -2,62 +2,101 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module GraphSpec (spec) where
 
-import Control.Applicative ((<$>), (<*>))
-import Control.Category ((>>>))
-import Control.Monad (guard)
 import Data.Foldable (toList)
 
-import Data.Monoid (mempty, (<>))
-import Data.Text (Text)
-import qualified Data.HashMap.Strict as HM
-import qualified Data.Aeson as A
-import qualified Data.Aeson.Types as A
-import Data.Function ((&))
 import Test.Hspec
 import Data.Greskell.Greskell (toGremlin)
-import Data.Greskell.Binder (Binder, newBind, runBinder)
-import Data.Greskell.GTraversal ((&.), ($.), liftWalk, gDrop, source, sV')
+import Data.Greskell.Binder (runBinder)
+import Data.Greskell.GTraversal (($.), liftWalk, gDrop, source, sV')
 import Network.Greskell.WebSocket
-  ( connect, close, submit, submitPair, submitRaw,
+  ( connect, close, submit, submitPair,
     slurpResults, drainResults
   )
 
 import Control.Exception (bracket)
 
 import Chopaan.Kibbutz.KbtzId
-import Chopaan.Graph
+import Chopaan.Kibbutz
+import Chopaan.Graph.Kbtz
+import Chopaan.Node.HW
+import Chopaan.Node.Components
 
 spec :: Spec
 spec = do
   describe "Chopaan's static configuration is a graph structure" $ do
-    it "adding and fetching kibbutzim" $ do
-      let
+    let
+        (host, port) = ("localhost", 8182)
         k = KbtzId "What"
-        n = ANode "ab:cd:ef:gh:ij:kl"
-        addSB = runBinder $ addKbtz k
-        readSB = runBinder $ gGetKbtzByKbtzId k
-        readNSB = runBinder $ gKbtzNodes k
-        addNToB = runBinder $ addNode k n
-      toGremlin (fst addSB)
-        `shouldBe` "g.addV(\"kbtz\").property(\"@kbtz_id\",__v0)"
-      (toGremlin $ allKbtz &. (liftWalk $ fst readSB))
-        `shouldBe` "g.V().hasLabel(\"kbtz\").has(\"@kbtz_id\",__v0)"
-      toGremlin (allKbtz &. fst readNSB)
+        kb = AKbtz k
+        n = "ab:cd:ef:gh:ij:kl"
+        an = ANode n
+        hw :: HW Double
+        hw = HW (SingBC defBC) (SingPC defPC)  (SingLC defLC)
+    it "adding a kibbutz works" $ do
+      let
+        writeKbtz = runBinder $ addKbtz kb
+      toGremlin (fst writeKbtz)
         `shouldBe`
-        "g.V().hasLabel(\"kbtz\").has(\"@kbtz_id\",__v0).out(\"kbtzIncludes\")"
-      toGremlin (fst addNToB)
-        `shouldBe`
-        "g.V().hasLabel(\"kbtz\").has(\"@kbtz_id\",__v1).sideEffect(__.addV(\"knode\").property(\"@knode_id\",__v0)).addE(\"kbtzIncludes\").to(__.has(\"@kbtz_id\",__v1).has(\"@kbtz_id\",__v2).out(\"kbtzIncludes\").has(\"@knode_id\",__v3))"
+        "g.addV(\"kbtz\").property(\"@kbtz_id\",__v0)"
 
-      let (host, port) = ("localhost", 8182)
+    it "reading a kibbutz by id works" $ do
+      let readKbtz = runBinder $ getKbtzById k
+      (toGremlin . fst $ readKbtz)
+        `shouldBe`
+        "g.V().hasLabel(\"kbtz\").has(\"@kbtz_id\",__v0).valueMap()"
+
+    it "adding a node works" $ do
+      let
+        writeHH = runBinder $ addHH an
+      toGremlin (fst writeHH)
+        `shouldBe`
+        "g.addV(\"hh\").property(\"@hh_id\",__v0)"
+
+    it "reading a kibbutz by id works" $ do
+      let readHH = runBinder $ getHHById n
+      (toGremlin . fst $ readHH)
+        `shouldBe`
+        "g.V().hasLabel(\"hh\").has(\"@hh_id\",__v0).valueMap()"
+
+        
+    it "round-tripping a Kbtz works" $ do
       bracket (connect host port) close $ \client -> do
         drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
-        drainResults =<< submitPair client addSB
-        drainResults =<< submitPair client addNToB
-        got_ns <- fmap toList $ slurpResults =<<
-                  submitPair client ((allKbtz &. fst readNSB), snd readNSB)
-        got_ns `shouldBe` []
+        drainResults =<< submitPair client (runBinder $ addKbtz kb)
         got_k1 <- fmap toList $ slurpResults =<<
-                  submitPair client ((allKbtz &. (liftWalk . fst $ readSB)), snd readSB)
-        print got_k1
-        got_k1 `shouldBe` []
+                  (submitPair client (runBinder $ getKbtzById k))
+        got_k1 `shouldBe` [kb]
+
+    it "round-tripping a HH works" $ do
+      bracket (connect host port) close $ \client -> do
+        drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
+        drainResults =<< submitPair client (runBinder $ addHH an)
+        got_n1 <- fmap toList $ slurpResults =<<
+                  (submitPair client (runBinder $ getHHById n))
+        got_n1 `shouldBe` [an]
+
+
+    it "adding an hh to a kbtz allows that hh to be fetched when searching along an edge" $ do
+      bracket (connect host port) close $ \client -> do
+        drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
+        drainResults =<< submitPair client (runBinder $ addKbtz kb)
+        drainResults =<< submitPair client (runBinder $ addHHToKbtz k an)
+        
+        got_e1 <- fmap toList $ slurpResults =<<
+                  (submitPair client (runBinder $ getKbtzNodes k))
+        got_e1 `shouldBe` [an]
+
+
+    it "adding a hwconfig to an hh allows that hh to be fetched when searching along an edge" $ do
+      bracket (connect host port) close $ \client -> do
+        drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
+        drainResults =<< submitPair client (runBinder $ addKbtz kb)
+        drainResults =<< submitPair client (runBinder $ addHHToKbtz k an)
+        drainResults =<< submitPair client (runBinder $ addHWToHH n hw)
+        got_h1 <- fmap toList $ slurpResults =<<
+                 (submitPair client (runBinder $ getNodeHW n))
+        got_h1 `shouldBe` [hw]
+      -- let b = runBinder $ getKbtzNodes k
+      -- let x = toGremlin . fst $ b 
+      -- print $ snd b
+      -- x `shouldBe` ""
