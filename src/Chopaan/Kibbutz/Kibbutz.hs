@@ -47,7 +47,7 @@ import ConCat.Misc
 
 import System.IO
 
-type KbtzConn t m n = (IsStream t, MonadAsync m, Address n)
+type KbtzConn t m n = (IsStream t, MonadAsync m, Ord n, Show n)
 
 instance KbtzConn t m n => LScan (Kbtz t m n) where
   lscan :: forall a. (Monoid a) => Kbtz t m n a -> (Kbtz t m n a :* a)
@@ -129,7 +129,6 @@ kbtz ::
   -> (t m b -> t m a)
   -> m (Kbtz t m n a)
 kbtz ns subscribe process = do
-  liftIO . print $ ("Kbtz Subscribing: " <> show ns)
   ss <- mapM subscribe ns
   return $ Kbtz . M.fromList $ [(n, process s) | n <- ns, s <- ss]
 
@@ -154,7 +153,3 @@ logNode :: (MonadIO m, Show n, Show a) => n -> a -> m ()
 logNode k v = liftIO . print $ "Node: "
                        <> show k
                        <> "\n" <> show v
-
-logKbtz :: (KbtzConn t m n, Show a) => Kbtz t m n a -> Kbtz t m n a 
-logKbtz = traceKbtz logNode
-

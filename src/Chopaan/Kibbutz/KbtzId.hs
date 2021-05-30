@@ -12,12 +12,13 @@ import Data.Typeable
 import Data.Aeson
 import Control.DeepSeq (NFData)
 import Shpadoinkle.Widgets.Types (Humanize (..))
+import Data.Greskell (FromGraphSON)
 
 type KbtzName = KbtzId Text.Text
 
 newtype KbtzId a = KbtzId { unKbtzId :: a }
   deriving (Eq, Ord, Generic, Typeable, Functor)
-  deriving newtype (NFData, FromJSON, ToJSON)
+  deriving newtype (NFData, FromJSON, ToJSON, FromGraphSON)
 
 
 instance (Show a) => Show (KbtzId a) where
