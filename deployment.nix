@@ -66,11 +66,12 @@ in
         script =
           let
             app = (import ./.) {};
-            chopaan-exe = app.chopaan.components.exes.chopaan-exe;
+            chopaan-server = app.chopaan.components.exes.server;
+            #chopaan-frontend = app.chopaan.components.exes.ui
             # --connectPort ${toString config.services.postgresql.port}
           in
             ''
-            ${chopaan-exe}/bin/chopaan-exe
+            ${chopaan-server}/bin/server
             '';
       };
     };
