@@ -64,7 +64,7 @@ unitS :: ShaderEff
 unitS = runShader' "unitS" (pairW (sliderW "Outer" (0,2) 1) timeW) $
       \ (o,i) -> annulus o ((sin i + 1) / 2)
       --unitW (const $ deltaDiskPlot (const C.black) x y)
-  where
+  --where
     --x :: _ --Maybe (Maybe (Maybe (Maybe (Maybe Double))))
     --x = pure 5
     --y :: Maybe (Maybe (Maybe (Maybe (Maybe Double))))
