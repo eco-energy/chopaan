@@ -54,12 +54,9 @@ type API = "api" :> "kibbutzim" :> Get '[JSON] KbtzList
 data GView = GView
   { _whichK :: KbtzName
   , _whichG :: GraphType
-  , _sg :: SG
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 makeFieldsNoPrefix ''GView
-
-
 
 data Frontend = MHomePage
               | MKibbutzim (RosterKbtzim)
@@ -73,14 +70,14 @@ type SPA m = "app" :> View m Frontend
         :<|> "app" :> "kibbutzim" :> View m Frontend
         :<|> "app" :> "kibbutz" :> Capture "id" KbtzName :> View m Frontend
         :<|> "app" :> "kibbutz" :> Capture "id" KbtzName :> "addNode" :> View m Frontend
-        :<|> "app" :> "graph" :> View m Frontend
+        :<|> "app" :> "graph" :> Capture "id" KbtzName :> View m Frontend
         :<|> Raw
 
 
 data Route
   = RHomePage
   | RKibbutzim
-  | RGraph
+  | RGraph KbtzName
   | RKibbutz KbtzName
   | RAddNode KbtzName
   deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
@@ -100,7 +97,7 @@ instance Routed (SPA m) Route where
     RKibbutzim -> Redirect (Proxy @("app" :> "kibbutzim" :> View m Frontend)) id
     RKibbutz k -> Redirect (Proxy @("app" :> "kibbutz" :> Capture "id" KbtzName :> View m Frontend)) ($ k)
     RAddNode k -> Redirect (Proxy @("app" :> "kibbutz" :> Capture "id" KbtzName :> "addNode" :> View m Frontend)) ($ k)
-    RGraph -> Redirect (Proxy @("app" :> "graph" :> View m Frontend)) id
+    RGraph k -> Redirect (Proxy @("app" :> "graph" :> Capture "id" KbtzName :> View m Frontend)) ($ k)
 
 
 {------------------ TABALS -----------}

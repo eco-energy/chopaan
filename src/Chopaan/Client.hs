@@ -25,10 +25,10 @@ import           Shpadoinkle.Router.Client   (client, runXHR)
 
 import           Chopaan.CRUD
 import           Chopaan.UiTypes              (API, SPA,
-                                              routes, Route)
-import           Chopaan.View                   (init, onRouteChange, view)
+                                              routes, Route(..))
+import           Chopaan.View                   (ainit, ginit, ginitM, onRouteChange, view, template)
 
-import           Shpadoinkle.Run             (runJSorWarp)
+import           Shpadoinkle.Run             (runJSorWarp, Env(Dev))
 
 newtype AppC a = AppC { runAppC :: JSM a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow)
@@ -38,7 +38,9 @@ newtype AppC a = AppC { runAppC :: JSM a }
 
 instance MonadUnliftIO AppC where
   {-# INLINE askUnliftIO #-}
-  askUnliftIO = do ctx <- askJSM; return $ UnliftIO $ \(AppC m) -> runJSM m ctx
+  askUnliftIO = do
+    ctx <- askJSM
+    return $ UnliftIO $ \(AppC m) -> runJSM m ctx
 
 instance CRUDChopaan AppC where
   listKibbutzim = AppC $ runXHR listKibbutzimM
@@ -49,7 +51,8 @@ instance CRUDChopaan AppC where
   = client (Proxy @ API)
   
 app :: JSM ()
-app = fullPageSPA @(SPA JSM) runAppC runParDiff Chopaan.View.init view getBody onRouteChange routes
+app =
+  fullPageSPA @(SPA JSM) runAppC runParDiff ainit view getBody onRouteChange routes
 
 main :: IO ()
 main = runJSorWarp 8080 app
