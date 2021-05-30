@@ -1,14 +1,21 @@
-{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia, FlexibleInstances #-}
+{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia, FlexibleInstances, OverloadedStrings #-}
 
 module Chopaan.Node.Components where
 
 import GHC.Generics
 import ConCat.Pair
 import Control.DeepSeq (NFData)
-import Data.Aeson (ToJSON, FromJSON)
+import Data.Aeson (ToJSON, FromJSON(..))
 import Data.Text
 
 import Shpadoinkle.Widgets.Types (Humanize(..), Present)
+
+import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
+
+import Data.Greskell (FromGraphSON(..), Key(..))
+import Chopaan.Graph.Greskell (GreskellC)
+import NetSpider.Graph (NodeAttributes(..), VFoundNode(..))
+import Data.Greskell.Extra (writeKeyValues, (<=:>), pMapToFail, lookupAs)
 
 data BatteryType = LeadAcidFlooded | LeadAcidSealed | LithiumIon
   deriving (Eq, Ord, Enum, Bounded, Read, Show, Humanize, Present,
@@ -19,8 +26,10 @@ instance Humanize (Maybe BatteryType) where
   humanize = maybe "select battery" humanize
 
 instance Semigroup BatteryType where (<>) = min
-instance Monoid BatteryType where mempty = maxBound
+instance Monoid BatteryType where mempty = minBound
 
+instance FromGraphSON BatteryType where
+  parseGraphSON = parseJSON . unwrapOne
 
 data BatteryConf a = BatteryConf
   { minV :: a
@@ -29,6 +38,33 @@ data BatteryConf a = BatteryConf
   , batType :: BatteryType
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
 
+instance (GreskellC a, Num a) => FromGraphSON (BatteryConf a) where
+  parseGraphSON = parseJSON . unwrapAll
+
+minVKey :: (ToJSON a) => Key VFoundNode a
+minVKey = "minV"
+maxVKey :: (ToJSON a) => Key VFoundNode a
+maxVKey = "maxV"
+capacityAHKey :: (ToJSON a) => Key VFoundNode a
+capacityAHKey = "capacityAH"
+batTypeKey :: (ToJSON a) => Key VFoundNode a
+batTypeKey = "batType"
+
+instance (GreskellC a, Num a) => NodeAttributes (BatteryConf a) where
+  writeNodeAttributes bc = fmap writeKeyValues $ sequence $
+    [ minVKey <=:> minV bc
+    , maxVKey <=:> maxV bc
+    , capacityAHKey <=:> capacityAH bc
+    , batTypeKey <=:> batType bc
+    ]
+  parseNodeAttributes props = pMapToFail (BatteryConf
+                                          <$> lookupAs minVKey props
+                                          <*> lookupAs maxVKey props
+                                          <*> lookupAs capacityAHKey props
+                                          <*> lookupAs batTypeKey props
+                                         )
+
+
 defBC :: Num a => BatteryConf a
 defBC = BatteryConf 0 0 0 LeadAcidFlooded
 
@@ -36,6 +72,12 @@ data BatteryTop a = ParBC (BatteryConf a) (BatteryConf a)
                   | SeqBC (BatteryConf a) (BatteryConf a)
                   | SingBC (BatteryConf a)
                   deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
+
+instance (GreskellC a, Num a) => FromGraphSON (BatteryTop a) where
+  parseGraphSON = parseJSON . unwrapAll
+
+--instance (GreskellC a, Num a) => NodeAttributes (BatteryTop a) where
+--  writeNodeAttributes bt = 
 
 type VI a = Pair a
 
@@ -67,6 +109,9 @@ data PVConf a = PVConf
   , pvPower :: a
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
 
+instance (GreskellC a, Num a) => FromGraphSON (PVConf a) where
+  parseGraphSON = parseJSON . unwrapAll
+
 defPC :: Num a => PVConf a
 defPC = PVConf 0 0 0 0
 
@@ -75,6 +120,8 @@ data PVTop a = ParPC (PVConf a) (PVConf a)
              | SingPC (PVConf a)
              deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
 
+instance (GreskellC a, Num a) => FromGraphSON (PVTop a) where
+  parseGraphSON = parseJSON . unwrapAll
 
 data PVEnv a = PVEnv deriving (Eq, Ord, Show, Generic, NFData)
 
@@ -99,6 +146,9 @@ data LoadConf a = LoadConf
   , loadName :: Text
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
 
+instance (GreskellC a, Num a) => FromGraphSON (LoadConf a) where
+  parseGraphSON = parseJSON . unwrapAll
+
 defLC :: Num a => LoadConf a
 defLC = LoadConf 0 ""
 
@@ -112,4 +162,5 @@ data LoadTop a = ParLC (LoadConf a) (LoadConf a)
                | SingLC (LoadConf a)
   deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON, Functor, Foldable)
 
-  
+instance (GreskellC a, Num a) => FromGraphSON (LoadTop a) where
+  parseGraphSON = parseJSON . unwrapAll

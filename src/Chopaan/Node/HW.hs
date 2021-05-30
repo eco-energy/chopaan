@@ -14,8 +14,9 @@ import Control.Monad.Except (MonadError (throwError))
 import Control.DeepSeq (NFData)
 
 import Data.Text
-import Data.Aeson (ToJSON, FromJSON)
-import Data.Greskell (Key, lookupAs, pMapToFail)
+import Data.Aeson (ToJSON(..), FromJSON(..))
+import Data.Greskell (Key, lookupAs, pMapToFail, FromGraphSON(..))
+import Data.Greskell.GraphSON.GValue (unwrapAll)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 
 import NetSpider.Found (FoundNode(..), FoundLink(..))
@@ -23,6 +24,7 @@ import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), VFoundNode, EFin
 import Data.Monoid (Sum(..))
 
 import Chopaan.Node.Components
+import Chopaan.Graph.Greskell (GreskellC)
 
 import Shpadoinkle.Widgets.Types (Field, Humanize (..)
                                  , Hygiene (Clean)
@@ -55,18 +57,29 @@ defHW = HW (SingBC defBC) (SingPC defPC) (SingLC defLC)
 instance (Show a) => Humanize (HW a)
 
 
-storageKey :: Key VFoundNode (BatteryTop Double)
+storageKey :: (Num a) => Key VFoundNode (BatteryTop a)
 storageKey = "hw_storage"
 
+generationKey :: (Num a) => Key VFoundNode (PVTop a)
+generationKey = "hw_generation"
 
-instance NodeAttributes (HW a) where
+loadKey :: (Num a) => Key VFoundNode (LoadTop a)
+loadKey = "hw_load"
+
+instance (GreskellC a, Num a) => NodeAttributes (HW a) where
   writeNodeAttributes hw = fmap writeKeyValues $ sequence $
-    [ 
+    [ storageKey <=:> storage hw
+    , generationKey <=:> generation hw
+    , loadKey <=:> loads hw
     ]
-  parseNodeAttributes = undefined --pMapToFail
+  parseNodeAttributes props = pMapToFail (HW
+                                          <$> lookupAs storageKey props
+                                          <*> lookupAs generationKey props
+                                          <*> lookupAs loadKey props
+                                         )
 
-
-
+instance (GreskellC a) => FromGraphSON (HW a) where
+  parseGraphSON = parseJSON . unwrapAll
 
 
 newtype WattHours = WattHours Double

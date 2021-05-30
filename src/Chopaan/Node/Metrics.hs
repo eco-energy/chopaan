@@ -24,12 +24,6 @@ import qualified Data.Text as T
 import Text.Printf
 
 
-import Chopaan.Node.NodeId
-import Chopaan.Node.Storage
-import Chopaan.Utils.JSON
-import Chopaan.Utils.Time
-
-
 import Proto.NodeMessageSchema.NodeMessages hiding (NodeId)
 import Proto.NodeMessageSchema.NodeMessages_Fields
 import ConCat.Misc (R)
@@ -43,6 +37,13 @@ import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
 import NetSpider.Graph (NodeAttributes(..), VFoundNode)
 import NetSpider.Timestamp (fromS)
 import NetSpider.Snapshot (nodeId, nodeTimestamp)
+
+import Chopaan.Node.NodeId
+import Chopaan.Node.Storage
+import Chopaan.Utils.JSON
+import Chopaan.Utils.Time
+import Chopaan.Graph.Greskell
+
 
 {----- Basic Types ------}
 
@@ -153,7 +154,7 @@ instance (Num a) => Semigroup (Node a) where
 instance (Num a) => Monoid (Node a) where
   mempty = initEA
 
-type GreskellC a = (ToJSON a, FromJSON a, FromGraphSON a)
+
 
 txKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
 txKey = "tx"
