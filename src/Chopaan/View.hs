@@ -25,16 +25,17 @@ module Chopaan.View where
 
 import qualified Data.Text                         as T
 import Data.Maybe (isNothing)
-
+import Data.Proxy (Proxy(..))
 
 import Control.Lens hiding (view, simple)
 import Control.Lens.Unsound (lensProduct)
 
 
-import           Shpadoinkle                       (Html, MonadJSM, text)
+import           Shpadoinkle                       (Html, MonadJSM, text, voidC)
 import qualified Shpadoinkle.Html                  as H
 import           Shpadoinkle.Lens
 import           Shpadoinkle.Router                (navigate, toHydration)
+import           Shpadoinkle.Router.Client   (client, runXHR)
 import           Shpadoinkle.Run                   (Env, entrypoint)
 
 import qualified Shpadoinkle.Widgets.Form.Input    as Input
@@ -48,8 +49,8 @@ import           Shpadoinkle.Run             (runJSorWarp, simple, Env(Dev))
 import           Shpadoinkle.Backend.ParDiff (runParDiff)
 
 
-
 import NetSpider.Snapshot
+import Servant.API                 ((:<|>) (..))
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.API.History
 import Chopaan.UiTypes
@@ -64,7 +65,7 @@ import Chopaan.Ui.FormCommon
 import Chopaan.Ui.GraphView
 import qualified Clay as C
 import Data.Colour
-
+import Chopaan.Ui.Style
 
 default (T.Text, [])
 
@@ -75,9 +76,21 @@ main = runJSorWarp 8080 $ do
   where
     initial = (MAddNode (KbtzId "this") Nothing emptyNodeForm)
 
-init :: (MonadJSM m) => Route -> m Frontend
-init _ = return (MAddNode (KbtzId "this") Nothing emptyNodeForm)
+ainit :: (MonadJSM m) => Route -> m Frontend
+ainit _ = return (MAddNode (KbtzId "this") Nothing emptyNodeForm)
   -- return MHomePage --
+
+defGView :: GView
+defGView = GView (KbtzId "thing") Plan --defPlanSG
+
+mkGView :: KbtzName -> GraphType -> GView 
+mkGView = GView
+
+ginit :: Frontend
+ginit = MGraph $ defGView
+
+ginitM :: (MonadJSM m) => Route -> m Frontend
+ginitM = pure . (const ginit)
 
 onRouteChange :: (Monad m, CRUDChopaan m) => Route -> m Frontend
 onRouteChange = \case
@@ -85,9 +98,14 @@ onRouteChange = \case
   RKibbutzim -> MKibbutzim . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
   RKibbutz k -> MKibbutz . RosterNodezim (SortCol NId ASC) mempty <$> (listNodezim k)
   RAddNode k -> return $ MAddNode k Nothing emptyNodeForm
-  --RGraph k -> return $ MGraph
+  RGraph k -> return . MGraph $ mkGView k Plan --(return  defPlanSG))
+    
   -- RSearch k s -> MKibbutz . RosterNodezim (SortCol NId ASC) s <$> (listNodezim k) 
-  
+defPlanSG :: SG
+defPlanSG = StakeSnapshot $ defStakeSnapshot
+  where
+    defStakeSnapshot = ([], [])
+    
 
 view :: forall m. (MonadJSM m) => Frontend -> Html m Frontend
 view fe = case fe of
@@ -144,7 +162,6 @@ addBattery bc = H.div [ H.onClick (\a-> undefined) ]
       ]
   where
     errs = validate bc
-    isValid = getValid errs
 
 addGeneration :: (MonadJSM m) => GenerationUpdate 'Edit -> Html m (GenerationUpdate 'Edit)
 addGeneration ef = H.div genProps [
@@ -156,7 +173,6 @@ addGeneration ef = H.div genProps [
   where
     genProps = []
     errs = validate ef
-    isValid = getValid errs
 
 addLoad :: (MonadJSM m) => LoadUpdate 'Edit -> Html m (LoadUpdate 'Edit) 
 addLoad ef = H.div loadProps 
@@ -166,7 +182,6 @@ addLoad ef = H.div loadProps
   where
     loadProps = []
     errs = validate ef
-    isValid = getValid errs
 
 
 cancelButton :: forall m a. MonadJSM m => Html m (NodeUpdate 'Edit)
@@ -190,21 +205,19 @@ saveButton idT isValid createT updateT  = H.button
       ] [ "Save" ]
 
 
-graphView :: forall m n a e. (MonadJSM m, CRUDChopaan m, HistoryConn n a e) => SnapshotGraph n a e -> Html m (SnapshotGraph n a e)
-graphView (nodes, links) = H.div "container-graph"
-  [ H.canvas [] [] 
-  ]
-
-
-
 template :: Env -> Frontend -> Html m a -> Html m a
 template ev fe stage = H.html_
   [ H.head_
     [ H.link'
-      [ H.rel "stylesheet"
-      , H.href "https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
-      ]
+        [ H.rel "stylesheet"
+        , H.href "https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
+        ]
+    , H.link'
+        [ H.rel "stylesheet"
+        , H.href "https://unpkg.com/tailwindcss@2.1.2/dist/tailwind.min.css"
+        ]
     , H.meta [ H.charset "ISO-8859-1" ] []
+    , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
     , toHydration fe
     , H.script [ H.src $ entrypoint ev ] []
     ]
@@ -221,9 +234,6 @@ tableCfg = mempty
   }
 
 
-
---adaptK :: KbtzList -> [Kbtzim -> T.Text]
---adaptK = fuzzyK
   
 fuzzyK :: [Kbtzim -> T.Text]
 fuzzyK = flip (^.) <$>
@@ -235,12 +245,21 @@ fuzzyK = flip (^.) <$>
 
 
 gView :: (MonadJSM m) => GView -> Html m GView
-gView gv = H.div_
-  [ onRecord sg $ renderKbtzGraph (gv ^. sg)
+gView gv = H.div [H.class' $ relative <> flex_grow <> flex_col]
+  [ voidC $ renderKbtzGraph defPlanSG
   , onRecord whichG $ graphSelectButtons ]
   where
+    sgNow = runXHR $ getHistoryC (gv ^. whichK) (gv ^. whichG) undefined undefined
     graphSelectButtons :: Html m (GraphType)
-    graphSelectButtons = H.div_ [
-      H.button [ H.onClick $ (const g)
-               , H.class' "btn btn-primary" ] [ text . humanize $ g ]
+    graphSelectButtons = H.div [H.class' $ flex
+                                 <> flex_row
+                                 <> justify_center
+                                 <> w_full
+                                 <> content_end ]
+      [ H.button [ H.onClick $ (const g)
+               , H.class' "btn btn-primary"
+               , H.class' $ flex <> justify_center <> w_full ] [ text . humanize $ g ]
       | g <- [(minBound @GraphType)..maxBound] ]
+
+
+(getHistoryC) = client (Proxy @HistoryAPI)
