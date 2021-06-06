@@ -101,8 +101,8 @@ onRouteChange = \case
   RGraph k -> return . MGraph $ mkGView k Plan --(return  defPlanSG))
     
   -- RSearch k s -> MKibbutz . RosterNodezim (SortCol NId ASC) s <$> (listNodezim k) 
-defPlanSG :: SG
-defPlanSG = StakeSnapshot $ defStakeSnapshot
+defPlanSG :: SG NodeMAC
+defPlanSG = StakeG $ defStakeSnapshot
   where
     defStakeSnapshot = ([], [])
     

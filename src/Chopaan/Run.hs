@@ -31,11 +31,13 @@ run = do
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
     kibbutzim = ["g"]
-    kbtzOpts =
-      fmap (\n -> mkKbtzConf (KbtzId n) [] (Left $ mqttOpts{connId=n}) janusHost janusPort) kibbutzim 
-  liftIO $ mapM_ runKibbutz kbtzOpts
+  -- qs <-mkMqttQs mqttOpts{connId=n}
+  -- let  kbtzOpts =
+  --     fmap (\n -> mkKbtzConf (KbtzId n) [] (Left $ qs) janusHost janusPort) kibbutzim 
+  -- liftIO $ mapM_ runKibbutz kbtzOpts
   --liftIO $ print ("Running Monitor...")
   --liftIO $ mon id (defGrid nodes) sensors runtime
+  return ()
   where
     janusHost = "localhost"
     janusPort = 8182

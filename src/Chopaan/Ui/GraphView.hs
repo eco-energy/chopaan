@@ -40,7 +40,7 @@ import qualified Clay as C
 
 import NetSpider.Snapshot
 
-import Chopaan.Kibbutz.Mesh
+import Chopaan.Node.Mesh
 import Chopaan.Node.Folds
 import Chopaan.Kibbutz.Transactor
 import Chopaan.Graph
@@ -57,34 +57,34 @@ newtype Pos = Pos Double
 
 
 
-meshEndo :: EndoIso (SnapshotGraph NodeMAC MeshNode RxSignal) SG
-meshEndo = EndoIso id fwd back
-  where
-    fwd = MeshSnapshot
-    back (MeshSnapshot a) = a
+-- meshEndo :: EndoIso (SnapshotGraph NodeMAC MeshNode RxSignal) (SG NodeMAC)
+-- meshEndo = EndoIso id fwd back
+--   where
+--     fwd = MeshG
+--     back (MeshG a) = a
 
-stakeEndo :: EndoIso (SnapshotGraph NodeMAC SensorS Stake) SG
-stakeEndo = EndoIso id fwd back
-  where
-    fwd = StakeSnapshot
-    back (StakeSnapshot a) = a
+-- stakeEndo :: EndoIso (SnapshotGraph NodeMAC SensorS Stake) (SG NodeMAC)
+-- stakeEndo = EndoIso id fwd back
+--   where
+--     fwd = StakeG
+--     back (StakeG a) = a
 
-statusEndo :: EndoIso (SnapshotGraph NodeMAC SensorS TransactionStatus) SG
-statusEndo = EndoIso id fwd back
-  where
-    fwd = StatusSnapshot
-    back (StatusSnapshot a) = a
+-- statusEndo :: EndoIso (SnapshotGraph NodeMAC SensorS TransactionStatus) (SG NodeMAC)
+-- statusEndo = EndoIso id fwd back
+--   where
+--     fwd = StatusG
+--     back (StatusG a) = a
 
 
-renderKbtzGraph :: forall m.(Applicative m) => SG -> Html m () -- SG
+renderKbtzGraph :: forall m n. (Applicative m, Ord n, Show n) => SG n -> Html m () -- SG
 renderKbtzGraph sg = case sg of
-  (MeshSnapshot ms) -> renderM ms -- (pimap meshEndo $) 
-  (StakeSnapshot ms) -> renderSk ms -- pimap stakeEndo $ 
-  (StatusSnapshot ms) -> renderSt ms -- pimap statusEndo $ 
+  (MeshG ms) -> renderM ms -- (pimap meshEndo $) 
+  (StakeG ms) -> renderSk ms -- pimap stakeEndo $ 
+  (StatusG ms) -> renderSt ms -- pimap statusEndo $ 
   where
-    renderM = renderThis @NodeMAC @MeshNode @RxSignal
-    renderSk = renderThis @NodeMAC @SensorS @Stake 
-    renderSt = renderThis @NodeMAC @SensorS @TransactionStatus
+    renderM = renderThis @n @MeshNode @RxSignal
+    renderSk = renderThis @n @SensorS @Stake 
+    renderSt = renderThis @n @SensorS @TransactionStatus
     renderThis :: forall n v l.
       (Monoid l, Eq l, Ord v, Show l, Show v, Ord n, Show n)
       =>  SnapshotGraph n v l -> Html m ()--(SnapshotGraph n v l)

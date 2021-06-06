@@ -15,11 +15,11 @@ asUTC = localTimeToUTC tz
   where
     tz = TimeZone (round $ 5.5 * 60) False "PK"
 
-timeToUIntSeconds :: LocalTime -> Word64
-timeToUIntSeconds = fromInteger . (\x -> round $ (realToFrac x) / 10e11) . fromPico . nominalDiffTimeToSeconds . utcTimeToPOSIXSeconds . asUTC
+timeToUIntSeconds :: UTCTime -> Word64
+timeToUIntSeconds = fromInteger . (\x -> round $ (realToFrac x) / 10e11) . fromPico . nominalDiffTimeToSeconds . utcTimeToPOSIXSeconds
 
 
--- $ converts the millisecond timestamp in the EnergyState to a UTCTime  
+-- $ converts the timestamp (in seconds) in the EnergyState to a UTCTime  
 utcTimeNow :: Word64 -> UTCTime
 utcTimeNow = posixSecondsToUTCTime . fromIntegral
 

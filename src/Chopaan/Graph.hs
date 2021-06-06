@@ -30,12 +30,15 @@ import qualified Algebra.Graph.Labelled as AG
 
 
 import Chopaan.Node.NodeId
-import Chopaan.Kibbutz.Mesh
+import Chopaan.Node.Mesh
 import Chopaan.Node.Folds (SensorS)
+import Chopaan.Node.Metrics hiding (Timestamp)
+import Chopaan.Node.NodeSensors
 import Chopaan.Kibbutz.Transactor (Stake, TransactionStatus)
 
 import Shpadoinkle.Widgets.Types
 
+type R = Double
 
 
 deriving instance Generic Timestamp
@@ -81,10 +84,13 @@ newtype GrNode = GrNode Int
   deriving newtype (Num)
 
 
-data SG where
-  MeshSnapshot :: SnapshotGraph NodeMAC MeshNode RxSignal -> SG
-  StakeSnapshot :: SnapshotGraph NodeMAC SensorS Stake -> SG
-  StatusSnapshot :: SnapshotGraph NodeMAC SensorS TransactionStatus -> SG
+data SG n where
+  MeshG :: SnapshotGraph n MeshNode RxSignal -> SG n
+  ThroughputG :: SnapshotGraph n Int Int -> SG n
+  StakeG :: SnapshotGraph n (SensorS) Stake -> SG n
+  StatusG :: SnapshotGraph n (SensorS) TransactionStatus -> SG n
+  FlowG :: SnapshotGraph n (Battery R R) R -> SG n
+  
   deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 

@@ -22,8 +22,9 @@ import Data.Time (UTCTime)
 import Chopaan.Comm.Address
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
-import Chopaan.Kibbutz (stakeConfig, meshConfig, statusConfig, getGridRoot)
+
 import Chopaan.Graph
+import Chopaan.Graph.Spider (stakeConfig, meshConfig, statusConfig, getGridRoot)
 
 import Servant (Server, Get, Capture, Proxy(..), (:>)
                , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer)
@@ -39,7 +40,7 @@ type HistoryAPI = "history"
   :> (Capture "graphType" GraphType)
   :> (Capture "startTime" UTCTime)
   :> (Capture "endTime" UTCTime)
-  :> Get '[JSON] (SG)
+  :> Get '[JSON] (SG NodeMAC)
 
 
 genericToUrlPieceViaShow :: Show a =>  a -> Text.Text
@@ -76,11 +77,11 @@ getHistoryForGraph :: forall m. (MonadIO m)
   -> GraphType
   -> UTCTime
   -> UTCTime
-  -> m (SG)
+  -> m (SG NodeMAC)
 getHistoryForGraph kn g t0 t1 = case g of
-  Mesh -> MeshSnapshot <$> getHistory meshConfig kn t0 t1
-  Plan -> StakeSnapshot <$> getHistory stakeConfig kn t0 t1
-  Status -> StatusSnapshot <$> getHistory statusConfig kn t0 t1
+  Mesh -> MeshG <$> getHistory meshConfig kn t0 t1
+  Plan -> StakeG <$> getHistory stakeConfig kn t0 t1
+  Status -> StatusG <$> getHistory statusConfig kn t0 t1
 
 getHistory :: forall m a e. (MonadIO m, IsoGConn NodeMAC a e)
   => Config NodeMAC a e

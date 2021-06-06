@@ -46,6 +46,7 @@ dependencies:
 - time
 - time-compat >= 1.9.2.2
 - ulid
+- filepath
 - directory
 - microlens
 - mtl
@@ -139,14 +140,14 @@ when:
      - ghcjs-three
 
 
-ghc-options:
-- -Wall
-- -Wcompat
-- -Widentities
-- -Wincomplete-record-updates
-- -Wincomplete-uni-patterns
-- -Wpartial-fields
-- -Wredundant-constraints
+# ghc-options:
+# - -Wall
+# - -Wcompat
+# - -Widentities
+# - -Wincomplete-record-updates
+# - -Wincomplete-uni-patterns
+# - -Wpartial-fields
+# - -Wredundant-constraints
 
 
 library:
@@ -266,9 +267,11 @@ tests:
           - hspec
           - QuickCheck
           - checkers
-          - proto-lens-arbitrary
           - quickspec
           - quickcheck-instances
+          - generic-arbitrary
+          - proto-lens-arbitrary
+          - proto-lens-arbitrary
         ghc-options:
           - -threaded
           - -rtsopts

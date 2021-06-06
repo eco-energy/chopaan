@@ -7,7 +7,7 @@ import Chopaan.Comm.S3
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz
 import Chopaan.Kibbutz.Kibbutz (getNodes)
-import Chopaan.Kibbutz.Mesh
+import Chopaan.Node.Mesh
 import Chopaan.Node.NodeSensors
 import Chopaan.Node.NodeId
 import Chopaan.Utils.Time

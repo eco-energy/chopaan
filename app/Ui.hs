@@ -13,11 +13,15 @@
 {-# OPTIONS_GHC -fsimpl-tick-factor=25 #-}  -- default 100
 -- {-# OPTIONS_GHC -fsimpl-tick-factor=250 #-}  -- default 100
 
--- {-# OPTIONS -fplugin-opt=ConCat.Plugin:trace #-}
+{-# OPTIONS -fplugin-opt=ConCat.Plugin:showResiduals #-}
+
+{-# OPTIONS -fplugin-opt=ConCat.Plugin:showCcc #-}
 
 {-# OPTIONS_GHC -fno-do-lambda-eta-expansion #-}
 
 module Main where
+
+import GHC.Generics
 
 import Prelude hiding (id, const, (.), id)
 import ConCat.Circuit
