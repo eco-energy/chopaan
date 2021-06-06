@@ -1,11 +1,13 @@
 {-# LANGUAGE OverloadedStrings, TypeFamilies, GeneralizedNewtypeDeriving, UndecidableInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, OverloadedLists #-}
 module GraphSpec (spec) where
 
 import Data.Foldable (toList)
-
+import qualified Data.Aeson as Aeson
 import Test.Hspec
 import Data.Greskell.Greskell (toGremlin)
+import Data.Greskell.GraphSON
+import Data.Greskell.GraphSON.GValue
 import Data.Greskell.Binder (runBinder)
 import Data.Greskell.GTraversal (($.), liftWalk, gDrop, source, sV')
 import Network.Greskell.WebSocket
@@ -20,6 +22,8 @@ import Chopaan.Kibbutz
 import Chopaan.Graph.Kbtz
 import Chopaan.Node.HW
 import Chopaan.Node.Components
+
+
 
 spec :: Spec
 spec = do
@@ -52,7 +56,7 @@ spec = do
         `shouldBe`
         "g.addV(\"hh\").property(\"@hh_id\",__v0)"
 
-    it "reading a kibbutz by id works" $ do
+    it "reading a node by id works" $ do
       let readHH = runBinder $ getHHById n
       (toGremlin . fst $ readHH)
         `shouldBe`
@@ -96,7 +100,3 @@ spec = do
         got_h1 <- fmap toList $ slurpResults =<<
                  (submitPair client (runBinder $ getNodeHW n))
         got_h1 `shouldBe` [hw]
-      -- let b = runBinder $ getKbtzNodes k
-      -- let x = toGremlin . fst $ b 
-      -- print $ snd b
-      -- x `shouldBe` ""
