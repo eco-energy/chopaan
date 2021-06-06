@@ -20,9 +20,12 @@ module Chopaan.Comm.Comm (Chopaan.Comm.Dispatch.Dispatch(..)
                          , PubQueue
                          , WriteChan(..)
                          , writeToPubQ
+                         , readPubQ
                          , mkCallback
                          , trivialCallback
                          , subStream
+                         , writeChan
+                         , unfoldChan
                          ) where
 
 import qualified Network.MQTT.Topic as MQ
@@ -36,8 +39,9 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent.STM
 import Control.Concurrent (forkIO)
 
-import Streamly
+import Streamly.Prelude (IsStream, MonadAsync)
 import qualified Streamly.Prelude as S
+import qualified Streamly.Internal.Data.Unfold as UF
 
 import Chopaan.Node.NodeId
 import Chopaan.Comm.Queues
@@ -67,6 +71,10 @@ data MessageQs n = MessageQs
   }
 
 
+unfoldChan :: (IsStream t, MonadAsync m) => WriteChan n a -> m (t m (n, a))
+unfoldChan (WriteChan wc) = (\rc -> pure $ S.repeatM (liftIO $ UC.readChan rc))
+                            =<< (liftIO . UC.dupChan $ wc) 
+
 initPubQ :: STM (PubQueue)
 initPubQ = initNodeQueue
 
@@ -91,7 +99,10 @@ initMessageQs = do
 writeToPubQ :: (Dispatch a) => PubQueue -> MQ.Topic -> a -> IO ()
 writeToPubQ p n et = atomically $ writeNodeQ p n (frame et)
 
+readPubQ :: PubQueue -> IO (MQ.Topic, MeshFrame)
+readPubQ = atomically . readNodeQ
 
+trivialCallback :: MQ.MessageCallback
 trivialCallback = MQ.SimpleCallback (\_ _ _ _ -> return ())
 
 mkCallback :: forall n. (Address n) => MessageQs n -> MQ.MessageCallback
@@ -119,10 +130,10 @@ mkCallback (MessageQs { stateChan, statsChan })  = MQ.SimpleCallback $ writer
 
 subStream :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a) => n -> WriteChan n a -> m (t m a)
 subStream n (WriteChan wc) = do
-  liftIO . print $ "subscribing to " <> show n 
+  --liftIO . print $ "subscribing to " <> show n 
   rc <- liftIO . UC.dupChan $ wc
   return $ S.map snd
-    -- $ S.trace (liftIO . (\(n', _) -> print $ "After Filter " <> show n' <> "\n Expected " <> show n))
+   -- $ S.trace (liftIO . (\(n', _) -> print $ "After Filter " <> show n' <> "\n Expected " <> show n))
     $ S.filter (\(n', _) -> n' == n)
     -- $ S.trace (liftIO . (\(n', _) -> print $ "Before Filter " <> show n' <> "\n Expected " <> show n))
     $ S.repeatM . liftIO $ UC.readChan rc
