@@ -14,7 +14,7 @@ module Chopaan.Kibbutz.Transactor ( runTransactor
                                   , foldTxState
                                   , mkStake
                                   , dispatchTx
-                                  , asKbtz
+--                                  , asKbtz
                                   , planTx
                                   , monitorTx
                                   , curryTx
@@ -28,7 +28,7 @@ import Prelude hiding (zip, zipWith)
 import Control.Monad.IO.Class
 import Control.DeepSeq (NFData)
 
-import Chopaan.Kibbutz.Kibbutz (Kbtz(..), kbtzState)
+import Chopaan.Kibbutz.Kibbutz (Kbtz(..))
 import Chopaan.Comm.Comm (Address(..), PubQueue, writeToPubQ)
 import Chopaan.Node.Node (SensorS)
 import Chopaan.Node.Metrics (toWattSeconds, toWatts
@@ -98,13 +98,6 @@ type NodeStates n = Tx n SensorS
 
 
 
-asKbtz :: forall t m n. (IsStream t, MonadAsync m, Ord n)
-  => t m (TxPlan n, t m TransactionStatus)
-  -> m (Kbtz t m (TxPlan n) TransactionStatus)
-asKbtz txs = do
-  tx <- S.toList . adapt $ txs
-  return . Kbtz . M.fromList $ tx
-
 curryTx :: forall n a. (Address n) => a -> Tx n a -> n -> a
 curryTx defA (Tx p) n = fromMaybe defA $ M.lookup n p
 
@@ -148,15 +141,19 @@ instance Monoid TransactionStatus where
 nodeCost :: (Functor f, Functor g, Foldable f, Foldable g) => t m (TxPlan n) -> t m TransactionStatus -> FL.Fold m TransactionStatus WattSeconds -> f (g WattSeconds)
 nodeCost k f = undefined
 
-toNodeStates :: (MonadAsync m, Address n, Ord n, IsStream t, Monad (t m)) => Kbtz t m n SensorS -> t m (NodeStates n)
-toNodeStates k = Tx <$> (kbtzState k)
+toNodeStates :: (MonadAsync m, Address n, Ord n, IsStream t) => Kbtz t m n SensorS -> t m (NodeStates n)
+toNodeStates k = Tx <$> (unKibbutz k)
 
 planTx :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m)) => Time.DiffTime -> Kbtz t m n SensorS -> t m (TxPlan n)
 planTx horizon k = S.trace (\p -> liftIO . print $ "Plan For Interval:\n" <> show p) $
                    S.postscan (transactionPlanner horizon)
-                    $ S.map (fromJust)
-                    $ S.filter (isJust)
-                    $ S.intervalsOf (realToFrac horizon) FL.last
+                    -- $ S.trace (liftIO . print)
+                    -- $ S.map (fromJust)
+                    -- $ S.trace (liftIO . print)
+                    -- $ S.filter (isJust)
+                    -- $ S.trace (liftIO . print)
+                    -- $ S.chunksOf 100 FL.last
+                    $ S.trace (liftIO . print)
                     $ toNodeStates k 
                    
 
@@ -434,6 +431,7 @@ keySL = "stateLag"
 
 keyEL :: Key EFinds Time.DiffTime
 keyEL = "endLag"
+
 
 
 instance LinkAttributes TransactionStatus where

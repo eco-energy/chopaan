@@ -29,21 +29,6 @@ import Servant.API.WebSocket
 import Servant.JS
 
 
-{--
-connOpts :: ConnectionOptions
-connOpts = defaultConnectionOptions
-
-
-instance PB.Message a => WebSocketsData a where
-  fromDataMessage = undefined
-  fromLazyByteString = undefined
-  toLazyByteString = undefined
-
-
-serveKbtz :: (IsStream t, MonadAsync m, Address n, Dispatch a) => Kbtz t m n a -> m ()
-serveKbtz k = do
-  S.mapM_ (liftIO . (sendBinaryData undefined)) $ adapt . runKbtz $ k
---}
 
 type NodeAPI n a = "node" :> QueryParam "nodeId" n :> WebSocket
 
@@ -58,15 +43,15 @@ server kb@(Kbtz k) = kbtzData :<|> streamData
     log :: MonadIO m => String -> m ()
     log = liftIO . print
     kbtzData :: MonadIO m => Maybe n -> m ([n])
-    kbtzData (Just _) = return . nodes $ kb 
+    kbtzData (Just _) = nodesK $ kb 
     kbtzData Nothing = log "No Kbtz Id" >> return mempty
     streamData :: MonadIO m => Maybe n -> Connection ->  m ()
     streamData (Just n) c = do
-      let nodeS = M.lookup n k
+      let nodeS = undefined --M.lookup n k
       case nodeS of
         Just s -> do
           liftIO $ forkPingThread c 10
-          S.mapM_ (\a -> liftIO $ sendTextData c $ pack . show $ a) (adapt s)
+          undefined--S.mapM_ (\a -> liftIO $ sendTextData c $ pack . show $ a) (adapt s)
         Nothing -> do
           log $ "NodeId not part of Kibbutz: " <> (show n)
     streamData Nothing _ = log "No NodeId Provided"

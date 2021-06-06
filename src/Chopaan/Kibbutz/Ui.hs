@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, FlexibleInstances, TypeOperators, TypeFamilies, FlexibleContexts, ConstraintKinds, InstanceSigs #-}
-{-# LANGUAGE DeriveGeneric, StandaloneDeriving,  DerivingStrategies, GeneralizedNewtypeDeriving, DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric, StandaloneDeriving,  DerivingStrategies, GeneralizedNewtypeDeriving, DeriveAnyClass, QuantifiedConstraints #-}
 
 module Chopaan.Kibbutz.Ui where
 
@@ -7,31 +7,39 @@ import GHC.Generics
 
 import Control.DeepSeq (NFData)
 import Chopaan.Kibbutz.Kibbutz
-import Chopaan.Kibbutz.Mesh
-import Chopaan.Node.NodeId
-import Chopaan.Node.Node
-import qualified Shpadoinkle.Html as S
+
+import Shpadoinkle
+import qualified Shpadoinkle.Html as H
 import qualified Shpadoinkle.Widgets.Table as T
+import qualified Shpadoinkle.Widgets.Types as T
+import qualified Data.Map.Strict as M
+import qualified Data.Text as Txt
+import Data.Aeson
+
+type TblConn n a = (Show a, Enum n, T.Humanize a)
+
+newtype TblMap n a = TblMap { runTbl :: M.Map n a }
+  deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
+
+data instance T.Column (TblMap n a) = Column n
+data instance T.Row (TblMap n a) = Row a
 
 
-newtype EnergyKbtz t m n = EnergyKbtz (Kbtz t m n SensorS)
-  deriving (Generic)
+showTbl :: (T.Humanize a) => a -> Txt.Text
+showTbl = T.humanize
 
-newtype MeshKbtz t m n = MeshKbtz (Kbtz t m n MeshNode)
-  deriving (Generic)
 
-data instance T.Column (EnergyKbtz t m n) = Column SensorS
-data instance T.Row (EnergyKbtz t m n) = Row n
 
-instance (KbtzConn t m n) => T.Tabular (EnergyKbtz t m n) where
-  toRows :: EnergyKbtz t m n -> [T.Row (EnergyKbtz t m n)]
+instance (forall m. Monad m, TblConn n a) => T.Tabular (TblMap n a) where
+  type Effect (TblMap n a) m = (MonadJSM m)
+  toRows :: TblMap n a -> [T.Row (TblMap n a)]
   toRows = undefined
-  -- toCell :: EnergyKbtz t m n
-  --   -> T.Row (EnergyKbtz t m n)
-  --   -> T.Column (EnergyKbtz t m n)
-  --   -> [S.Html m (EnergyKbtz t m n)] 
-  toCell = undefined
-  sortTable :: T.SortCol (EnergyKbtz t m n)
-    -> T.Row (EnergyKbtz t m n)
-    -> T.Row (EnergyKbtz t m n) -> Ordering
+  toCell :: TblMap n a
+                  -> T.Row (TblMap n a)
+                  -> T.Column (TblMap n a)
+                  -> [H.Html m (TblMap n a)] 
+  toCell _ (Row a) (Column c) = [H.text . showTbl $ a] 
+  sortTable :: T.SortCol (TblMap n a)
+    -> T.Row (TblMap n a)
+    -> T.Row (TblMap n a) -> Ordering
   sortTable = undefined
