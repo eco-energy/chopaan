@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, KindSignatures, DataKinds, NamedFieldPuns, ConstraintKinds #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveFoldable, DeriveTraversable
 , DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, DerivingVia #-}
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies, ScopedTypeVariables #-}
 {-# LANGUAGE CPP, TemplateHaskell #-}
 module Chopaan.Node.HW where
 
@@ -15,7 +15,9 @@ import Control.DeepSeq (NFData)
 
 import Data.Text
 import Data.Aeson (ToJSON(..), FromJSON(..))
-import Data.Greskell (Key, lookupAs, pMapToFail, FromGraphSON(..))
+import Data.Greskell (Key, lookupAs, lookupM, lookup, pMapToFail
+                     , FromGraphSON(..), PMap(..)
+                     , GValue, Single, Multi, Parser)
 import Data.Greskell.GraphSON.GValue (unwrapAll)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 
@@ -24,7 +26,7 @@ import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), VFoundNode, EFin
 import Data.Monoid (Sum(..))
 
 import Chopaan.Node.Components
-import Chopaan.Graph.Greskell (GreskellC)
+import Chopaan.Graph.Greskell (GreskellC, parseUnwrapTraversable)
 
 import Shpadoinkle.Widgets.Types (Field, Humanize (..)
                                  , Hygiene (Clean)
@@ -48,14 +50,13 @@ data HW a = HW
   { storage :: BatteryTop a
   , generation :: PVTop a
   , loads :: LoadTop a
-  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData, Functor)
+  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData, Functor, Foldable, Traversable)
 
 defHW :: Num a => HW a
 defHW = HW (SingBC defBC) (SingPC defPC) (SingLC defLC)
 
 
 instance (Show a) => Humanize (HW a)
-
 
 storageKey :: (Num a) => Key VFoundNode (BatteryTop a)
 storageKey = "hw_storage"
@@ -66,7 +67,7 @@ generationKey = "hw_generation"
 loadKey :: (Num a) => Key VFoundNode (LoadTop a)
 loadKey = "hw_load"
 
-instance (GreskellC a, Num a) => NodeAttributes (HW a) where
+instance (GreskellC a, Num a, Show a, Read a) => NodeAttributes (HW a) where
   writeNodeAttributes hw = fmap writeKeyValues $ sequence $
     [ storageKey <=:> storage hw
     , generationKey <=:> generation hw
@@ -78,8 +79,18 @@ instance (GreskellC a, Num a) => NodeAttributes (HW a) where
                                           <*> lookupAs loadKey props
                                          )
 
-instance (GreskellC a) => FromGraphSON (HW a) where
-  parseGraphSON = parseJSON . unwrapAll
+instance (GreskellC a, Num a, Read a) => FromGraphSON (HW a) where
+  -- parseGraphSON = parseUnwrapTraversable
+  parseGraphSON gv = fromPMap =<< parseGraphSON gv
+    where
+      lookupAsF k pm = maybe (fail "key not found") parseGraphSON (Data.Greskell.lookup k pm)
+      fromPMap :: PMap Single GValue -> Parser (HW a)
+      fromPMap pm = do
+        s <- (lookupAsF storageKey pm)
+        g <- (lookupAsF generationKey pm)
+        c <- (lookupAsF loadKey pm)
+        return $ HW s g c
+      
 
 
 newtype WattHours = WattHours Double

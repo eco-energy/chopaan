@@ -108,20 +108,8 @@ data Node a = Node
   { tx :: ! a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Ord, Generic, Functor, NFData)
-
-instance (ToJSON a) => ToJSON (Node a)
-instance (FromJSON a) => FromJSON (Node a)
-
-
-instance (Show a) => Show (Node a) where
-  show Node{..} = 
-    "Generated : " <> (rs generated)
-    <> "Consumed : " <> (rs consumed)
-    <> "Grid Transfer (Inflow is positive) : " <> (rs tx)
-    where
-      nl = "\n"
-      rs x = show x <> nl
+  } deriving (Eq, Ord, Show, Generic, Functor, NFData, ToJSON, FromJSON)
+  
 
 instance (ToField a) => ToNamedRecord (Node a)
 
@@ -189,7 +177,7 @@ data SensorMetrics e p = SensorMetrics
   , _energyT :: !(Node e)
   , _battery :: !(Battery R R)
   , _demand :: !e
-  } deriving (Eq, Ord, Generic, NFData, ToJSON, FromJSON)
+  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 
 --instance (ToJSON e, ToJSON p) => ToJSON (SensorMetrics e p)
@@ -320,8 +308,8 @@ instance (ToField e, ToField p) => ToNamedRecord (SensorMetrics e p) where
 showDec :: R -> String
 showDec = (printf ("%.2g"))
 
-instance (Show e, Show p, RealFrac e, RealFrac p) => Show (SensorMetrics e p) where
-  show SensorMetrics{..} = ("last connection: " <> show _time)
+prettyShow :: (Show e, Show p) => SensorMetrics e p -> String
+prettyShow SensorMetrics{..} = ("last connection: " <> show _time)
     <> sep <> ("battery energy stored (Ws): " <> sep <> showDec (socPercentage _battery * totalCapacity _battery))
     -- <> sep <> ("runtime estimate :" <> sep <> showDec (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
     <> sep <> ("current demand (Ws): " <> show _demand)

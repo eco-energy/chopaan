@@ -23,7 +23,9 @@ import Chopaan.Node.Storage
 import Chopaan.Node.Metrics
 import Chopaan.Utils.Time
 
-import Proto.NodeMessageSchema.NodeMessages
+import Proto.NodeMessageSchema.NodeMessages (EnergyState, RuntimeStats)
+
+import Chopaan.Node.Mesh
 
 {----------------------------------------------------------------------------------------------------
 
@@ -33,7 +35,8 @@ Folds of type FL.Fold, as functions to the instantatenous values of the system o
 
 
 -----------------------------------------------------------------------------------------------------}
-
+meshFold :: forall m. Applicative m => FL.Fold m (RuntimeStats) (MeshNode, RxSignal)
+meshFold = meshF
 
 
 timeFold :: forall m. Applicative m => FL.Fold m (EnergyState) Timestamp
