@@ -14,6 +14,7 @@ import qualified Data.Text as T hiding (zip)
 import Data.Aeson (ToJSON(..), FromJSON(..), encode)
 import Data.Text.Encoding (decodeUtf8)
 import Data.ByteString.Lazy (toStrict)
+import Data.Monoid
 
 import Data.Greskell.Graph (AVertex, AEdge, ElementData, Element, Vertex, Edge, Key, Keys(..))
 import Data.Greskell.GraphSON (FromGraphSON(..), GValue)
@@ -187,8 +188,10 @@ newtype VHW = VHW AVertex
 
 
 addHW :: HW Double -> Binder (GTraversal SideEffect () VHW)
-addHW hw = (addHWProps hw) <*.> (pure $ sAddV "hwConfig" $ source "g")
+addHW hw = (addProps hw) <*.> (pure $ sAddV "hwConfig" $ source "g")
   where
+    addProps :: HW Double -> Binder (Walk SideEffect VHW VHW)
+    addProps hw = (unsafeCastStart . unsafeCastEnd) <$> (writeNodeAttributes hw)
     addHWProps :: HW Double -> Binder (Walk SideEffect VHW VHW)
     addHWProps hw' = fmap writeKeyValues $ sequence $
       [ storagKey <=:> (storage hw')
@@ -198,11 +201,11 @@ addHW hw = (addHWProps hw) <*.> (pure $ sAddV "hwConfig" $ source "g")
     textS :: ToJSON a => a -> T.Text
     textS = decodeUtf8 . toStrict . encode . toJSON
     --storageKey :: (Num a) => Key VHW (BatteryTop a)
-    storagKey = "hw_storage"
+storagKey = "hw_storage"
     --generationKey :: (Num a) => Key VHW (PVTop a)
-    generatioKey = "hw_generation"
-    --loadKey :: (Num a) => Key VHW (LoadTop a)
-    loaKey = "hw_load"
+generatioKey = "hw_generation"
+--loadKey :: (Num a) => Key VHW (LoadTop a)
+loaKey = "hw_load"    
 
 
 toHW :: Walk Transform VHW (HW Double)
@@ -218,8 +221,15 @@ newtype EHHHasHW = EHasHW AEdge
 hhHasHW :: Walk Transform VHH VHW
 hhHasHW = gOut ["hasHW"]
 
-hwBelongsTo :: Walk Transform VHW VHH
-hwBelongsTo = gIn ["HWbelongsToHH"]
+-- hhHasStorage :: Walk Transform VHH VStorage
+-- hhHasStorage = gOut ["hasStorage"]
+
+-- hhHasGeneration :: Walk Transform VHH VGeneration
+-- hhHasGeneration = gOut ["hasGeneration"]
+
+-- hhHasLoad :: Walk Transform VHH VLoad
+-- hhHasLoad = gOut ["hasLoad"]
+
 
 addHWToHH :: NodeMAC -> (HW Double) -> Binder (GTraversal SideEffect () EHHHasHW) 
 addHWToHH n hw = (hhHas) <*.> (addHW hw)
@@ -229,13 +239,26 @@ addHWToHH n hw = (hhHas) <*.> (addHW hw)
       return $
         gAddE "hasHW" (gFrom (gV @VHW [] >>> gHas2 "@hh_id" n'))
 
-getNodeHW' :: Walk Transform VHH (HW Double)
-getNodeHW' = toHW <<< hhHasHW
+getNodeHW' :: Walk Transform VHH VHW
+getNodeHW' = hhHasHW
+
+getNodeHW'' :: NodeMAC -> Binder (GTraversal Transform () (PMap Multi GValue))
+getNodeHW'' n = do
+  n' <- getVHHById n
+  return $ n' &. ((gValueMap KeysNil) <<< getNodeHW')
+
+parseHW :: PMap Multi GValue -> Either PMapLookupException (HW Double)
+parseHW pm = HW
+             <$> (lookupAs storagKey pm)
+             <*> (lookupAs generatioKey pm)
+             <*> (lookupAs loaKey pm)
+
+
 
 getNodeHW :: NodeMAC -> Binder (GTraversal Transform () (HW Double))
 getNodeHW n = do
   n' <- getVHHById n
-  return $ n' &. getNodeHW'
+  return $ n' &. (toHW <<< getNodeHW')
 
 
 {--
