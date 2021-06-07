@@ -13,6 +13,8 @@ import Control.Monad.IO.Class
 import qualified Data.Text as Text
 import Test.QuickCheck.Arbitrary.Generic
 import Data.ProtoLens.Arbitrary
+import Data.ProtoLens
+import Data.Word
 
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId (KbtzId(..))
@@ -39,7 +41,19 @@ instance Arbitrary (NM.EnergyState) where
   arbitrary = arbitraryMessage
 
 instance Arbitrary (NM.RuntimeStats) where
-  arbitrary = arbitraryMessage
+  arbitrary = arbitraryMessage -- do
+    -- mFH <- arbitrary @Word32
+    -- cFH <- arbitrary @Word32
+    -- cu <-  arbitrary @Word32
+    -- r <- arbitrary @Bool
+    -- w <- arbitrary @Int
+    -- ps <- arbitrary @Int
+    -- u <- arbitrary @Word64
+    -- return $ defMessage
+    --   & (NM.minFreeHeap .~ mFH)
+    --   & (NM.currentFreeHeap .~ cFH)
+    --   & (NM.cpuUtilization .~ cu)
+    --   & (NM.isRoot .~ r)
 
 
     
@@ -47,12 +61,12 @@ spec :: Spec
 spec = do
   describe "Spiders are great" $ do
     it "qKbtz processor processes all messages!" $ do
-      let nNodes = 100
-          nMessages = 100000
+      let nNodes = 10
+          nMessages = 100
       ns <- arbs @NodeMAC nNodes
-      -- es <- do
-      --   xs'' <- mapM (\_ -> orderedES 50) ns
-      --   return $ foldl S.wSerial S.nil xs''
+      es <- do
+        xs'' <- mapM (\_ -> orderedES nMessages) ns
+        return $ foldl S.wSerial S.nil xs''
       rs <- do
         xs'' <- mapM (\_ -> orderedRS nMessages) ns
         return $ foldl S.wSerial S.nil xs''
@@ -66,11 +80,12 @@ spec = do
               }
       let ns' = S.fromList $ cycle ns
 
-      --S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
-      S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
-      l <- S.length $ S.take (nNodes * nMessages) $ k
+      forkIO $ do
+        S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
+        S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
 
-      l `shouldBe` (nNodes * nMessages)
+      l <- S.length $ S.take ((2 * nNodes * nMessages) + 1) $ k
+      l `shouldBe` (2 * nNodes * nMessages)
 
 
 

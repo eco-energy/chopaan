@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards, NamedFieldPuns, NoMonomorphismRestriction  #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving #-}
 
-{-# LANGUAGE ExplicitForAll, FlexibleContexts #-}
+{-# LANGUAGE ExplicitForAll, FlexibleContexts, TupleSections #-}
 module Chopaan.Graph.Spider where
 
 import qualified Streamly.Prelude as S
@@ -14,27 +14,21 @@ import Control.DeepSeq
 import Control.Monad.IO.Class
 import Control.Monad.Catch
 
-import Chopaan.Comm.Address
 import Chopaan.Node.NodeId
-import Chopaan.Node.Metrics hiding (TimeStamp, Timestamp)
+import Chopaan.Node.Metrics hiding (Timestamp)
 import Chopaan.Node.Folds
-import Chopaan.Node.Mesh (MeshNode, RxSignal)
+import Chopaan.Node.Mesh (MeshNode, RxSignal, rsToFN)
+import qualified Proto.NodeMessageSchema.NodeMessages as N
 
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Kibbutz
-import Chopaan.Kibbutz.Transactor (planTx
-                                  , monitorTx
-                                  , dispatchTx
-                                  , TransactionStatus
+import Chopaan.Kibbutz.Transactor ( TransactionStatus
                                   , Stake
-                                  , Role(..)
-                                  , curryTx
                                   , stakeLinkDir
                                   , txStatusLinkDir
                                   )
 import Chopaan.Graph.Greskell
 
-import NetSpider.Spider
 import NetSpider.Spider (Spider, addFoundNode, getSnapshot, getSnapshotSimple, connectWith, close)
 import NetSpider.Spider.Config (Config(..), defConfig)
 import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..))
@@ -49,7 +43,7 @@ import Data.Greskell
 import Data.Hashable (Hashable)
 import Data.Maybe (fromMaybe)
 import Data.Time (UTCTime)
-
+import Data.Pool
 
 import Control.Monad.Trans.Reader
 
@@ -71,19 +65,6 @@ mkKbtzRoot (KbtzId k) = (KbtzRoot (NodeId ("grid_" <> k) :: NodeMAC))
 
 getGridRoot :: KbtzName -> NodeMAC
 getGridRoot = getRoot . mkKbtzRoot
-
-
--- spiderF :: forall m n a c d. (MonadAsync m, Address n)
---   => Config n c d
---   -> (Spider n c d -> (n, a) -> m ())
---   -> FL.Fold (SpiderM m n c d) (n, a) ()
--- spiderF c f = FL.Fold (step) i o
---   where
---     step arg i' = do
---       s <- ask
---       return (f s arg i')
---     i = mkSpider c
---     o = pure
   
 
 class (NodeAttributes v) => HasTime v where
@@ -99,8 +80,7 @@ instance HasDir Stake where
   getEDir = stakeLinkDir
 
 instance HasDir TransactionStatus where
-  getEDir = txStatusLinkDir 
-
+  getEDir = txStatusLinkDir
   
 type GrSConn t m n v e = (IsStream t, MonadAsync m, SpiderConn n v e, HasTime v, HasDir e)
 
@@ -118,19 +98,28 @@ ingestHyperGraph conf (KbtzRoot gn) =
   where
     addNodeWithEdges :: Spider n v e -> (n, v, [e]) -> m Bool
     addNodeWithEdges spider (n, v, es) = do
-      liftIO . print $ "adding a node"
+      liftIO . (print @String) $ "adding a node"
       t' <- liftIO now
       let
         t = fromMaybe t' $ fromUTCTime <$> (getVTime v)
         lx = (toLink getEDir) gn <$> es
-      expToBool =<< (liftIO $ try (addFoundNode spider $ toFN t (n, v) lx)) 
-    
+      addFN spider $ toFN t n v lx 
+
+
+addFN :: MonadIO m
+      => MonadCatch m
+      => SpiderConn n v e
+      => Spider n v e -> FoundNode n v e -> m (Bool) 
+addFN s f = expToBool =<< (liftIO $ try (addFoundNode s f))
+
+
 expToBool :: (MonadIO m) => Either SomeException () -> m Bool
 expToBool (Left e) = (liftIO . print $ e) >> return False
 expToBool (Right _) = return True
-    
-toFN :: (SpiderConn n v e) => Timestamp -> (n, v) -> [FoundLink n e] -> FoundNode n v e
-toFN t (n, v) lx = FoundNode
+
+
+toFN :: (SpiderConn n v e) => Timestamp -> n -> v -> [FoundLink n e] -> FoundNode n v e
+toFN t n v lx = FoundNode
       { subjectNode = n
       , foundAt = t 
       , neighborLinks = lx
@@ -143,6 +132,30 @@ toLink getDir n' e = FoundLink
                      , linkState = getDir e
                      , linkAttributes = e
                      }
+
+
+spiderFold :: forall m a n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
+           => Config n v e
+           -> ((n, a) -> FoundNode n v e)
+           -> FL.Fold m (n, a) Bool
+spiderFold conf asFN = FL.mkFoldM step start end
+  where
+    step :: (Pool(Spider n v e), Bool) -> (n, a) -> m (FL.Step (Pool(Spider n v e), Bool) Bool)
+    step (s, _) a = (\r -> return $ FL.Partial (s, r)) =<< (withResource s (flip addFN (asFN a))) 
+    start = (,True) <$> (liftIO $ spiderPool conf)
+    end (s, r) = liftIO $ destroyAllResources s >> return r
+
+
+addMeshNode :: forall m. (MonadAsync m, MonadCatch m)
+  => FL.Fold m (NodeMAC, N.RuntimeStats) Bool
+addMeshNode = spiderFold meshConfig rsToFN
+
+addStakeNode :: forall m. (MonadAsync m, MonadCatch m)
+  => FL.Fold m (NodeMAC, (SensorS, Stake)) Bool
+addStakeNode = spiderFold stakeConfig x
+  where
+    x :: (NodeMAC, (SensorS, Stake)) -> FoundNode NodeMAC SensorS Stake
+    x = undefined
 
 writeSpiderStream :: (IsStream t, MonadAsync m, MonadCatch m)
   => Config n v e
@@ -198,3 +211,7 @@ statusConfig = defConfig
 
 meshConfig :: Config NodeMAC MeshNode RxSignal
 meshConfig = defConfig
+
+
+spiderPool :: forall n v e. Config n v e -> IO (Pool (Spider n v e))
+spiderPool c = createPool (connectWith c) close 10 100 10

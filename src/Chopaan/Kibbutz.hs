@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications, FlexibleContexts, ScopedTypeVariables, RankNTypes, ConstraintKinds, KindSignatures, QuantifiedConstraints, MultiParamTypeClasses, GADTs, FlexibleInstances#-}
 {-# LANGUAGE OverloadedStrings, RecordWildCards, NamedFieldPuns, NoMonomorphismRestriction  #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Chopaan.Kibbutz where
 
@@ -11,20 +11,22 @@ import Data.Greskell
 import Data.Hashable (Hashable)
 import Data.Maybe (fromMaybe)
 import Data.Time (UTCTime)
-
+import Data.Either
 import Network.AWS.S3 (BucketName)
 import Chopaan.Types hiding (DBOpts)
 import Kbtz
 
 import Control.DeepSeq (NFData)
-import Control.Arrow (second)
+import Control.Arrow (second, first)
 import ConCat.Misc (result)
 import Control.Monad.Trans.Reader
 import Control.Monad.IO.Class
 import Control.Monad.Catch
-
+import Control.Concurrent (forkIO)
 import qualified Data.Map as M
 import qualified Control.Concurrent.Async as A
+import qualified Control.Concurrent.STM.TChan as TChan
+import qualified Control.Concurrent.STM as STM
 
 import Streamly
 import qualified Streamly.Prelude as S
@@ -46,6 +48,9 @@ import Chopaan.Kibbutz.Transactor (planTx
                                   , monitorTx
                                   , dispatchTx
                                   , TransactionStatus
+                                  , TxPlan(..)
+                                  , TxState(..)
+                                  , Tx(..)
                                   , Stake
                                   , Role(..)
                                   , curryTx
@@ -69,6 +74,8 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          , PubQueue
                          , initPubQIO
                          , unfoldChan
+                         , initQs
+                         , writeChan
                          )
 import Chopaan.Graph.Greskell
 import Chopaan.Graph
@@ -94,41 +101,35 @@ data KbtzC n = KbtzC
   , spiderPort :: Int
   } deriving (Generic)
 
--- ChannelOpts -> AsyncT m (NodeMAC, Node Watts, Node WattHours, (Watts, WattHours))
+
 
 mkKbtzConf :: KbtzName -> [n] -> ChannelOpts -> String -> Int -> KbtzC n
 mkKbtzConf = KbtzC
 
 
-sensorFD = FL.classify sensorFold
-rsFD = FL.classify meshFold
-
-qKbtz :: forall t m. (KbtzConn t m NodeMAC)
-  => [NodeMAC]
-  -> MessageQs NodeMAC
-  -> m (Kbtz t m NodeMAC SensorS, Kbtz t m NodeMAC (MeshNode, RxSignal), PubQueue)
-qKbtz ns (MessageQs{stateChan, statsChan, outbox}) = do
+qSrc :: forall t m. (KbtzConn t m NodeMAC)
+  => MessageQs NodeMAC
+  -> m (t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue)
+qSrc (MessageQs{stateChan, statsChan, outbox}) = do
   sk <- unfoldChan stateChan
   rk <- unfoldChan statsChan
-  return ( Kbtz (S.scan sensorFD sk)
-         , Kbtz (S.scan rsFD rk)
-         , outbox )
+  return $ (sk, rk, outbox)
 
 
-s3Kbtz :: forall t m. (KbtzConn t m NodeMAC)
+s3Qs :: forall m. (MonadAsync m)
   => [NodeMAC]
   -> S3Opts
-  -> m (Kbtz t m NodeMAC SensorS, Kbtz t m NodeMAC (MeshNode, RxSignal), PubQueue)
-s3Kbtz ns bucket = do
-  l <- liftIO $ newLogger Info stdout
-  outbox <- liftIO $ initPubQIO
-  return ( sk undefined
-         , rk undefined
-         , outbox )
-  where
-    sk = Kbtz . (S.scan sensorFD)
-    rk = Kbtz . (S.scan rsFD)
-    -- alls l = nodeS3 l bucket n
+  -> m (MessageQs NodeMAC)
+s3Qs ns bucket = do
+  lg <- liftIO $ newLogger Info stdout
+  qs <- liftIO $ initQs
+  let x = (first fst) <$> (S.concatMapWith parallel (nodeS3 lg bucket) $ S.fromList ns)
+  liftIO . forkIO $ S.mapM_ (\(n, x) -> case x of
+              Left e -> liftIO $ writeChan (stateChan qs) n e
+              Right r -> liftIO $ writeChan (statsChan qs) n r
+          ) x
+  return $ qs 
+  
 
 mqttQs :: (MonadIO m) => MQTTOpts -> KbtzName -> [NodeMAC] -> m (MessageQs NodeMAC)
 mqttQs opts name ns = do
@@ -137,57 +138,94 @@ mqttQs opts name ns = do
               =<< A.async (liftIO $ withMqttAuth lg name
                             (runMqtt opts ns mkCallback)))
 
-mqttKbtz :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOpts
-  -> m (Kbtz t m NodeMAC SensorS, Kbtz t m NodeMAC (MeshNode, RxSignal), PubQueue)  
-mqttKbtz k ns o = qKbtz ns  =<< (mqttQs o k ns)
+mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOpts
+  -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
+mqttSrc k ns o = qSrc  =<< (mqttQs o k ns)
 
 
-runKibbutz :: forall t m. (IsStream t, MonadAsync m, MonadCatch m, Monad (t m)) => KbtzC NodeMAC -> m (t m Bool)
+runKibbutz :: forall t m. (IsStream t, MonadAsync m, MonadCatch m) => KbtzC NodeMAC -> m (t m Bool)
 runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
-  ((sensorKbtz :: Kbtz t m NodeMAC SensorS)
-   , (rsKbtz  :: Kbtz t m NodeMAC (MeshNode, RxSignal))
-   , (outbox :: PubQueue)) <- case channelOpts of
-    Left queues -> qKbtz nodes queues
-    Right s3Opts -> s3Kbtz nodes s3Opts
-  let
-    counts = FL.classify FL.sum
-    --powerK = _powerT <$> sensorKbtz
-    --energyK = _energyT <$> sensorKbtz
-    --storage = _battery <$> sensorKbtz
-      
-    --txPlan = S.map (const True) $ stream sensorKbtz -- planTx horizon
-    --txMonitor = (flip monitorTx sensorKbtz) <$> txPlan
-    --dispatcher = S.trace (liftIO . print) $ S.mapM (dispatchTxSafe outbox) txPlan
+  (es, rs, outbox) <- case channelOpts of
+    Left queues -> qSrc @t queues
+    Right s3Opts -> qSrc =<< s3Qs nodes s3Opts
 
-    --planHG = ingestSensorKbtz $ (,)
+  (esTimer, sensorS) <- duplicateS es
+  
+  let  
+    sensorKbtz = S.postscan sensorFD sensorS
+    -- powerK = _powerT <$> sensorKbtz
+    -- energyK = _energyT <$> sensorKbtz
+    -- storage = _battery <$> sensorKbtz
+    
+  (txStream, dup1) <- duplicateS sensorKbtz
+  (monStream, nodeStream) <- duplicateS dup1
+  let
+    txPlan = planTx horizon (Kbtz txStream)
+    txMonitor = (flip monitorTx (Kbtz monStream)) <$> txPlan
+    planner :: t m (TxPlan NodeMAC, TxState NodeMAC)
+    planner = S.mapM (\(tx, s) -> (tx,) <$> ((S.fold FL.mconcat) . S.adapt $ s))
+              $ txMonitor
+    -- dispatcher = S.mapM (dispatchTxSafe outbox) txPlan
+    meshS = S.postscan rsFD rs
+    saver = addPlanFN esTimer nodeStream planner
+    -- planHG = S.fold S.zipWith statePlanToFN $
     --         <$> (S.trace (liftIO . print) $ stream sensorKbtz)
-    --         <*> (S.yield . (curryTx mempty) <$> txPlan)
+    --         <*> ((curryTx mempty) <$> txPlan)
     -- monHG = ingestSensorKbtz $ editMonS snd $ (,)
     --         <$> stream sensorKbtz
     --         <*> ((fmap . fmap) (curryTx (Source, mempty)) txMonitor)
-  --return $ -- S.map (\_ -> True)
-  let xs = S.map (const True) $ stream rsKbtz
-  let ys = S.map (const True) $ stream sensorKbtz
-  --meshHG <- pure . writeSpiderStream spConf addRTSSafe $ xs
-   
-  return . adapt $ xs --`async` txPlan
-    {--monHG `parallel`  planHG `parallel` `parallel` dispatcher meshHG `parallel` meshHG --}
+  return . adapt $ saver `parallel` meshS {-- monHG `parallel` planHG `parallel` meshHG --}
   where
-    addRTSSafe a b = expToBool =<< (try $ addRTS a b)
+    sensorFD = FL.classify sensorFold
+    rsFD = snd <$> ((,) <$> (FL.classify (meshFold)) <*> (addMeshNode))
+    processEither = FL.partition sensorFD rsFD
     dispatchTxSafe o t = expToBool =<< (try $ dispatchTx o t)
-    spConf :: forall v e. SpiderConn () v e => Config NodeMAC v e
-    spConf = defConfig { wsHost = spiderHost, wsPort = spiderPort } 
-
-    ingestSensorKbtz :: forall t e. (IsStream t, LinkAttributes e, HasDir e)
-      =>  GrS t m NodeMAC SensorS e -> t m Bool
-    ingestSensorKbtz = ingestHyperGraph spConf (mkKbtzRoot name)
+    addPlanFN :: t m (NodeMAC, EnergyState)
+      -> t m (M.Map NodeMAC SensorS)
+      -> t m (TxPlan NodeMAC, TxState NodeMAC)
+      -> t m Bool
+    addPlanFN a st pl = do
+      (n, _) <- S.take 1 a
+      m <- S.take 1 st
+      (Tx txMap, Tx statusMap) <- S.take 1 pl
+      let
+        sen = m M.! n
+        stake = txMap M.! n
+        txStatus = statusMap M.! n
+      syes <- addStakeFN n sen stake
+      syes' <- addStateFN n sen (snd txStatus)
+      S.yield (syes && syes')
+      where
+        addStakeFN :: NodeMAC -> SensorS -> Stake -> m Bool
+        addStakeFN = undefined
+        addStateFN :: NodeMAC -> SensorS -> TransactionStatus -> m Bool
+        addStateFN = undefined
+    -- ingestSensorKbtz :: forall t e. (IsStream t, LinkAttributes e, HasDir e)
+    --   =>  GrS t m NodeMAC SensorS e -> t m Bool
+    -- ingestSensorKbtz = ingestHyperGraph spConf (mkKbtzRoot name)
     -- semantic editor combinator
-    editMonS :: (Functor (t m)) => (c -> d) -> t m (a, t m (b -> c)) -> t m (a, t m (b -> d))
-    editMonS = (fmap . second . fmap . result)
-    horizon = 60
+    -- editMonS :: (Functor (t m)) => (c -> d) -> t m (a, t m (b -> c)) -> t m (a, t m (b -> d))
+    -- editMonS = (fmap . second . fmap . result)
+    horizon = 8
 
 
 
-
-
-
+duplicateS
+  :: MonadAsync m
+  => IsStream t
+  => t m a
+  -> m (t m a, t m a)
+duplicateS src = do
+  (writeChan', readChan1, readChan2) <- liftIO $ do
+    chan <- TChan.newBroadcastTChanIO
+    chan' <- STM.atomically $ TChan.dupTChan chan
+    chan'' <- STM.atomically $ TChan.dupTChan chan
+    pure (chan, chan', chan'')
+  let
+    writes =
+      S.mapM (liftIO . STM.atomically . TChan.writeTChan writeChan') src
+    reads1 =
+      S.repeatM (liftIO $ STM.atomically $ TChan.readTChan readChan1)
+    reads2 =
+      S.repeatM (liftIO $ STM.atomically $ TChan.readTChan readChan2)
+  pure (fmap (fromRight undefined) $ S.filter isRight $ (Left <$> writes) `S.async` (Right <$> reads1), reads2)

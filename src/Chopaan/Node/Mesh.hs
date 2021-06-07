@@ -33,7 +33,7 @@ import Data.Monoid (Sum(..), Last(..))
 import Data.Maybe
 
 import Data.ProtoLens
-import Data.Time (DiffTime(..))
+import Data.Time (DiffTime(..), UTCTime(..), Day(..))
 import Data.Text
 import Data.Binary
 import Data.Aeson (FromJSON, ToJSON)
@@ -48,7 +48,8 @@ import Data.Greskell (newBind, gProperty, lookupAs, lookupAs', Key, pMapToFail)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Spider
-  (Spider, addFoundNode)
+  (Spider, addFoundNode, withSpider)
+import NetSpider.Spider.Config (Config(..))
 import NetSpider.Graph (LinkAttributes(..), EFinds, NodeAttributes(..), VFoundNode)
 import NetSpider.Timestamp (fromUTCTime)
 
@@ -69,17 +70,14 @@ instance LinkAttributes RxSignal where
 data MeshLink = MeshLink
   deriving (Eq, Show, Ord, Generic, ToJSON, FromJSON, NFData)
 
---deriving instance Generic DiffTime
---instance Binary DiffTime
 
 data MeshNode = MeshNode
   { isRoot :: Bool
-  , uptime :: Double
+  , uptime :: Int
   , routerRSSI :: Int
   , version :: Maybe Text
   }
   deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
-  deriving anyclass (Binary) 
 
 
 instance Semigroup MeshNode where
@@ -91,7 +89,7 @@ instance Monoid MeshNode where
 rootKey :: Key VFoundNode Bool
 rootKey = "isRoot"
 
-uptimeKey :: Key VFoundNode Double
+uptimeKey :: Key VFoundNode Int
 uptimeKey = "uptime"
 
 routerRSSIKey :: Key VFoundNode Int
@@ -122,18 +120,23 @@ addRTS :: (MonadIO m)
         => Spider NodeMAC MeshNode RxSignal
         -> (NodeMAC, N.RuntimeStats)
         -> m ()
-addRTS spider (n, rts) = liftIO $ addFoundNode spider finding
-  where
-    finding = FoundNode { subjectNode = n
-                        , foundAt = fromUTCTime . utcTimeNow $ rts ^. N.cpuTime
-                        , neighborLinks = [link]
-                        , nodeAttributes = parseRTSToNode rts
-                        }
+addRTS spider (n, rts) = liftIO $ addFoundNode spider $ rsToFN (n, rts)
+
+
+rsToFN :: (NodeMAC, N.RuntimeStats) -> FoundNode NodeMAC MeshNode RxSignal
+rsToFN (n, rts) = let
+  finding = FoundNode { subjectNode = n
+                      , foundAt = fromUTCTime . utcTimeNow $ rts ^. N.cpuTime 
+                      , neighborLinks = [link]
+                      , nodeAttributes = parseRTSToNode rts
+                      }
     
-    link = FoundLink { targetNode = NodeId (rts ^. N.parent ^. N.macAddr)
-                     , linkState=LinkToSubject
-                     , linkAttributes = parseRxSignal rts
-                     }
+  link = FoundLink { targetNode = NodeId (rts ^. N.parent ^. N.macAddr)
+                   , linkState=LinkToSubject
+                   , linkAttributes = parseRxSignal rts
+                   }
+  in finding
+
 
 parseRTSToNode :: N.RuntimeStats -> MeshNode
 parseRTSToNode rts = MeshNode
@@ -148,7 +151,7 @@ parseRxSignal rts = RxSignal . Just . fromIntegral $ rts ^. N.meshParentStrength
 nodeLinkPair :: N.RuntimeStats -> (MeshNode, RxSignal)
 nodeLinkPair rts = (parseRTSToNode rts, parseRxSignal rts)
 
-meshF :: forall m. (Applicative m) => FL.Fold m N.RuntimeStats (MeshNode, RxSignal)
+meshF :: forall m. (Applicative m) => FL.Fold m (N.RuntimeStats) (MeshNode, RxSignal)
 meshF = FL.Fold step i o
   where
     step :: (MeshNode, RxSignal)

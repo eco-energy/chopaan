@@ -123,7 +123,7 @@ s3Prefix = Just . stateTopic
 
 process :: forall t m. (IsStream t, MonadAsync m)
       => t m ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame)
-      -> t m ((NodeMAC, Maybe Time.UTCTime), Either RuntimeStats EnergyState)
+      -> t m ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats)
 process = S.map ((fromRight undefined))
           . S.filter (isRight)
           . S.map toRL
@@ -135,33 +135,33 @@ process = S.map ((fromRight undefined))
     unpackMAC = S.map (first (first fromJust))
       . S.filter (isJust . fst . fst)
     toRL :: ((NodeMAC, Maybe Time.UTCTime), Either String MeshFrame)
-         -> Either () ((NodeMAC, Maybe Time.UTCTime), Either RuntimeStats EnergyState)
+         -> Either () ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats)
     toRL ((n, t), m') = case m' of
       Left _ -> Left ()
       Right m ->
         case accessEnergyState m of
-          Just e -> Right $ ((n, t), Right e)
+          Just e -> Right $ ((n, t), Left e)
           Nothing ->
             case accessRTS m of
-              Just r -> Right $ ((n, t), Left r)
+              Just r -> Right $ ((n, t), Right r)
               Nothing -> Left ()
 
 nodeS3 :: forall t m. (IsStream t, MonadAsync m) => Logger
        -> S3.BucketName
        -> NodeMAC
-       -> t m ((NodeMAC, Maybe Time.UTCTime), Either RuntimeStats EnergyState)
+       -> t m ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats)
 nodeS3 l bucket n = process S.|$ (s3frames l) bucket
                   -- $ S.trace (liftIO . print)
                   $ s3Paths l bucket $ s3Prefix n
     
 
 sensorS3 :: (IsStream t, MonadAsync m) =>  Logger -> S3.BucketName -> NodeMAC -> t m (EnergyState)
-sensorS3 l bucket n = S.map ((fromRight undefined) . snd)
-                  S.|$ S.filter (isRight . snd)
+sensorS3 l bucket n = S.map ((fromLeft undefined) . snd)
+                  S.|$ S.filter (isLeft . snd)
                   S.|$ nodeS3 l bucket n
 
 rsS3 :: (IsStream t, MonadAsync m) => Logger -> S3.BucketName -> NodeMAC -> t m (RuntimeStats)
-rsS3 l bucket n = S.map ((fromLeft undefined) . snd)
-         $ S.filter (isLeft . snd)
+rsS3 l bucket n = S.map ((fromRight undefined) . snd)
+         $ S.filter (isRight . snd)
          $ nodeS3 l bucket n
 

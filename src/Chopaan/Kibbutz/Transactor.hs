@@ -144,33 +144,29 @@ nodeCost k f = undefined
 toNodeStates :: (MonadAsync m, Address n, Ord n, IsStream t) => Kbtz t m n SensorS -> t m (NodeStates n)
 toNodeStates k = Tx <$> (unKibbutz k)
 
-planTx :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m)) => Time.DiffTime -> Kbtz t m n SensorS -> t m (TxPlan n)
-planTx horizon k = S.trace (\p -> liftIO . print $ "Plan For Interval:\n" <> show p) $
-                   S.postscan (transactionPlanner horizon)
+planTx :: (MonadAsync m, Address n, Ord n, Show n, IsStream t) => Time.DiffTime -> Kbtz t m n SensorS -> t m (TxPlan n)
+planTx horizon k = S.postscan (transactionPlanner horizon)
                     -- $ S.trace (liftIO . print)
                     -- $ S.map (fromJust)
                     -- $ S.trace (liftIO . print)
                     -- $ S.filter (isJust)
                     -- $ S.trace (liftIO . print)
-                    -- $ S.chunksOf 100 FL.last
-                    $ S.trace (liftIO . print)
+                    -- $ S.intervalsOf horizon FL.last
+                    -- $ S.trace (liftIO . print)
                     $ toNodeStates k 
                    
 
-monitorTx :: (MonadAsync m, Address n, Ord n, IsStream t, Monad (t m)) => TxPlan n -> Kbtz t m n SensorS -> t m (TxState n)
-monitorTx tx k = S.postscan (transactionFold tx)
-                 $ S.trace (\t -> liftIO . print
-                                  $ "Entering Tx Monitor" <> "\n" <> show t)  
-                 $ toNodeStates k
+monitorTx :: (MonadAsync m, Address n, Ord n, IsStream t) => TxPlan n -> Kbtz t m n SensorS -> (TxPlan n, t m (TxState n))
+monitorTx tx k = (tx, S.postscan (transactionFold tx) $ toNodeStates k)
 
 
 
-runTransactor :: (MonadAsync m, Address n, Ord n, Show n, IsStream t, Monad (t m))
+runTransactor :: (MonadAsync m, Address n, Ord n, Show n, IsStream t)
   => PubQueue
   -> Time.DiffTime
   -> Kbtz t m n SensorS
   -> t m (TxPlan n, t m (TxState n))
-runTransactor q horizon k = (,) <$> txs <*> statuses
+runTransactor q horizon k = statuses
   where
     txs = S.trace (dispatchTx q) $ planTx horizon k
     statuses = S.map (flip monitorTx $ k) txs
@@ -179,11 +175,11 @@ dispatchTx :: forall m n. (MonadIO m, Address n)
   => PubQueue
   -> TxPlan n
   -> m ()
-dispatchTx q tx = do
-  uid <- liftIO $ (Text.pack . show) <$> getULID
-  t0 <- liftIO $ Time.getCurrentTime
-  let txDispatch = mkTxDispatch uid t0 tx
-  liftIO $ (writeToPubQ q) (rootTopic @n (undefined)) $ txDispatch
+dispatchTx = dispatchNodeTx -- do
+  -- uid <- liftIO $ (Text.pack . show) <$> getULID
+  -- t0 <- liftIO $ Time.getCurrentTime
+  -- let txDispatch = mkTxDispatch uid t0 tx
+  -- liftIO $ (writeToPubQ q) (rootTopic @n (undefined)) $ txDispatch
 
 dispatchNodeTx :: forall m n. (MonadIO m, Address n)
   => PubQueue
@@ -194,12 +190,12 @@ dispatchNodeTx q (Tx tx) = do
   sequence_ $ (\(t, s) -> liftIO $ writeToPubQ q t s) <$> txDispatches
 
 
-foldTxState :: (Monad m) => TxState n -> m TransactionStatus
+foldTxState :: TxState n -> TransactionStatus
 foldTxState (Tx gt) = let
       gridTx = foldl (<>) mempty $ snd <$> gt
       loss = energyDispatched gridTx - energyReceived gridTx
       lossPerWS = loss / (energyDispatched gridTx)
-      in return $ gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
+      in gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
 
 -- The state will just be carried across as a TransactionStatus
 transactionFold :: forall m n. (Monad m, Address n, Ord n) => TxPlan n
@@ -282,7 +278,7 @@ solveTP timeHorizon sources sinks cs = do
   liftIO $ do
     (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs
     let dict = getModelDictionary sol
-    print $ "Plan:\n" <> (show dict)
+    --print $ "Plan:\n" <> (show dict)
     if not . modelExists $ sol then return Wait else do
       let
           (ns, cvs) = unzip $ M.toAscList dict
