@@ -61,8 +61,8 @@ spec :: Spec
 spec = do
   describe "Spiders are great" $ do
     it "qKbtz processor processes all messages!" $ do
-      let nNodes = 10
-          nMessages = 100
+      let nNodes = 1
+          nMessages = 10
       ns <- arbs @NodeMAC nNodes
       es <- do
         xs'' <- mapM (\_ -> orderedES nMessages) ns

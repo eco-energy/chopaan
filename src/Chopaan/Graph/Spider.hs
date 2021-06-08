@@ -42,7 +42,7 @@ import Data.Aeson (ToJSON, FromJSON)
 import Data.Greskell
 import Data.Hashable (Hashable)
 import Data.Maybe (fromMaybe)
-import Data.Time (UTCTime)
+import Data.Time (UTCTime, getCurrentTime)
 import Data.Pool
 
 import Control.Monad.Trans.Reader
@@ -102,7 +102,7 @@ ingestHyperGraph conf (KbtzRoot gn) =
       t' <- liftIO now
       let
         t = fromMaybe t' $ fromUTCTime <$> (getVTime v)
-        lx = (toLink getEDir) gn <$> es
+        lx = toLink gn <$> es
       addFN spider $ toFN t n v lx 
 
 
@@ -126,36 +126,57 @@ toFN t n v lx = FoundNode
       , nodeAttributes = v
       }
 
-toLink :: (e -> LinkState) -> n -> e -> FoundLink n e
-toLink getDir n' e = FoundLink
+toLink :: HasDir e => n -> e -> FoundLink n e
+toLink n' e = FoundLink
                      { targetNode = n'
-                     , linkState = getDir e
+                     , linkState = getEDir e
                      , linkAttributes = e
                      }
 
 
 spiderFold :: forall m a n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
            => Config n v e
-           -> ((n, a) -> FoundNode n v e)
+           -> ((n, a) -> m (FoundNode n v e))
            -> FL.Fold m (n, a) Bool
 spiderFold conf asFN = FL.mkFoldM step start end
   where
     step :: (Pool(Spider n v e), Bool) -> (n, a) -> m (FL.Step (Pool(Spider n v e), Bool) Bool)
-    step (s, _) a = (\r -> return $ FL.Partial (s, r)) =<< (withResource s (flip addFN (asFN a))) 
+    step (s, _) a = (\r -> return $ FL.Partial (s, r))
+      =<< (withResource s . (flip addFN))
+      =<< (asFN a)
     start = (,True) <$> (liftIO $ spiderPool conf)
     end (s, r) = liftIO $ destroyAllResources s >> return r
 
 
 addMeshNode :: forall m. (MonadAsync m, MonadCatch m)
   => FL.Fold m (NodeMAC, N.RuntimeStats) Bool
-addMeshNode = spiderFold meshConfig rsToFN
+addMeshNode = spiderFold meshConfig (pure . rsToFN)
 
 addStakeNode :: forall m. (MonadAsync m, MonadCatch m)
-  => FL.Fold m (NodeMAC, (SensorS, Stake)) Bool
-addStakeNode = spiderFold stakeConfig x
+  => FL.Fold m (NodeMAC, (SensorS, Stake, TransactionStatus)) Bool
+addStakeNode = spiderFold stakeConfig (\(n, (s, st, _)) -> x n s st)
   where
-    x :: (NodeMAC, (SensorS, Stake)) -> FoundNode NodeMAC SensorS Stake
-    x = undefined
+    x :: NodeMAC -> SensorS -> Stake -> m (FoundNode NodeMAC SensorS Stake)
+    x n v e = do
+      t <- liftIO getCurrentTime
+      pure $ toFN (fromUTCTime . (fromMaybe t) .  _time $ v) n v [toLink n e]
+
+addMonNode :: forall m. (MonadAsync m, MonadCatch m)
+  => FL.Fold m (NodeMAC, (SensorS, Stake, TransactionStatus)) Bool
+addMonNode = spiderFold statusConfig (\(n, (s, _, st)) -> x n s st)
+  where
+    x :: NodeMAC
+      -> SensorS
+      -> TransactionStatus
+      -> m (FoundNode NodeMAC SensorS TransactionStatus)
+    x n v e = do
+      t <- liftIO getCurrentTime
+      pure $ toFN (fromUTCTime . (fromMaybe t) .  _time $ v) n v [toLink n e]
+
+
+saveTx ::  forall m. (MonadAsync m, MonadCatch m)
+  => FL.Fold m (NodeMAC, (SensorS, Stake, TransactionStatus)) (Bool, Bool)
+saveTx = (,) <$> addStakeNode <*> addMonNode
 
 writeSpiderStream :: (IsStream t, MonadAsync m, MonadCatch m)
   => Config n v e

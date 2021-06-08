@@ -143,7 +143,7 @@ mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOp
 mqttSrc k ns o = qSrc  =<< (mqttQs o k ns)
 
 
-runKibbutz :: forall t m. (IsStream t, MonadAsync m, MonadCatch m) => KbtzC NodeMAC -> m (t m Bool)
+runKibbutz :: forall t m. (IsStream t, MonadAsync m, MonadCatch m, Monad (t m)) => KbtzC NodeMAC -> m (t m Bool)
 runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
   (es, rs, outbox) <- case channelOpts of
     Left queues -> qSrc @t queues
@@ -153,59 +153,46 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
   
   let  
     sensorKbtz = S.postscan sensorFD sensorS
-    -- powerK = _powerT <$> sensorKbtz
-    -- energyK = _energyT <$> sensorKbtz
-    -- storage = _battery <$> sensorKbtz
+    powerK = _powerT <$> (Kbtz sensorKbtz)
+    energyK = _energyT <$> (Kbtz sensorKbtz)
+    storage = _battery <$> (Kbtz sensorKbtz)
     
   (txStream, dup1) <- duplicateS sensorKbtz
   (monStream, nodeStream) <- duplicateS dup1
   let
     txPlan = planTx horizon (Kbtz txStream)
     txMonitor = (flip monitorTx (Kbtz monStream)) <$> txPlan
-    planner :: t m (TxPlan NodeMAC, TxState NodeMAC)
-    planner = S.mapM (\(tx, s) -> (tx,) <$> ((S.fold FL.mconcat) . S.adapt $ s))
-              $ txMonitor
-    -- dispatcher = S.mapM (dispatchTxSafe outbox) txPlan
+
+    --dispatcher = S.mapM (dispatchTxSafe outbox) txPlan
     meshS = S.postscan rsFD rs
-    saver = addPlanFN esTimer nodeStream planner
+    kstate = gridState esTimer nodeStream txMonitor
+    saveK = (uncurry (&&)) <$> S.scan saveTx kstate
     -- planHG = S.fold S.zipWith statePlanToFN $
     --         <$> (S.trace (liftIO . print) $ stream sensorKbtz)
     --         <*> ((curryTx mempty) <$> txPlan)
     -- monHG = ingestSensorKbtz $ editMonS snd $ (,)
     --         <$> stream sensorKbtz
     --         <*> ((fmap . fmap) (curryTx (Source, mempty)) txMonitor)
-  return . adapt $ saver `parallel` meshS {-- monHG `parallel` planHG `parallel` meshHG --}
+  return . adapt $ saveK `parallel` meshS {-- monHG `parallel` planHG `parallel` meshHG --}
   where
     sensorFD = FL.classify sensorFold
     rsFD = snd <$> ((,) <$> (FL.classify (meshFold)) <*> (addMeshNode))
     processEither = FL.partition sensorFD rsFD
     dispatchTxSafe o t = expToBool =<< (try $ dispatchTx o t)
-    addPlanFN :: t m (NodeMAC, EnergyState)
+    gridState :: () => t m (NodeMAC, EnergyState)
       -> t m (M.Map NodeMAC SensorS)
-      -> t m (TxPlan NodeMAC, TxState NodeMAC)
-      -> t m Bool
-    addPlanFN a st pl = do
-      (n, _) <- S.take 1 a
-      m <- S.take 1 st
-      (Tx txMap, Tx statusMap) <- S.take 1 pl
+      -> t m (TxPlan NodeMAC, t m (TxState NodeMAC))
+      -> t m (NodeMAC, (SensorS, Stake, TransactionStatus))
+    gridState a st pl = do
+      (n, _) <- a
+      m <- st
+      (Tx txMap, stati) <- pl
+      (Tx statusMap) <- S.scan FL.mconcat stati 
       let
         sen = m M.! n
-        stake = txMap M.! n
-        txStatus = statusMap M.! n
-      syes <- addStakeFN n sen stake
-      syes' <- addStateFN n sen (snd txStatus)
-      S.yield (syes && syes')
-      where
-        addStakeFN :: NodeMAC -> SensorS -> Stake -> m Bool
-        addStakeFN = undefined
-        addStateFN :: NodeMAC -> SensorS -> TransactionStatus -> m Bool
-        addStateFN = undefined
-    -- ingestSensorKbtz :: forall t e. (IsStream t, LinkAttributes e, HasDir e)
-    --   =>  GrS t m NodeMAC SensorS e -> t m Bool
-    -- ingestSensorKbtz = ingestHyperGraph spConf (mkKbtzRoot name)
-    -- semantic editor combinator
-    -- editMonS :: (Functor (t m)) => (c -> d) -> t m (a, t m (b -> c)) -> t m (a, t m (b -> d))
-    -- editMonS = (fmap . second . fmap . result)
+        tx = txMap M.! n
+        mon = statusMap M.! n
+      S.yield $ (n, (sen, tx, snd mon))
     horizon = 8
 
 
