@@ -17,17 +17,17 @@ import Data.Greskell (FromGraphSON(..), Key(..), PMap
                      , GValue, Single, Parser
                      , parseUnwrapList, parseJSONViaGValue, (.:)
                      , lookup, lookupM)
-import Chopaan.Graph.Greskell (GreskellC, parseUnwrapTraversable, optSumEncoding)
+import Chopaan.Graph.Greskell
 import NetSpider.Graph (NodeAttributes(..), VFoundNode)
 import Data.Greskell.Extra (writeKeyValues, (<=:>), pMapToFail, lookupAs)
 import Data.Text.Encoding (encodeUtf8)
 import Data.ByteString.Lazy (fromStrict)
-import qualified Data.Vector as V
+import Data.Binary
 
 
 data BatteryType = LeadAcidFlooded | LeadAcidSealed | LithiumIon
   deriving (Eq, Ord, Enum, Bounded, Read, Show, Humanize, Present,
-            Generic, ToJSON, FromJSON, NFData)
+            Generic, Binary, ToJSON, FromJSON, NFData)
 
 
 instance Humanize (Maybe BatteryType) where
@@ -44,7 +44,7 @@ data BatteryConf a = BatteryConf
   , maxV :: a
   , capacityAH :: a
   , batType :: BatteryType
-  } deriving (Eq, Ord, Show, Read, Generic, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
+  } deriving (Eq, Ord, Show, Read, Generic, Binary, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
 
 instance (GreskellC a, Num a) => FromGraphSON (BatteryConf a) where
   parseGraphSON = parseUnwrapTraversable
@@ -90,34 +90,19 @@ defBC = BatteryConf 0 0 0 LeadAcidFlooded
 data BatteryTop a = ParBC (BatteryConf a) (BatteryConf a)
                   | SeqBC (BatteryConf a) (BatteryConf a)
                   | SingBC (BatteryConf a)
-                  deriving (Eq, Ord, Show, Read, Generic, NFData, Functor, Foldable, Traversable)
+                  deriving (Eq, Ord, Show, Read, Generic, Binary, NFData, Functor, Foldable, Traversable)
 
 batEncodingOpts = optSumEncoding "batteryTag" "batteryContent"
 pvEncodingOpts = optSumEncoding "pvTag" "pvContent"
 ldEncodingOpts = optSumEncoding "loadTag" "loadContent"
 
 
-instance (ToJSON a, Show a) => ToJSON (BatteryTop a) where
-  toJSON = toJSONHack --genericToJSON pvEncodingOpts
-  toEncoding = toEncodingHack
+instance (Binary a) => ToJSON (BatteryTop a) where
+  toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
+  toEncoding = binaryJSONEncode
 
-instance (FromJSON a, Read a) => FromJSON (BatteryTop a) where
-  parseJSON = parseJSONHack "BatteryTop"
-
-
--- $ JANUSGRAPH DOES NOT SUPPORT NESTED PROPERTY TYPES. THIS IS AN UGLY HACK TO
--- $ SERIALIZE NESTED THINGS HORRIBLY. IT SHOULD BE MOVED OUT OF THE FromJSON, ToJSON INSTANCES!
-
-toJSONHack :: (Show a) => a -> Aeson.Value
-toJSONHack = toJSON . T.pack . show
-
-toEncodingHack :: (Show a) => a -> Aeson.Encoding
-toEncodingHack = toEncoding . T.pack . show
-
-parseJSONHack _ (Aeson.Array x) = pure (readValue . V.head $ x)
-    where
-      readValue (Aeson.String s) = read . T.unpack $ s
-parseJSONHack x _ = fail $ x <> " is encoded as a string"
+instance (Binary a) => FromJSON (BatteryTop a) where
+  parseJSON = binaryJSONRead "BatteryTop"
 
 
 instance (GreskellC a, Num a, Read a) => FromGraphSON (BatteryTop a) where
@@ -189,7 +174,7 @@ data PVConf a = PVConf
   , vAtMPP :: a
   , iAtMPP :: a
   , pvPower :: a
-  } deriving (Eq, Ord, Show, Read, Generic, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
+  } deriving (Eq, Ord, Show, Read, Generic, Binary, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
 
 instance (GreskellC a, Num a) => FromGraphSON (PVConf a) where
   parseGraphSON = parseUnwrapTraversable
@@ -216,17 +201,17 @@ defPC = PVConf 0 0 0 0
 data PVTop a = ParPC (PVConf a) (PVConf a)
              | SeqPC (PVConf a) (PVConf a)
              | SingPC (PVConf a)
-             deriving (Eq, Ord, Show, Read, Generic, NFData, Functor, Foldable, Traversable)
+             deriving (Eq, Ord, Show, Read, Generic, Binary, NFData, Functor, Foldable, Traversable)
 
 
-instance (ToJSON a, Show a) => ToJSON (PVTop a) where
-  toJSON = toJSONHack --genericToJSON pvEncodingOpts
-  toEncoding = toEncodingHack
+instance (Binary a) => ToJSON (PVTop a) where
+  toJSON = binaryJSONWrite
+  toEncoding = binaryJSONEncode
 
-instance (FromJSON a, Read a) => FromJSON (PVTop a) where
-  parseJSON = parseJSONHack "PVTop"
+instance (Binary a) => FromJSON (PVTop a) where
+  parseJSON = binaryJSONRead "PVTop"
 
-instance (GreskellC a, Num a, Read a) => FromGraphSON (PVTop a) where
+instance (GreskellC a, Num a) => FromGraphSON (PVTop a) where
   parseGraphSON = parseJSON . unwrapAll -- do
     -- fromPMap =<< parseGraphSON gv
     --   where
@@ -245,7 +230,7 @@ instance (GreskellC a, Num a, Read a) => FromGraphSON (PVTop a) where
           --   batC pm = (Data.Greskell.lookup pm "pvContent")
     
 
-data PVEnv a = PVEnv deriving (Eq, Ord, Show, Read, Generic, NFData)
+data PVEnv a = PVEnv deriving (Eq, Ord, Show, Read, Generic, Binary, NFData)
 
 type EvolvePV a = (PVConf a -> PVEnv a -> VI a)
 
@@ -266,7 +251,7 @@ runPV (APV bConf evolve) p = evolve bConf p
 data LoadConf a = LoadConf
   { loadPower :: a
   , loadName :: T.Text
-  } deriving (Eq, Ord, Show, Read, Generic, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
+  } deriving (Eq, Ord, Show, Read, Generic, Binary, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
 
 instance (GreskellC a, Num a) => FromGraphSON (LoadConf a) where
   parseGraphSON = parseUnwrapTraversable -- fromPMap =<< parseGraphSON gv
@@ -287,23 +272,23 @@ defLC = LoadConf 0 "No_LC"
 data Load a where
   ParLoad :: Load a -> Load a -> Load a
   ALoad :: LoadConf a -> Load a
-  deriving (Generic, NFData, ToJSON, FromJSON)
+  deriving (Generic, Binary, NFData, ToJSON, FromJSON)
 
 
 data LoadTop a = ParLC (LoadConf a) (LoadConf a)
                | SingLC (LoadConf a)
-  deriving (Eq, Ord, Show, Read, Generic, NFData, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Read, Generic, Binary, NFData, Functor, Foldable, Traversable)
 
 
 
-instance (ToJSON a, Show a) => ToJSON (LoadTop a) where
-  toJSON = toJSONHack --genericToJSON pvEncodingOpts
-  toEncoding = toEncodingHack
+instance (Binary a, Show a) => ToJSON (LoadTop a) where
+  toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
+  toEncoding = binaryJSONEncode
 
-instance (FromJSON a, Read a) => FromJSON (LoadTop a) where
-  parseJSON = parseJSONHack "LoadTop"
+instance (Binary a) => FromJSON (LoadTop a) where
+  parseJSON = binaryJSONRead "LoadTop"
 
-instance (GreskellC a, Num a, Read a) => FromGraphSON (LoadTop a) where
+instance (GreskellC a, Num a) => FromGraphSON (LoadTop a) where
   parseGraphSON = parseJSON . unwrapAll
 
 

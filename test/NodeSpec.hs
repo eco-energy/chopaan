@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, TypeApplications #-}
 
 module NodeSpec (spec) where
 
@@ -9,6 +9,7 @@ import Test.QuickCheck.Classes
 import Test.QuickCheck.Checkers
 import Test.QuickCheck
 import Test.QuickCheck.Instances.Time ()
+import Test.QuickCheck.Arbitrary.Generic
 
 import qualified Streamly.Prelude as S
 import Streamly
@@ -19,6 +20,8 @@ import Proto.NodeMessageSchema.NodeMessages_Fields
 import Lens.Micro ()
 --import Data.ProtoLens.Arbitrary
 
+import Data.Aeson as A
+import Data.Text.Encoding.Base64
 import Data.ProtoLens (defMessage)
 import Lens.Micro
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
@@ -28,20 +31,36 @@ import Control.Concurrent (threadDelay, forkIO)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (isEmptyTChan, dupTChan)
 import Control.Monad (forever, liftM)
-
+import Chopaan.Graph.Greskell
 
 import Numeric.Compensated
 
 --instance Arbitrary EnergyState where
 --  arbitrary = arbitraryMessage
 
-instance (Arbitrary a) => Arbitrary (Node a) where
-  arbitrary = Node <$> arbitrary <*> arbitrary <*> arbitrary 
+-- instance (Arbitrary a) => Arbitrary (Node a) where
+--   arbitrary = Node <$> arbitrary <*> arbitrary <*> arbitrary 
 
 
 instance (Eq a) => EqProp (Node a) where
   a =-= b = eq a b
 
+instance (Arbitrary v) => Arbitrary (Node v) where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
+
+instance (Arbitrary e, Arbitrary p) => Arbitrary (Battery e p) where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
+
+-- instance (Arbitrary e, Arbitrary p) => Arbitrary (SensorMetrics e p) where
+--   arbitrary = genericArbitrary
+--   shrink = genericShrink
+
+
+instance (Arbitrary e, Arbitrary p) => Arbitrary (SensorMetrics e p) where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 spec :: Spec
 spec = do
@@ -50,7 +69,13 @@ spec = do
       verboseBatch (applicative (undefined :: Node (Double, Double, Double)))
     it "Node is monoidal" $ do
       verboseBatch (monoid (undefined :: (Node Int)))
-      
+    it "Sensor Metrics can round-trip json" $ do
+      sms <- arbs @(SensorMetrics Double Double) 10
+       -- let p = fromJSON . toJSON
+        --    xs = p <$> sms
+      -- print x
+      -- print y
+      (decode . encode . head $ sms) `shouldBe` (Just . head $ sms)
 {--    it "a stream at a 1 sec interval with a fixed power has an energy after n steps equivalent to the sum of the powers" $ do
       let
         len = 102 :: Int

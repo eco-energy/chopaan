@@ -112,8 +112,10 @@ addFN :: MonadIO m
       => Spider n v e -> FoundNode n v e -> m (Bool) 
 addFN s f = expToBool =<< (liftIO $ try (addFoundNode s f))
 
+tryForBool :: (MonadIO m, MonadCatch m) => m a -> m Bool 
+tryForBool m = expToBool =<< (try m)
 
-expToBool :: (MonadIO m) => Either SomeException () -> m Bool
+expToBool :: (MonadIO m) => Either SomeException a -> m Bool
 expToBool (Left e) = (liftIO . print $ e) >> return False
 expToBool (Right _) = return True
 
@@ -176,7 +178,7 @@ addMonNode = spiderFold statusConfig (\(n, (s, _, st)) -> x n s st)
 
 saveTx ::  forall m. (MonadAsync m, MonadCatch m)
   => FL.Fold m (NodeMAC, (SensorS, Stake, TransactionStatus)) (Bool, Bool)
-saveTx = (,) <$> addStakeNode <*> addMonNode
+saveTx = (,) <$> (addStakeNode) <*> (addMonNode)
 
 writeSpiderStream :: (IsStream t, MonadAsync m, MonadCatch m)
   => Config n v e

@@ -24,9 +24,15 @@ import Control.Monad.IO.Class
 import Control.Monad (void, when)
 import Data.Key
 
+import Language.Javascript.JSaddle
+       (strToText, valToStr, fromJSVal, toJSVal
+       , JSNull(..), deRefVal, valToObject, js, JSF(..), js1, js4, jsg,
+        valToNumber, (!), (!!), (#), (<#), global, eval, fun, val, array, new, valToText
+       , JSValue(..), call, JSM(..))
 import GHCJS.DOM (currentWindowUnchecked)
 import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback)
 import GHCJS.DOM.Window (Window, requestAnimationFrame)
+--import GHCJS.DOM.WebGLContext
 --import "ghcjs-dom" GHCJS.DOM.Document (createElement)
 --import GHCJS.DOM.Types (Element)
 
@@ -34,7 +40,9 @@ import Shpadoinkle
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Run (runJSorWarp)
 import Shpadoinkle.Backend.ParDiff (runParDiff, stage)
---import qualified Clay as Css
+
+import qualified Chopaan.Ui.Style as Css
+import Chopaan.View (staticTemplate)
 
 --import Language.Javascript.JSaddle
 --import Control.Lens ((^.))
@@ -47,6 +55,7 @@ newtype ShaderEff = ShaderEff { unShaderEff :: T.Text }
 
 shaderH :: GenBuses a => Widgets a -> (a :> ImageC) -> ShaderEff
 shaderH widgets effect = ShaderEff . T.pack . shaderDefs $ glsl widgets effect
+ 
 
 addShader :: MonadJSM m => ShaderEff -> m ()
 addShader = H.addScriptSrc . unShaderEff
@@ -77,8 +86,6 @@ deltaPlot toR xs ys = foldl xorR noThing $
     deltas = fmap toR ys
 
 
-getCanvas :: MonadJSM m => m (RawNode)
-getCanvas = H.getById "effect"
 
 installEffect :: (MonadJSM m) => RawNode -> ShaderEff -> m ()
 installEffect = undefined
@@ -97,6 +104,38 @@ imListener ma = baked . args
         ---sss = runShader' unitW (\() -> deltaDiskPlot (\(x, y) -> C.black) undefined)
 
 
+
+setupShader :: (MonadJSM m) => ShaderEff -> H.Html m ()
+setupShader (ShaderEff t) = H.canvas ( [H.onLoadM_ $ (liftJSM $ H.addScriptSrc t)]
+                                     <> [H.onClickM_ $ (liftIO $ print t)]
+                                     <> [H.onDragM_ $ (liftJSM $ do
+                                                          w <- currentWindowUnchecked
+                                                          return ()
+                                                          ) ]
+                                     <> [H.class' $
+                                          Css.h_screen <> (Css.bg_red_900)
+                                        ]
+                                     )
+                            []
+
+-- shader :: ShaderEff -> Html m ShaderEff
+-- shader cc = baked $ do
+--   (notify, stream) <- mkGlobalMailboxAfforded constUpdate
+--   doc' <- currentDocumentUnchecked
+--   container' <- toJSVal =<< createElement doc' "canvas"
+--   --cfg <- mirrorCfg cc
+--   cm  <- jsg2 "CodeMirror" container' cfg
+--   _ <- cm ^. js2 "on" "change" (fun $ \_ _ _ -> do
+--         jsv <- cm ^. js0 "getValue"
+--         raw :: Maybe Text <- fromJSVal jsv
+--         maybe (pure ()) (notify . Code . encodeUtf8 . TL.fromStrict) raw
+--       )
+--   window <- currentWindowUnchecked
+--   _ <- setTimeout window (fun $ \_ _ _ -> () <$ cm ^. js0 "refresh") (Just 33)
+--   return (RawNode container', stream)
+
+  
+
 animation :: () => Window -> TVar ShaderEff -> (Double -> ShaderEff) -> JSM ()
 animation w s f = void $ requestAnimationFrame w =<< go where
   go = newRequestAnimationFrameCallback $ \clock' -> do
@@ -111,8 +150,9 @@ dur = 3000
 wait :: Num n => n
 wait = 3000000
 
-view :: ShaderEff -> Html m ShaderEff
-view s = H.canvas "thing" [text . T.pack . show $ s]
+view :: (MonadJSM m) => ShaderEff -> Html m ShaderEff
+view = staticTemplate . setupShader
+--H.canvas "thing" [text . unShaderEff $ s]
 
 
 {--

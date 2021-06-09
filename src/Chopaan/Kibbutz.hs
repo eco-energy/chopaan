@@ -9,7 +9,7 @@ import GHC.Generics
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Greskell
 import Data.Hashable (Hashable)
-import Data.Maybe (fromMaybe)
+import Data.Maybe
 import Data.Time (UTCTime)
 import Data.Either
 import Network.AWS.S3 (BucketName)
@@ -25,39 +25,24 @@ import Control.Monad.Catch
 import Control.Concurrent (forkIO)
 import qualified Data.Map as M
 import qualified Control.Concurrent.Async as A
-import qualified Control.Concurrent.STM.TChan as TChan
-import qualified Control.Concurrent.STM as STM
 
-import Streamly
+import Streamly.Prelude (IsStream, MonadAsync, adapt)
+import Chopaan.Utils.Streamly
 import qualified Streamly.Prelude as S
+import qualified Streamly.Internal.Data.Stream.IsStream as Internal
 import qualified Streamly.Internal.Data.Fold as FL
+import qualified Streamly.Internal.Data.Pipe as P
+import Control.Monad
 
 import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, EnergyState)
 import System.IO (stdout)
-
-
-import Streamly.Prelude (IsStream, MonadAsync)
-
 
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Kibbutz
 
 import Chopaan.Comm.Mqtt.AWS (withMqttAuth)
 import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
-import Chopaan.Kibbutz.Transactor (planTx
-                                  , monitorTx
-                                  , dispatchTx
-                                  , TransactionStatus
-                                  , TxPlan(..)
-                                  , TxState(..)
-                                  , Tx(..)
-                                  , Stake
-                                  , Role(..)
-                                  , curryTx
-                                  , stakeLinkDir
-                                  , txStatusLinkDir
-                                  )
-
+import Chopaan.Kibbutz.Transactor
 import Chopaan.Node.NodeId (NodeId(..), NodeMAC)
 import Chopaan.Node.Folds (SensorS, sensorFold, energyFold, demandFold, powerFold, timeFold, meshFold)
 import Chopaan.Node.Node (nodeS)
@@ -82,10 +67,6 @@ import Chopaan.Graph
 import Chopaan.Graph.Spider
 import NetSpider.Spider.Config
 
-
-newtype Channel m n a = Channel {
-  unChannel :: ChannelOpts -> (ParallelT m (n, a))
-} deriving (Generic)
 
 
 type S3Opts = BucketName
@@ -123,7 +104,7 @@ s3Qs :: forall m. (MonadAsync m)
 s3Qs ns bucket = do
   lg <- liftIO $ newLogger Info stdout
   qs <- liftIO $ initQs
-  let x = (first fst) <$> (S.concatMapWith parallel (nodeS3 lg bucket) $ S.fromList ns)
+  let x = (first fst) <$> (S.concatMapWith S.parallel (nodeS3 lg bucket) $ S.fromList ns)
   liftIO . forkIO $ S.mapM_ (\(n, x) -> case x of
               Left e -> liftIO $ writeChan (stateChan qs) n e
               Right r -> liftIO $ writeChan (statsChan qs) n r
@@ -148,71 +129,84 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
   (es, rs, outbox) <- case channelOpts of
     Left queues -> qSrc @t queues
     Right s3Opts -> qSrc =<< s3Qs nodes s3Opts
-
-  (esTimer, sensorS) <- duplicateS es
-  
-  let  
-    sensorKbtz = S.postscan sensorFD sensorS
-    powerK = _powerT <$> (Kbtz sensorKbtz)
-    energyK = _energyT <$> (Kbtz sensorKbtz)
-    storage = _battery <$> (Kbtz sensorKbtz)
-    
-  (txStream, dup1) <- duplicateS sensorKbtz
-  (monStream, nodeStream) <- duplicateS dup1
+  (sensorS, dup1) <- duplicateS es
+  (esTimer, saveTimer) <- duplicateS dup1
   let
-    txPlan = planTx horizon (Kbtz txStream)
-    txMonitor = (flip monitorTx (Kbtz monStream)) <$> txPlan
+    gridSensorS = sampleOn (S.postscan sensorFD sensorS) (fmap (const id) $ esTimer)
+    --powerK = _powerT <$> (Kbtz sensorKbtz)
+    --energyK = _energyT <$> (Kbtz sensorKbtz)
+    --storage = _battery <$> (Kbtz sensorKbtz)
+    
+  (txStream, nodeStream) <- duplicateS gridSensorS
+  let plan = S.trace (void . (dispatchTxSafe outbox) )
+        $ S.postscan (transactionPlanner horizon)
+        $ tapCount "txStream" $ (Tx <$> txStream)
+  let tx = tapCount "statePipe"
+        $ S.filter (isJust)
+        $ Internal.transform (statePipe horizon) (Tx <$> nodeStream) 
 
+  let saveMe = S.map (\(x, y) -> x && y) $ S.postscan (saveTx)
+        $ S.map ((\(n, se, st, (r, ts)) -> (n, (se, st, ts))) . fromJust)
+        $ S.filter (isJust)
+        $ S.trace (liftIO . print)
+        $ S.zipAsyncWith unburden tx saveTimer
     --dispatcher = S.mapM (dispatchTxSafe outbox) txPlan
-    meshS = S.postscan rsFD rs
-    kstate = gridState esTimer nodeStream txMonitor
-    saveK = (uncurry (&&)) <$> S.scan saveTx kstate
-    -- planHG = S.fold S.zipWith statePlanToFN $
-    --         <$> (S.trace (liftIO . print) $ stream sensorKbtz)
-    --         <*> ((curryTx mempty) <$> txPlan)
-    -- monHG = ingestSensorKbtz $ editMonS snd $ (,)
-    --         <$> stream sensorKbtz
-    --         <*> ((fmap . fmap) (curryTx (Source, mempty)) txMonitor)
-  return . adapt $ saveK `parallel` meshS {-- monHG `parallel` planHG `parallel` meshHG --}
+  let
+
+    meshS = S.postscan rsFD rs -- S.trace (\_-> liftIO . print $ "rs") $ 
+
+  let  saveK = (constBool plan) `S.parallel` (saveMe)
+  return . adapt $ meshS `S.parallel` saveK
   where
+    unburden :: (Ord n) => Maybe (NodeStates n, TxPlan n, TxState n) -> (n, a) -> Maybe (n, SensorS, Stake, (Role, TransactionStatus))
+    unburden Nothing _ = Nothing
+    unburden (Just (Tx sen, Tx pl, Tx st)) (n, _) = do
+      s <- (M.lookup n sen)
+      p <- (M.lookup n pl)
+      t <- (M.lookup n st)
+      return $ (n, s, p, t)
+    tapCount = S.tap . printCount
+    printCount s = FL.mkAccumM_ (\x _ -> (liftIO . print $ s <> ": " <> (show x))
+                                  >> (return $ x + 1))
+                   (pure 0)
+    constBool = S.mapM (pure . (const True))
     sensorFD = FL.classify sensorFold
     rsFD = snd <$> ((,) <$> (FL.classify (meshFold)) <*> (addMeshNode))
     processEither = FL.partition sensorFD rsFD
-    dispatchTxSafe o t = expToBool =<< (try $ dispatchTx o t)
-    gridState :: () => t m (NodeMAC, EnergyState)
-      -> t m (M.Map NodeMAC SensorS)
-      -> t m (TxPlan NodeMAC, t m (TxState NodeMAC))
-      -> t m (NodeMAC, (SensorS, Stake, TransactionStatus))
-    gridState a st pl = do
-      (n, _) <- a
-      m <- st
-      (Tx txMap, stati) <- pl
-      (Tx statusMap) <- S.scan FL.mconcat stati 
-      let
-        sen = m M.! n
-        tx = txMap M.! n
-        mon = statusMap M.! n
-      S.yield $ (n, (sen, tx, snd mon))
-    horizon = 8
+    dispatchTxSafe o t = tryJust t
+      where
+        tryJust (Just x) = expToBool
+                         =<< (try $ (dispatchTx o x))
+        tryJust Nothing = pure False
+    horizon = 60 * 60
 
 
 
-duplicateS
-  :: MonadAsync m
-  => IsStream t
-  => t m a
-  -> m (t m a, t m a)
-duplicateS src = do
-  (writeChan', readChan1, readChan2) <- liftIO $ do
-    chan <- TChan.newBroadcastTChanIO
-    chan' <- STM.atomically $ TChan.dupTChan chan
-    chan'' <- STM.atomically $ TChan.dupTChan chan
-    pure (chan, chan', chan'')
-  let
-    writes =
-      S.mapM (liftIO . STM.atomically . TChan.writeTChan writeChan') src
-    reads1 =
-      S.repeatM (liftIO $ STM.atomically $ TChan.readTChan readChan1)
-    reads2 =
-      S.repeatM (liftIO $ STM.atomically $ TChan.readTChan readChan2)
-  pure (fmap (fromRight undefined) $ S.filter isRight $ (Left <$> writes) `S.async` (Right <$> reads1), reads2)
+
+gridState :: forall t m. (IsStream t, MonadAsync m, Monad (t m))
+  => t m (NodeMAC, EnergyState)
+  -> t m (M.Map NodeMAC SensorS)
+  -> t m (TxPlan NodeMAC, TxState NodeMAC)
+  -> t m (NodeMAC, (SensorS, Stake, TransactionStatus))
+gridState a b c = S.map curNode $ S.zipAsyncly $ zip3S a b c -- c
+  where
+    curNode ((n, _), m, (Tx txMap, Tx statusMap)) = let
+      sen = m M.! n
+      tx = txMap M.! n
+      mon = statusMap M.! n
+      in (n, (sen, tx, snd mon))
+
+zip3S :: (IsStream t, MonadAsync m) => t m a -> t m b -> t m c -> S.ZipAsyncM m (a, b, c)
+zip3S a b c = S.zipAsyncly $ (,,) <$> (adapt a) <*> (adapt b) <*> (adapt c)
+
+zipWithTweak :: (IsStream t, MonadAsync m)
+  => t m a -> t m b -> t m (c, t m d) -> m (t m (a, b, (c, d)))
+zipWithTweak a b c = do
+  c' <- tweak c
+  return $ S.zipAsyncly $ zip3S a b c'
+  
+
+tweak :: (IsStream t, MonadAsync m) => t m (a, t m b) -> m (t m (a, b))
+tweak d = S.fold FL.mconcat $ (\(x, s) -> S.zipWith (,) (S.repeat x) (s)) <$> (adapt d)
+
+

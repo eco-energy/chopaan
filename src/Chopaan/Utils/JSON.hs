@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, PackageImports #-}
 
 module Chopaan.Utils.JSON (encodeMessageJSON, messageToEncoding) where
 
@@ -8,7 +8,7 @@ import Data.Monoid ((<>))
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encoding as AE
-import qualified Data.ByteString.Base64 as B64
+import qualified "base64" Data.ByteString.Base64 as B
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as Map
@@ -63,7 +63,7 @@ fieldValueToEncoding (P.ScalarField P.FloatField) = realFloatToEncoding AE.float
 fieldValueToEncoding (P.ScalarField P.DoubleField) = realFloatToEncoding AE.double
 fieldValueToEncoding (P.ScalarField P.BoolField) = AE.bool
 fieldValueToEncoding (P.ScalarField P.StringField) = AE.text
-fieldValueToEncoding (P.ScalarField P.BytesField) = AE.unsafeToEncoding . quote . B.byteString . B64.encode
+fieldValueToEncoding (P.ScalarField P.BytesField) = AE.unsafeToEncoding . quote . B.byteString . B.encodeBase64'
   where quote b = B.char8 '"' <> b <> B.char8 '"'
 
 realFloatToEncoding :: RealFloat a => (a -> AE.Encoding) -> a -> AE.Encoding

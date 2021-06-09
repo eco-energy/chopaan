@@ -1,17 +1,18 @@
-{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds #-}
+{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving #-}
 module Chopaan.Node.Metrics where
 
 import GHC.Generics hiding (R)
 import Control.DeepSeq (NFData)
-
+import Data.Binary (Binary(..))
+import qualified Data.Binary as B
 import Data.Time
 import Data.Aeson hiding (encode, decode)
 import qualified Data.Aeson as A
 
 
 import qualified Data.HashMap.Strict as HM
-import Data.Csv hiding ((.:))
+import qualified Data.Csv as Csv
 import qualified Data.Vector as Vec (fromList)
 
 import Data.ByteString.Char8 (pack)
@@ -45,22 +46,26 @@ import Chopaan.Utils.Time
 import Chopaan.Graph.Greskell
 
 
+toField = Csv.toField
+toNamedRecord = Csv.toNamedRecord
+headerOrder = Csv.headerOrder
+
 {----- Basic Types ------}
 
 
 newtype WattSeconds = WS { unWs :: Compensated Double }
   deriving stock (Eq, Ord, Generic)
-  deriving newtype (Num, Fractional, Real, RealFrac, NFData)
+  deriving newtype (Num, Fractional, Show, Binary, Real, RealFrac, NFData)
 
 newtype Watts = W { unW :: Compensated Double }
   deriving stock (Eq, Ord, Generic)
-  deriving newtype (Num, Fractional, Real, RealFrac, NFData)
+  deriving newtype (Num, Fractional, Real, Show, Binary, RealFrac, NFData)
 
-instance Show WattSeconds where
-  show = (printf ("%.2g")) . fromWattSeconds
+-- instance Show WattSeconds where
+--   show = (printf ("%.2g")) . fromWattSeconds
 
-instance Show Watts where
-  show = (printf ("%.2g")) . fromWatts
+-- instance Show Watts where
+--   show = (printf ("%.2g")) . fromWatts
 
 
 fromWatts :: Watts -> Double
@@ -78,10 +83,10 @@ toWattSeconds a = WS $ add a 0 compensated
 pToE :: (Real t) => t -> Watts -> WattSeconds
 pToE t (W p') = WS $ (*^) (realToFrac t) p'
 
-instance ToField (Watts) where
+instance Csv.ToField (Watts) where
   toField = toField . uncompensated . unW
 
-instance ToField (WattSeconds) where
+instance Csv.ToField (WattSeconds) where
   toField = toField . uncompensated . unWs
 
 instance ToJSON WattSeconds where
@@ -108,12 +113,12 @@ data Node a = Node
   { tx :: ! a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Ord, Show, Generic, Functor, NFData, ToJSON, FromJSON)
+  } deriving (Eq, Ord, Show, Binary, Generic, Functor, NFData, ToJSON, FromJSON)
   
 
-instance (ToField a) => ToNamedRecord (Node a)
+instance (Csv.ToField a) => Csv.ToNamedRecord (Node a)
 
-instance DefaultOrdered (Node a) where
+instance Csv.DefaultOrdered (Node a) where
   headerOrder _ = Vec.fromList ["tx", "consumed", "generated"]
 
 instance Applicative Node where
@@ -170,6 +175,17 @@ instance (GreskellC a) => FromGraphSON (Node a) where
   parseGraphSON = parseJSON . unwrapAll
 
 
+deriving instance Generic UTCTime
+deriving instance Generic Day
+deriving instance Binary Day
+
+
+instance Binary UTCTime
+instance Binary DiffTime where
+  put a = put @Int $ round a
+  get = secondsToDiffTime <$> B.get 
+
+
 data SensorMetrics e p = SensorMetrics
   { _time :: !(Maybe UTCTime)
   , lastTimeDiff :: !DiffTime
@@ -177,12 +193,17 @@ data SensorMetrics e p = SensorMetrics
   , _energyT :: !(Node e)
   , _battery :: !(Battery R R)
   , _demand :: !e
-  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+  } deriving (Eq, Ord, Generic, Binary, Show, NFData, ToJSON, FromJSON)
 
 
---instance (ToJSON e, ToJSON p) => ToJSON (SensorMetrics e p)
+-- instance (Binary e, Binary p) => ToJSON (SensorMetrics e p) where
+--     toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
+--     toEncoding = binaryJSONEncode
 
---instance (FromJSON e, FromJSON p) => ToJSON (SensorMetrics e p)
+
+-- instance (Binary e, Binary p) => FromJSON (SensorMetrics e p) where
+--   parseJSON = binaryJSONRead "SensorMetrics"
+
 
 timeKey :: Key VFoundNode (Maybe UTCTime)
 timeKey = "time"
@@ -259,7 +280,7 @@ fieldAccessorsJSON es = es ^.. ( batteryVoltage
                           <> solarInputCurrent
                         )
 
-esFieldNamesCSV :: [Name]
+esFieldNamesCSV :: [Csv.Name]
 esFieldNamesCSV = ["batteryV",
                    "gridV",
                    "battery2LoadC",
@@ -277,17 +298,17 @@ fieldAccessorsCSV es = es ^.. ( batteryVoltage
                           <> dutyCycle
                         )
 
-instance ToNamedRecord EnergyState where
+instance Csv.ToNamedRecord EnergyState where
   toNamedRecord es = HM.fromList $
                 zip esFieldNamesCSV $
                 map (pack . show) $
                 fieldAccessorsCSV es
 
 
-instance DefaultOrdered EnergyState where
+instance Csv.DefaultOrdered EnergyState where
   headerOrder _ = Vec.fromList esFieldNamesCSV
 
-instance ToField UTCTime where
+instance Csv.ToField UTCTime where
   toField t = pack (show t)
 
 instance FromGraphSON UTCTime where
@@ -296,7 +317,7 @@ instance FromGraphSON UTCTime where
 instance FromGraphSON DiffTime where
   parseGraphSON = parseJSON . unwrapOne
 
-instance (ToField e, ToField p) => ToNamedRecord (SensorMetrics e p) where
+instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (SensorMetrics e p) where
   toNamedRecord (SensorMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
     [ toNamedRecord _battery,
       toNamedRecord _powerT,
@@ -326,7 +347,7 @@ nmFilter :: (NodeId a) -> SensorMetrics e p -> Bool
 nmFilter _ = isJust . _time
 
 
-instance DefaultOrdered (SensorMetrics e p)
+instance Csv.DefaultOrdered (SensorMetrics e p)
 
 type Timestamp = (Maybe UTCTime, DiffTime)
 
@@ -335,7 +356,7 @@ data Battery e p = Battery
   , chargeLim :: !p
   , dischargeLim :: !p
   , totalCapacity :: !e
-  } deriving (Eq, Ord, Show, Generic, NFData)
+  } deriving (Eq, Ord, Show, Binary, Generic, NFData)
 
 instance (ToJSON e, ToJSON p) => ToJSON (Battery e p)
 instance (FromJSON e, FromJSON p) => FromJSON (Battery e p)
@@ -376,8 +397,8 @@ instance (GreskellC e, GreskellC p) => NodeAttributes (Battery e p) where
 emptyB :: (Fractional e, Fractional p) => Battery e p
 emptyB = Battery 0 0 0 0
 
-instance DefaultOrdered (Battery e p)
-instance (ToField e, ToField p) => ToNamedRecord (Battery e p)
+instance Csv.DefaultOrdered (Battery e p)
+instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (Battery e p)
 
 instance (Fractional e, Fractional p, Ord e, Ord p) => Semigroup (Battery e p) where
   b <> b' = emptyB { soc = min (soc b)  (soc b')
@@ -464,10 +485,10 @@ zeroMsg = defMessage
 -- Identified sensor type for monitoring
 newtype TaggedNode n e p = TaggedNode (n, SensorMetrics e p) deriving (Generic)
 
-instance (ToField n, ToField e, ToField p) => ToNamedRecord (TaggedNode n e p) where
+instance (Csv.ToField n, Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (TaggedNode n e p) where
   toNamedRecord (TaggedNode (n, ns)) = (HM.fromList [("NodeId", toField n)]) <> toNamedRecord ns
 
-instance DefaultOrdered (TaggedNode n e p) where
+instance Csv.DefaultOrdered (TaggedNode n e p) where
   headerOrder _ = (Vec.fromList $ ["NodeId", "time"])
                   <> (headerOrder (undefined :: EnergyState))
                   <> (headerOrder (undefined :: PowerN))

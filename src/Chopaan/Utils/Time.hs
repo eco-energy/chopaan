@@ -6,6 +6,9 @@ import Data.Time.LocalTime.Compat
 import Data.Time.Clock.POSIX.Compat
 import Data.Word
 import qualified Data.Text as T
+import GHC.Read
+import Text.ParserCombinators.ReadP
+import Text.ParserCombinators.ReadPrec
 
 fromPico :: Pico -> Integer
 fromPico (MkFixed i) = i
@@ -30,3 +33,10 @@ parseUTCTime = utcTimeNow . read . T.unpack
 
 diffUTC :: UTCTime -> UTCTime -> DiffTime
 diffUTC a b = realToFrac $ diffUTCTime a b
+
+
+instance Read DiffTime where
+  readPrec = do
+    t <- readPrec
+    _ <- lift $ char 's'
+    return $ fromInteger t

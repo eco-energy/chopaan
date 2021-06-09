@@ -35,7 +35,8 @@ import Chopaan.Node.Folds (SensorS)
 import Chopaan.Node.Metrics hiding (Timestamp)
 import Chopaan.Node.NodeSensors
 import Chopaan.Kibbutz.Transactor (Stake, TransactionStatus)
-
+import Chopaan.Graph.Spider
+import Chopaan.Graph.Greskell
 import Shpadoinkle.Widgets.Types
 
 type R = Double
