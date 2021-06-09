@@ -235,6 +235,13 @@ packages:
     git: https://github.com/composewell/streamly.git
     commit: 4e48b52e8709390a47e99c107ebed2d1c9420076
 - completed:
+    hackage: base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
+    pantry-tree:
+      size: 2116
+      sha256: 52ea810635517dd6c2c39a4b04d50bb4be6925026873f5bdb1c2e4846325d6ef
+  original:
+    hackage: base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
+- completed:
     hackage: amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
     pantry-tree:
       size: 992
@@ -689,6 +696,13 @@ packages:
       sha256: b4130e25e85c786b91b8ad6137d8a7079859e4d7a9effa1fd4d3785a55b4a9cc
   original:
     hackage: network-3.1.2.1@sha256:188d6daea8cd91bc3553efd5a90a1e7c6d0425fa66a53baa74db5b6d9fd75c8b,4968
+- completed:
+    hackage: ghc-byteorder-4.11.0.0.10@sha256:d47fdef63f2a145091e91b1aedbd46bf61ca03bb935e81e3462a1d904c319de3,1594
+    pantry-tree:
+      size: 169
+      sha256: 61d9a815b5fcef9127430d7a7660a0209117d987dc80d7af05bb96c188375140
+  original:
+    hackage: ghc-byteorder-4.11.0.0.10@sha256:d47fdef63f2a145091e91b1aedbd46bf61ca03bb935e81e3462a1d904c319de3,1594
 snapshots:
 - completed:
     size: 524799
