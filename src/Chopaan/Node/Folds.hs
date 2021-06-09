@@ -111,10 +111,12 @@ batteryFold bat@BatteryParams{} = FL.Fold step begin end
     begin = pure $ (Nothing, Nothing)
     end :: (Maybe UTCTime, Maybe (KF R)) -> m (Battery R R)
     end (_, Just (KalmanFilter (StateVector{..}) _)) = pure $
-      (emptyB @R @R) { soc = soC
+      (emptyB @R @R) { soc = clamp 0 99.9 soC
                      , totalCapacity = chargeCapacity bat
                      }
     end (_, Nothing) = pure $ emptyB @R @R
+
+
 
 
 sensorFold :: forall m. (Monad m) => FL.Fold m (EnergyState) (SensorMetrics WattSeconds Watts) 

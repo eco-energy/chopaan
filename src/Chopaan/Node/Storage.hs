@@ -180,12 +180,12 @@ processModel bp w_k dt
   (AugmentState st@StateVector{..} sensor@SensorVector{..}) = AugmentState state' $ sensor'
   where
     state' = st
-      { soC = z_next bp soC dt sensorCurrent w_k
+      { soC = clamp 0 99.9 nSoc
       , diffusionCurrent = i_rkn bp dt diffusionCurrent sensorCurrent
       , hysteresisVoltage = h_kn bp dt sensorCurrent hysteresisVoltage
       }
     sensor' = sensor {sensorTerminalV = predictedTerminalV bp sensorTerminalV state'}
-
+    nSoc = z_next bp soC dt sensorCurrent w_k
 
 
 -- $ SoC state equation
@@ -326,6 +326,9 @@ runEstimator battery dt sensorReadings@SensorVector{..} = do
     model noise = EKFProcess $ processModel (auto <$> battery) (auto noise) (auto dt)
 
 
+
+clamp :: (Num a, Ord a) => a -> a -> a -> a
+clamp min' max' val = max min' $ min max' val
 
 -- $ ----------------------------------------------------------------------------
 -- $           Kalman Filter Measurement Model
