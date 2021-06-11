@@ -110,7 +110,8 @@ addFN :: MonadIO m
       => MonadCatch m
       => SpiderConn n v e
       => Spider n v e -> FoundNode n v e -> m (Bool) 
-addFN s f = expToBool =<< (liftIO $ (print f) >> (try (addFoundNode s f)))
+addFN s f = expToBool =<< (liftIO $ -- (print f) >>
+                           (try (addFoundNode s f)))
 
 tryForBool :: (MonadIO m, MonadCatch m) => m a -> m Bool 
 tryForBool m = expToBool =<< (try m)

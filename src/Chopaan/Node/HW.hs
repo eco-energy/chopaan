@@ -14,6 +14,7 @@ import Control.Monad.Except (MonadError (throwError))
 import Control.DeepSeq (NFData)
 
 import Data.Text
+import Data.Binary (Binary(..))
 import Data.Aeson (ToJSON(..), FromJSON(..))
 import Data.Greskell (Key, lookupAs, lookupM, lookup, pMapToFail
                      , FromGraphSON(..), PMap(..)
@@ -26,7 +27,7 @@ import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), VFoundNode, EFin
 import Data.Monoid (Sum(..))
 
 import Chopaan.Node.Components
-import Chopaan.Graph.Greskell (GreskellC, parseUnwrapTraversable)
+import Chopaan.Graph.Greskell
 
 import Shpadoinkle.Widgets.Types (Field, Humanize (..)
                                  , Hygiene (Clean)
@@ -50,11 +51,19 @@ data HW a = HW
   { storage :: BatteryTop a
   , generation :: PVTop a
   , loads :: LoadTop a
-  } deriving (Eq, Ord, Show, Generic, NFData, Functor, Foldable, Traversable)
+  } deriving (Eq, Ord, Show, Generic, Binary, NFData, Functor, Foldable, Traversable)
+
+instance (Binary a) => ToJSON (HW a) where
+  toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
+  toEncoding = binaryJSONEncode
+
+instance (Binary a) => FromJSON (HW a) where
+  parseJSON = binaryJSONRead "HW"
+
+
 
 defHW :: Num a => HW a
 defHW = HW (SingBC defBC) (SingPC defPC) (SingLC defLC)
-
 
 instance (Show a) => Humanize (HW a)
 

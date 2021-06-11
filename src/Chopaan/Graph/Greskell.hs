@@ -58,9 +58,8 @@ toEncodingHack = toEncoding . T.pack . show
 --       readValue _ = fail $ x <> " is not encoded as a string"
 
 
--- $ Encode a haskell value as a base64 encoding of its
+-- $ Convert a haskell value to a base64 encoded string inside Aeson.
 
-data MsgT = HW | NS deriving (Eq, Ord, Show, Enum)
 
 binaryJSONRead :: (Binary a, Show x) => x -> Aeson.Value -> Parser a
 binaryJSONRead x v = (pure . decode) =<< (readValue v)
