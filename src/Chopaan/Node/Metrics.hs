@@ -1,14 +1,17 @@
 {-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports #-}
 module Chopaan.Node.Metrics where
 
 import GHC.Generics hiding (R)
+import Control.Applicative
 import Control.DeepSeq (NFData)
 import Data.Binary (Binary(..))
 import qualified Data.Binary as B
+import qualified "base64" Data.ByteString.Base64 as B64
 import Data.Time
 import Data.Aeson hiding (encode, decode)
 import qualified Data.Aeson as A
+import Data.Either
 
 
 import qualified Data.HashMap.Strict as HM
@@ -16,12 +19,15 @@ import qualified Data.Csv as Csv
 import qualified Data.Vector as Vec (fromList)
 
 import Data.ByteString.Char8 (pack)
-import Data.Maybe (isJust)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import Data.Maybe
 import Numeric.Compensated
 
 import Data.ProtoLens
 import Lens.Micro
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import Text.Printf
 
 
@@ -211,36 +217,55 @@ timeKey = "time"
 timeDiffKey :: Key VFoundNode (DiffTime)
 timeDiffKey = "timeDiff"
 
-powerKey :: (GreskellC p) => Key VFoundNode (Node p)
+powerKey :: Key VFoundNode (BL.ByteString)
 powerKey = "power"
 
-energyKey :: (GreskellC e) => Key VFoundNode (Node e)
+energyKey :: Key VFoundNode (BL.ByteString)
 energyKey = "energy"
 
-batteryKey :: (GreskellC e, GreskellC p) => Key VFoundNode (Battery e p)
+batteryKey :: Key VFoundNode (BL.ByteString)
 batteryKey = "battery"
 
 demandKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
 demandKey = "demand"
 
+
+instance FromJSON B.ByteString where
+  parseJSON (String t) = pure $ (either (const "") id . B64.decodeBase64 . T.encodeUtf8) t
+  parseJSON _ = empty
+
+instance ToJSON B.ByteString where
+  toJSON = String . T.decodeUtf8 . B64.encodeBase64'
+
+instance FromJSON BL.ByteString where
+  parseJSON a = (pure . BL.fromStrict) =<< A.parseJSON a
+
+instance ToJSON BL.ByteString where
+  toJSON = String . T.decodeUtf8 . B64.encodeBase64' . BL.toStrict
+
+instance FromGraphSON BL.ByteString where
+  parseGraphSON = parseJSON . unwrapOne
+
 instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
   writeNodeAttributes SensorMetrics{..} = fmap writeKeyValues $ sequence $
     [ timeKey <=:> _time
     , timeDiffKey <=:> lastTimeDiff
-    , powerKey <=:> _powerT
-    , energyKey <=:> _energyT
-    , batteryKey <=:> _battery
+    , powerKey <=:> A.encode _powerT
+    , energyKey <=:> A.encode _energyT
+    , batteryKey <=:> A.encode _battery
     , demandKey <=:> _demand
     ]
   parseNodeAttributes props = pMapToFail (SensorMetrics
                                           <$> lookupAs timeKey props
                                           <*> lookupAs timeDiffKey props
-                                          <*> lookupAs powerKey props
-                                          <*> lookupAs energyKey props
-                                          <*> lookupAs batteryKey props
+                                          <*> (decodeBin $ lookupAs powerKey props)
+                                          <*> (decodeBin $ lookupAs energyKey props)
+                                          <*> (decodeBin $ lookupAs batteryKey props)
                                           <*> lookupAs demandKey props
                                          )
-
+    where
+      decodeBin (Left a) = (Left a)
+      decodeBin (Right x) = Right (fromJust . A.decode $ x)
 
 instance ToJSON (EnergyState) where
   toJSON a = object $ zipWith (A..=) esFieldNamesJSON (fieldAccessorsJSON a)

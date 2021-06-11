@@ -49,7 +49,7 @@ import Control.Monad.Trans.Reader
 
 
 
-type SpiderConn n v e = (SpiderNodeId n, NodeAttributes v, LinkAttributes e)
+type SpiderConn n v e = (SpiderNodeId n, NodeAttributes v, LinkAttributes e, Show n, Show v, Show e)
 
 type SpiderM m n c d = ReaderT (Spider n c d) m
 
@@ -110,7 +110,7 @@ addFN :: MonadIO m
       => MonadCatch m
       => SpiderConn n v e
       => Spider n v e -> FoundNode n v e -> m (Bool) 
-addFN s f = expToBool =<< (liftIO $ try (addFoundNode s f))
+addFN s f = expToBool =<< (liftIO $ (print f) >> (try (addFoundNode s f)))
 
 tryForBool :: (MonadIO m, MonadCatch m) => m a -> m Bool 
 tryForBool m = expToBool =<< (try m)

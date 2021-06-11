@@ -285,7 +285,7 @@ instance (Binary a, Show a) => ToJSON (LoadTop a) where
   toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
   toEncoding = binaryJSONEncode
 
-instance (Binary a) => FromJSON (LoadTop a) where
+instance (Binary a, Show a) => FromJSON (LoadTop a) where
   parseJSON = binaryJSONRead "LoadTop"
 
 instance (GreskellC a, Num a) => FromGraphSON (LoadTop a) where

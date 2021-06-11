@@ -50,7 +50,7 @@ data HW a = HW
   { storage :: BatteryTop a
   , generation :: PVTop a
   , loads :: LoadTop a
-  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData, Functor, Foldable, Traversable)
+  } deriving (Eq, Ord, Show, Generic, NFData, Functor, Foldable, Traversable)
 
 defHW :: Num a => HW a
 defHW = HW (SingBC defBC) (SingPC defPC) (SingLC defLC)
