@@ -42,6 +42,7 @@ import Shpadoinkle.Run (runJSorWarp)
 import Shpadoinkle.Backend.ParDiff (runParDiff, stage)
 
 import qualified Chopaan.Ui.Style as Css
+import Chopaan.Ui.WebGL
 import Chopaan.View (staticTemplate)
 
 --import Language.Javascript.JSaddle
@@ -128,7 +129,7 @@ setupShader (ShaderEff t) = H.canvas ( [H.onLoadM_ $ (liftJSM $ H.addScriptSrc t
 --   _ <- cm ^. js2 "on" "change" (fun $ \_ _ _ -> do
 --         jsv <- cm ^. js0 "getValue"
 --         raw :: Maybe Text <- fromJSVal jsv
---         maybe (pure ()) (notify . Code . encodeUtf8 . TL.fromStrict) raw
+--         maybe (pure ()) (notify . Code--  . encodeUtf8 . TL.fromStrict) raw
 --       )
 --   window <- currentWindowUnchecked
 --   _ <- setTimeout window (fun $ \_ _ _ -> () <$ cm ^. js0 "refresh") (Just 33)
