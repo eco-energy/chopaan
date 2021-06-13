@@ -51,6 +51,8 @@ dependencies:
 - microlens
 - mtl
 - transformers
+- transformers-base
+- monad-control
 - resourcet
 - unliftio
 - hashable
@@ -68,7 +70,7 @@ dependencies:
 - katip
 - resource-pool
 - monad-bayes
-- base64-bytestring
+- base64
 - servant
 - servant-js
 - diagrams-lib
@@ -272,6 +274,7 @@ tests:
           - generic-arbitrary
           - proto-lens-arbitrary
           - proto-lens-arbitrary
+          - hspec-golden-aeson
         ghc-options:
           - -threaded
           - -rtsopts
