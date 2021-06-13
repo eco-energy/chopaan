@@ -45,7 +45,7 @@ import Streamly.Prelude (IsStream, MonadAsync, adapt)
 import qualified Streamly.Internal.Data.Fold as FL
 
 import Data.Greskell (newBind, gProperty, lookupAs, lookupAs', Key, pMapToFail)
-import Data.Greskell.Extra (writeKeyValues, (<=:>))
+import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Spider
   (Spider, addFoundNode, withSpider)
@@ -72,7 +72,7 @@ data MeshLink = MeshLink
 
 
 data MeshNode = MeshNode
-  { isRoot :: Bool
+  { isRoot :: Maybe Bool
   , uptime :: Int
   , routerRSSI :: Int
   , version :: Maybe Text
@@ -84,9 +84,9 @@ instance Semigroup MeshNode where
   a <> b = if uptime a >= uptime b then a else b
   
 instance Monoid MeshNode where
-  mempty = MeshNode False 0 0 Nothing
+  mempty = MeshNode Nothing 0 0 Nothing
 
-rootKey :: Key VFoundNode Bool
+rootKey :: Key VFoundNode (Maybe Bool)
 rootKey = "isRoot"
 
 uptimeKey :: Key VFoundNode Int
@@ -101,15 +101,13 @@ versionKey = "version"
 instance NodeAttributes MeshNode where
   writeNodeAttributes n = fmap writeKeyValues $
                           sequence $
-                          [ rootKey <=:> isRoot n
+                          [ rootKey <=?> isRoot n
                           , uptimeKey <=:> (uptime n)
                           , routerRSSIKey <=:> routerRSSI n
-                          , versionKey
-                            <=:> (version n)
+                          , versionKey <=?> (version n)
                           ]
-  parseNodeAttributes props =
-    pMapToFail (MeshNode
-                 <$> lookupAs rootKey props
+  parseNodeAttributes props = pMapToFail (MeshNode
+                 <$> lookupAs' rootKey props
                  <*> (lookupAs uptimeKey props)
                  <*> lookupAs routerRSSIKey props
                  <*> lookupAs' versionKey props
@@ -139,11 +137,14 @@ rsToFN (n, rts) = let
 
 
 parseRTSToNode :: N.RuntimeStats -> MeshNode
-parseRTSToNode rts = MeshNode
-  { isRoot = (rts ^. N.isRoot)
-  , uptime = (fromIntegral $ rts ^. N.uptime)
-  , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
-  , version = (Just $ rts ^. N.version) }
+parseRTSToNode rts = m
+  where
+    m = MeshNode
+      { isRoot = (rts ^? N.isRoot)
+      , uptime = (fromIntegral $ rts ^. N.uptime)
+      , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
+      , version = (Just $ rts ^. N.version)
+  }
 
 parseRxSignal :: N.RuntimeStats -> RxSignal
 parseRxSignal rts = RxSignal . Just . fromIntegral $ rts ^. N.meshParentStrength
@@ -157,7 +158,6 @@ meshF = FL.Fold step i o
     step :: (MeshNode, RxSignal)
       -> N.RuntimeStats
       -> m (FL.Step (MeshNode, RxSignal) (MeshNode, RxSignal))
-    step _ r = let p = (nodeLinkPair r)
-                   in pure . FL.Done $ p 
+    step _ r = pure . FL.Done $ nodeLinkPair r 
     i = pure (mempty, mempty)
     o = pure
