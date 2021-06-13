@@ -426,13 +426,13 @@ newtype Stake = Stake {
 
 
 roleKey :: Key EFinds Role
-roleKey = "role"
+roleKey = "roleTx"
 
 powerKey :: Key EFinds Watts
-powerKey = "power"
+powerKey = "powerTx"
 
 durationKey :: Key EFinds Time.DiffTime
-durationKey = "duration"
+durationKey = "durationTx"
 
 
 instance LinkAttributes Stake where
@@ -504,28 +504,28 @@ fromStake (Stake (role, watts, duration)) = defMessage
 
 
 keyED :: Key EFinds WattSeconds
-keyED = "energyDispatched"
+keyED = "txStatusEnergyDispatched"
 
 keyERec :: Key EFinds WattSeconds
-keyERec = "energyReceived"
+keyERec = "txStatusEnergyReceived"
 
 keyTR :: Key EFinds Time.DiffTime
-keyTR = "timeRemaining"
+keyTR = "txStatusTimeRemaining"
 
 keyERem :: Key EFinds WattSeconds
-keyERem = "energyRemaining"
+keyERem = "txStatusEnergyRemaining"
 
 keyLPW :: Key EFinds WattSeconds
-keyLPW = "lossPerWattSecond"
+keyLPW = "txStatusLossPerWattSecond"
 
 keyTL :: Key EFinds WattSeconds
-keyTL = "totalLoss"
+keyTL = "txStatusTotalLoss"
 
 keySL :: Key EFinds Time.DiffTime
-keySL = "stateLag"
+keySL = "txStatusStartLag"
 
 keyEL :: Key EFinds Time.DiffTime
-keyEL = "endLag"
+keyEL = "txStatusEndLag"
 
 
 
