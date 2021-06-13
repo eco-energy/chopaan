@@ -39,7 +39,6 @@ import Control.Monad.Trans.Resource
 import Data.Maybe
 import Data.HashMap.Strict
 import Data.Text.Encoding (encodeUtf8)
-import qualified Data.ByteString.Base64 as B64
 
 
 -- Streamly
