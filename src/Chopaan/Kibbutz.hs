@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeApplications, FlexibleContexts, ScopedTypeVariables, RankNTypes, ConstraintKinds, KindSignatures, QuantifiedConstraints, MultiParamTypeClasses, GADTs, FlexibleInstances#-}
-{-# LANGUAGE OverloadedStrings, RecordWildCards, NamedFieldPuns, NoMonomorphismRestriction  #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, NamedFieldPuns  #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Chopaan.Kibbutz where
@@ -12,12 +12,13 @@ import Data.Hashable (Hashable)
 import Data.Maybe
 import Data.Time (UTCTime)
 import Data.Either
+import Data.Function
 import Network.AWS.S3 (BucketName)
 import Chopaan.Types hiding (DBOpts)
 import Kbtz
 
 import Control.DeepSeq (NFData)
-import Control.Arrow (second, first)
+import Control.Arrow (second, first, (***), (&&&))
 import ConCat.Misc (result)
 import Control.Monad.Trans.Reader
 import Control.Monad.IO.Class
@@ -129,38 +130,43 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
   (es, rs, outbox) <- case channelOpts of
     Left queues -> qSrc @t queues
     Right s3Opts -> qSrc =<< s3Qs nodes s3Opts
-  (sensorS, dup1) <- duplicateS es
-  (esTimer, saveTimer) <- duplicateS dup1
-  let
-    gridSensorS = sampleOn (S.postscan sensorFD sensorS) (fmap (const id) $ esTimer)
-    --powerK = _powerT <$> (Kbtz sensorKbtz)
-    --energyK = _energyT <$> (Kbtz sensorKbtz)
-    --storage = _battery <$> (Kbtz sensorKbtz)
     
-  (txStream, nodeStream) <- duplicateS gridSensorS
-  let plan = S.trace (void . (dispatchTxSafe outbox) )
-        $ S.postscan (transactionPlanner horizon)
-        $ tapCount "txStream" $ (Tx <$> txStream)
+  -- BOTH THE DUPLICATED STREAMS SHOULD RUN FOR AT LEAST ONE TO RUN
+  --(sensorS, sTimer) <- duplicateS es
+  
+  let gridSensorS = -- S.trace (liftIO . print) $
+        S.postscan ((,)
+                    <$> (FL.mkAccum_ ((const (Just . fst))) Nothing)
+                    <*> sensorFD)
+        es
   let tx = tapCount "statePipe"
-        $ S.filter (isJust)
-        $ Internal.transform (statePipe horizon) (Tx <$> nodeStream) 
+           $ S.map (uncurry (&&))
+           $ S.postscan (FL.lcatMaybes (saveTx (mkKbtzRoot name)))
+           $ S.trace (liftIO . print . isNothing)
+           $ S.map (fmap (\(n, se, st, (_, ts)) -> (n, (se, st, ts))))
+           $ S.map unburden tx' -- S.zipAsyncWith unburden (tx') sTimer
+        where
+          tx' = (Internal.transform (tplOvrPipe) ((\(x, y) -> (x, Tx y)) <$> gridSensorS))
+          tplOvrPipe = P.zipWith (,) (P.map fst) pipeOvrTpl
+          pipeOvrTpl = P.compose (statePipe horizon) (P.map snd)
+            -- & S.trace (\(Just (x, y, z)) -> do
+            --                 liftIO . print $ "NodeStates"
+            --                 liftIO . print . M.keys . unTx $ x
+            --                 liftIO . print $ "TxPlan"
+            --                 liftIO . print . M.keys . unTx $ y
+            --                 liftIO . print $ "TxState"
+            --                 liftIO . print . M.keys . unTx $ z
+            --             ) 
+        
+  let meshS = -- tapCount "rsPipe" $ 
+        S.postscan rsFD $ S.trace (liftIO . print) rs
 
-  let saveMe = S.map (\(x, y) -> x && y) $ S.postscan (saveTx)
-        $ S.map ((\(n, se, st, (r, ts)) -> (n, (se, st, ts))) . fromJust)
-        $ S.filter (isJust)
-        $ S.trace (liftIO . print)
-        $ S.zipAsyncWith unburden tx saveTimer
-    --dispatcher = S.mapM (dispatchTxSafe outbox) txPlan
-  let
-
-    meshS = S.postscan rsFD rs -- S.trace (\_-> liftIO . print $ "rs") $ 
-
-  let  saveK = (constBool plan) `S.parallel` (saveMe)
-  return . adapt $ meshS `S.parallel` saveK
+  return . adapt $ meshS `S.parallel` tx
   where
-    unburden :: (Ord n) => Maybe (NodeStates n, TxPlan n, TxState n) -> (n, a) -> Maybe (n, SensorS, Stake, (Role, TransactionStatus))
-    unburden Nothing _ = Nothing
-    unburden (Just (Tx sen, Tx pl, Tx st)) (n, _) = do
+    unburden :: (Ord n) => (Maybe n, Maybe (NodeStates n, TxPlan n, TxState n)) -> Maybe (n, SensorS, Stake, (Role, TransactionStatus))
+    unburden (Nothing, _) = Nothing
+    unburden (_, Nothing) = Nothing
+    unburden ((Just n), Just (Tx sen, Tx pl, Tx st)) = do
       s <- (M.lookup n sen)
       p <- (M.lookup n pl)
       t <- (M.lookup n st)
@@ -169,10 +175,10 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
     printCount s = FL.mkAccumM_ (\x _ -> (liftIO . print $ s <> ": " <> (show x))
                                   >> (return $ x + 1))
                    (pure 0)
-    constBool = S.mapM (pure . (const True))
+    --constBool = S.mapM (pure . (const True))
     sensorFD = FL.classify sensorFold
     rsFD = snd <$> ((,) <$> (FL.classify (meshFold)) <*> (addMeshNode))
-    processEither = FL.partition sensorFD rsFD
+    --processEither = FL.partition sensorFD rsFD
     dispatchTxSafe o t = tryJust t
       where
         tryJust (Just x) = expToBool
