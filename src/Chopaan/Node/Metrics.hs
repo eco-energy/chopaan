@@ -36,7 +36,7 @@ import Proto.NodeMessageSchema.NodeMessages_Fields
 import ConCat.Misc (R)
 
 {---- NetSpider Imports ----}
-import Data.Greskell (Key, lookupAs, pMapToFail, FromGraphSON(..), parseGraphSON)
+import Data.Greskell (Key, lookupAs, lookupAs', pMapToFail, FromGraphSON(..), parseGraphSON)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
 
@@ -212,22 +212,22 @@ data SensorMetrics e p = SensorMetrics
 
 
 timeKey :: Key VFoundNode (Maybe UTCTime)
-timeKey = "time"
+timeKey = "timeKey"
 
 timeDiffKey :: Key VFoundNode (DiffTime)
-timeDiffKey = "timeDiff"
+timeDiffKey = "timeDiffKey"
 
 powerKey :: Key VFoundNode (BL.ByteString)
-powerKey = "power"
+powerKey = "powerKey"
 
 energyKey :: Key VFoundNode (BL.ByteString)
-energyKey = "energy"
+energyKey = "energyKey"
 
 batteryKey :: Key VFoundNode (BL.ByteString)
-batteryKey = "battery"
+batteryKey = "batteryKey"
 
 demandKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
-demandKey = "demand"
+demandKey = "demandKey"
 
 
 instance FromJSON B.ByteString where
@@ -256,7 +256,7 @@ instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
     , demandKey <=:> _demand
     ]
   parseNodeAttributes props = pMapToFail (SensorMetrics
-                                          <$> lookupAs timeKey props
+                                          <$> lookupAs' timeKey props
                                           <*> lookupAs timeDiffKey props
                                           <*> (decodeBin $ lookupAs powerKey props)
                                           <*> (decodeBin $ lookupAs energyKey props)
