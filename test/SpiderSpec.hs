@@ -8,19 +8,21 @@ import Test.Hspec
 import Test.QuickCheck.Checkers
 import Test.QuickCheck
 import Test.QuickCheck.Classes
-import Data.Monoid (Sum(..))
 import Control.Monad.IO.Class
 import qualified Data.Text as Text
 import Test.QuickCheck.Arbitrary.Generic
 import Data.ProtoLens.Arbitrary
 import Data.ProtoLens
 import Data.Word
+import Data.Maybe
 
+import NetSpider.Snapshot
 import Chopaan.Monad.Env
 import Control.Monad.Bayes.Class
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId (KbtzId(..))
 import Chopaan.Kibbutz
+import Chopaan.Graph.Spider
 import Chopaan.Comm.Comm (initQs, writeChan, MessageQs(..), readPubQ)
 import Chopaan.Utils.Time (timeToUIntSeconds)
 import qualified Data.Text as T
@@ -30,10 +32,13 @@ import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
 import Lens.Micro
 import Control.Concurrent hiding (writeChan)
+import Control.Applicative
+import NetSpider.Spider
+  (withSpider, clearAll)
 
 instance Arbitrary (NodeMAC) where
   arbitrary = do
-    let el = ['a'..'z'] <> ['0'..'9']
+    let el = ['a'..'z']
     xs <- mapM (\_ -> elements el) [1..6]
     ys <- mapM (\_ -> elements el) [1..6]
     let cpld = fmap (\(a, b) -> [a] <> [b]) $ zip xs ys
@@ -61,70 +66,124 @@ instance Arbitrary (NM.RuntimeStats) where
     
 spec :: Spec
 spec = do
-  describe "Spiders are great" $ do
-    it "qKbtz processor processes all messages!" $ do
-      let nNodes = 5
-          nMessages = 50
-      ns <- arbs @NodeMAC nNodes
-      es <- do
-        xs'' <- mapM (\_ -> orderedES nMessages) ns
-        return $ foldl S.wSerial S.nil xs''
-      rs <- do
-        xs'' <- mapM (\_ -> orderedRS nMessages) ns
-        return $ foldl S.wSerial S.nil xs''
-      qs <- initQs
-      k <- runKibbutz $
-        KbtzC { name = KbtzId "test"
-              , nodes = ns
-              , channelOpts = Left qs
-              , spiderHost = "localhost"
-              , spiderPort = 8182
-              }
-      let ns' = S.fromList $ cycle ns
+  let
+    nNodes = 5
+    nMessages = 10
+    t0 = t
+    tn = Ti.addUTCTime (d * (fromIntegral $ nNodes * nMessages)) t0
+    
+  beforeAll (liftIO $ arbs @NodeMAC nNodes) $ do
+    describe "Spiders are great" $ do
+      it "qKbtz processor processes all messages!" $ \ns -> do
+        es <- do
+          xs'' <- mapM (\i ->
+                          orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
+                  $ [1..nNodes]
+          return $ foldl S.wSerial S.nil xs''
+        rs <- do
+          xs'' <- mapM (\i ->
+                          orderedRS (if (i == 1) then Root else Child) nMessages (head ns))
+                  $ [1..nNodes]
+          return $ foldl S.wSerial S.nil xs''
+        qs <- initQs
+        k <- runKibbutz $
+          KbtzC { name = KbtzId "test"
+                , nodes = ns
+                , channelOpts = Left qs
+                , spiderHost = "localhost"
+                , spiderPort = 8182
+                }
+        let ns' = S.fromList $ cycle ns
+        forkIO $ do
+          S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
+          S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
 
-      forkIO $ do
-        S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
-        --S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
+        l <- S.length $ S.take ((2 * nNodes * nMessages) + 1) k
+        l `shouldBe` (2 * nNodes * nMessages)
 
-      l <- S.length $ S.take ((2 * nNodes * nMessages)) $ k
-      -- let txns = S.repeatM @S.SerialT (readPubQ $ outbox qs)
-      --     d = S.take (nMessages) $ S.trace (print) txns
-      -- l' <- S.length d
-      l `shouldBe` (2 * nNodes * nMessages)
-      -- l' `shouldBe` (nNodes * nMessages)
+
+    it "RS snapshot graph has the right number of nodes and links" $ \ns -> do
+      (gotNs, gotLs) <- snapDebug meshSnapshot ns t0 tn
+      oneSnapNodePerNodeMAC gotNs nNodes
+      -- $ for a tree structure with one root node, each node should have the root as its parent,
+      -- $ while the root node should be linked to router
+      oneLinkPerNodeMAC gotLs nNodes
       
+    it "Stake snapshot graph has the right number of nodes and links" $ \ns -> do
+      (gotNs, gotLs) <- snapDebug stakeSnapshot ns t0 tn
+      oneSnapNodePerNodeMAC gotNs nNodes
+      oneLinkPerNodeMAC gotLs nNodes
 
-orderedES :: Int -> IO (S.Serial NM.EnergyState)
-orderedES n = do
+    it "Status snapshot graph has the right number of nodes and links" $ \ns -> do
+      
+      (gotNs, gotLs) <- snapDebug statusSnapshot ns t0 tn
+      oneSnapNodePerNodeMAC gotNs nNodes
+      oneLinkPerNodeMAC gotLs nNodes
+
+
+oneSnapNodePerNodeMAC sn nNodes = ((length $ filter (isJust . nodeAttributes) sn)
+                                    `shouldBe` (nNodes))
+oneLinkPerNodeMAC sl nNodes = ((length $ sl) `shouldBe` (nNodes))
+
+snapDebug :: (Show n, Show v, Show l)
+  => ([n] -> Ti.UTCTime -> Ti.UTCTime -> IO (SnapshotGraph n v l))
+  -> [n] -> Ti.UTCTime -> Ti.UTCTime -> IO (SnapshotGraph n v l) 
+snapDebug snapfn ns t0 tn = do
+  print $ "Total Nodes: " <> (show . length $ ns)
+  (gotNs, gotLs) <-  (snapfn ns t0 tn)
+  print $ "Num Nodes: " <> (show . length  $ gotNs)
+  print $ "Num Links: " <> (show . length  $ gotLs)
+  print $ (fmap nodeId gotNs)
+  print $ (fmap nodeAttributes gotNs)
+  print $ gotLs
+  return $ (gotNs, gotLs)
+
+
+data ESType = Source | Sink deriving (Eq, Ord, Show, Bounded, Enum)
+
+data RSType = Root | Child deriving (Eq, Ord, Show, Bounded, Enum)
+
+orderedES :: ESType -> Int -> IO (S.Serial NM.EnergyState)
+orderedES et n = do
   xs <- arbs n
-  let xs' = map updateT $ zip [1..n] (zip xs tsL)
+  let xs' = map updateT $ (zip xs tsL)
   return $ S.fromList xs'
   where
-    updateT (i, (m, t')) = m
+    updateT (m, t') = m
       & NM.cpuTime .~ (timeToUIntSeconds t')
-      & NM.batteryVoltage .~ v
-      & NM.solarVoltage .~ 16
-      & NM.solarInputCurrent .~ si
-      & NM.batteryToLoadCurrent .~ li
+      & NM.batteryVoltage .~ v et
+      & NM.solarVoltage .~ sv et
+      & NM.solarInputCurrent .~ si et
+      & NM.batteryToLoadCurrent .~ li et
       & NM.gridToBatteryCurrent .~ 0
       & NM.batteryToGridCurrent .~ 0
       & NM.gridVoltage .~ 60
       where
-        isOdd i = mod i 2 == 0
-        v = if isOdd i then 14.8 else 8.0
-        si = if isOdd i then 15 else 0
-        li = if isOdd i then 0 else 10.0
+        v Source = 14.8
+        v Sink = 8.0
+        si Source = 15
+        si Sink = 0
+        li Source = 0
+        li Sink = 10.0
+        sv Source = 18
+        sv Sink = 9
         
-orderedRS :: Int -> IO (S.Serial NM.RuntimeStats)
-orderedRS n = do
+orderedRS :: RSType -> Int -> NodeMAC -> IO (S.Serial NM.RuntimeStats)
+orderedRS r n (NodeId root) = do
   xs <- arbs n
   let xs' = map updateT $ zip xs tsL
   return $ S.fromList xs'
   where
-    updateT (m, t') = m & NM.cpuTime .~ (timeToUIntSeconds t)
-                       & NM.isRoot .~ True
-                       & NM.version .~ "verion1"
-    
+    updateT (m, t') = m & NM.cpuTime .~ (timeToUIntSeconds t')
+                       & NM.isRoot .~ (x r)
+                       & NM.version .~ "version1"
+                       & (NM.parent . NM.macAddr) .~ (p r)  
+      where
+        p (Root) = "router"
+        p (Child) = root
+        x (Root) = True
+        x (Child) = False
+
 tsL = iterate (Ti.addUTCTime d) t
 t = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
 d = Ti.diffUTCTime (Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 60)) t
