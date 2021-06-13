@@ -131,10 +131,7 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
     Left queues -> qSrc @t queues
     Right s3Opts -> qSrc =<< s3Qs nodes s3Opts
     
-  -- BOTH THE DUPLICATED STREAMS SHOULD RUN FOR AT LEAST ONE TO RUN
-  --(sensorS, sTimer) <- duplicateS es
-  
-  let gridSensorS = -- S.trace (liftIO . print) $
+  let gridSensorS =
         S.postscan ((,)
                     <$> (FL.mkAccum_ ((const (Just . fst))) Nothing)
                     <*> sensorFD)
@@ -158,8 +155,8 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
             --                 liftIO . print . M.keys . unTx $ z
             --             ) 
         
-  let meshS = -- tapCount "rsPipe" $ 
-        S.postscan rsFD $ S.trace (liftIO . print) rs
+  let meshS = tapCount "rsPipe" $ 
+              S.postscan rsFD $ rs
 
   return . adapt $ meshS `S.parallel` tx
   where
@@ -173,7 +170,7 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
       return $ (n, s, p, t)
     tapCount = S.tap . printCount
     printCount s = FL.mkAccumM_ (\x _ -> (liftIO . print $ s <> ": " <> (show x))
-                                  >> (return $ x + 1))
+                                  >> (return $ x + (1 :: Int)))
                    (pure 0)
     --constBool = S.mapM (pure . (const True))
     sensorFD = FL.classify sensorFold
@@ -184,35 +181,4 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
         tryJust (Just x) = expToBool
                          =<< (try $ (dispatchTx o x))
         tryJust Nothing = pure False
-    horizon = 60 * 60
-
-
-
-
-gridState :: forall t m. (IsStream t, MonadAsync m, Monad (t m))
-  => t m (NodeMAC, EnergyState)
-  -> t m (M.Map NodeMAC SensorS)
-  -> t m (TxPlan NodeMAC, TxState NodeMAC)
-  -> t m (NodeMAC, (SensorS, Stake, TransactionStatus))
-gridState a b c = S.map curNode $ S.zipAsyncly $ zip3S a b c -- c
-  where
-    curNode ((n, _), m, (Tx txMap, Tx statusMap)) = let
-      sen = m M.! n
-      tx = txMap M.! n
-      mon = statusMap M.! n
-      in (n, (sen, tx, snd mon))
-
-zip3S :: (IsStream t, MonadAsync m) => t m a -> t m b -> t m c -> S.ZipAsyncM m (a, b, c)
-zip3S a b c = S.zipAsyncly $ (,,) <$> (adapt a) <*> (adapt b) <*> (adapt c)
-
-zipWithTweak :: (IsStream t, MonadAsync m)
-  => t m a -> t m b -> t m (c, t m d) -> m (t m (a, b, (c, d)))
-zipWithTweak a b c = do
-  c' <- tweak c
-  return $ S.zipAsyncly $ zip3S a b c'
-  
-
-tweak :: (IsStream t, MonadAsync m) => t m (a, t m b) -> m (t m (a, b))
-tweak d = S.fold FL.mconcat $ (\(x, s) -> S.zipWith (,) (S.repeat x) (s)) <$> (adapt d)
-
-
+    horizon = 10 * 60
