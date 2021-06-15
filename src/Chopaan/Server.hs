@@ -64,7 +64,7 @@ instance CRUDChopaan App where
 
 app :: Env -> FilePath -> Application
 app ev root = serve (Proxy @ (API :<|> SPA App :<|> HistoryAPI)) $
-              serveAPI :<|> serveSPA :<|> serveHistoryApi
+              serveAPI :<|> serveSPA :<|> serveHistoryAPI
   where
     serveAPI :: Server API
     serveAPI = hoistServer (Proxy @API) (toHandler Opts) $ listKibbutzim
