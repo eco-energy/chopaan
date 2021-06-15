@@ -335,7 +335,6 @@ txn h (Tx ns) = do
         consumption = M.toAscList $ fmap _demand ns
         storage = M.toAscList $
                   fmap (\n ->
-                          toWattSeconds $
                           (totalCapacity . _battery $ n) * (soc . _battery $ n))
                   ns
         d = fmap (\(i, (c, s))
