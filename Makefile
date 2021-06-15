@@ -45,6 +45,9 @@ mqtt_cert:
   aws iot register-thing --template-body file://certs/chopaan_template.json --parameters file://certs/params.json
 
 
+js:
+	nix-build -A projectCross.ghcjs --option binary-caches "s3://ee-nixcache?region=ap-southeast-1 https://shpadoinkle.cachix.org" --option require-sigs false
+
 db_image:
 	docker build -f Dockerfile.db -t chopaan/timescale .
 
