@@ -87,13 +87,11 @@ newtype GrNode = GrNode Int
 
 data SG n where
   MeshG :: SnapshotGraph n MeshNode RxSignal -> SG n
-  ThroughputG :: SnapshotGraph n Int Int -> SG n
   StakeG :: SnapshotGraph n (SensorS) Stake -> SG n
   StatusG :: SnapshotGraph n (SensorS) TransactionStatus -> SG n
   FlowG :: SnapshotGraph n (Battery R R) R -> SG n
-  
   deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 
-data GraphType = Mesh | Plan | Status | Power | Hardware
+data GraphType = Mesh | Plan | Status | Flow
   deriving (Eq, Ord, Show, Read, Bounded, Enum, Generic, ToJSON, FromJSON, NFData, Humanize)
