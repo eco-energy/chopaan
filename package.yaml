@@ -28,6 +28,7 @@ description:         Please see the README on Github at <https://github.com/faez
 dependencies:
 - base >= 4.11 && < 10
 - rio >= 0.1.8.0
+- streamly >= 0.7.2
 - async
 - exceptions
 - deepseq
@@ -73,6 +74,7 @@ dependencies:
 - base64
 - servant
 - servant-js
+- servant-client
 - diagrams-lib
 - diagrams-svg >= 1.4.3
 - diagrams-contrib >= 1.4.4
@@ -106,7 +108,6 @@ when:
       - beam-core
       - beam-postgres
       - beam-migrate
-      - streamly >= 0.7.2
       - network >= 3.1.2.1
       - postgresql-simple
       - concat-classes
@@ -135,6 +136,7 @@ when:
       - convertible
       - dhall >= 1.33.0
       - sbv
+      - http-client
     ghc-options:
       - -fplugin=ConCat.Plugin
   else:
@@ -275,6 +277,7 @@ tests:
           - proto-lens-arbitrary
           - proto-lens-arbitrary
           - hspec-golden-aeson
+          - hspec-wai
         ghc-options:
           - -threaded
           - -rtsopts

@@ -213,17 +213,6 @@ packages:
     git: https://github.com/Fresheyeball/Shpadoinkle.git
     commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
 - completed:
-    name: ghcjs-three
-    version: 0.1.0.0
-    git: https://github.com/faezs/ghcjs-three.git
-    pantry-tree:
-      size: 3271
-      sha256: e18509b2938e3fbade2ad20adb2339b8f484359310968892ce5a39d6105e8f19
-    commit: 2b4b1c6867c09aaec430cba39a98a765b5b79437
-  original:
-    git: https://github.com/faezs/ghcjs-three.git
-    commit: 2b4b1c6867c09aaec430cba39a98a765b5b79437
-- completed:
     name: streamly
     version: 0.7.2
     git: https://github.com/composewell/streamly.git

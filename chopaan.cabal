@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8149b30326a1675b297ada7edfcabf54f7ac383e41192015908a233b752ce91f
+-- hash: 715d1cfa570b268f04c5d8f59333cb6c62c7383817a157c7afbb33b46bed8df2
 
 name:           chopaan
 version:        0.1.0.0
@@ -173,8 +173,10 @@ library
     , rio >=0.1.8.0
     , servant
     , servant-blaze
+    , servant-client
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -205,6 +207,7 @@ library
       , convertible
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
+      , http-client
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -213,7 +216,6 @@ library
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -290,8 +292,10 @@ executable dev
     , rio >=0.1.8.0
     , servant
     , servant-blaze
+    , servant-client
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -322,6 +326,7 @@ executable dev
       , convertible
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
+      , http-client
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -330,7 +335,6 @@ executable dev
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -416,8 +420,10 @@ executable hydrate
     , rio >=0.1.8.0
     , servant
     , servant-blaze
+    , servant-client
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -448,6 +454,7 @@ executable hydrate
       , convertible
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
+      , http-client
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -456,7 +463,6 @@ executable hydrate
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -542,8 +548,10 @@ executable server
     , rio >=0.1.8.0
     , servant
     , servant-blaze
+    , servant-client
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -574,6 +582,7 @@ executable server
       , convertible
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
+      , http-client
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -582,7 +591,6 @@ executable server
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -669,8 +677,10 @@ executable tx
     , rio >=0.1.8.0
     , servant
     , servant-blaze
+    , servant-client
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -701,6 +711,7 @@ executable tx
       , convertible
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
+      , http-client
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -709,7 +720,6 @@ executable tx
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -794,8 +804,10 @@ executable ui
     , rio >=0.1.8.0
     , servant
     , servant-blaze
+    , servant-client
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -826,6 +838,7 @@ executable ui
       , convertible
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
+      , http-client
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -834,7 +847,6 @@ executable ui
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -860,6 +872,7 @@ test-suite chopaan-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      APISpec
       Common
       GraphSpec
       KbtzSpec
@@ -930,8 +943,10 @@ test-suite chopaan-test
     , rio >=0.1.8.0
     , servant
     , servant-blaze
+    , servant-client
     , servant-js
     , stm
+    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -962,6 +977,7 @@ test-suite chopaan-test
       , convertible
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
+      , http-client
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -970,7 +986,6 @@ test-suite chopaan-test
       , sbv
       , servant-server
       , servant-websockets
-      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -996,6 +1011,7 @@ test-suite chopaan-test
       , generic-arbitrary
       , hspec
       , hspec-golden-aeson
+      , hspec-wai
       , proto-lens-arbitrary
       , quickcheck-instances
       , quickspec
