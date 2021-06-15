@@ -108,44 +108,6 @@ instance (Binary a) => FromJSON (BatteryTop a) where
 instance (GreskellC a, Num a, Read a) => FromGraphSON (BatteryTop a) where
   parseGraphSON = parseJSON . unwrapAll
 
--- instance (ToJSON a) => ToJSON (BatteryTop a) where
---   toJSON = genericToJSON batEncodingOpts
---   toEncoding = genericToEncoding batEncodingOpts
-
--- instance (FromJSON a) => FromJSON (BatteryTop a) where
---   parseJSON = genericParseJSON batEncodingOpts
-  
--- instance (GreskellC a, Num a) => FromGraphSON (BatteryTop a) where
---   parseGraphSON = parseUnwrapTraversable
-  -- parseGraphSON gv = 
-  --    ((\(Aeson.String x) -> maybe (fail $ "no batteryContent: " <> (T.unpack x)) pure $
-  --                           (read . T.unpack $ x)) . unwrapAll)
-  --      =<< (parseGraphSON . head)
-  --      =<< (parseUnwrapList gv)
-  --      where
-  --        fromPMap :: PMap Single GValue -> Parser (BatteryTop a)
-  --        fromPMap pm = do
-  --          k <- maybe (fail "no batteryTag") (parseGraphSON @T.Text) $ Data.Greskell.lookup ("batteryTag" :: T.Text) pm
-  --          c <- maybe (fail "no batteryContent") pure $ Data.Greskell.lookup ("batteryContent" :: T.Text) pm
-  --          case k of
-  --            "SingBC" -> do
-  --              l <- parseUnwrapList @[GValue] c
-  --              SingBC <$> parseGraphSON (head l)
-  --            "SeqBC" -> do
-  --              (x':y':[]) <- parseUnwrapList c
-  --              x <- parseGraphSON x'
-  --              y <- parseGraphSON y'
-  --              return $ ParBC x y
-  --            "ParBC" -> do
-  --              (x':y':[]) <- parseUnwrapList c
-  --              x <- parseGraphSON x'
-  --              y <- parseGraphSON y'
-  --              return $ SeqBC x y
-  --            _ -> fail $ "Not the right tag for a BatteryTop" <> (T.unpack k) 
-
---instance (GreskellC a, Num a) => NodeAttributes (BatteryTop a) where
---  writeNodeAttributes bt = 
-
 type VI a = Pair a
 
 type EvolveB a = (BatteryConf a -> VI a -> VI a)
@@ -254,16 +216,7 @@ data LoadConf a = LoadConf
   } deriving (Eq, Ord, Show, Read, Generic, Binary, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
 
 instance (GreskellC a, Num a) => FromGraphSON (LoadConf a) where
-  parseGraphSON = parseUnwrapTraversable -- fromPMap =<< parseGraphSON gv
-    -- where
-    --   lookupAsF k pm = pMapToFail $ lookupAs k pm
-    --   fromPMap :: PMap Single GValue -> Parser (LoadConf a)
-    --   fromPMap pm = do
-    --     m <- lookupAsF lpwKey pm
-    --     m' <- lookupAsF lnameKey pm
-    --     return $ LoadConf m m'
-    --   lpwKey = "lpw" :: Key x a
-    --   lnameKey = "loadName" :: Key x Text
+  parseGraphSON = parseUnwrapTraversable
   
 
 defLC :: Num a => LoadConf a
@@ -290,16 +243,3 @@ instance (Binary a, Show a) => FromJSON (LoadTop a) where
 
 instance (GreskellC a, Num a) => FromGraphSON (LoadTop a) where
   parseGraphSON = parseJSON . unwrapAll
-
-
-
--- instance (ToJSON a) => ToJSON (LoadTop a) where
---   toJSON = genericToJSON ldEncodingOpts
---   toEncoding = genericToEncoding ldEncodingOpts
-
--- instance (FromJSON a) => FromJSON (LoadTop a) where
---   parseJSON = genericParseJSON ldEncodingOpts
-
-
--- instance (GreskellC a, Num a) => FromGraphSON (LoadTop a) where
---   parseGraphSON = parseUnwrapTraversable

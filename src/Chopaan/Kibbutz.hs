@@ -130,6 +130,8 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
   (es, rs, outbox) <- case channelOpts of
     Left queues -> qSrc @t queues
     Right s3Opts -> qSrc =<< s3Qs nodes s3Opts
+
+  _ <- liftIO $ initGridRoot name
     
   let gridSensorS =
         S.postscan ((,)
@@ -144,16 +146,16 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
            $ S.map unburden tx' -- S.zipAsyncWith unburden (tx') sTimer
         where
           tx' = (Internal.transform (tplOvrPipe) ((\(x, y) -> (x, Tx y)) <$> gridSensorS))
+                      -- & S.trace (\(n, Just (x, y, z)) -> do
+                      --       liftIO . print $ "NodeStates"
+                      --       liftIO . print . M.keys . unTx $ x
+                      --       liftIO . print $ "TxPlan"
+                      --       liftIO . print . M.keys . unTx $ y
+                      --       liftIO . print $ "TxState"
+                      --       liftIO . print . M.keys . unTx $ z
+                      --   ) 
           tplOvrPipe = P.zipWith (,) (P.map fst) pipeOvrTpl
           pipeOvrTpl = P.compose (statePipe horizon) (P.map snd)
-            -- & S.trace (\(Just (x, y, z)) -> do
-            --                 liftIO . print $ "NodeStates"
-            --                 liftIO . print . M.keys . unTx $ x
-            --                 liftIO . print $ "TxPlan"
-            --                 liftIO . print . M.keys . unTx $ y
-            --                 liftIO . print $ "TxState"
-            --                 liftIO . print . M.keys . unTx $ z
-            --             ) 
         
   let meshS = tapCount "rsPipe" $ 
               S.postscan rsFD $ rs

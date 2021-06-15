@@ -36,7 +36,7 @@ import Data.ProtoLens
 import Data.Time (DiffTime(..), UTCTime(..), Day(..))
 import Data.Text
 import Data.Binary
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON(..), ToJSON)
 import Chopaan.Comm.Comm (Address(..))
 import Chopaan.Node.NodeId
 import Chopaan.Utils.Time (utcTimeNow)
@@ -44,7 +44,8 @@ import qualified Streamly.Prelude as S
 import Streamly.Prelude (IsStream, MonadAsync, adapt)
 import qualified Streamly.Internal.Data.Fold as FL
 
-import Data.Greskell (newBind, gProperty, lookupAs, lookupAs', Key, pMapToFail)
+import Data.Greskell.GraphSON.GValue (unwrapOne)
+import Data.Greskell (newBind, gProperty, lookupAs, lookupAs', Key, pMapToFail, FromGraphSON(..))
 import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Spider
@@ -71,20 +72,23 @@ data MeshLink = MeshLink
   deriving (Eq, Show, Ord, Generic, ToJSON, FromJSON, NFData)
 
 
+newtype NodeVersion = NodeVersion (Text)
+  deriving (Eq, Ord, Show, Generic)
+  deriving newtype (ToJSON, FromJSON, NFData, FromGraphSON)
+
+-- instance FromGraphSON NodeVersion where
+--   parseGraphSON = parseJSON . unwrapOne
+
 data MeshNode = MeshNode
   { isRoot :: Maybe Bool
   , uptime :: Int
   , routerRSSI :: Int
-  , version :: Maybe Text
+  , version :: Maybe NodeVersion
   }
   deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
 
-
-instance Semigroup MeshNode where
-  a <> b = if uptime a >= uptime b then a else b
-  
-instance Monoid MeshNode where
-  mempty = MeshNode Nothing 0 0 Nothing
+initMeshNode :: MeshNode
+initMeshNode = MeshNode Nothing 0 0 Nothing
 
 rootKey :: Key VFoundNode (Maybe Bool)
 rootKey = "isRoot"
@@ -95,7 +99,7 @@ uptimeKey = "uptime"
 routerRSSIKey :: Key VFoundNode Int
 routerRSSIKey = "routerRSSI"
 
-versionKey :: Key VFoundNode (Maybe Text)
+versionKey :: Key VFoundNode (Maybe NodeVersion)
 versionKey = "version"
 
 instance NodeAttributes MeshNode where
@@ -143,7 +147,7 @@ parseRTSToNode rts = m
       { isRoot = (rts ^? N.isRoot)
       , uptime = (fromIntegral $ rts ^. N.uptime)
       , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
-      , version = (Just $ rts ^. N.version)
+      , version = (Just . NodeVersion $ rts ^. N.version)
   }
 
 parseRxSignal :: N.RuntimeStats -> RxSignal
@@ -159,5 +163,5 @@ meshF = FL.Fold step i o
       -> N.RuntimeStats
       -> m (FL.Step (MeshNode, RxSignal) (MeshNode, RxSignal))
     step _ r = pure . FL.Done $ nodeLinkPair r 
-    i = pure (mempty, mempty)
+    i = pure (initMeshNode, mempty)
     o = pure

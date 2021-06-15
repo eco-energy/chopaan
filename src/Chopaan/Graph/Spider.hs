@@ -17,7 +17,7 @@ import Control.Monad.Catch
 import Chopaan.Node.NodeId
 import Chopaan.Node.Metrics hiding (Timestamp)
 import Chopaan.Node.Folds
-import Chopaan.Node.Mesh (MeshNode, RxSignal, rsToFN)
+import Chopaan.Node.Mesh (MeshNode, RxSignal, rsToFN, initMeshNode)
 import qualified Proto.NodeMessageSchema.NodeMessages as N
 
 import Chopaan.Kibbutz.KbtzId
@@ -35,7 +35,7 @@ import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Timestamp (fromUTCTime, now, Timestamp)
 import NetSpider.Snapshot (SnapshotGraph)
-import NetSpider.Query (defQuery, Query(..), Extended(..), (<=..<=))
+import NetSpider.Query (defQuery, Query(..), Extended(..), (<=..<=), policyAppend)
 
 
 import Data.Aeson (ToJSON, FromJSON)
@@ -110,7 +110,7 @@ addFN :: MonadIO m
       => MonadCatch m
       => SpiderConn n v e
       => Spider n v e -> FoundNode n v e -> m (Bool) 
-addFN s f = expToBool =<< (liftIO $ -- (print f) >>
+addFN s f = expToBool =<< (liftIO $ (print f) >>
                            (try (addFoundNode s f)))
 
 tryForBool :: (MonadIO m, MonadCatch m) => m a -> m Bool 
@@ -163,6 +163,18 @@ addStakeNode (KbtzRoot gn) = spiderFold stakeConfig (\(n, (s, st, _)) -> x n s s
     x n v e = do
       t <- liftIO getCurrentTime
       pure $ toFN (fromUTCTime . (fromMaybe t) .  _time $ v) n v [toLink gn e]
+
+
+initGridRoot :: KbtzName -> IO (Bool)
+initGridRoot name = do
+  t <- fromUTCTime <$> getCurrentTime
+  let root = getGridRoot name
+  a <- withSpider stakeConfig (\s -> addFN s $ toFN t root initSM [])
+  b <- withSpider statusConfig (\s -> addFN s $ toFN t root initSM [])
+  c <- withSpider meshConfig (\s -> addFN s $ toFN t root initMeshNode [])
+  return $ a && b && c
+  
+  
 
 addMonNode :: forall m. (MonadAsync m, MonadCatch m)
   => KbtzRoot NodeMAC -> FL.Fold m (NodeMAC, (SensorS, Stake, TransactionStatus)) Bool
@@ -225,12 +237,12 @@ getNodesSnapshot ns t t' s = liftIO
                            . (rangeQuery t t') $ ns
 
 rangeQuery :: (Eq n, Show n) => UTCTime -> UTCTime -> [n] -> Query n na sla sla
-rangeQuery t t' ns = (defQuery ns) {
-  timeInterval =
+rangeQuery t t' ns = (defQuery ns)
+  { timeInterval =
       Finite (fromUTCTime t)
       <=..<=
       Finite (fromUTCTime t')
-  } 
+  , foundNodePolicy = policyAppend } 
 
 
 getGridSnapshotSimple :: forall m n v e. (SnapshotId n, SpiderConn n v e)

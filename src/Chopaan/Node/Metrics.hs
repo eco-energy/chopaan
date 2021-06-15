@@ -12,7 +12,7 @@ import Data.Time
 import Data.Aeson hiding (encode, decode)
 import qualified Data.Aeson as A
 import Data.Either
-
+import Data.Bifunctor
 
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Csv as Csv
@@ -37,7 +37,7 @@ import ConCat.Misc (R)
 
 {---- NetSpider Imports ----}
 import Data.Greskell (Key, lookupAs, lookupAs', pMapToFail, FromGraphSON(..), parseGraphSON)
-import Data.Greskell.Extra (writeKeyValues, (<=:>))
+import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
 import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
 
 
@@ -197,10 +197,13 @@ data SensorMetrics e p = SensorMetrics
   , lastTimeDiff :: !DiffTime
   , _powerT :: !(Node p)
   , _energyT :: !(Node e)
-  , _battery :: !(Battery R R)
+  , _battery :: !(Battery e p)
   , _demand :: !e
   } deriving (Eq, Ord, Generic, Binary, Show, NFData, ToJSON, FromJSON)
 
+initSM :: (Fractional e, Fractional p) => SensorMetrics e p
+initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0 
+  
 
 -- instance (Binary e, Binary p) => ToJSON (SensorMetrics e p) where
 --     toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
@@ -248,7 +251,7 @@ instance FromGraphSON BL.ByteString where
 
 instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
   writeNodeAttributes SensorMetrics{..} = fmap writeKeyValues $ sequence $
-    [ timeKey <=:> _time
+    [ timeKey <=?> _time
     , timeDiffKey <=:> lastTimeDiff
     , powerKey <=:> A.encode _powerT
     , energyKey <=:> A.encode _energyT
@@ -354,9 +357,10 @@ instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (SensorMetrics e p)
 showDec :: R -> String
 showDec = (printf ("%.2g"))
 
-prettyShow :: (Show e, Show p) => SensorMetrics e p -> String
+prettyShow :: (Show e, Show p, Fractional e) => SensorMetrics e p -> String
 prettyShow SensorMetrics{..} = ("last connection: " <> show _time)
-    <> sep <> ("battery energy stored (Ws): " <> sep <> showDec (socPercentage _battery * totalCapacity _battery))
+    <> sep <> ("battery energy stored (Ws): "
+    <> sep <> (show $ (socPercentage _battery) * (totalCapacity _battery)))
     -- <> sep <> ("runtime estimate :" <> sep <> showDec (secsToMinutes $ runTime @R _battery (storageSensors _sensorsT)))
     <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
@@ -381,7 +385,16 @@ data Battery e p = Battery
   , chargeLim :: !p
   , dischargeLim :: !p
   , totalCapacity :: !e
-  } deriving (Eq, Ord, Show, Binary, Generic, NFData)
+  } deriving (Eq, Ord, Show, Binary, Generic, NFData, Functor)
+
+instance Bifunctor Battery where
+  bimap f g Battery{soc, chargeLim, dischargeLim, totalCapacity} = Battery
+    { soc = f soc
+    , chargeLim = g chargeLim
+    , dischargeLim = g dischargeLim
+    , totalCapacity = f totalCapacity
+    } 
+
 
 instance (ToJSON e, ToJSON p) => ToJSON (Battery e p)
 instance (FromJSON e, FromJSON p) => FromJSON (Battery e p)
@@ -443,7 +456,7 @@ runTime Battery{soc} SensorVector{..} = soc / ((normC sensorCurrent) * sensorTer
       | otherwise = error "neither greater nor less than nor equal to zero"
       
 
-socPercentage :: Fractional a => Battery a a -> a
+socPercentage :: Fractional e => Battery e p -> e
 socPercentage Battery{..} = (soc * 100 / totalCapacity)
 
 

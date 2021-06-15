@@ -15,6 +15,7 @@ import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 
 import Data.Time
+import Data.Bifunctor
 import Numeric.Estimator (KalmanFilter(..))
 import ConCat.Misc (R)
 
@@ -89,8 +90,9 @@ energyFold = AppF (FL.Fold step begin end)
       where
         Node{..} = p
 
-batteryFold :: forall m. (Monad m) => BatteryParams R -> FL.Fold m EnergyState (Battery R R)
-batteryFold bat@BatteryParams{} = FL.Fold step begin end
+batteryFold :: forall m e p. (Monad m)
+  => BatteryParams R -> FL.Fold m EnergyState (Battery WattSeconds Watts)
+batteryFold bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts) (FL.Fold step begin end)
   where
     step :: (Maybe UTCTime, Maybe (KF R))
       -> EnergyState
@@ -102,7 +104,9 @@ batteryFold bat@BatteryParams{} = FL.Fold step begin end
                                     (runEstimator bat (tdiff t) $ storageSensors sensorReadings))
       where
         cState (Just (KalmanFilter currState _)) = currState
-        cState Nothing = initDynamic {soC = ocvToSoC bat (sensorTerminalV . storageSensors $ sensorReadings)}
+        cState Nothing = initDynamic {
+          soC = ocvToSoC bat (sensorTerminalV . storageSensors $ sensorReadings)
+          }
         tnow = utcTimeES sensorReadings
         tdiff (Just t') = realToFrac $ diffUTCTime tnow t'
         tdiff Nothing = 0
@@ -111,9 +115,10 @@ batteryFold bat@BatteryParams{} = FL.Fold step begin end
     begin = pure $ (Nothing, Nothing)
     end :: (Maybe UTCTime, Maybe (KF R)) -> m (Battery R R)
     end (_, Just (KalmanFilter (StateVector{..}) _)) = pure $
-      (emptyB @R @R) { soc = clamp 0 99.9 soC
-                     , totalCapacity = chargeCapacity bat
-                     }
+      (emptyB @R @R)
+        { soc = clamp 0 99.9 soC
+        , totalCapacity = chargeCapacity bat
+        }
     end (_, Nothing) = pure $ emptyB @R @R
 
 
