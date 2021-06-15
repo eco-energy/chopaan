@@ -27,11 +27,11 @@ import Chopaan.Graph
 import Chopaan.Graph.Spider (stakeConfig, meshConfig, statusConfig, getGridRoot)
 
 import Servant (Server, Get, Capture, Proxy(..), (:>)
-               , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer)
+               , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer, serve)
 
 
 import Data.Aeson (ToJSON, FromJSON)
-
+import Network.Wai (Application)
 
 
 
@@ -43,14 +43,17 @@ type HistoryAPI = "history"
   :> Get '[JSON] (SG NodeMAC)
 
 
-genericToUrlPieceViaShow :: Show a =>  a -> Text.Text
-genericToUrlPieceViaShow = Text.pack . show
+toUrlPieceViaEnum :: Enum a => a -> Text.Text
+toUrlPieceViaEnum = Text.pack . show . fromEnum
+
+parseUrlPieceViaEnum :: Enum a => Text.Text -> Either Text.Text a
+parseUrlPieceViaEnum = Right . toEnum . read . Text.unpack
 
 instance ToHttpApiData GraphType where
-  toUrlPiece = genericToUrlPieceViaShow
+  toUrlPiece = toUrlPieceViaEnum
 
 instance FromHttpApiData GraphType where
-  parseUrlPiece = read . Text.unpack
+  parseUrlPiece = parseUrlPieceViaEnum
 
 
 type IsoGConn n a e = (Address n
@@ -68,8 +71,11 @@ type HistoryConn n a e =
   , FromGraphSON n, IsoGConn n a e)
 
 
-serveHistoryApi :: Server (HistoryAPI)
-serveHistoryApi = hoistServer (Proxy @ HistoryAPI) liftIO getHistoryForGraph
+serveHistoryAPI :: Server (HistoryAPI)
+serveHistoryAPI = hoistServer (Proxy @ HistoryAPI) liftIO getHistoryForGraph
+
+historyApp :: Application
+historyApp = serve (Proxy :: Proxy HistoryAPI) serveHistoryAPI
 
 
 getHistoryForGraph :: forall m. (MonadIO m)
