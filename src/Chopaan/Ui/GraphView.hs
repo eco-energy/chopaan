@@ -44,6 +44,7 @@ import Chopaan.Node.Mesh
 import Chopaan.Node.Folds
 import Chopaan.Kibbutz.Transactor
 import Chopaan.Graph
+import Chopaan.Graph.G as G
 import Chopaan.Node.NodeId
 import qualified Chopaan.Ui.Style as Css 
 
@@ -63,13 +64,13 @@ newtype Pos = Pos Double
 --     fwd = MeshG
 --     back (MeshG a) = a
 
--- stakeEndo :: EndoIso (SnapshotGraph NodeMAC SensorS Stake) (SG NodeMAC)
+-- stakeEndo :: EndoIso (SnapshotGraph NodeMAC SensorR Stake) (SG NodeMAC)
 -- stakeEndo = EndoIso id fwd back
 --   where
 --     fwd = StakeG
 --     back (StakeG a) = a
 
--- statusEndo :: EndoIso (SnapshotGraph NodeMAC SensorS TransactionStatus) (SG NodeMAC)
+-- statusEndo :: EndoIso (SnapshotGraph NodeMAC SensorR TxStatus) (SG NodeMAC)
 -- statusEndo = EndoIso id fwd back
 --   where
 --     fwd = StatusG
@@ -78,13 +79,11 @@ newtype Pos = Pos Double
 
 renderKbtzGraph :: forall m n. (Applicative m, Ord n, Show n) => SG n -> Html m () -- SG
 renderKbtzGraph sg = case sg of
-  (MeshG ms) -> renderM ms -- (pimap meshEndo $) 
-  (StakeG ms) -> renderSk ms -- pimap stakeEndo $ 
-  (StatusG ms) -> renderSt ms -- pimap statusEndo $ 
+  (G.Mesh (SG ms)) -> renderThis ms -- (pimap meshEndo $) 
+  (G.Transactor (SG ms)) -> renderThis ms -- pimap stakeEndo $ 
+  (G.Status (SG ms)) -> renderThis ms -- pimap statusEndo $
+  (G.Flow (SG ms)) -> renderThis ms -- pimap statusEndo $
   where
-    renderM = renderThis @n @MeshNode @RxSignal
-    renderSk = renderThis @n @SensorS @Stake 
-    renderSt = renderThis @n @SensorS @TransactionStatus
     renderThis :: forall n v l.
       (Monoid l, Eq l, Ord v, Show l, Show v, Ord n, Show n)
       =>  SnapshotGraph n v l -> Html m ()--(SnapshotGraph n v l)

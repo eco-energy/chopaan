@@ -61,15 +61,15 @@ instance (Monad m) => Applicative (AppF m a) where
   pure = AppF . pure
   (AppF f) <*> (AppF xs) = AppF $ f <*> xs
 
-powerFold :: forall m. Applicative m => AppF m EnergyState (PowerN)
+powerFold :: forall m. Applicative m => AppF m EnergyState (PowerNR)
 powerFold = AppF (FL.Fold (\_ b-> pure . FL.Partial . power $ b) (pure $ mempty) pure) 
 
 
-energyFold :: forall m. Applicative m => AppF m (EnergyState) (EnergyN)
+energyFold :: forall m. Applicative m => AppF m (EnergyState) (EnergyNR)
 energyFold = AppF (FL.Fold step begin end)
   where
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
-    step :: (EnergyN, Maybe UTCTime) -> EnergyState -> m (FL.Step (EnergyN, Maybe UTCTime) EnergyN)
+    step :: (EnergyNR, Maybe UTCTime) -> EnergyState -> m (FL.Step (EnergyNR, Maybe UTCTime) EnergyNR)
     step (esPrev, (Just tPrev)) cur = pure . FL.Partial $
       (esPrev <> eAtT (power cur) (diffUTC tn tPrev), Just tn)
       where
@@ -78,11 +78,11 @@ energyFold = AppF (FL.Fold step begin end)
       (esPrev <> (eAtT (power cur) 0), Just tn)
       where
         tn = utcTimeES cur
-    begin :: m (EnergyN, Maybe UTCTime)
+    begin :: m (EnergyNR, Maybe UTCTime)
     begin = pure $ (mempty, Nothing)
-    end :: (EnergyN, Maybe UTCTime) -> m (EnergyN)
+    end :: (EnergyNR, Maybe UTCTime) -> m (EnergyNR)
     end = pure . fst
-    eAtT :: PowerN -> DiffTime -> (EnergyN)
+    eAtT :: PowerNR -> DiffTime -> (EnergyNR)
     eAtT p t = Node { tx = (pToE t tx)
                     , consumed = (pToE t consumed)
                     , generated = (pToE t generated)
@@ -142,7 +142,7 @@ demandFold = FL.Fold (\_ nes -> pure . FL.Partial $ (d $ power nes)) (pure 0) pu
 sensors :: (Applicative m) => FL.Fold m EnergyState EnergyState
 sensors = FL.Fold (\_ nes -> pure . FL.Partial $ nes) (pure zeroMsg) (pure) 
 
-type SensorS = SensorMetrics WattSeconds Watts 
+type SensorR = SensorMetrics WattSeconds Watts 
 
-defSensorS :: SensorS
-defSensorS = SensorMetrics Nothing 0 mempty mempty mempty 0
+defSensorR :: SensorR
+defSensorR = SensorMetrics Nothing 0 mempty mempty mempty 0

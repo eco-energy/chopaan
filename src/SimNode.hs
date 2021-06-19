@@ -18,7 +18,7 @@ import Chopaan.Comm.Queues (initNodeQueue)
 import Chopaan.Comm.Mqtt (Topic)
 import Chopaan.Utils.Time
 import Chopaan.Ui (mon)
-import Chopaan.Node.Node (nodeS, SensorS)
+import Chopaan.Node.Node (nodeS, SensorR)
 
 import Proto.NodeMessageSchema.NodeMessages
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as F
@@ -57,10 +57,6 @@ uiDelay = liftIO . threadDelay $ 1000000
 
 
 
-nodeStream :: forall t. (IsStream t) =>  t MonadEnv EnergyState
-nodeStream = S.map snd $ S.iterateM (\xs -> do
-                                        uiDelay
-                                        nodeStep @MonadEnv xs) (pure (startDay $ TimeOfDay 0 0 0, defMessage))
 
 runtimeS :: forall t. (IsStream t) => t MonadEnv RuntimeStats
 runtimeS = runtime
@@ -78,41 +74,7 @@ logsS = logs
 
 
 
-nodeStep :: forall m. (MonadSample m) => (LocalTime, EnergyState) -> m (LocalTime, EnergyState)
-nodeStep (t, oldState) = do
-  -- note that outflow of current is assumed to be positive 
-  loadCurrent <- abs <$> normal 30 20
-  gridCurrent <- normal 0 20
-  solarCurrent <- biGauss daytime (30, 10) (0, 0.3) t
-  --solarVoltage <- biGauss daytime (17, 3) (0, 1) t
-  batteryVoltageDiff <- normal 0.01 0.001
-  gridVoltageDiff <- normal 0.03 0.03 
-  
-  let
-    t' = addLocalTime (1 :: NominalDiffTime) t
-    batteryV = oldState ^. F.batteryVoltage + batteryVoltageDiff
-    gridV = oldState ^. F.gridVoltage + gridVoltageDiff
-    
-    newState = (defMessage :: EnergyState)
-      & F.batteryVoltage .~ batteryV
-      & F.gridVoltage .~ gridV
-      & F.batteryToLoadCurrent .~ loadCurrent
-      & F.batteryToGridCurrent .~ (if gridCurrent > 0 then gridCurrent else 0)
-      & F.gridToBatteryCurrent .~ (if gridCurrent < 0 then gridCurrent else 0)
-      & F.solarInputCurrent    .~ solarCurrent
-      & F.temperature          .~ (26 :: Double)
-      & F.cpuTime             .~  timeToUIntSeconds t
-  return $ (t', newState)
-  where
-    biGauss :: (MonadSample m) => (t -> Bool) -> (Double, Double) -> (Double, Double) -> t -> m Double 
-    biGauss choice (mu, theta) (mu', theta') chooser = case choice chooser of
-      True -> normal mu theta
-      False -> normal mu' theta'
-    daytime :: LocalTime -> Bool
-    daytime tx = t' > sunrise && t' < sunset
-      where
-        t' = localTimeOfDay tx
-    (sunrise, sunset) = (TimeOfDay 6 0 0, TimeOfDay 18 0 0)
+
 
 startDay :: TimeOfDay -> LocalTime
 startDay = LocalTime $ fromGregorian 1 1 2020
@@ -204,7 +166,7 @@ startApp :: IO ()
 startApp = do
   let
     ns = take 10 testNodes
-    sensors :: Kbtz SerialT MonadEnv NodeTest SensorS
+    sensors :: Kbtz SerialT MonadEnv NodeTest SensorR
     sensors = testKbtz ns (\_ -> nodeStream) (nodeS)
     --mesh = testKbtz ns (\_ -> meshStream) (meshT)
     --market = testKbtz ns (\_ -> txStream) (txS)

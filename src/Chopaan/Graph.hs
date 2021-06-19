@@ -7,7 +7,7 @@
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable, DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase, TypeOperators, TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Chopaan.Graph (module Chopaan.Graph, module AG, module NG) where
+module Chopaan.Graph (module Chopaan.Graph, module Chopaan.Graph.G, module Chopaan.Graph.Spider) where
 
 import Prelude hiding ((.), id)
 
@@ -24,6 +24,7 @@ import qualified Data.Map.Strict as Map
 
 
 import NetSpider.Graph as NG (NodeAttributes(..), LinkAttributes(..), VFoundNode)
+import NetSpider.Spider.Config
 import NetSpider.Snapshot
 import NetSpider.Timestamp (Timestamp(..))
 import qualified Algebra.Graph.Labelled as AG
@@ -31,13 +32,16 @@ import qualified Algebra.Graph.Labelled as AG
 
 import Chopaan.Node.NodeId
 import Chopaan.Node.Mesh
-import Chopaan.Node.Folds (SensorS)
+import Chopaan.Node.Folds (SensorR)
 import Chopaan.Node.Metrics hiding (Timestamp)
 import Chopaan.Node.NodeSensors
-import Chopaan.Kibbutz.Transactor (Stake, TransactionStatus)
+import Chopaan.Kibbutz.Transactor (Stake, TxStatus)
 import Chopaan.Graph.Spider
+import Chopaan.Graph.Kbtz
 import Chopaan.Graph.Greskell
 import Shpadoinkle.Widgets.Types
+
+import Chopaan.Graph.G
 
 type R = Double
 
@@ -85,13 +89,9 @@ newtype GrNode = GrNode Int
   deriving newtype (Num)
 
 
-data SG n where
-  MeshG :: SnapshotGraph n MeshNode RxSignal -> SG n
-  StakeG :: SnapshotGraph n (SensorS) Stake -> SG n
-  StatusG :: SnapshotGraph n (SensorS) TransactionStatus -> SG n
-  FlowG :: SnapshotGraph n (Battery R R) R -> SG n
-  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
-
-
-data GraphType = Mesh | Plan | Status | Flow
+data GraphType = MeshG | PlanG | StatusG | FlowG
   deriving (Eq, Ord, Show, Read, Bounded, Enum, Generic, ToJSON, FromJSON, NFData, Humanize)
+
+
+
+  

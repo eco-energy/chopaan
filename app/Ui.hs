@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, ExplicitForAll, TypeApplications, TypeOperators #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, ExplicitForAll, TypeApplications, TypeOperators, PackageImports #-}
 
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
@@ -15,7 +15,7 @@
 
 {-# OPTIONS -fplugin-opt=ConCat.Plugin:showResiduals #-}
 
-{-# OPTIONS -fplugin-opt=ConCat.Plugin:showCcc #-}
+--{-# OPTIONS -fplugin-opt=ConCat.Plugin:showCcc #-}
 
 {-# OPTIONS_GHC -fno-do-lambda-eta-expansion #-}
 
@@ -46,10 +46,11 @@ import Shpadoinkle.Run (runJSorWarp, live)
 
 import UnliftIO.Concurrent (forkIO, threadDelay)
 import Chopaan.Ui.ImageV
-
+import qualified Chopaan.Ui.Grable as Ui
 
 main :: IO ()
 main = appx
+
 
 {--
 We want a canvas element that can be passed to install_effect from
@@ -67,6 +68,7 @@ app = live 8080 $ do
 unitS :: ShaderEff
 unitS = runShader' "unitS" (pairW (sliderW "Outer" (0,2) 1) timeW) $
       \ (o,i) -> annulus o ((sin i + 1) / 2)
+{-# INLINE unitS #-}
       --unitW (const $ deltaDiskPlot (const C.black) x y)
   --where
     --x :: _ --Maybe (Maybe (Maybe (Maybe (Maybe Double))))
@@ -88,6 +90,7 @@ appx = do
 
 runS :: (GenBuses a) => Widgets a -> (a :> ImageC) -> ShaderEff
 runS w c = shaderH w c
+
 
 runShader' :: (GenBuses a, C.ToColor c)
         => String

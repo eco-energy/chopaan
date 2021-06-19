@@ -29,13 +29,13 @@ class CRUDChopaan m where
   listKibbutzim :: m (KbtzList)
   listNodezim :: KbtzName -> m (NodeList)
   nodeDetails :: NodeMAC -> m (Nodezim)
-  --sensorMonitor :: (IsStream t) => NodeMAC -> t m SensorS
+  --sensorMonitor :: (IsStream t) => NodeMAC -> t m SensorR
 
 instance (MonadTrans t, Monad m, CRUDChopaan m) => CRUDChopaan (t m) where
   listKibbutzim = lift listKibbutzim
   listNodezim = lift . listNodezim
   nodeDetails = lift . nodeDetails
-  --sensorMonitor :: (IsStream t') => NodeMAC -> t' (t m) SensorS
+  --sensorMonitor :: (IsStream t') => NodeMAC -> t' (t m) SensorR
   --sensorMonitor = lift . sensorMonitor
 
 newtype NodeList = NodeList { unNodeList :: [Nodezim] }

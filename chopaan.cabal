@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 715d1cfa570b268f04c5d8f59333cb6c62c7383817a157c7afbb33b46bed8df2
+-- hash: 4ed0b467be944f7a46e344791cf8ba19d60af19121a554e0a5e5fbcf160be2b1
 
 name:           chopaan
 version:        0.1.0.0
@@ -45,6 +45,8 @@ library
       Chopaan.DB.Nodes
       Chopaan.DB.Sensors
       Chopaan.Graph
+      Chopaan.Graph.DataSource
+      Chopaan.Graph.G
       Chopaan.Graph.Greskell
       Chopaan.Graph.Kbtz
       Chopaan.Graph.Spider
@@ -134,9 +136,13 @@ library
     , clay
     , colour
     , comonad
+    , constraints-extras
     , containers
     , data-default-class
     , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -182,6 +188,7 @@ library
     , time-compat >=1.9.2.2
     , transformers
     , transformers-base
+    , typerep-map
     , ulid
     , unagi-chan
     , unliftio
@@ -253,9 +260,13 @@ executable dev
     , clay
     , colour
     , comonad
+    , constraints-extras
     , containers
     , data-default-class
     , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -301,6 +312,7 @@ executable dev
     , time-compat >=1.9.2.2
     , transformers
     , transformers-base
+    , typerep-map
     , ulid
     , unagi-chan
     , unliftio
@@ -381,9 +393,13 @@ executable hydrate
     , clay
     , colour
     , comonad
+    , constraints-extras
     , containers
     , data-default-class
     , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -429,6 +445,7 @@ executable hydrate
     , time-compat >=1.9.2.2
     , transformers
     , transformers-base
+    , typerep-map
     , ulid
     , unagi-chan
     , unliftio
@@ -509,9 +526,13 @@ executable server
     , clay
     , colour
     , comonad
+    , constraints-extras
     , containers
     , data-default-class
     , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -557,6 +578,7 @@ executable server
     , time-compat >=1.9.2.2
     , transformers
     , transformers-base
+    , typerep-map
     , ulid
     , unagi-chan
     , unliftio
@@ -638,9 +660,13 @@ executable tx
     , clay
     , colour
     , comonad
+    , constraints-extras
     , containers
     , data-default-class
     , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -686,6 +712,7 @@ executable tx
     , time-compat >=1.9.2.2
     , transformers
     , transformers-base
+    , typerep-map
     , ulid
     , unagi-chan
     , unliftio
@@ -765,9 +792,13 @@ executable ui
     , clay
     , colour
     , comonad
+    , constraints-extras
     , containers
     , data-default-class
     , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -813,6 +844,7 @@ executable ui
     , time-compat >=1.9.2.2
     , transformers
     , transformers-base
+    , typerep-map
     , ulid
     , unagi-chan
     , unliftio
@@ -904,9 +936,13 @@ test-suite chopaan-test
     , clay
     , colour
     , comonad
+    , constraints-extras
     , containers
     , data-default-class
     , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -952,6 +988,7 @@ test-suite chopaan-test
     , time-compat >=1.9.2.2
     , transformers
     , transformers-base
+    , typerep-map
     , ulid
     , unagi-chan
     , unliftio

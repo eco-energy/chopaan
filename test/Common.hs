@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, TypeApplications, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, TypeApplications, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, OverloadedStrings, FlexibleContexts, QuantifiedConstraints, UndecidableInstances #-}
 module Common (
   module Test.Hspec,
   module Test.QuickCheck.Checkers,
@@ -107,11 +107,14 @@ instance Arbitrary RxSignal where
 instance Arbitrary Role where
   arbitrary = genericArbitrary
 
-instance Arbitrary TransactionStatus where
+instance (Arbitrary n) => Arbitrary (TxStatus' n) where
   arbitrary = genericArbitrary
 
-instance Arbitrary Stake where
+instance (Arbitrary n) => Arbitrary (Stake' n) where
   arbitrary = genericArbitrary
 
-instance (Arbitrary n) => Arbitrary (SG n) where
+instance (Arbitrary n, Arbitrary v, Arbitrary e) => Arbitrary (SG' n v e) where
+  arbitrary = genericArbitrary
+
+instance (forall a b. (Arbitrary a, Arbitrary b) => Arbitrary (k n a b)) => Arbitrary (G k n) where
   arbitrary = genericArbitrary

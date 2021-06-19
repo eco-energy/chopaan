@@ -43,14 +43,14 @@ import Chopaan.API.History
 import Chopaan.View (view, template, onRouteChange)
 
 
-data Opts = Opts
+data Opts = Opts String Int
 
 newtype App a = App { runApp :: ReaderT Opts IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader Opts)
 
 
-toHandler :: MonadIO m => Opts -> App ~> m
-toHandler c a = liftIO $ runReaderT (runApp a) c
+appToHandler :: MonadIO m => Opts -> App ~> m
+appToHandler c a = liftIO $ runReaderT (runApp a) c
 
 
 newtype Noop a = Noop (JSM a)
@@ -62,20 +62,15 @@ instance CRUDChopaan App where
   listKibbutzim = undefined
   nodeDetails = undefined
 
-app :: Env -> FilePath -> Application
-app ev root = serve (Proxy @ (API :<|> SPA App :<|> HistoryAPI)) $
-              serveAPI :<|> serveSPA :<|> serveHistoryAPI
+app :: Env -> FilePath -> Opts -> Application
+app ev root (Opts h p) = serve (Proxy @ (SPA App :<|> HistoryAPI)) (serveSPA :<|> (serveHistoryAPI h p))
   where
-    serveAPI :: Server API
-    serveAPI = hoistServer (Proxy @API) (toHandler Opts) $ listKibbutzim
-               :<|> listNodezim
-               
     serveSPA :: Server (SPA App)
     serveSPA = serveUI @ (SPA App) root
-      (\r -> toHandler Opts $ do
+      (\r -> appToHandler (undefined) $ do
           i <- onRouteChange r
           return . template ev i $ view @ Noop i) routes
 
 
 application :: Env -> FilePath -> IO Application
-application e f = return $ app e f 
+application e f = return $ app e f (Opts "localhost" 8182) 

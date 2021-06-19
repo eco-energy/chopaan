@@ -42,20 +42,20 @@ spec = do
             hw = HW (SingBC defBC) (SingPC defPC)  (SingLC defLC)
         it "adding a kibbutz works" $ do
           let
-            writeKbtz = runBinder $ addKbtz kb
+            writeKbtz = runBinder $ addKbtz' kb
           toGremlin (fst writeKbtz)
             `shouldBe`
             "g.addV(\"kbtz\").property(\"@kbtz_id\",__v0)"
 
         it "reading a kibbutz by id works" $ do
-          let readKbtz = runBinder $ getKbtzById k
+          let readKbtz = runBinder $ getKbtzById' k
           (toGremlin . fst $ readKbtz)
             `shouldBe`
             "g.V().hasLabel(\"kbtz\").has(\"@kbtz_id\",__v0).valueMap()"
 
         it "adding a node works" $ do
           let
-            writeHH = runBinder $ addHH an
+            writeHH = runBinder $ addHH' an
           toGremlin (fst writeHH)
             `shouldBe`
             "g.addV(\"hh\").property(\"@hh_id\",__v0)"
@@ -70,15 +70,15 @@ spec = do
         it "round-tripping a Kbtz works" $ do
           bracket (connect host port) close $ \client -> do
             drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
-            drainResults =<< submitPair client (runBinder $ addKbtz kb)
+            addKbtz client k
             got_k1 <- fmap toList $ slurpResults =<<
-                      (submitPair client (runBinder $ getKbtzById k))
+                      (submitPair client (runBinder $ getKbtzById' k))
             got_k1 `shouldBe` [kb]
 
         it "round-tripping a HH works" $ do
           bracket (connect host port) close $ \client -> do
             drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
-            drainResults =<< submitPair client (runBinder $ addHH an)
+            drainResults =<< submitPair client (runBinder $ addHH' an)
             got_n1 <- fmap toList $ slurpResults =<<
                       (submitPair client (runBinder $ getHHById n))
             got_n1 `shouldBe` [an]
@@ -87,20 +87,17 @@ spec = do
         it "adding an hh to a kbtz allows that hh to be fetched when searching along an edge" $ do
           bracket (connect host port) close $ \client -> do
             drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
-            drainResults =<< submitPair client (runBinder $ addKbtz kb)
-            drainResults =<< submitPair client (runBinder $ addHHToKbtz k an)
-
-            got_e1 <- fmap toList $ slurpResults =<<
-                      (submitPair client (runBinder $ getKbtzNodes k))
-            got_e1 `shouldBe` [an]
+            addKbtz client k
+            addHHToKbtz client k an
+            got_e1 <- getKbtzNodes client k
+            got_e1 `shouldBe` [n]
 
 
         it "adding a hwconfig to an hh allows that hh to be fetched when searching along an edge" $ do
           bracket (connect host port) close $ \client -> do
             drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
-            drainResults =<< submitPair client (runBinder $ addKbtz kb)
-            drainResults =<< submitPair client (runBinder $ addHHToKbtz k an)
-            drainResults =<< submitPair client (runBinder $ addHWToHH n hw)
-            got_h1 <- fmap toList $ slurpResults =<<
-                     (submitPair client (runBinder $ getNodeHW n))
+            addKbtz client k
+            addHHToKbtz client k an
+            addHWToHH client n hw
+            got_h1 <- getNodeHW client n
             got_h1 `shouldBe` [hw]

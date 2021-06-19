@@ -1,17 +1,32 @@
 {-# LANGUAGE TypeApplications, FlexibleContexts, ScopedTypeVariables, RankNTypes, ConstraintKinds, KindSignatures, QuantifiedConstraints, MultiParamTypeClasses, GADTs, FlexibleInstances#-}
 {-# LANGUAGE OverloadedStrings, RecordWildCards, NamedFieldPuns, NoMonomorphismRestriction  #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, UndecidableInstances, TypeOperators, AllowAmbiguousTypes #-}
 
-{-# LANGUAGE ExplicitForAll, FlexibleContexts, TupleSections #-}
+{-# LANGUAGE ExplicitForAll, FlexibleContexts, TupleSections, TypeInType #-}
 module Chopaan.Graph.Spider where
 
 import qualified Streamly.Prelude as S
-import Streamly.Prelude
+import Streamly.Prelude (IsStream, MonadAsync, adapt)
 import qualified Streamly.Internal.Data.Fold as FL
+
+import Data.Proxy
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Aeson (ToJSON, FromJSON)
+import Data.Text
+import Data.Greskell
+import Data.Hashable (Hashable)
+import Data.Maybe (fromMaybe)
+import Data.Time (UTCTime(..), getCurrentTime, fromGregorian, secondsToDiffTime)
+import Data.Pool
 
 import GHC.Generics
 import Control.DeepSeq
 import Control.Monad.IO.Class
+import Control.Monad.Reader.Class
+import Control.Monad.Trans.Reader hiding (ask)
+import Control.Monad.Trans.Control
+import Control.Monad.Base
 import Control.Monad.Catch
 
 import Chopaan.Node.NodeId
@@ -22,37 +37,57 @@ import qualified Proto.NodeMessageSchema.NodeMessages as N
 
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Kibbutz
-import Chopaan.Kibbutz.Transactor ( TransactionStatus
+import Chopaan.Kibbutz.Transactor ( TxStatus
                                   , Stake
+                                  , Tx(..)
+                                  , NodeStates
+                                  , TxPlan
+                                  , TxState
                                   , stakeLinkDir
                                   , txStatusLinkDir
                                   )
 import Chopaan.Graph.Greskell
 
 import NetSpider.Spider (Spider, addFoundNode, getSnapshot, getSnapshotSimple, connectWith, close, withSpider)
-import NetSpider.Spider.Config (Config(..), defConfig)
-import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..))
+import NetSpider.Spider.Config (Config(..), defConfig, LogLevel(..))
+import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..), VNode(..))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Timestamp (fromUTCTime, now, Timestamp)
 import NetSpider.Snapshot (SnapshotGraph)
 import NetSpider.Query (defQuery, Query(..), Extended(..), (<=..<=), policyAppend)
 
 
-import Data.Aeson (ToJSON, FromJSON)
-import Data.Greskell
-import Data.Hashable (Hashable)
-import Data.Maybe (fromMaybe)
-import Data.Time (UTCTime, getCurrentTime)
-import Data.Pool
+import Data.String
 
-import Control.Monad.Trans.Reader
+import Chopaan.Graph.G
 
+type (~>) f g = forall x. f x -> g x
+
+type Spool n = SpoolG n
+
+type Spools = SpG'' NodeMAC
+
+type SnapshotId n = (FromGraphSON n, ToJSON n, Ord n, Hashable n, Show n)
+
+mkSpool :: forall m n. (MonadIO m, SnapshotId n) => ConfG n -> m (SpG'' n)
+mkSpool (G''{meshG, txG, statusG, flowG}) = G''
+                                        <$> (SpoolG <$> (spiderPool (unConf meshG)))
+                                        <*> (SpoolG <$> spiderPool (unConf txG))
+                                        <*> (SpoolG <$> spiderPool (unConf statusG))
+                                        <*> (SpoolG <$> spiderPool (unConf flowG))
+
+
+
+runSpider :: (MonadIO m) => Spools -> SpiderM ~> m
+runSpider c a = liftIO $ runReaderT (runSpiderM a) c
+
+newtype SpiderM a = SpiderM { runSpiderM :: ReaderT (Spools) IO a }
+  deriving newtype (Functor, Applicative, Monad, MonadIO,
+                    MonadThrow, MonadCatch, MonadReader (Spools),
+                    MonadBase IO, MonadBaseControl IO)
 
 
 type SpiderConn n v e = (SpiderNodeId n, NodeAttributes v, LinkAttributes e, Show n, Show v, Show e)
-
-type SpiderM m n c d = ReaderT (Spider n c d) m
-
 
 type SpiderNodeId n = (ToJSON n)
 
@@ -79,7 +114,7 @@ class (LinkAttributes e) => HasDir e where
 instance HasDir Stake where
   getEDir = stakeLinkDir
 
-instance HasDir TransactionStatus where
+instance HasDir TxStatus where
   getEDir = txStatusLinkDir
   
 type GrSConn t m n v e = (IsStream t, MonadAsync m, SpiderConn n v e, HasTime v, HasDir e)
@@ -110,7 +145,7 @@ addFN :: MonadIO m
       => MonadCatch m
       => SpiderConn n v e
       => Spider n v e -> FoundNode n v e -> m (Bool) 
-addFN s f = expToBool =<< (liftIO $ (print f) >>
+addFN s f = expToBool =<< (liftIO $ -- (print $ neighborLinks f) >>
                            (try (addFoundNode s f)))
 
 tryForBool :: (MonadIO m, MonadCatch m) => m a -> m Bool 
@@ -136,62 +171,84 @@ toLink n' e = FoundLink
                      , linkAttributes = e
                      }
 
+toLink' :: n -> e -> LinkState -> FoundLink n e
+toLink' n' e dir = FoundLink
+                     { targetNode = n'
+                     , linkState = dir
+                     , linkAttributes = e
+                     }
+
 
 spiderFold :: forall m a n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
-           => Config n v e
-           -> ((n, a) -> m (FoundNode n v e))
+           => Pool (Spider n v e)
+           -> ((n, a) -> m (Maybe (FoundNode n v e)))
            -> FL.Fold m (n, a) Bool
-spiderFold conf asFN = FL.mkFoldM step start end
+spiderFold p asFN = FL.mkFoldM step start end
   where
-    step :: (Pool(Spider n v e), Bool) -> (n, a) -> m (FL.Step (Pool(Spider n v e), Bool) Bool)
-    step (s, _) a = (\r -> return $ FL.Partial (s, r))
-      =<< (withResource s . (flip addFN))
+    step :: (Pool (Spider n v e), Bool)
+         -> (n, a)
+         -> m (FL.Step ((Pool(Spider n v e)), Bool) Bool)
+    step (sp, _) a = (\r -> return $ FL.Partial (sp, r))
+      =<< addMaybe
       =<< (asFN a)
-    start = (,True) <$> (liftIO $ spiderPool conf)
+      where
+        addMaybe Nothing = return True
+        addMaybe (Just n) = withResource sp ((flip addFN) n)
+    start = pure (p ,True)
     end (s, r) = liftIO $ destroyAllResources s >> return r
 
 
-addMeshNode :: forall m. (MonadAsync m, MonadCatch m)
-  => FL.Fold m (NodeMAC, N.RuntimeStats) Bool
-addMeshNode = spiderFold meshConfig (pure . rsToFN)
+--utcToRange :: UTCTime -> UTCTime -> _
+utcToRange t t' = Finite (fromUTCTime t) <=..<= Finite (fromUTCTime t')
 
-addStakeNode :: forall m. (MonadAsync m, MonadCatch m)
-  => KbtzRoot NodeMAC -> FL.Fold m (NodeMAC, (SensorS, Stake, TransactionStatus)) Bool
-addStakeNode (KbtzRoot gn) = spiderFold stakeConfig (\(n, (s, st, _)) -> x n s st)
-  where
-    x :: NodeMAC -> SensorS -> Stake -> m (FoundNode NodeMAC SensorS Stake)
-    x n v e = do
-      t <- liftIO getCurrentTime
-      pure $ toFN (fromUTCTime . (fromMaybe t) .  _time $ v) n v [toLink gn e]
+infRange = NegInf <=..<= PosInf
 
-
-initGridRoot :: KbtzName -> IO (Bool)
-initGridRoot name = do
-  t <- fromUTCTime <$> getCurrentTime
-  let root = getGridRoot name
-  a <- withSpider stakeConfig (\s -> addFN s $ toFN t root initSM [])
-  b <- withSpider statusConfig (\s -> addFN s $ toFN t root initSM [])
-  c <- withSpider meshConfig (\s -> addFN s $ toFN t root initMeshNode [])
-  return $ a && b && c
-  
-  
-
-addMonNode :: forall m. (MonadAsync m, MonadCatch m)
-  => KbtzRoot NodeMAC -> FL.Fold m (NodeMAC, (SensorS, Stake, TransactionStatus)) Bool
-addMonNode (KbtzRoot gn) = spiderFold statusConfig (\(n, (s, _, st)) -> x n s st)
-  where
-    x :: NodeMAC
-      -> SensorS
-      -> TransactionStatus
-      -> m (FoundNode NodeMAC SensorS TransactionStatus)
-    x n v e = do
-      t <- liftIO getCurrentTime
-      pure $ toFN (fromUTCTime . (fromMaybe t) .  _time $ v) n v [toLink gn e]
+rangeQuery :: (Eq n, Show n) => UTCTime -> UTCTime -> [n] -> Query n na sla sla
+rangeQuery t t' ns = (defQuery ns)
+  { timeInterval = utcToRange t t'
+  , foundNodePolicy = policyAppend
+  , includeIncomingLinks = True
+  } 
 
 
-saveTx ::  forall m. (MonadAsync m, MonadCatch m)
-  => KbtzRoot NodeMAC -> FL.Fold m (NodeMAC, (SensorS, Stake, TransactionStatus)) (Bool, Bool)
-saveTx k = (,) <$> (addStakeNode k) <*> (addMonNode k)
+class HasLabel a where
+  label :: a -> Text
+  nodeType :: a -> Proxy v
+  edgeType :: a -> Proxy e
+
+
+instance HasLabel (G k n) where
+  label (Mesh _) = "mesh"
+  label (Transactor _) = "transactor"
+  label (Status _) = "status"
+  label (Flow _) = "flow"
+
+toKey :: forall n. Text -> Key VNode n 
+toKey a = fromString . unpack $ "@" <> a <> "_node"
+
+type Opts = (String, Int)
+
+
+hasConfig :: forall a n v e. (SpiderConn n v e)
+  => Opts -> Text -> Config n v e
+hasConfig (h, p) label = defConfig
+  { wsHost = h
+  , wsPort = p
+  , nodeIdKey = toKey label
+  , logThreshold = LevelWarn
+  }
+
+
+spiderPool :: forall m n v e. MonadIO m => Config n v e -> m (Pool (Spider n v e))
+spiderPool c = liftIO $ createPool (connectWith c) close 10 100 10
+
+
+gridSnapshotSimple :: forall m n v e. (MonadIO m, SpiderConn n v e)
+  => KbtzName
+  -> Spider NodeMAC v e
+  -> m (SnapshotGraph NodeMAC v e)
+gridSnapshotSimple k s = liftIO $ getSnapshotSimple s $ getGridRoot k
+
 
 writeSpiderStream :: (IsStream t, MonadAsync m, MonadCatch m)
   => Config n v e
@@ -213,56 +270,6 @@ getSnapshotStream conf f = S.bracket
   (liftIO . close)
   (\s -> S.repeatM $ f s)
 
-type SnapshotId n = (FromGraphSON n, ToJSON n, Ord n, Hashable n, Show n)
-
-getGridSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadIO m)
-  => KbtzRoot n
-  -> UTCTime
-  -> UTCTime
-  -> Spider n v e
-  -> m (SnapshotGraph n v e)
-getGridSnapshot r t t' s = liftIO
-                           . (getSnapshot s)
-                           . (rangeQuery t t') $ [getRoot r]
-
-
-getNodesSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadIO m)
-  => [n]
-  -> UTCTime
-  -> UTCTime
-  -> Spider n v e
-  -> m (SnapshotGraph n v e)
-getNodesSnapshot ns t t' s = liftIO
-                           . (getSnapshot s)
-                           . (rangeQuery t t') $ ns
-
-rangeQuery :: (Eq n, Show n) => UTCTime -> UTCTime -> [n] -> Query n na sla sla
-rangeQuery t t' ns = (defQuery ns)
-  { timeInterval =
-      Finite (fromUTCTime t)
-      <=..<=
-      Finite (fromUTCTime t')
-  , foundNodePolicy = policyAppend } 
-
-
-getGridSnapshotSimple :: forall m n v e. (SnapshotId n, SpiderConn n v e)
-  => KbtzRoot n
-  -> Config n v e
-  -> IO (SnapshotGraph n v e)
-getGridSnapshotSimple r c = withSpider c (\s -> getSnapshotSimple s $ getRoot r) 
-
-statusSnapshot' k = getGridSnapshotSimple k statusConfig
-
-stakeSnapshot' k = getGridSnapshotSimple k stakeConfig
-
-meshSnapshot' n = withSpider meshConfig (\s -> getSnapshotSimple s n)
-
-meshSnapshot ns t0 tn = withSpider meshConfig (getNodesSnapshot ns t0 tn)
-
-stakeSnapshot ns t0 tn = withSpider stakeConfig (getNodesSnapshot ns t0 tn)
-
-statusSnapshot ns t0 tn = withSpider statusConfig (getNodesSnapshot ns t0 tn)
-
 
 
 subscribeSnapshot :: forall t m v e.
@@ -273,15 +280,183 @@ subscribeSnapshot :: forall t m v e.
 subscribeSnapshot k c = getSnapshotStream c (\s -> liftIO $ getSnapshotSimple s (getRoot . mkKbtzRoot $ k))
 
 
-stakeConfig :: Config NodeMAC SensorS Stake
-stakeConfig = defConfig { nodeIdKey = "@stake_node" }
+addMeshNode :: (MonadAsync m, MonadCatch m) => SpiderM (FL.Fold m (NodeMAC, N.RuntimeStats) Bool)
+addMeshNode = do
+  spool <- ask
+  return $ spiderFold (unSpool . meshG $ spool) (pure . Just . rsToFN)
 
-statusConfig :: Config NodeMAC SensorS TransactionStatus
-statusConfig = defConfig { nodeIdKey = "@status_node"}
+addTxNode :: forall m. (MonadAsync m, MonadCatch m)
+  => KbtzName -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake, TxStatus)) Bool)
+addTxNode k = do
+  spool <- ask
+  return $ spiderFold (unSpool . txG $ spool)
+    (\(n, (s, stake, status)) -> case stake of
+        Nothing -> pure Nothing
+        Just stk -> Just <$> (x (_time s) n stk status))
+  where
+    x :: Maybe UTCTime -> NodeMAC -> Stake -> TxStatus -> m (FoundNode NodeMAC Stake TxStatus)
+    x t n v e = do
+      t' <- liftIO getCurrentTime
+      pure $ toFN (fromUTCTime . (fromMaybe t') $ t) n v [toLink (getGridRoot k) e]
 
-meshConfig :: Config NodeMAC MeshNode RxSignal
-meshConfig = defConfig { nodeIdKey = "@mesh_node"}
+
+gridState :: KbtzName -> NodeStates n -> TxPlan n -> TxState n -> IO (Bool)
+gridState k = undefined
 
 
-spiderPool :: forall n v e. Config n v e -> IO (Pool (Spider n v e))
-spiderPool c = createPool (connectWith c) close 10 100 10
+initGridRoot :: KbtzName -> [NodeMAC] -> SpiderM (Bool)
+initGridRoot name ns = do
+  spool <- ask
+  --t <- fromUTCTime <$> getCurrentTime
+  let t = fromUTCTime $ UTCTime (fromGregorian 2021 4 6) (secondsToDiffTime 0)
+  let root = getGridRoot name
+  a <- withResource (unSpool . txG $ spool) (\s -> addFN s $ toFN t root mempty [])
+  b <- withResource (unSpool . statusG $ spool) (\s -> addFN s $ toFN t root initSM [])
+  c <- withResource (unSpool . meshG $ spool) (\s -> addFN s $ toFN t root initMeshNode [])
+  -- print =<< (gridSnapshotSimple name meshConfig)
+  -- print =<< (gridSnapshotSimple name stakeConfig)
+  -- print =<< (gridSnapshotSimple name statusConfig)
+  return $ a && b && c
+  -- (foldl (&&) True a) && (foldl (&&) True b) && (foldl (&&) True c)
+  where
+    initialEdges :: forall e. (Monoid e, LinkAttributes e, HasDir e) => [FoundLink NodeMAC e]
+    initialEdges = ((flip toLink $ mempty) <$> ns)
+    reverseFN :: forall v e. (Show v, Show e, NodeAttributes v, LinkAttributes e, Monoid e)
+              => v -> NodeMAC -> Timestamp -> NodeMAC -> FoundNode NodeMAC v e 
+    reverseFN v root t n = toFN t n v [toLink' root mempty LinkBidirectional]
+    reverseFNs :: forall v e. (Show v, Show e, NodeAttributes v, LinkAttributes e, Monoid e)
+              => v -> NodeMAC -> Timestamp -> [FoundNode NodeMAC v e]
+    reverseFNs v root t = (reverseFN v root t) <$> ns
+    meshEdges :: [FoundLink NodeMAC RxSignal]
+    meshEdges = ((\n -> toLink' n mempty LinkBidirectional) <$> ns)
+  
+
+addMonNode :: forall m. (MonadAsync m, MonadCatch m)
+  => KbtzName -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake, TxStatus)) Bool)
+addMonNode k = do
+  spool <- ask
+  return $ spiderFold (unSpool . statusG $ spool) (\(n, (s, st, _)) -> x n s st)
+  where
+    x :: NodeMAC
+      -> SensorR
+      -> Maybe (Stake)
+      -> m (Maybe (FoundNode NodeMAC SensorR Stake))
+    x n v e = case e of
+                Nothing -> return Nothing
+                Just stk -> do
+                  t <- liftIO getCurrentTime
+                  pure . Just $
+                    toFN (fromUTCTime . (fromMaybe t) .  _time $ v) n v [toLink (getGridRoot k) stk]
+
+
+saveTx ::  forall m. (MonadAsync m, MonadCatch m)
+  => KbtzName
+  -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake, TxStatus)) (Bool, Bool))
+saveTx k = do
+  stakeF <- addTxNode k
+  monF <- addMonNode k
+  return $ (,) <$> stakeF <*> monF
+
+
+
+gridSnapshot :: forall m v e. (SpiderConn NodeMAC v e, MonadIO m)
+  => KbtzName
+  -> UTCTime
+  -> UTCTime
+  -> Spider NodeMAC v e
+  -> m (SnapshotGraph NodeMAC v e)
+gridSnapshot r t t' s = liftIO
+                           . (getSnapshot s)
+                           . (rangeQuery t t') $ [getGridRoot r]
+
+
+nodesSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadIO m)
+  => [n]
+  -> UTCTime
+  -> UTCTime
+  -> Spider n v e
+  -> m (SnapshotGraph n v e)
+nodesSnapshot ns t t' s = liftIO
+                           . (getSnapshot s)
+                           . (rangeQuery t t') $ ns
+
+
+statusGridSnapshot :: KbtzName
+  -> UTCTime
+  -> UTCTime
+  -> SpiderM (SnapshotGraph NodeMAC SensorR Stake)
+statusGridSnapshot k t t' = do
+  spool <- ask
+  liftIO $ withResource (unSpool . statusG $ spool) (gridSnapshot k t t')
+
+txGridSnapshot :: KbtzName
+  -> UTCTime
+  -> UTCTime
+  -> SpiderM (SnapshotGraph NodeMAC Stake TxStatus)
+txGridSnapshot k t t' = do
+  spool <- ask
+  liftIO $ withResource (unSpool . txG $ spool) (gridSnapshot k t t')
+
+meshGridSnapshot :: KbtzName
+  -> UTCTime
+  -> UTCTime
+  -> SpiderM (SnapshotGraph NodeMAC MeshNode RxSignal)
+meshGridSnapshot k t t' = do
+  spool <- ask
+  liftIO $ withResource (unSpool . meshG $ spool) (gridSnapshot k t t')
+
+flowGridSnapshot :: KbtzName
+  -> UTCTime
+  -> UTCTime
+  -> SpiderM (SnapshotGraph NodeMAC BatteryR PowerNR)
+flowGridSnapshot k t t' = do
+  spool <- ask
+  liftIO $ withResource (unSpool . flowG $ spool) (gridSnapshot k t t')
+
+
+statusNodesSnapshot :: [NodeMAC]
+  -> UTCTime
+  -> UTCTime
+  -> SpiderM (SnapshotGraph NodeMAC SensorR Stake)
+statusNodesSnapshot k t t' = do
+  spool <- ask
+  liftIO $ withResource (unSpool . statusG $ spool) (nodesSnapshot k t t')
+
+txNodesSnapshot :: [NodeMAC]
+  -> UTCTime
+  -> UTCTime
+  -> SpiderM (SnapshotGraph NodeMAC Stake TxStatus)
+txNodesSnapshot k t t' = do
+  spool <- ask
+  liftIO $ withResource (unSpool . txG $ spool) (nodesSnapshot k t t')
+
+meshNodesSnapshot :: [NodeMAC]
+  -> UTCTime
+  -> UTCTime
+  -> SpiderM (SnapshotGraph NodeMAC MeshNode RxSignal)
+meshNodesSnapshot k t t' = do
+  spool <- ask
+  liftIO $ withResource (unSpool . meshG $ spool) (nodesSnapshot k t t')
+
+flowNodesSnapshot :: [NodeMAC]
+  -> UTCTime
+  -> UTCTime
+  -> SpiderM (SnapshotGraph NodeMAC BatteryR PowerNR)
+flowNodesSnapshot k t t' = do
+  spool <- ask
+  liftIO $ withResource (unSpool . flowG $ spool) (nodesSnapshot k t t')
+
+mkConfG :: Opts -> ConfG NodeMAC
+mkConfG o = G'' (CG $ meshConfig o) (CG $ txConfig o) (CG $ statusConfig o) (CG $ flowConfig o) 
+
+txConfig :: Opts -> Config NodeMAC Stake TxStatus
+txConfig o = hasConfig o "transactor"
+
+statusConfig :: Opts -> Config NodeMAC SensorR Stake
+statusConfig o = hasConfig o "status"
+
+meshConfig :: Opts -> Config NodeMAC MeshNode RxSignal
+meshConfig o = hasConfig o "mesh"
+
+flowConfig :: Opts -> Config NodeMAC BatteryR PowerNR
+flowConfig o = hasConfig o "flow"

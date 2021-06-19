@@ -16,7 +16,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Chopaan.Node.Node (
   -- scans
-  nodeS, SensorS, energyS, powerS, timeS
+  nodeS, SensorR, energyS, powerS, timeS
   -- folds
   , sensorFold, energyFold, powerFold, timeFold
   ) where
@@ -37,13 +37,13 @@ import Chopaan.Node.Metrics
 ---------------------------------------------------------------------------------------------------------------}
 
 
-powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m PowerN
+powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m PowerNR
 powerS = S.postscan . unAppF $ powerFold
 
-energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m EnergyN
+energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m EnergyNR
 energyS = S.postscan . unAppF $ energyFold
 
-nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m SensorS
+nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m SensorR
 nodeS = S.postscan sensorFold
 
 timeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp

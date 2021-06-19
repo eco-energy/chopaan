@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, TypeApplications, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, OverloadedStrings, FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module SpiderSpec (spec) where
+module SpiderSpec (spec, hydrateKbtz) where
 
 import Streamly.Prelude (IsStream, MonadAsync)
 import qualified Streamly.Prelude as S
@@ -10,8 +10,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Classes
 import Control.Monad.IO.Class
 import qualified Data.Text as Text
-import Test.QuickCheck.Arbitrary.Generic
-import Data.ProtoLens.Arbitrary
+
 import Data.ProtoLens
 import Data.Word
 import Data.Maybe
@@ -20,14 +19,26 @@ import NetSpider.Snapshot
 import Chopaan.Monad.Env
 import Control.Monad.Bayes.Class
 import Chopaan.Node.NodeId
-import Chopaan.Kibbutz.KbtzId (KbtzId(..))
+import Chopaan.Kibbutz.KbtzId (KbtzId(..), KbtzName)
 import Chopaan.Kibbutz
 import Chopaan.Graph.Spider
 import Chopaan.Comm.Comm (initQs, writeChan, MessageQs(..), readPubQ)
 import Chopaan.Utils.Time (timeToUIntSeconds)
+
+import Chopaan.Graph
+import Chopaan.Graph.Kbtz
+import Chopaan.API.History
+import Chopaan.Kibbutz.KbtzId
+
 import qualified Data.Text as T
 import qualified Data.Time as Ti
 
+import qualified Network.Wai.Handler.Warp         as Warp
+
+import           Servant
+import           Servant.Client
+
+import Common
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
 import Lens.Micro
@@ -36,45 +47,30 @@ import Control.Applicative
 import NetSpider.Spider
   (withSpider, clearAll)
 
-instance Arbitrary (NodeMAC) where
-  arbitrary = do
-    let el = ['a'..'z']
-    xs <- mapM (\_ -> elements el) [1..6]
-    ys <- mapM (\_ -> elements el) [1..6]
-    let cpld = fmap (\(a, b) -> [a] <> [b]) $ zip xs ys
-    return $ NodeId . T.pack . tail $ foldl (\x y -> x <> ":" <> y) "" cpld
-
-instance Arbitrary (NM.EnergyState) where
-  arbitrary = arbitraryMessage
-
-instance Arbitrary (NM.RuntimeStats) where
-  arbitrary = arbitraryMessage -- do
-    -- mFH <- arbitrary @Word32
-    -- cFH <- arbitrary @Word32
-    -- cu <-  arbitrary @Word32
-    -- r <- arbitrary @Bool
-    -- w <- arbitrary @Int
-    -- ps <- arbitrary @Int
-    -- u <- arbitrary @Word64
-    -- return $ defMessage
-    --   & (NM.minFreeHeap .~ mFH)
-    --   & (NM.currentFreeHeap .~ cFH)
-    --   & (NM.cpuUtilization .~ cu)
-    --   & (NM.isRoot .~ r)
-
 
     
 spec :: Spec
 spec = do
   let
-    nNodes = 5
-    nMessages = 10
+    nNodes = 10
+    nMessages = 20
+    kId = KbtzId "test"
     t0 = t
-    tn = Ti.addUTCTime (d * (fromIntegral $ nNodes * nMessages)) t0
+    tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
+    --tn = Ti.addUTCTime (d * (fromIntegral $ nNodes * nMessages)) t0
     
-  beforeAll (liftIO $ arbs @NodeMAC nNodes) $ do
+  beforeAll (do
+                let c = mkConfG ("localhost", 8182)
+                withSpider (unConf $ meshG c) clearAll
+                withSpider (unConf $ txG c) clearAll
+                withSpider (unConf $ flowG c) clearAll
+                withSpider (unConf $ statusG c) clearAll
+                ns <- liftIO $ arbs @NodeMAC nNodes
+                sp <- mkSpool c
+                return (ns, sp)
+            ) $ do
     describe "Spiders are great" $ do
-      it "qKbtz processor processes all messages!" $ \ns -> do
+      it "qKbtz processor processes all messages!" $ \(ns, sp) -> do
         es <- do
           xs'' <- mapM (\i ->
                           orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
@@ -87,7 +83,7 @@ spec = do
           return $ foldl S.wSerial S.nil xs''
         qs <- initQs
         k <- runKibbutz $
-          KbtzC { name = KbtzId "test"
+          KbtzC { name = kId
                 , nodes = ns
                 , channelOpts = Left qs
                 , spiderHost = "localhost"
@@ -97,51 +93,76 @@ spec = do
         forkIO $ do
           S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
           S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
-
+          print "Messages Queued"
         l <- S.length $ S.take ((2 * nNodes * nMessages) + 1) k
         l `shouldBe` (2 * nNodes * nMessages)
 
-
-    it "RS snapshot graph has the right number of nodes and links" $ \ns -> do
-      (gotNs, gotLs) <- snapDebug meshSnapshot ns t0 tn
-      oneSnapNodePerNodeMAC gotNs nNodes
+    it "RS snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
+      (gotNs, gotLs) <- snapDebug meshNodesSnapshot sp ns t0 tn
+      oneNodePerMACPlusRoot gotNs nNodes
       -- $ for a tree structure with one root node, each node should have the root as its parent,
       -- $ while the root node should be linked to router
-      oneLinkPerNodeMAC gotLs nNodes
+      treePlusStructure gotLs nNodes
       
-    it "Stake snapshot graph has the right number of nodes and links" $ \ns -> do
-      (gotNs, gotLs) <- snapDebug stakeSnapshot ns t0 tn
-      oneSnapNodePerNodeMAC gotNs nNodes
-      oneLinkPerNodeMAC gotLs nNodes
+    it "Stake snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
+      (gotNs, gotLs) <- snapDebug txNodesSnapshot sp ns t0 tn
+      oneNodePerMACPlusRoot gotNs nNodes
+      constHypergraphLinks gotLs nNodes
 
-    it "Status snapshot graph has the right number of nodes and links" $ \ns -> do
-      
-      (gotNs, gotLs) <- snapDebug statusSnapshot ns t0 tn
-      oneSnapNodePerNodeMAC gotNs nNodes
-      oneLinkPerNodeMAC gotLs nNodes
+    it "Status snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
+      (gotNs, gotLs) <- snapDebug statusNodesSnapshot sp ns t0 tn
+      oneNodePerMACPlusRoot gotNs nNodes
+      constHypergraphLinks gotLs nNodes
 
 
-oneSnapNodePerNodeMAC sn nNodes = ((length $ filter (isJust . nodeAttributes) sn)
-                                    `shouldBe` (nNodes))
-oneLinkPerNodeMAC sl nNodes = ((length $ sl) `shouldBe` (nNodes))
+oneNodePerMACPlusRoot sn nNodes = ((length $ sn)
+                                    `shouldBe` (nNodes + 1))
+constHypergraphLinks sl nNodes = ((length $ sl)
+                                  `shouldBe` (nNodes))
+treePlusStructure sl nNodes = ((length $ sl)
+                                  `shouldBe` (nNodes + 1))
 
-snapDebug :: (Show n, Show v, Show l)
-  => ([n] -> Ti.UTCTime -> Ti.UTCTime -> IO (SnapshotGraph n v l))
-  -> [n] -> Ti.UTCTime -> Ti.UTCTime -> IO (SnapshotGraph n v l) 
-snapDebug snapfn ns t0 tn = do
-  print $ "Total Nodes: " <> (show . length $ ns)
-  (gotNs, gotLs) <-  (snapfn ns t0 tn)
+-- snapDebug :: (Show n, Show v, Show l)
+--   => ([n] -> Ti.UTCTime -> Ti.UTCTime -> IO (SnapshotGraph n v l))
+--   -> [n] -> Ti.UTCTime -> Ti.UTCTime -> IO (SnapshotGraph n v l) 
+snapDebug snapfn sp ns t0 tn = do
+  --print $ "Total Nodes: " <> (show . length $ ns)
+  (gotNs, gotLs) <-  runSpider sp (snapfn ns t0 tn)
   print $ "Num Nodes: " <> (show . length  $ gotNs)
   print $ "Num Links: " <> (show . length  $ gotLs)
-  print $ (fmap nodeId gotNs)
-  print $ (fmap nodeAttributes gotNs)
-  print $ gotLs
+  --print $ (fmap nodeId gotNs)
+  --print $ (fmap nodeAttributes gotNs)
+  --print $ (gotLs)
   return $ (gotNs, gotLs)
 
 
 data ESType = Source | Sink deriving (Eq, Ord, Show, Bounded, Enum)
 
 data RSType = Root | Child deriving (Eq, Ord, Show, Bounded, Enum)
+
+hydrateKbtz :: (IsStream t, Monad (t IO)) => KbtzName -> [NodeMAC] -> Int -> Int -> IO (t IO Bool)
+hydrateKbtz kId ns nNodes nMessages = do
+    es <- do
+      xs'' <- mapM (\i ->
+                      orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
+              $ [1..nNodes]
+      return $ foldl S.wSerial S.nil xs''
+    rs <- do
+      xs'' <- mapM (\i ->
+                      orderedRS (if (i == 1) then Root else Child) nMessages (head ns))
+              $ [1..nNodes]
+      return $ foldl S.wSerial S.nil xs''
+    qs <- liftIO $ initQs
+    let ns' = S.fromList $ cycle ns
+    S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
+    S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
+    runKibbutz KbtzC { name = kId
+                     , nodes = ns
+                     , channelOpts = Left qs
+                     , spiderHost = "localhost"
+                     , spiderPort = 8182
+                     }
+
 
 orderedES :: ESType -> Int -> IO (S.Serial NM.EnergyState)
 orderedES et n = do
@@ -179,7 +200,7 @@ orderedRS r n (NodeId root) = do
                        & NM.version .~ "version1"
                        & (NM.parent . NM.macAddr) .~ (p r)  
       where
-        p (Root) = "router"
+        p (Root) = "grid_test"
         p (Child) = root
         x (Root) = True
         x (Child) = False
@@ -187,6 +208,8 @@ orderedRS r n (NodeId root) = do
 tsL = iterate (Ti.addUTCTime d) t
 t = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
 d = Ti.diffUTCTime (Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 60)) t
+
+
 
 
 -- nodeStream :: forall t. (IsStream t) => t MonadEnv NM.EnergyState

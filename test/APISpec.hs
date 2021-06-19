@@ -29,7 +29,7 @@ spec = serverSpec
 
 
 withUserApp :: (Warp.Port -> IO ()) -> IO ()
-withUserApp action = Warp.testWithApplication (pure historyApp) action
+withUserApp action = Warp.testWithApplication (pure $ historyApp "localhost" 8182) action
 
 
 t0 = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
@@ -51,7 +51,7 @@ serverSpec = do
       let clientEnv port = mkClientEnv manager (baseUrl { baseUrlPort = port })
       describe "GET Graph" $ do
         it "responds with 200" $ \p -> do
-          result <- runClientM (getHistory kbtzId Mesh t0 tn) (clientEnv p)
+          result <- runClientM (getHistory kbtzId MeshG t0 tn) (clientEnv p)
           print (result)
           1 `shouldBe` 1 --(Right (x)) 
 

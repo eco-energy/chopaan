@@ -54,6 +54,11 @@ dependencies:
 - transformers
 - transformers-base
 - monad-control
+- typerep-map
+- dependent-sum
+- dependent-map
+- dependent-sum-template
+- constraints-extras
 - resourcet
 - unliftio
 - hashable

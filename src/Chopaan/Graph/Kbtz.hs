@@ -6,14 +6,20 @@ module Chopaan.Graph.Kbtz where
 import Prelude hiding ((.), id)
 
 import GHC.Generics
+
 import Control.Category
 import Control.DeepSeq (NFData)
+import Control.Monad
+import Control.Monad.IO.Class
+
+import Control.Exception (bracket)
 
 import Data.Function ((&))
 import qualified Data.Text as T hiding (zip)
 import Data.Aeson (ToJSON(..), FromJSON(..), encode)
 import Data.Text.Encoding (decodeUtf8)
 import Data.ByteString.Lazy (toStrict)
+import qualified Data.Vector as V
 import Data.Monoid
 
 import Data.Greskell.Graph (AVertex, AEdge, ElementData, Element, Vertex, Edge, Key, Keys(..))
@@ -28,11 +34,52 @@ import Data.Greskell.PMap
     lookupAs, lookupAs', pMapToFail
   )
 
+import Network.Greskell.WebSocket
+  ( connect, close, submitPair,
+    slurpResults, drainResults, Client
+  )
+
+
 import NetSpider.Graph (writeNodeAttributes)
 
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 import Chopaan.Node.HW
+
+import Data.Pool
+
+-- $ Actual DB interactions
+
+type KbtzPool = (Pool Client)
+
+getKbtzim :: MonadIO m => Client -> m [KbtzName]
+getKbtzim c = (fmap (fmap akId)) $ fetchResult c (allKbtzim)
+
+getKbtzNodes :: MonadIO m => Client -> KbtzName -> m [NodeMAC]
+getKbtzNodes c k = (fmap (fmap anId)) $ (fetchResult c (getKbtzNodes' k))
+
+addHWToHH :: MonadIO m => Client -> NodeMAC -> HW Double -> m ()
+addHWToHH c n hw = runTraversal c (addHWToHH' n hw)
+
+getNodeHW :: MonadIO m => Client -> NodeMAC -> m [HW Double]
+getNodeHW c n = fetchResult c (getNodeHW' n)
+
+addKbtz :: MonadIO m => Client -> KbtzName -> m ()
+addKbtz c k = runTraversal c (addKbtz' (AKbtz k))
+
+addHHToKbtz :: MonadIO m => Client -> KbtzName -> ANode -> m ()
+addHHToKbtz c k n = runTraversal c (addHHToKbtz' k n)
+
+addNodeToKbtz :: MonadIO m => Client -> KbtzName -> NodeMAC -> m ()
+addNodeToKbtz c k n = addHHToKbtz c k (ANode n)
+
+kbtzPool :: String -> Int -> IO (KbtzPool)
+kbtzPool host port = createPool (connect host port) close 10 100 10
+
+fetchResult c = (pure . V.toList) <=< (liftIO . slurpResults) <=< (liftIO . submitPair c . runBinder)
+
+runTraversal c = (liftIO . drainResults) <=< (liftIO . submitPair c . runBinder)
+
 
 
 newtype VKbtz = VKbtz AVertex
@@ -46,6 +93,7 @@ newtype EKbtzIncludes = EKbtzIncludes AEdge
 newtype VHH = VHH AVertex
   deriving (Eq, Show)
   deriving newtype (FromGraphSON, ElementData, Element, Vertex)
+
 
 
 kbtzIncludesTar :: Walk Transform VKbtz VHH
@@ -84,30 +132,31 @@ instance FromGraphSON ANode where
   parseGraphSON gv = (pMapToFail . parseANode) =<< parseGraphSON gv
 
 
-addKbtz :: AKbtz -> Binder (GTraversal SideEffect () VKbtz)
-addKbtz k = do
+addKbtz' :: AKbtz -> Binder (GTraversal SideEffect () VKbtz)
+addKbtz' k = do
   kid <- newBind $ akId k
   let
     addId :: Binder (Walk SideEffect VKbtz VKbtz)
     addId = return $ gProperty "@kbtz_id" kid
   addId <*.> (pure $ sAddV "kbtz" $ source "g")
 
-addHH :: ANode -> Binder (GTraversal SideEffect () VHH)
-addHH nx = do
+
+
+addHH' :: ANode -> Binder (GTraversal SideEffect () VHH)
+addHH' nx = do
   n <- newBind $ anId nx
   let addId = return $ gProperty "@hh_id" n
   addId <*.> (pure $ sAddV "hh" $ source "g")
 
 
-addHHToKbtz :: KbtzName -> ANode -> Binder (GTraversal SideEffect () EKbtzIncludes) 
-addHHToKbtz k n = (addBelongsToE k) <*.> (addHH n)
+addHHToKbtz' :: KbtzName -> ANode -> Binder (GTraversal SideEffect () EKbtzIncludes) 
+addHHToKbtz' k n = (addBelongsToE k) <*.> (addHH' n)
   where
     addBelongsToE :: KbtzName -> Binder (Walk SideEffect VHH EKbtzIncludes)
     addBelongsToE (KbtzId x) = do
       k' <- newBind x
       return $
         gAddE "kbtzIncludes" (gFrom (gV @VHH [] >>> gHas2 "@kbtz_id" k'))
-      
     addHasNodeE :: ANode -> Binder (Walk SideEffect VKbtz EKbtzIncludes)
     addHasNodeE ANode{anId} = do
       n <- newBind anId
@@ -152,19 +201,22 @@ toANode = unsafeCastEnd aNodeProps
   where
     aNodeProps = gValueMap KeysNil
 
-getKbtzById' :: KbtzName -> Binder (Walk Filter VKbtz VKbtz)
-getKbtzById' k = do
+allKbtzim :: Binder (GTraversal Transform () AKbtz)
+allKbtzim = pure $ allKbtz &. (liftWalk toAKbtz)
+
+getKbtzById'' :: KbtzName -> Binder (Walk Filter VKbtz VKbtz)
+getKbtzById'' k = do
   k' <- newBind k
   return $ gHas2 "@kbtz_id" k'
 
-getKbtzVById :: KbtzName -> Binder (GTraversal Transform () VKbtz)
-getKbtzVById k = do
-  k' <- getKbtzById' k
+getKbtzVById' :: KbtzName -> Binder (GTraversal Transform () VKbtz)
+getKbtzVById' k = do
+  k' <- getKbtzById'' k
   return $ allKbtz &. (liftWalk k')
 
-getKbtzById :: KbtzName -> Binder (GTraversal Transform () AKbtz)
-getKbtzById k = do
-  k' <- getKbtzVById k
+getKbtzById' :: KbtzName -> Binder (GTraversal Transform () AKbtz)
+getKbtzById' k = do
+  k' <- getKbtzVById' k
   return $ k' &. toAKbtz
 
 toAKbtz :: Walk Transform VKbtz AKbtz
@@ -173,13 +225,14 @@ toAKbtz = unsafeCastEnd aKbtzProps
     aKbtzProps = gValueMap KeysNil
 
 
-getKbtzNodes' :: Walk Transform VKbtz ANode
-getKbtzNodes' = toANode <<< kbtzIncludesTar
+getKbtzNodes'' :: Walk Transform VKbtz ANode
+getKbtzNodes'' = toANode <<< kbtzIncludesTar
 
-getKbtzNodes :: KbtzName -> Binder (GTraversal Transform () ANode)
-getKbtzNodes k = do
-  k' <- getKbtzVById k
-  return $ k' &. getKbtzNodes'
+getKbtzNodes' :: KbtzName -> Binder (GTraversal Transform () ANode)
+getKbtzNodes' k = do
+  k' <- getKbtzVById' k
+  return $ k' &. getKbtzNodes''
+
 
 
 newtype VHW = VHW AVertex
@@ -187,8 +240,8 @@ newtype VHW = VHW AVertex
   deriving newtype (FromGraphSON, ElementData, Element, Vertex)
 
 
-addHW :: HW Double -> Binder (GTraversal SideEffect () VHW)
-addHW hw = (addProps hw) <*.> (pure $ sAddV "hwConfig" $ source "g")
+addHW' :: HW Double -> Binder (GTraversal SideEffect () VHW)
+addHW' hw = (addProps hw) <*.> (pure $ sAddV "hwConfig" $ source "g")
   where
     addProps :: HW Double -> Binder (Walk SideEffect VHW VHW)
     addProps hw = (unsafeCastStart . unsafeCastEnd) <$> (writeNodeAttributes hw)
@@ -231,21 +284,19 @@ hhHasHW = gOut ["hasHW"]
 -- hhHasLoad = gOut ["hasLoad"]
 
 
-addHWToHH :: NodeMAC -> (HW Double) -> Binder (GTraversal SideEffect () EHHHasHW) 
-addHWToHH n hw = (hhHas) <*.> (addHW hw)
+addHWToHH' :: NodeMAC -> (HW Double) -> Binder (GTraversal SideEffect () EHHHasHW) 
+addHWToHH' n hw = (hhHas) <*.> (addHW' hw)
   where
     hhHas = do
       n' <- newBind n
       return $
         gAddE "hasHW" (gFrom (gV @VHW [] >>> gHas2 "@hh_id" n'))
 
-getNodeHW' :: Walk Transform VHH VHW
-getNodeHW' = hhHasHW
 
-getNodeHW'' :: NodeMAC -> Binder (GTraversal Transform () (PMap Multi GValue))
-getNodeHW'' n = do
+getNodeHWPM :: NodeMAC -> Binder (GTraversal Transform () (PMap Multi GValue))
+getNodeHWPM n = do
   n' <- getVHHById n
-  return $ n' &. ((gValueMap KeysNil) <<< getNodeHW')
+  return $ n' &. ((gValueMap KeysNil) <<< hhHasHW)
 
 parseHW :: PMap Multi GValue -> Either PMapLookupException (HW Double)
 parseHW pm = HW
@@ -255,10 +306,12 @@ parseHW pm = HW
 
 
 
-getNodeHW :: NodeMAC -> Binder (GTraversal Transform () (HW Double))
-getNodeHW n = do
+getNodeHW' :: NodeMAC -> Binder (GTraversal Transform () (HW Double))
+getNodeHW' n = do
   n' <- getVHHById n
-  return $ n' &. (toHW <<< getNodeHW')
+  return $ n' &. (toHW <<< hhHasHW)
+
+
 
 
 {--

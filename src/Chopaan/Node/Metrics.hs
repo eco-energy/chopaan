@@ -41,7 +41,7 @@ import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
 import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
 
 
-import NetSpider.Graph (NodeAttributes(..), VFoundNode)
+import NetSpider.Graph (NodeAttributes(..), VFoundNode, LinkAttributes(..), EFinds)
 import NetSpider.Timestamp (fromS)
 import NetSpider.Snapshot (nodeId, nodeTimestamp)
 
@@ -155,15 +155,28 @@ instance (Num a) => Monoid (Node a) where
 
 
 
-txKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+txKey :: (FromJSON a, ToJSON a) => Key n a
 txKey = "tx"
 
-consumedKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+consumedKey :: (FromJSON a, ToJSON a) => Key n a
 consumedKey = "consumed"
 
-generatedKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+generatedKey :: (FromJSON a, ToJSON a) => Key n a
 generatedKey = "generated"
 
+
+               
+instance (GreskellC a) => LinkAttributes (Node a) where
+  writeLinkAttributes node = fmap writeKeyValues $ sequence $
+    [ txKey <=:> tx node
+    , consumedKey <=:> consumed node
+    , generatedKey <=:> generated node
+    ]
+  parseLinkAttributes props = pMapToFail (Node
+                                          <$> lookupAs txKey props
+                                          <*> lookupAs consumedKey props
+                                          <*> lookupAs generatedKey props
+                                         )
                
 instance (GreskellC a) => NodeAttributes (Node a) where
   writeNodeAttributes node = fmap writeKeyValues $ sequence $
@@ -380,6 +393,8 @@ instance Csv.DefaultOrdered (SensorMetrics e p)
 
 type Timestamp = (Maybe UTCTime, DiffTime)
 
+type BatteryR = Battery WattSeconds Watts
+
 data Battery e p = Battery
   { soc :: !e
   , chargeLim :: !p
@@ -467,9 +482,14 @@ socPercentage Battery{..} = (soc * 100 / totalCapacity)
                                           Helper Functions
 ---------------------------------------------------------------------------------------------------------------------}
 
-type PowerN = Node (Watts)
 
-type EnergyN = Node (WattSeconds)
+type PowerN p = Node p
+
+type EnergyN e = Node e
+
+type PowerNR = EnergyN Watts
+
+type EnergyNR = EnergyN WattSeconds
 
 
 storageSensors :: EnergyState -> SensorVector R
@@ -481,7 +501,7 @@ storageSensors es = SensorVector
     i = - (es ^. gridToBatteryCurrent + es ^. solarInputCurrent)
     o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
 
-power :: EnergyState -> PowerN
+power :: EnergyState -> PowerNR
 power es = Node
            { tx = txIn' - txOut'
            , consumed = cnsm'
@@ -529,5 +549,5 @@ instance (Csv.ToField n, Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (Tag
 instance Csv.DefaultOrdered (TaggedNode n e p) where
   headerOrder _ = (Vec.fromList $ ["NodeId", "time"])
                   <> (headerOrder (undefined :: EnergyState))
-                  <> (headerOrder (undefined :: PowerN))
-                  <> (headerOrder (undefined :: EnergyN))
+                  <> (headerOrder (undefined :: PowerNR))
+                  <> (headerOrder (undefined :: EnergyNR))

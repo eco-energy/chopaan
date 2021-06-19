@@ -11,7 +11,7 @@ import Chopaan.Comm.Mqtt.AWS (withMqttAuth
                              , deregisterChopaanIO
                              )
 import Chopaan.Kibbutz.KbtzId
-import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchNodeTx, Stake(..))
+import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchNodeTx, Stake, Stake'(..))
 import Chopaan.Comm.Mqtt (pub, client)
 import Chopaan.Comm.Comm (initPubQ, trivialCallback)
 import Chopaan.Types

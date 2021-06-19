@@ -55,6 +55,7 @@ import Chopaan.Kibbutz.KbtzId
 import Chopaan.API.History
 import Chopaan.UiTypes
 import Chopaan.Graph
+import Chopaan.Graph.G as G (SG, G(..), SG'(..))
 import Chopaan.CRUD
 import Chopaan.Node.NodeT
 import Chopaan.Node.NodeId
@@ -81,7 +82,7 @@ ainit _ = return (MAddNode (KbtzId "this") Nothing emptyNodeForm)
   -- return MHomePage --
 
 defGView :: GView
-defGView = GView (KbtzId "thing") Plan --defPlanSG
+defGView = GView (KbtzId "thing") FlowG --defPlanSG
 
 mkGView :: KbtzName -> GraphType -> GView 
 mkGView = GView
@@ -98,11 +99,11 @@ onRouteChange = \case
   RKibbutzim -> MKibbutzim . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
   RKibbutz k -> MKibbutz . RosterNodezim (SortCol NId ASC) mempty <$> (listNodezim k)
   RAddNode k -> return $ MAddNode k Nothing emptyNodeForm
-  RGraph k -> return . MGraph $ mkGView k Plan --(return  defPlanSG))
+  RGraph k -> return . MGraph $ mkGView k FlowG --(return  defPlanSG))
     
   -- RSearch k s -> MKibbutz . RosterNodezim (SortCol NId ASC) s <$> (listNodezim k) 
 defPlanSG :: SG NodeMAC
-defPlanSG = StakeG $ defStakeSnapshot
+defPlanSG = G.Flow . G.SG $ defStakeSnapshot
   where
     defStakeSnapshot = ([], [])
     

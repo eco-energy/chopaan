@@ -1,13 +1,15 @@
-{-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables, GADTs, FlexibleContexts #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia #-}
+{-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables, GADTs, FlexibleContexts, NamedFieldPuns #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia, UndecidableInstances #-}
 
 module Chopaan.API.History where
 
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader hiding (ask)
+import Control.Monad.Reader.Class
 
 import Data.Greskell (FromGraphSON)
 
-import NetSpider.Spider (getSnapshot, withSpider)
+import NetSpider.Spider (Spider)
 import NetSpider.Spider.Config (Config(..))
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..))
 import NetSpider.Timestamp (fromUTCTime)
@@ -23,16 +25,35 @@ import Chopaan.Comm.Address
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 
+
+import Network.Greskell.WebSocket (Client)
+import Chopaan.Graph.Kbtz (addHHToKbtz, getKbtzNodes, kbtzPool, KbtzPool, kbtzPool)
 import Chopaan.Graph
-import Chopaan.Graph.Spider (stakeConfig, meshConfig, statusConfig, getGridRoot)
+import qualified Chopaan.Graph.G as G
+import Chopaan.Graph.Spider ( Spools
+                            , SpiderM
+                            , mkSpool
+                            , runSpider
+                            , mkConfG
+                            , meshNodesSnapshot
+                            , txNodesSnapshot
+                            , statusNodesSnapshot
+                            , flowNodesSnapshot
+                            )
 
 import Servant (Server, Get, Capture, Proxy(..), (:>)
                , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer, serve)
 
-
+import Data.Pool
 import Data.Aeson (ToJSON, FromJSON)
 import Network.Wai (Application)
+import Control.Monad.Base
+import Control.Monad.Trans.Control
 
+
+newtype HistoryApp a = HistoryApp { runHistoryApp :: ReaderT (DBPools) IO a }
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
+                    MonadBase IO, MonadBaseControl IO)
 
 
 type HistoryAPI = "history"
@@ -40,7 +61,7 @@ type HistoryAPI = "history"
   :> (Capture "graphType" GraphType)
   :> (Capture "startTime" UTCTime)
   :> (Capture "endTime" UTCTime)
-  :> Get '[JSON] (SG NodeMAC)
+  :> Get '[JSON] (G.SG NodeMAC)
 
 
 toUrlPieceViaEnum :: Enum a => a -> Text.Text
@@ -70,43 +91,40 @@ type HistoryConn n a e =
   , ToJSON a, FromJSON a
   , FromGraphSON n, IsoGConn n a e)
 
+toHandler :: MonadIO m => String -> Int -> HistoryApp ~> m
+toHandler h p a = liftIO $ runReaderT (runHistoryApp a) =<< (mkDBPools h p)
 
-serveHistoryAPI :: Server (HistoryAPI)
-serveHistoryAPI = hoistServer (Proxy @ HistoryAPI) liftIO getHistoryForGraph
+mkDBPools :: MonadIO m => String -> Int -> m (DBPools)
+mkDBPools h p = do
+  kp <- liftIO $ kbtzPool h p
+  spools <- liftIO $ mkSpool $ mkConfG (h, p)
+  return $ DBPools spools kp
 
-historyApp :: Application
-historyApp = serve (Proxy :: Proxy HistoryAPI) serveHistoryAPI
+serveHistoryAPI :: String -> Int -> Server (HistoryAPI)
+serveHistoryAPI h p = hoistServer (Proxy @ HistoryAPI) (toHandler h p) getHistoryForGraph 
+
+historyApp :: String -> Int -> Application
+historyApp h p = serve (Proxy :: Proxy HistoryAPI) $ serveHistoryAPI h p
 
 
-getHistoryForGraph :: forall m. (MonadIO m)
-  => KbtzName
+data DBPools = DBPools
+  { spools :: Spools
+  , gremlinPool :: KbtzPool
+  }
+
+getHistoryForGraph :: KbtzName
   -> GraphType
   -> UTCTime
   -> UTCTime
-  -> m (SG NodeMAC)
-getHistoryForGraph kn g t0 t1 = case g of
-  Mesh -> MeshG <$> getHistory meshConfig kn t0 t1
-  Plan -> StakeG <$> getHistory stakeConfig kn t0 t1
-  Status -> StatusG <$> getHistory statusConfig kn t0 t1
-
-getHistory :: forall m a e. (MonadIO m, IsoGConn NodeMAC a e)
-  => Config NodeMAC a e
-  -> KbtzName
-  -> UTCTime
-  -> UTCTime
-  -> m (SnapshotGraph NodeMAC a e)
-getHistory c k t t' = query c q
-  where
-    q :: Query NodeMAC a e e
-    q = (defQuery [getGridRoot k])
-      { timeInterval =
-        Finite (fromUTCTime t)
-        <=..<=
-        Finite (fromUTCTime t')
-      }
-
-query :: (MonadIO m, IsoGConn n a e)
-  => Config n a e
-  -> Query n a e e
-  -> m (SnapshotGraph n a e)
-query c q = liftIO $ withSpider c (\sp -> liftIO $ getSnapshot sp q)
+  -> HistoryApp (G.SG NodeMAC)
+getHistoryForGraph kn g t0 t1 = do
+  DBPools{gremlinPool, spools} <- ask  
+  ns <- withResource gremlinPool ((flip getKbtzNodes) kn)
+  let
+    spoolSnap :: SpiderM ~> HistoryApp
+    spoolSnap = liftIO . (runSpider spools)
+  case g of
+    MeshG -> (G.Mesh . G.SG) <$> (spoolSnap $ meshNodesSnapshot ns t0 t1)
+    PlanG -> (G.Transactor . G.SG) <$> (spoolSnap $ txNodesSnapshot ns t0 t1)
+    StatusG -> (G.Status . G.SG)  <$> (spoolSnap $ statusNodesSnapshot ns t0 t1)
+    FlowG -> (G.Flow . G.SG) <$> (spoolSnap $ flowNodesSnapshot ns t0 t1)

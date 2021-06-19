@@ -109,6 +109,19 @@ packages:
     git: https://github.com/faezs/concat.git
     commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
 - completed:
+    subdir: net-spider
+    name: net-spider
+    version: 0.4.3.6
+    git: https://github.com/faezs/net-spider.git
+    pantry-tree:
+      size: 2918
+      sha256: 4f9c7d2df258079356b7e7fee6af921e3e1eec4eb4427427a073bba3388fc8ef
+    commit: 3b9edca43c3125528edfa929d917bbe43b1afcd1
+  original:
+    subdir: net-spider
+    git: https://github.com/faezs/net-spider.git
+    commit: 3b9edca43c3125528edfa929d917bbe43b1afcd1
+- completed:
     subdir: core
     name: Shpadoinkle
     version: 0.3.0.0
@@ -392,12 +405,12 @@ packages:
   original:
     hackage: dependent-map-0.2.4.0@sha256:21d35c1eba3f2afa3af3c4c5d8998fd14ac76f596f951c280bd83d1d5a19ae28,1739
 - completed:
-    hackage: dependent-sum-0.5@sha256:da0cb690c900e3a94197770e4d86c9b7b19a13f4f2e3844fc5e990b2c44eafef,1900
+    hackage: dependent-sum-0.4@sha256:40c705604f52374fb72616e10234635104a626ede737ddde899777b719df120b,1907
     pantry-tree:
-      size: 617
-      sha256: 33c0b274f9e2eab445d3dac8a339f9ad89a3f3382fae24038df8d1314972cece
+      size: 565
+      sha256: 6c0cb5e52d35c04c3a561b342d41d0bfb20cd8a5e83ab39d93ab1a25aba50888
   original:
-    hackage: dependent-sum-0.5@sha256:da0cb690c900e3a94197770e4d86c9b7b19a13f4f2e3844fc5e990b2c44eafef,1900
+    hackage: dependent-sum-0.4
 - completed:
     hackage: monad-bayes-0.1.1.0@sha256:57d96f530a37a1c8efed0830c7f2bcf86da05d0d53324aebdd5b5aa165d72829,5132
     pantry-tree:
@@ -553,10 +566,10 @@ packages:
   original:
     hackage: suavemente-0.2.0.0
 - completed:
-    hackage: diagrams-svg-1.4.3@sha256:36708b0b4cf35507ccf689f1a25f6f81b8f41c2c4c2900793de820f66d4e241c,3181
+    hackage: diagrams-svg-1.4.3@sha256:7b4eefffba2b25267eea25155dded4309a153a965eebf16923d289bb797ac3a6,3169
     pantry-tree:
       size: 475
-      sha256: 2a2f10e8c32a6c181a06494e13a462e00f77e98ad346fd99c123afa3fa89f9e1
+      sha256: 48d1705e7aad5646e3cb7669b8e952efef3a0f2d98f420ba712d09db85fb1277
   original:
     hackage: diagrams-svg-1.4.3
 - completed:
@@ -594,13 +607,6 @@ packages:
       sha256: 0aa2b84eef52bf8a7fc9906c2b2a1bc37d077456f232cdf445fc182ee888c20f
   original:
     hackage: beam-migrate-0.5.0.0
-- completed:
-    hackage: net-spider-0.4.3.6@sha256:d6f08b83ca14144bfc3bf033df563ae5329d1a4fd97bc521d5ab20649560c27a,6198
-    pantry-tree:
-      size: 2918
-      sha256: b03a943dd31c6f9153dae6daf47f8ce3a7af53ecc4c604163a963bebf9abcd97
-  original:
-    hackage: net-spider-0.4.3.6
 - completed:
     hackage: data-interval-2.0.1@sha256:e5a8705d15a14d56791fbc1cdb90fdcc434bc084f938c096e70a3194a442b444,2393
     pantry-tree:
@@ -692,6 +698,13 @@ packages:
       sha256: 61d9a815b5fcef9127430d7a7660a0209117d987dc80d7af05bb96c188375140
   original:
     hackage: ghc-byteorder-4.11.0.0.10@sha256:d47fdef63f2a145091e91b1aedbd46bf61ca03bb935e81e3462a1d904c319de3,1594
+- completed:
+    hackage: constraints-extras-0.3.1.0@sha256:c70fcf437e1d640cfd50a8eda1db47a64e49c96857e08fd0d8c438327d908ac1,1846
+    pantry-tree:
+      size: 595
+      sha256: f29920355b21ef7a7218573591aa740b01b3d1fb3b0bbd66e2f726d091d56fb2
+  original:
+    hackage: constraints-extras-0.3.1.0@sha256:c70fcf437e1d640cfd50a8eda1db47a64e49c96857e08fd0d8c438327d908ac1,1846
 snapshots:
 - completed:
     size: 524799
