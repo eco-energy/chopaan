@@ -52,8 +52,8 @@ import NetSpider.Spider
 spec :: Spec
 spec = do
   let
-    nNodes = 10
-    nMessages = 20
+    nNodes = 5
+    nMessages = 5
     kId = KbtzId "test"
     t0 = t
     tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
@@ -73,12 +73,12 @@ spec = do
       it "qKbtz processor processes all messages!" $ \(ns, sp) -> do
         es <- do
           xs'' <- mapM (\i ->
-                          orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
+                          (orderedES (if (mod i 2 == 0) then Source else Sink) nMessages))
                   $ [1..nNodes]
           return $ foldl S.wSerial S.nil xs''
         rs <- do
           xs'' <- mapM (\i ->
-                          orderedRS (if (i == 1) then Root else Child) nMessages (head ns))
+                          (orderedRS (if (i == 1) then Root else Child) nMessages (head ns)))
                   $ [1..nNodes]
           return $ foldl S.wSerial S.nil xs''
         qs <- initQs
@@ -89,12 +89,12 @@ spec = do
                 , spiderHost = "localhost"
                 , spiderPort = 8182
                 }
-        let ns' = S.fromList $ cycle ns
+        let ns' = (S.fromList $ cycle ns) 
         forkIO $ do
           S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
           S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
           print "Messages Queued"
-        l <- S.length $ S.take ((2 * nNodes * nMessages) + 1) k
+        l <- S.length $ S.take ((2 * nNodes * nMessages)) k
         l `shouldBe` (2 * nNodes * nMessages)
 
     it "RS snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do

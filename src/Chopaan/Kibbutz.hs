@@ -100,6 +100,13 @@ mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOp
   -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
 mqttSrc k ns o = qSrc  =<< (mqttQs o k ns)
 
+propagateLastMaybe :: (IsStream t, MonadAsync m, Monoid a) => t m (Maybe a) -> t m a
+propagateLastMaybe = S.postscan mf
+  where
+    mf = FL.mkAccum_ lastOnNothingCurrentOnJust mempty
+    lastOnNothingCurrentOnJust a (Just a') = a'
+    lastOnNothingCurrentOnJust a Nothing = a
+
 
 runKibbutz :: forall t m. (IsStream t, MonadAsync m, MonadCatch m, Monad (t m)) => KbtzC NodeMAC -> m (t m Bool)
 runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
@@ -110,35 +117,52 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
   spool <- mkSpool $ mkConfG (spiderHost, spiderPort)
   _ <- liftIO $ runSpider spool $ initGridRoot name nodes
 
-  gridFold <- liftIO $ runSpider spool (saveTx name)
-  let gridSensorR =
-        S.postscan ((,)
-                    <$> (FL.mkAccum_ ((const (Just . fst))) Nothing)
-                    <*> sensorFD)
-        es
-      plan :: t m (NodeMAC, NodeStates NodeMAC)
-        -> t m (NodeMAC, (NodeStates NodeMAC, Maybe (TxPlan NodeMAC)))
-      plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
-  let tx = tapCount "statePipe"
-           $ S.map (uncurry (&&))
-           $ S.postscan gridFold
-           $ S.map (\(n, ((a, b), c)) -> (n, a, b, c))
-           $ S.postscan (secondF txFold)
-           $ plan
-           $ S.map (\(n, a) -> (fromJust n, a))
-           $ S.filter (isJust . fst)
-           $ ((\(x, y) -> (x, Tx y)) <$> gridSensorR)
-
-  meshSF <- runSpider spool addMeshNode
-  let meshS = tapCount "rsPipe" $ S.postscan (rsFD meshSF) rs
-
-  return $ (meshS) `S.parallel` (adapt tx)
+  gridFold <- liftIO $ runSpider spool (saveTx @m name)
+  liftIO $ print "Grid Fold Initialized"
+  meshFold <- runSpider spool addMeshNode
+  liftIO $ print "Mesh Fold Initialized"
+  let
+    gridSensorR = S.postscan (-- (,)
+                              -- <$> (FL.mkAccum_ ((const (Just . fst))) Nothing)
+                              -- <*>
+                              sensorFD)
+                  (tapCount "messages" es)
+    plan :: t m (NodeMAC, NodeStates NodeMAC)
+      -> t m (NodeMAC, (NodeStates NodeMAC, Maybe (TxPlan NodeMAC)))
+    plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
+    txFK = txFold @m . Tx $ M.fromList [(n, mempty) | n <- nodes]
+    tx = tapCount "statePipe"
+--           $ S.scan gridFold
+           $ constBool
+           -- $ S.map getLatest
+           -- $ S.postscan (secondF txFK)
+           -- $ plan
+           -- $ S.map (\(n, a) -> (fromJust n, a))
+           $ S.trace (liftIO . print)
+           -- $ S.filter (isJust . fst)
+           -- $ ((\(x, y) -> (x, Tx y)) <$> gridSensorR)
+           $ gridSensorR
+  
+  let meshS = tapCount "rsPipe" $ S.postscan (rsFD meshFold) rs
+  
+  return $ meshS `S.parallel` tx
   where
+    getLatest ::
+      (NodeMAC, ((NodeStates NodeMAC, Maybe (TxPlan NodeMAC)), (TxState NodeMAC)))
+      -> (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus))
+    getLatest (n, ((Tx a, b), c)) = let
+      a' = getN a
+      b' = (\x -> M.lookup n (unTx x)) =<< b
+      c' = snd <$> (M.lookup n (unTx c))
+      in (n, (a', b', c'))
+      where
+        getN :: M.Map NodeMAC a -> a
+        getN = flip (M.!) n
     tapCount = S.tap . printCount
     printCount s = FL.mkAccumM_ (\x _ -> (liftIO . print $ s <> ": " <> (show x))
                                   >> (return $ x + (1 :: Int)))
                    (pure 0)
-    --constBool = S.mapM (pure . (const True))
+    constBool = S.mapM @t (pure @m . (const True))
     sensorFD = FL.classify sensorFold
     rsFD saveMF = snd <$> ((,) <$> (FL.classify meshFold) <*> saveMF)
     --processEither = FL.partition sensorFD rsFD

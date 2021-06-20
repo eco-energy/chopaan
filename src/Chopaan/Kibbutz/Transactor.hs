@@ -197,22 +197,22 @@ dupF :: (Monad m, Monoid a) => FL.Fold m a b -> FL.Fold m a (a, b)
 dupF f = (,) <$> idFold <*> f  
 
 txFold :: forall m n. (MonadIO m, MonadCatch m, Address n, Ord n)
-       => FL.Fold m (NodeStates n, Maybe (TxPlan n)) ((NodeStates n, Maybe (TxPlan n)), TxState n)
-txFold = dupF transactionFold
+       => TxPlan n
+       -> FL.Fold m (NodeStates n, Maybe (TxPlan n)) ((NodeStates n, Maybe (TxPlan n)), TxState n)
+txFold = dupF . transactionFold
 
 transactionFold :: forall m n. (MonadIO m, MonadCatch m, Address n, Ord n)
-                => FL.Fold m (NodeStates n, Maybe (TxPlan n)) (TxState n)
-transactionFold  = FL.Fold step start end
+                => TxPlan n -> FL.Fold m (NodeStates n, Maybe (TxPlan n)) (TxState n)
+transactionFold participants = FL.Fold step start end
   where
-    participants = undefined
-    step t n = pure . shouldQuit $ incTxState t n
+    step t n = pure . FL.Partial $ incTxState t n
     start :: m (TxState n)
     start = return $ stakeStatus <$> participants
     end :: TxState n -> m (TxState n)
     end = pure
-    shouldQuit (Tx t) = if (all ((\x -> timeRemaining x <= 0) . snd . snd) (M.toList t))
-                   then (FL.Done . Tx $ t)
-                   else (FL.Partial . Tx $ t)
+    -- shouldQuit (Tx t) = if (all ((\x -> timeRemaining x <= 0) . snd . snd) (M.toList t))
+    --                then (FL.Partial . Tx $ t)
+    --                else (FL.Partial . Tx $ t)
 
 
 stakeStatus :: Stake -> (Role, TxStatus)
@@ -230,7 +230,10 @@ zipWith3 f a b c = M.intersectionWith ($) (M.intersectionWith f a b) c
 incTxState :: (Ord n) => TxState n -> (NodeStates n, Maybe (TxPlan n)) -> TxState n
 incTxState (Tx ts) (Tx ns, plan) = case plan of
   Nothing -> Tx $ zipWith updateTS ts ns
-  Just (Tx p) -> Tx $ zipWith updateTS (fmap stakeStatus p) ns 
+  Just (Tx p) ->
+    case (M.size p == 0) of
+      True -> Tx $ zipWith updateTS ts ns
+      False -> Tx $ zipWith updateTS (fmap stakeStatus p) ns 
   where
     updateTS :: (Role, TxStatus) -> SensorR -> (Role, TxStatus)
     updateTS (px, prevTx) SensorMetrics{..} = let
@@ -336,8 +339,11 @@ txn h (Tx ns) = do
   let nodes = M.keys ns
   let indexer = M.fromList $ zip [1..] nodes
       getAtI i = indexer M.! i
-  fmap (fmap ((\(Tx n) -> Tx $ M.fromList $
-                fmap (\(i, a) -> (getAtI i, a)) $ M.toList n))) schedule
+      reindexTx (Tx n) = Tx $ M.fromList $
+                         fmap (\(i, a) -> (getAtI i, a)) $ M.toList n
+  sched <- schedule
+  liftIO . print $ sched
+  return $ fmap reindexTx sched
       where
         consumption = M.toAscList $ fmap _demand ns
         storage = M.toAscList $
@@ -347,13 +353,13 @@ txn h (Tx ns) = do
         d = fmap (\(i, (c, s))
                      -> (i, c - s)) $ zip [1..] $ zip (snd <$> consumption) (snd <$> storage)
         (sources, sinks) = L.partition (\x -> snd x > 0) d
-        better f ss = uncurry f $ unzip $ (\(x, y) -> (x, fromWattSeconds y)) <$> ss
+        better f ss = uncurry f $ unzip $ (second fromWattSeconds) <$> ss
         schedule :: m (TxPlan' Int)
         schedule =  (fmap join) . tryForMaybe $ (solveTP h)
                     (better mkSources sources)
                     (better mkSinks sinks)
-          [[1 -- (fromIntegral $ mod j 2) * 1000
-           |i <- [1..length sources]] | j <- [1..length sinks]]
+          [[10 -- (fromIntegral $ mod j 2) * 1000
+           | i <- [1..length sources]] | j <- [1..length sinks]]
 
 tryForMaybe :: (MonadIO m, MonadCatch m) => m a -> m (Maybe a) 
 tryForMaybe m = expToMaybe =<< (try m)
