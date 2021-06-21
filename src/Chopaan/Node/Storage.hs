@@ -10,6 +10,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric, ApplicativeDo, GADTs, TypeOperators #-}
+{-# LANGUAGE Strict #-}
 module Chopaan.Node.Storage where
 
 import Numeric.Estimator.KalmanFilter
@@ -18,20 +19,19 @@ import Numeric.Estimator.Model.Symbolic ()
 import Numeric.Estimator.Class
 
 import GHC.Generics (Generic)
-import Control.Monad.Trans.Class
 
 import Control.Monad.Bayes.Class hiding (gamma)
+import Control.Concurrent.STM
 
 import Data.Distributive
 import Data.Foldable ()
 import Data.Traversable ()
 import Linear
-import Control.Monad.State.Lazy 
 import Numeric.AD
-import Numeric.AD.Internal.Reverse ()
+--import Numeric.AD.Internal.Reverse ()
 
-import ConCat.Interval
-import ConCat.Regress
+--import ConCat.Interval
+--import ConCat.Regress
 
 -- | Goals
 -- 1) SoC Estimation
@@ -287,48 +287,51 @@ type KF a = KalmanFilter StateVector a
 
 type Cov a = StateVector (StateVector a)
 
-type KalmanState m a = StateT (a, KF a) m
+--type KalmanState m a = StateT (a, KF a) m
 
-runKalmanState :: (ParamType a) => a -> StateVector a -> KalmanState m a b -> m (b, (a, KalmanFilter StateVector a))
-runKalmanState ts stateVec = (flip runStateT) (ts, (KalmanFilter stateVec initCov))
+-- runKalmanState :: (ParamType a) => a -> StateVector a -> KalmanState m a b -> m (b, (a, KalmanFilter StateVector a))
+-- runKalmanState ts stateVec = (flip runStateT) (ts, KalmanFilter stateVec initCov)
 
+initKF s = KalmanFilter s initCov
 
-runEstimator' :: forall m a. (MonadSample m, ParamType a) => BatteryParams a -> a -> SensorVector a -> KalmanState m a (KI a)
-runEstimator' battery dt sensorReadings@SensorVector{..} = do
-  (ts, prior) <- get
-  senNoise <- lift senDist
-  procNoise <- lift procDist
-  w_k <- realToFrac <$> (lift $ normal 0.5 1)
-  let processPosterior = augmentProcess (model w_k) sensorReadings (scaled procNoise) (scaled senNoise) prior
-  let (innovation, measurePosterior) = ic processPosterior 
-  put (ts, measurePosterior) -- KalmanFilter state' p' = (ts, KalmanFilter state' p')
-  return $ innovation
-  where
-    ic processPosterior = innovationCorrection sensorPred initSensorCov processPosterior
-    sensorPred = sensorPrediction battery sensorReadings
-    model noise = EKFProcess $ processModel (auto <$> battery) (auto noise) (auto dt)
-
-
-runEstimator :: forall m a. (ParamType a, Monad m) => BatteryParams a -> a -> SensorVector a -> KalmanState m a (KI a)
-runEstimator battery dt sensorReadings@SensorVector{..} = do
-  (ts, prior) <- get
+runEstimator :: forall a. (ParamType a) => BatteryParams a -> a -> SensorVector a -> KF a -> (KF a, KI a)
+runEstimator battery dt sensorReadings@SensorVector{..} prior =
   let
     w_k = 0.5
     procNoise = processNoise
     senNoise = sensorNoise
-    processPosterior = augmentProcess (model w_k) sensorReadings (scaled procNoise) (scaled senNoise) prior
-    (innovation, measurePosterior) = ic processPosterior 
-  put (ts, measurePosterior) -- KalmanFilter state' p' = (ts, KalmanFilter state' p')
-  return $ innovation
+    processPosterior = --prior --processModel battery w_k dt
+      augmentProcess (model w_k) sensorReadings (scaled procNoise) (scaled senNoise) prior
+    (innovation, measurePosterior) = ic processPosterior
+  in (measurePosterior, innovation)
   where
-    ic processPosterior = innovationCorrection sensorPred initSensorCov processPosterior
+    ic processPosterior = --(testInno (pure 0) (pure . pure $ 0), processPosterior)
+      innovationCorrection sensorPred initSensorCov processPosterior
     sensorPred = sensorPrediction battery sensorReadings
+    --pm = processModel battery 0.5 dt
+    --model :: _
     model noise = EKFProcess $ processModel (auto <$> battery) (auto noise) (auto dt)
+    testInno = KalmanInnovation
+
+-- runEstimator' :: forall m a. (MonadSample m, ParamType a) => BatteryParams a -> a -> SensorVector a -> KalmanState m a (KI a)
+-- runEstimator' battery dt sensorReadings@SensorVector{..} = do
+--   (ts, prior) <- get
+--   senNoise <- lift senDist
+--   procNoise <- lift procDist
+--   w_k <- realToFrac <$> (lift $ normal 0.5 1)
+--   let processPosterior = augmentProcess (model w_k) sensorReadings (scaled procNoise) (scaled senNoise) prior
+--   let (innovation, measurePosterior) = ic processPosterior 
+--   put (ts, measurePosterior) -- KalmanFilter state' p' = (ts, KalmanFilter state' p')
+--   return $ innovation
+--   where
+--     ic processPosterior = innovationCorrection sensorPred initSensorCov processPosterior
+--     sensorPred = sensorPrediction battery sensorReadings
+--     model noise = EKFProcess $ processModel (auto <$> battery) (auto noise) (auto dt)
 
 
 
 clamp :: (Num a, Ord a) => a -> a -> a -> a
-clamp min' max' val = max min' $ min max' val
+clamp min' max' val = val --max min' $ min max' val
 
 -- $ ----------------------------------------------------------------------------
 -- $           Kalman Filter Measurement Model
