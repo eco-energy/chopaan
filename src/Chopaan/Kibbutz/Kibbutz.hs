@@ -6,7 +6,7 @@ module Chopaan.Kibbutz.Kibbutz where
 import Prelude hiding (zipWith)
 
 import Control.Monad
-import Streamly.Prelude (IsStream, MonadAsync)
+import Streamly -- (IsStream, MonadAsync)
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
@@ -86,13 +86,13 @@ valuesK :: (IsStream t, Monad m) => Kbtz t m n a -> t m [a]
 valuesK = (fmap (fmap snd)) . collK
 
 nodesK :: (IsStream t, Monad m) => Kbtz t m n a -> m ([n])
-nodesK = (pure . (fromMaybe [])) <=< ((S.fold FL.head) . S.adapt . (fmap (fmap fst)) . collK)
+nodesK = (pure . (fromMaybe [])) <=< ((S.fold FL.head) . adapt . (fmap (fmap fst)) . collK)
 
 stream' :: forall t m n a. (IsStream t, MonadAsync m, Ord n) => Kbtz t m n a -> t m a
-stream' = (S.concatMapWith S.ahead S.fromList) . valuesK
+stream' = (S.concatMapWith ahead S.fromList) . valuesK
 
 stream :: forall t m n a. (IsStream t, MonadAsync m) => Kbtz t m n a -> t m (n, a)
-stream = (S.concatMapWith S.ahead S.fromList) . collK
+stream = (S.concatMapWith ahead S.fromList) . collK
 
 
 kbtz ::
@@ -101,10 +101,10 @@ kbtz ::
   => Map n (FL.Fold m b a)
   -> m (t m (n, b))
   -> m (Kbtz t m n a)
-kbtz process getS = (\s -> return . Kbtz $ S.postscan (FL.demux process) s) =<< getS
+kbtz process getS = (pure . Kbtz . (S.postscan (FL.demux process))) =<< getS
 
 traceKbtz :: (IsStream t, MonadAsync m) => (Map n a -> m ())
-          -> Kbtz t m n a
+         -> Kbtz t m n a
           -> Kbtz t m n a
 traceKbtz act (Kbtz s) = Kbtz $ S.trace (act) s
 

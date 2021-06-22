@@ -6,7 +6,7 @@
 module Chopaan.Graph.Spider where
 
 import qualified Streamly.Prelude as S
-import Streamly.Prelude (IsStream, MonadAsync, adapt)
+import Streamly (IsStream, MonadAsync, adapt)
 import qualified Streamly.Internal.Data.Fold as FL
 
 import Data.Proxy
@@ -97,10 +97,11 @@ newtype KbtzRoot n = KbtzRoot { getRoot :: n }
 
 mkKbtzRoot :: KbtzName -> KbtzRoot NodeMAC
 mkKbtzRoot (KbtzId k) = (KbtzRoot (NodeId ("grid_" <> k) :: NodeMAC))
+{-# INLINE mkKbtzRoot #-}
 
 getGridRoot :: KbtzName -> NodeMAC
 getGridRoot = getRoot . mkKbtzRoot
-  
+{-# INLINE getGridRoot #-}
 
 class (NodeAttributes v) => HasTime v where
   getVTime :: v -> Maybe UTCTime
@@ -147,13 +148,17 @@ addFN :: MonadIO m
       => Spider n v e -> FoundNode n v e -> m (Bool) 
 addFN s f = expToBool =<< (liftIO $ -- (print $ neighborLinks f) >>
                            (try (addFoundNode s f)))
+{-# INLINE addFN #-}
+
 
 tryForBool :: (MonadIO m, MonadCatch m) => m a -> m Bool 
 tryForBool m = expToBool =<< (try m)
+{-# INLINE tryForBool #-}
 
 expToBool :: (MonadIO m) => Either SomeException a -> m Bool
 expToBool (Left e) = (liftIO . print $ e) >> return False
 expToBool (Right _) = return True
+{-# INLINE expToBool #-}
 
 
 toFN :: (SpiderConn n v e) => Timestamp -> n -> v -> [FoundLink n e] -> FoundNode n v e
@@ -163,6 +168,8 @@ toFN t n v lx = FoundNode
       , neighborLinks = lx
       , nodeAttributes = v
       }
+{-# INLINE toFN #-}
+
 
 toLink :: HasDir e => n -> e -> FoundLink n e
 toLink n' e = FoundLink
@@ -170,6 +177,7 @@ toLink n' e = FoundLink
                      , linkState = getEDir e
                      , linkAttributes = e
                      }
+{-# INLINE toLink #-}
 
 toLink' :: n -> e -> LinkState -> FoundLink n e
 toLink' n' e dir = FoundLink
@@ -177,31 +185,32 @@ toLink' n' e dir = FoundLink
                      , linkState = dir
                      , linkAttributes = e
                      }
-
+{-# INLINE toLink' #-}
 
 spiderFold :: forall m a n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
            => Pool (Spider n v e)
            -> ((n, a) -> m (Maybe (FoundNode n v e)))
            -> FL.Fold m (n, a) Bool
-spiderFold p asFN = FL.mkFoldM step start end
+spiderFold p asFN = FL.mkFold step (pure True) end
   where
-    step :: (Pool (Spider n v e), Bool)
+    {-# INLINE step #-}
+    step :: (Bool)
          -> (n, a)
-         -> m (FL.Step ((Pool(Spider n v e)), Bool) Bool)
-    step (sp, _) a = (\r -> return $ FL.Partial (sp, r))
-      =<< addMaybe
-      =<< (asFN a)
+         -> m Bool
+    step _ a = addMaybe =<< (asFN a)
       where
         addMaybe Nothing = return True
-        addMaybe (Just n) = withResource sp ((flip addFN) n)
-    start = pure (p ,True)
-    end (s, r) = liftIO $ destroyAllResources s >> return r
-
+        addMaybe (Just n) = withResource p ((flip addFN) n)
+    end x = liftIO $ destroyAllResources p >> return x
+{-# INLINE spiderFold #-}
 
 --utcToRange :: UTCTime -> UTCTime -> _
 utcToRange t t' = Finite (fromUTCTime t) <=..<= Finite (fromUTCTime t')
+{-# INLINE utcToRange #-}
+
 
 infRange = NegInf <=..<= PosInf
+{-# INLINE infRange #-}
 
 rangeQuery :: (Eq n, Show n) => UTCTime -> UTCTime -> [n] -> Query n na sla sla
 rangeQuery t t' ns = (defQuery ns)
@@ -209,7 +218,7 @@ rangeQuery t t' ns = (defQuery ns)
   , foundNodePolicy = policyAppend
   , includeIncomingLinks = True
   } 
-
+{-# INLINE rangeQuery #-}
 
 class HasLabel a where
   label :: a -> Text
@@ -225,6 +234,7 @@ instance HasLabel (G k n) where
 
 toKey :: forall n. Text -> Key VNode n 
 toKey a = fromString . unpack $ "@" <> a <> "_node"
+{-# INLINE toKey #-}
 
 type Opts = (String, Int)
 
@@ -237,7 +247,7 @@ hasConfig (h, p) label = defConfig
   , nodeIdKey = toKey label
   , logThreshold = LevelWarn
   }
-
+{-# INLINE hasConfig #-}
 
 spiderPool :: forall m n v e. MonadIO m => Config n v e -> m (Pool (Spider n v e))
 spiderPool c = liftIO $ createPool (connectWith c) close 10 100 10
@@ -248,6 +258,7 @@ gridSnapshotSimple :: forall m n v e. (MonadIO m, SpiderConn n v e)
   -> Spider NodeMAC v e
   -> m (SnapshotGraph NodeMAC v e)
 gridSnapshotSimple k s = liftIO $ getSnapshotSimple s $ getGridRoot k
+{-# INLINE gridSnapshotSimple #-}
 
 
 writeSpiderStream :: (IsStream t, MonadAsync m, MonadCatch m)
@@ -285,6 +296,7 @@ addMeshNode = do
   spool <- ask
   return $ spiderFold (unSpool . meshG $ spool) (pure . Just . rsToFN)
 
+
 addTxNode :: forall m. (MonadAsync m, MonadCatch m)
   => KbtzName -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake, TxStatus)) Bool)
 addTxNode k = do
@@ -310,13 +322,13 @@ initGridRoot name ns = do
   --t <- fromUTCTime <$> getCurrentTime
   let t = fromUTCTime $ UTCTime (fromGregorian 2021 4 6) (secondsToDiffTime 0)
   let root = getGridRoot name
-  a <- withResource (unSpool . txG $ spool) (\s -> addFN s $ toFN t root mempty [])
-  b <- withResource (unSpool . statusG $ spool) (\s -> addFN s $ toFN t root initSM [])
-  c <- withResource (unSpool . meshG $ spool) (\s -> addFN s $ toFN t root initMeshNode [])
+  --a <- withResource (unSpool . txG $ spool) (\s -> addFN s $ toFN t root mempty [])
+  --b <- withResource (unSpool . statusG $ spool) (\s -> addFN s $ toFN t root initSM [])
+  --c <- withResource (unSpool . meshG $ spool) (\s -> addFN s $ toFN t root initMeshNode [])
   -- print =<< (gridSnapshotSimple name meshConfig)
   -- print =<< (gridSnapshotSimple name stakeConfig)
   -- print =<< (gridSnapshotSimple name statusConfig)
-  return $ a && b && c
+  return $ True -- a && b && c
   -- (foldl (&&) True a) && (foldl (&&) True b) && (foldl (&&) True c)
   where
     initialEdges :: forall e. (Monoid e, LinkAttributes e, HasDir e) => [FoundLink NodeMAC e]
@@ -379,7 +391,7 @@ nodesSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadIO m)
 nodesSnapshot ns t t' s = liftIO
                            . (getSnapshot s)
                            . (rangeQuery t t') $ ns
-
+{-# INLINE nodesSnapshot #-}
 
 statusGridSnapshot :: KbtzName
   -> UTCTime

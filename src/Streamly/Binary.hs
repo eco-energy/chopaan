@@ -14,13 +14,13 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Streamly.Internal.Data.Stream.StreamD as D
 
-import Streamly (SerialT)
+import Streamly (SerialT, IsStream, MonadAsync)
 import Streamly.Internal.Data.Pipe.Types
 import Streamly.Internal.Data.Pipe
 import qualified Streamly.Prelude as S
 
 {-# INLINE transform #-}
-transform :: (S.IsStream t, Monad m) => Pipe m a b -> t m a -> t m b
+transform :: (IsStream t, Monad m) => Pipe m a b -> t m a -> t m b
 transform pipe xs = D.fromStreamD $ D.transform pipe (D.toStreamD xs)
 
 -- | Decode stream of bytestrings given that there exists instance of 'Binary'

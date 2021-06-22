@@ -29,6 +29,7 @@ dependencies:
 - base >= 4.11 && < 10
 - rio >= 0.1.8.0
 - streamly >= 0.7.2
+- fusion-plugin
 - async
 - exceptions
 - deepseq
@@ -144,6 +145,11 @@ when:
       - http-client
     ghc-options:
       - -fplugin=ConCat.Plugin
+      - -fdicts-strict
+      - -fmax-worker-args=16
+      - -fspec-constr-recursive=16
+      - -fplugin Fusion.Plugin
+      - -O2
   else:
     dependencies:
      - ghcjs-three
@@ -285,8 +291,12 @@ tests:
           - hspec-wai
         ghc-options:
           - -threaded
-          - -rtsopts
           - -with-rtsopts=-N
+          - -O2
+          - -fdicts-strict
+          - -fmax-worker-args=16
+          - -fspec-constr-recursive=16
+          - -fplugin Fusion.Plugin
           - -O2
         build-tools:
           hspec-discover:hspec-discover

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4ed0b467be944f7a46e344791cf8ba19d60af19121a554e0a5e5fbcf160be2b1
+-- hash: 8ba581b3f3f153f3480f5d9f5e2c964241accb63c7aa8a7a98f4f2a21f5d44df
 
 name:           chopaan
 version:        0.1.0.0
@@ -152,6 +152,7 @@ library
     , estimator
     , exceptions
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -196,7 +197,7 @@ library
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -276,6 +277,7 @@ executable dev
     , estimator
     , exceptions
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -320,7 +322,7 @@ executable dev
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -409,6 +411,7 @@ executable hydrate
     , estimator
     , exceptions
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -453,7 +456,7 @@ executable hydrate
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -542,6 +545,7 @@ executable server
     , estimator
     , exceptions
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -586,7 +590,7 @@ executable server
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -676,6 +680,7 @@ executable tx
     , estimator
     , exceptions
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -720,7 +725,7 @@ executable tx
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -808,6 +813,7 @@ executable ui
     , estimator
     , exceptions
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -852,7 +858,7 @@ executable ui
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -952,6 +958,7 @@ test-suite chopaan-test
     , estimator
     , exceptions
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -996,7 +1003,7 @@ test-suite chopaan-test
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -1038,7 +1045,7 @@ test-suite chopaan-test
         base
     buildable: False
   else
-    ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
+    ghc-options: -threaded -with-rtsopts=-N -O2 -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
     build-tool-depends:
         hspec-discover:hspec-discover
     build-depends:

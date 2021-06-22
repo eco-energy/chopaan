@@ -61,17 +61,17 @@ headerOrder = Csv.headerOrder
 
 newtype WattSeconds = WS { unWs :: Compensated Double }
   deriving stock (Eq, Ord, Generic)
-  deriving newtype (Num, Fractional, Show, Binary, Real, RealFrac, NFData)
+  deriving newtype (Num, Fractional, Binary, Real, RealFrac, NFData)
 
 newtype Watts = W { unW :: Compensated Double }
   deriving stock (Eq, Ord, Generic)
-  deriving newtype (Num, Fractional, Real, Show, Binary, RealFrac, NFData)
+  deriving newtype (Num, Fractional, Real, Binary, RealFrac, NFData)
 
--- instance Show WattSeconds where
---   show = (printf ("%.2g")) . fromWattSeconds
+instance Show WattSeconds where
+  show = (printf ("%.2g")) . fromWattSeconds
 
--- instance Show Watts where
---   show = (printf ("%.2g")) . fromWatts
+instance Show Watts where
+  show = (printf ("%.2g")) . fromWatts
 
 
 fromWatts :: Watts -> Double
@@ -81,10 +81,10 @@ fromWattSeconds :: WattSeconds -> Double
 fromWattSeconds = uncompensated . unWs
 
 toWatts :: Double -> Watts
-toWatts a = W $ add a 0 compensated
+toWatts a = W $ add a 0.000000001 compensated
 
 toWattSeconds :: Double -> WattSeconds
-toWattSeconds a = WS $ add a 0 compensated
+toWattSeconds a = WS $ add a 0.0000000001 compensated
 
 pToE :: (Real t) => t -> Watts -> WattSeconds
 pToE t (W p') = WS $ (*^) (realToFrac t) p'
@@ -108,10 +108,10 @@ instance FromJSON Watts where
   parseJSON x = toWatts <$> (A.parseJSON x)
 
 instance FromGraphSON WattSeconds where
-  parseGraphSON = parseJSON . unwrapOne
+  parseGraphSON = (fmap toWattSeconds) . parseGraphSON
 
 instance FromGraphSON Watts where
-  parseGraphSON = parseJSON . unwrapOne
+  parseGraphSON = (fmap toWatts) . parseGraphSON
 
 -- Episodic Metrics
 
@@ -500,6 +500,7 @@ storageSensors es = SensorVector
   where
     i = - (es ^. gridToBatteryCurrent + es ^. solarInputCurrent)
     o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
+{-# INLINE storageSensors #-}
 
 power :: EnergyState -> PowerNR
 power es = Node
@@ -514,11 +515,11 @@ power es = Node
     p v i = toWatts $ (es ^. i) * v'
       where
         v' = (es ^. v)
-
+{-# INLINE power #-}
 
 utcTimeES :: EnergyState -> UTCTime
 utcTimeES = utcTimeNow . (^. cpuTime)
-
+{-# INLINE utcTimeES #-}
 
 
 zeroMsg :: EnergyState
