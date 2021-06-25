@@ -18,18 +18,48 @@
 
 
 let
-  chopaan = c.chopaan.components.exes.chopaan-exe;
+  exes = c.chopaan;
 in
-pkgs.dockerTools.buildImage {
-  name = "chopaan";
-  tag = "latest";
-  contents = [ chopaan pkgs.iana-etc pkgs.cacert ];
-    
-  config = {
-    Cmd = [ "${chopaan}/bin/chopaan-exe" ];
-    Version = "1.0";
-    ExposedPorts = {
-      "8883/tcp" = {};
+{
+  server = pkgs.dockerTools.buildImage {
+    name = "chopaan-server";
+    tag = "latest";
+    contents = [ exes.server pkgs.iana-etc pkgs.cacert ];
+    created = "now";
+    config = {
+      Cmd = [ "${exes.server}/bin/server" ];
+      Version = "1.0";
+      ExposedPorts = {
+        "8883/tcp" = {};
+      };
+    };
+  };
+
+  ui = pkgs.dockerTools.buildImage {
+    name = "chopaan-ui";
+    tag = "latest";
+    contents = [ exes.ui pkgs.iana-etc pkgs.cacert ];
+    created = "now";
+    config = {
+      Cmd = [ "${exes.ui}/bin/ui" ];
+      Version = "1.0";
+      ExposedPorts = {
+        "8884/tcp" = {};
+      };
+    };
+  };
+
+  kbtzim = pkgs.dockerTools.buildImage {
+    name = "chopaan-kbtzim";
+    tag = "latest";
+    contents = [ exes.kbtzim pkgs.iana-etc pkgs.cacert ];
+    created = "now";
+    config = {
+      Cmd = [ "${exes.kbtzim}/bin/kbtzim" ];
+      Version = "1.0";
+      ExposedPorts = {
+        "8885/tcp" = {};
+      };
     };
   };
 }
