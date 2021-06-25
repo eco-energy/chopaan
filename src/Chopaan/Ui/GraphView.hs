@@ -161,7 +161,7 @@ renderWith3 a = baked $ do
 cview :: Html m a
 cview = H.div [
   H.className "my-view"
-  ] $(embedHtml "src/Chopaan/Ui/gridRenderer.html")
+  ] $(embedHtml "js/gridRenderer.html")
 
 --renderWithI = template id 
 
