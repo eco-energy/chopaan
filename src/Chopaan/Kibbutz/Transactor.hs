@@ -80,7 +80,7 @@ import Chopaan.Kibbutz.LinOpt
 import Data.SBV
 import ConCat.Misc (R)
 
-import Data.Greskell (lookupAs, Key, pMapToFail, FromGraphSON(..), parseGraphSON)
+import Data.Greskell (lookupAs, Key, pMapToFail, FromGraphSON(..), parseGraphSON, PMapLookupException(..))
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 import Data.Greskell.GraphSON.GValue (unwrapOne)
 import NetSpider.Found (LinkState(..))
@@ -476,7 +476,10 @@ instance (ToJSON n, FromJSON n) => NodeAttributes (Stake' n) where
 
 
 decodeBin (Left a) = (Left a)
-decodeBin (Right x) = Right (fromJust . A.decode $ x)
+decodeBin (Right x) = case A.decode x of
+        Nothing -> (Left $
+                    PMapParseError "Transactor or Stake Key" "aeson decode failed for sensor metrics")
+        Just x' -> Right x'
 
 instance (ToJSON n, FromJSON n) => LinkAttributes (Stake' n) where
   writeLinkAttributes s = fmap writeKeyValues $

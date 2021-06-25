@@ -165,3 +165,6 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
                          =<< (try $ (dispatchTx o x))
         tryJust Nothing = pure False
     horizon = 10 * 60
+
+
+

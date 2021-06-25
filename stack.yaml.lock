@@ -226,6 +226,19 @@ packages:
     git: https://github.com/Fresheyeball/Shpadoinkle.git
     commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
 - completed:
+    subdir: template
+    name: Shpadoinkle-template
+    version: 0.0.0.1
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    pantry-tree:
+      size: 487
+      sha256: e1413cb2d921751b02008676f2120c3508fa53f8b6d68749b92dd2afc9b2bb0c
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+  original:
+    subdir: template
+    git: https://github.com/Fresheyeball/Shpadoinkle.git
+    commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+- completed:
     hackage: base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
     pantry-tree:
       size: 2116
@@ -701,6 +714,13 @@ packages:
       sha256: f29920355b21ef7a7218573591aa740b01b3d1fb3b0bbd66e2f726d091d56fb2
   original:
     hackage: constraints-extras-0.3.1.0@sha256:c70fcf437e1d640cfd50a8eda1db47a64e49c96857e08fd0d8c438327d908ac1,1846
+- completed:
+    hackage: html-parse-0.2.0.2@sha256:268c6c3a723aae77ff799bf501d60a91e60536facab3ae70df7a74cea75e29c3,3898
+    pantry-tree:
+      size: 516
+      sha256: c5c294ecfbe759becf84a555c578995788c98a5b3944066b167bea8b143efb1e
+  original:
+    hackage: html-parse-0.2.0.2@sha256:268c6c3a723aae77ff799bf501d60a91e60536facab3ae70df7a74cea75e29c3,3898
 snapshots:
 - completed:
     size: 524799

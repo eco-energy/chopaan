@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables, GADTs, FlexibleContexts, NamedFieldPuns #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia, UndecidableInstances #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia, UndecidableInstances, OverloadedStrings #-}
 
 module Chopaan.API.History where
 
@@ -7,7 +7,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader hiding (ask)
 import Control.Monad.Reader.Class
 
-import Data.Greskell (FromGraphSON)
+import Data.Greskell (FromGraphSON, ToGreskell(..))
 
 import NetSpider.Spider (Spider)
 import NetSpider.Spider.Config (Config(..))
@@ -27,8 +27,8 @@ import Chopaan.Node.NodeId
 
 
 import Network.Greskell.WebSocket (Client)
-import Chopaan.Graph.Kbtz (addHHToKbtz, getKbtzNodes, kbtzPool, KbtzPool, kbtzPool)
-import Chopaan.Graph
+import Chopaan.Graph.Kbtz (getKbtzim, addHHToKbtz, getKbtzNodes, kbtzPool, KbtzPool)
+import Chopaan.Graph hiding (toLink)
 import qualified Chopaan.Graph.G as G
 import Chopaan.Graph.Spider ( Spools
                             , SpiderM
@@ -49,7 +49,13 @@ import Data.Aeson (ToJSON, FromJSON)
 import Network.Wai (Application)
 import Control.Monad.Base
 import Control.Monad.Trans.Control
+import Chopaan.CRUD
+import Chopaan.Kibbutz.KbtzimT
+import Chopaan.Node.NodeT
+import Servant.Links
 
+
+data SpiderOpts = SpiderOpts String Int
 
 newtype HistoryApp a = HistoryApp { runHistoryApp :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
@@ -91,8 +97,8 @@ type HistoryConn n a e =
   , ToJSON a, FromJSON a
   , FromGraphSON n, IsoGConn n a e)
 
-toHandler :: MonadIO m => String -> Int -> HistoryApp ~> m
-toHandler h p a = liftIO $ runReaderT (runHistoryApp a) =<< (mkDBPools h p)
+toHandlerH :: MonadIO m => String -> Int -> HistoryApp ~> m
+toHandlerH h p a = liftIO $ runReaderT (runHistoryApp a) =<< (mkDBPools h p)
 
 mkDBPools :: MonadIO m => String -> Int -> m (DBPools)
 mkDBPools h p = do
@@ -101,7 +107,7 @@ mkDBPools h p = do
   return $ DBPools spools kp
 
 serveHistoryAPI :: String -> Int -> Server (HistoryAPI)
-serveHistoryAPI h p = hoistServer (Proxy @ HistoryAPI) (toHandler h p) getHistoryForGraph 
+serveHistoryAPI h p = hoistServer (Proxy @ HistoryAPI) (toHandlerH h p) getHistoryForGraph 
 
 historyApp :: String -> Int -> Application
 historyApp h p = serve (Proxy :: Proxy HistoryAPI) $ serveHistoryAPI h p
@@ -111,6 +117,24 @@ data DBPools = DBPools
   { spools :: Spools
   , gremlinPool :: KbtzPool
   }
+
+
+withKbtzPool :: (Client -> HistoryApp a) -> HistoryApp a
+withKbtzPool f = do
+    (DBPools _ kp) <- ask
+    withResource kp f
+    
+defKbtz :: Int -> KbtzName -> Kbtzim
+defKbtz i k = Kbtzim (KbtzId i) k Nothing
+
+instance CRUDChopaan (HistoryApp) where
+  listKibbutzim = do
+    ks <- withKbtzPool getKbtzim
+    return . KbtzList $ (uncurry defKbtz) <$> (zip [1..] ks)  
+  listNodezim k = do
+    ns <- withKbtzPool ((flip getKbtzNodes) k)
+    return . NodeList $ (undefined) <$> (zip [1..] ns)
+  getGraph = getHistoryForGraph
 
 getHistoryForGraph :: KbtzName
   -> GraphType

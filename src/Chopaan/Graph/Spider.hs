@@ -6,7 +6,7 @@
 module Chopaan.Graph.Spider where
 
 import qualified Streamly.Prelude as S
-import Streamly (IsStream, MonadAsync, adapt)
+import Streamly as S
 import qualified Streamly.Internal.Data.Fold as FL
 
 import Data.Proxy
@@ -216,7 +216,7 @@ rangeQuery :: (Eq n, Show n) => UTCTime -> UTCTime -> [n] -> Query n na sla sla
 rangeQuery t t' ns = (defQuery ns)
   { timeInterval = utcToRange t t'
   , foundNodePolicy = policyAppend
-  , includeIncomingLinks = True
+  --, includeIncomingLinks = True
   } 
 {-# INLINE rangeQuery #-}
 
@@ -382,15 +382,13 @@ gridSnapshot r t t' s = liftIO
                            . (rangeQuery t t') $ [getGridRoot r]
 
 
-nodesSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadIO m)
+nodesSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadAsync m)
   => [n]
   -> UTCTime
   -> UTCTime
-  -> Spider n v e
+  -> Pool (Spider n v e)
   -> m (SnapshotGraph n v e)
-nodesSnapshot ns t t' s = liftIO
-                           . (getSnapshot s)
-                           . (rangeQuery t t') $ ns
+nodesSnapshot ns t t' p = S.fold FL.mconcat $ S.parallely $ S.mapM (\n -> liftIO $ withResource p (\s -> getSnapshot s $ rangeQuery t t' [n])) $ S.fromList ns
 {-# INLINE nodesSnapshot #-}
 
 statusGridSnapshot :: KbtzName
@@ -430,33 +428,25 @@ statusNodesSnapshot :: [NodeMAC]
   -> UTCTime
   -> UTCTime
   -> SpiderM (SnapshotGraph NodeMAC SensorR Stake)
-statusNodesSnapshot k t t' = do
-  spool <- ask
-  liftIO $ withResource (unSpool . statusG $ spool) (nodesSnapshot k t t')
+statusNodesSnapshot k t t' = ((nodesSnapshot k t t') . (unSpool . statusG)) =<< ask
 
 txNodesSnapshot :: [NodeMAC]
   -> UTCTime
   -> UTCTime
   -> SpiderM (SnapshotGraph NodeMAC Stake TxStatus)
-txNodesSnapshot k t t' = do
-  spool <- ask
-  liftIO $ withResource (unSpool . txG $ spool) (nodesSnapshot k t t')
+txNodesSnapshot k t t' = ((nodesSnapshot k t t') . (unSpool . txG)) =<< ask
 
 meshNodesSnapshot :: [NodeMAC]
   -> UTCTime
   -> UTCTime
   -> SpiderM (SnapshotGraph NodeMAC MeshNode RxSignal)
-meshNodesSnapshot k t t' = do
-  spool <- ask
-  liftIO $ withResource (unSpool . meshG $ spool) (nodesSnapshot k t t')
+meshNodesSnapshot k t t' = ((nodesSnapshot k t t') . (unSpool . meshG)) =<< ask
 
 flowNodesSnapshot :: [NodeMAC]
   -> UTCTime
   -> UTCTime
   -> SpiderM (SnapshotGraph NodeMAC BatteryR PowerNR)
-flowNodesSnapshot k t t' = do
-  spool <- ask
-  liftIO $ withResource (unSpool . flowG $ spool) (nodesSnapshot k t t')
+flowNodesSnapshot k t t' = ((nodesSnapshot k t t') . (unSpool . flowG)) =<< ask
 
 mkConfG :: Opts -> ConfG NodeMAC
 mkConfG o = G'' (CG $ meshConfig o) (CG $ txConfig o) (CG $ statusConfig o) (CG $ flowConfig o) 

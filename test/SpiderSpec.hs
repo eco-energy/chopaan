@@ -52,25 +52,26 @@ import Control.Applicative
 import NetSpider.Spider
   (withSpider, clearAll)
 import Control.Monad.Catch
-
+import Data.Pool
     
 spec :: Spec
 spec = do
   let
     nNodes = 20
-    nMessages = 100
+    nMessages = 1000
     kId = KbtzId "test"
     t0 = t
     tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
-    --tn = Ti.addUTCTime (d * (fromIntegral $ nNodes * nMessages)) t0
-    
   beforeAll (do
                 let c = mkConfG ("localhost", 8182)
                 withSpider (unConf $ meshG c) clearAll
                 withSpider (unConf $ txG c) clearAll
                 withSpider (unConf $ flowG c) clearAll
                 withSpider (unConf $ statusG c) clearAll
+                kp <- kbtzPool "localhost" 8182                 
                 ns <- liftIO $ arbs @NodeMAC nNodes
+                withResource kp (\c -> addKbtz c kId)
+                mapM_ (\n -> withResource kp (\c -> addNodeToKbtz c kId n)) ns
                 sp <- mkSpool c
                 return (ns, sp)
             ) $ do
@@ -137,7 +138,7 @@ spec = do
       oneNodePerMACPlusRoot gotNs nNodes
       -- $ for a tree structure with one root node, each node should have the root as its parent,
       -- $ while the root node should be linked to router
-      treePlusStructure gotLs nNodes
+      -- treePlusStructure gotLs nNodes
       
     it "Stake snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
       (gotNs, gotLs) <- snapDebug txNodesSnapshot sp ns t0 tn

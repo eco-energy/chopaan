@@ -46,7 +46,7 @@ import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.KbtzimT ()
 import Chopaan.CRUD
 import Chopaan.Graph
-
+import qualified Data.Time as Ti
 
 type API = "api" :> "kibbutzim" :> Get '[JSON] KbtzList
       :<|> "api" :> "kibbutz" :> Capture "id" KbtzName :> Get '[JSON] NodeList
@@ -54,6 +54,9 @@ type API = "api" :> "kibbutzim" :> Get '[JSON] KbtzList
 data GView = GView
   { _whichK :: KbtzName
   , _whichG :: GraphType
+  , _startTime :: Ti.UTCTime
+  , _endTime :: Ti.UTCTime
+  , _currentG :: Maybe (SG NodeMAC)
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 makeFieldsNoPrefix ''GView

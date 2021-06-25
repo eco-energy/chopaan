@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction #-}
+{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction, ScopedTypeVariables #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports #-}
 module Chopaan.Node.Metrics where
 
@@ -30,13 +30,14 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Text.Printf
 
-
+import GHCJS.Marshal
 import Proto.NodeMessageSchema.NodeMessages hiding (NodeId)
 import Proto.NodeMessageSchema.NodeMessages_Fields
 import ConCat.Misc (R)
 
 {---- NetSpider Imports ----}
-import Data.Greskell (Key, lookupAs, lookupAs', pMapToFail, FromGraphSON(..), parseGraphSON)
+import Data.Greskell (Key, lookupAs, lookupAs', pMapToFail
+                     , FromGraphSON(..), parseGraphSON, PMapLookupException(..))
 import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
 import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
 
@@ -59,13 +60,21 @@ headerOrder = Csv.headerOrder
 {----- Basic Types ------}
 
 
+-- instance (ToJSVal a, Compensable a) => ToJSVal (Compensated a) where
+--   toJSVal = toJSVal . uncompensated 
+-- instance (FromJSVal a, Compensable a) => FromJSVal (Compensated a) where
+--   fromJSVal = (pure . (fmap (\a -> add a 0 compensated))) =<< (fromJSVal @a)
+
+
 newtype WattSeconds = WS { unWs :: Compensated Double }
   deriving stock (Eq, Ord, Generic)
   deriving newtype (Num, Fractional, Binary, Real, RealFrac, NFData)
 
+
 newtype Watts = W { unW :: Compensated Double }
   deriving stock (Eq, Ord, Generic)
   deriving newtype (Num, Fractional, Real, Binary, RealFrac, NFData)
+
 
 instance Show WattSeconds where
   show = (printf ("%.2g")) . fromWattSeconds
@@ -195,8 +204,15 @@ instance (GreskellC a) => FromGraphSON (Node a) where
 
 
 deriving instance Generic UTCTime
+--deriving instance ToJSVal UTCTime
+--deriving instance FromJSVal UTCTime
 deriving instance Generic Day
 deriving instance Binary Day
+--deriving instance ToJSVal Day
+--deriving instance FromJSVal Day
+
+--deriving instance ToJSVal DiffTime
+--deriving instance FromJSVal DiffTime
 
 
 instance Binary UTCTime
@@ -281,7 +297,9 @@ instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
                                          )
     where
       decodeBin (Left a) = (Left a)
-      decodeBin (Right x) = Right (fromJust . A.decode $ x)
+      decodeBin (Right x) = case A.decode x of
+        Nothing -> (Left $ PMapParseError "sensorMetric Key" "aeson decode failed for sensor metrics")
+        Just x' -> Right x'
 
 instance ToJSON (EnergyState) where
   toJSON a = object $ zipWith (A..=) esFieldNamesJSON (fieldAccessorsJSON a)

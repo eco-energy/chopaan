@@ -63,6 +63,7 @@ extra-deps:
      - router
      - lens
      - disembodied
+     - template
 
  # - git: https://github.com/composewell/streamly.git
  #   commit: 4e48b52e8709390a47e99c107ebed2d1c9420076
@@ -136,6 +137,7 @@ extra-deps:
  - network-3.1.2.1@sha256:188d6daea8cd91bc3553efd5a90a1e7c6d0425fa66a53baa74db5b6d9fd75c8b,4968
  - ghc-byteorder-4.11.0.0.10@sha256:d47fdef63f2a145091e91b1aedbd46bf61ca03bb935e81e3462a1d904c319de3,1594
  - constraints-extras-0.3.1.0@sha256:c70fcf437e1d640cfd50a8eda1db47a64e49c96857e08fd0d8c438327d908ac1,1846
+ - html-parse-0.2.0.2@sha256:268c6c3a723aae77ff799bf501d60a91e60536facab3ae70df7a74cea75e29c3,3898
  #- z3-408.2@sha256:1f8b6ccbcc6d06a6701900a09fcfcbaf86ed8a8495615710bef4da5cdb073a3f,4226
 # Override default flag values for local packages and extra-deps
 flags:

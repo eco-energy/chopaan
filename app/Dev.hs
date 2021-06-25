@@ -1,20 +1,16 @@
 module Main where
 
-
-import Control.Concurrent
-import Control.Monad
-
-import qualified Chopaan.Client as C
-import qualified Chopaan.Server as S
-import qualified Chopaan.View as V
-import           Shpadoinkle.Run (Env (Dev), liveWithBackend)
+import Chopaan as C
+import           Shpadoinkle.Run (runJSorWarp)
 
 
 main :: IO ()
-main = liveAndWait 8080 C.app $ S.application Dev "./assets"
+main = C.app
+
+  -- liveAndWait 8080 C.app $ S.application Dev "./assets"
 
 
-liveAndWait p f b = liveWithBackend p f b >> forever (threadDelay $ 1000 * 1000)
+--liveAndWait p f b = liveWithBackend p f b >> forever (threadDelay $ 1000 * 1000)
 
 
 -- dev :: IO ()

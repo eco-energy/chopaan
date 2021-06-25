@@ -71,3 +71,6 @@ s2nix:
 
 image:
 	docker load < $$(nix-build ./nix/docker.nix)
+
+images:
+  $$(nix-build ./nix/docker.nix --option binary-caches "s3://ee-nixcache?region=ap-southeast-1 https://shpadoinkle.cachix.org" --option require-sigs false)

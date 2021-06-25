@@ -29,22 +29,27 @@ import Data.Proxy (Proxy(..))
 
 import Control.Lens hiding (view, simple)
 import Control.Lens.Unsound (lensProduct)
+import Control.Monad.IO.Class
+
 
 
 import           Shpadoinkle                       (Html, MonadJSM, text, voidC)
 import qualified Shpadoinkle.Html                  as H
+import qualified Shpadoinkle.Html.Utils            as H
 import           Shpadoinkle.Lens
 import           Shpadoinkle.Router                (navigate, toHydration)
 import           Shpadoinkle.Router.Client   (client, runXHR)
 import           Shpadoinkle.Run                   (Env, entrypoint)
 
 import qualified Shpadoinkle.Widgets.Form.Input    as Input
+import qualified Shpadoinkle.Widgets.Types.Form    as F 
+
 import           Shpadoinkle.Widgets.Table         as Table hiding (view)
 import           Shpadoinkle.Widgets.Types         (Control (..),
                                                     Pick (..), Status (..),
                                                     fuzzySearch,
                                                     getValid, humanize,
-                                                    validate)
+                                                    validate, Hygiene(..))
 import           Shpadoinkle.Run             (runJSorWarp, simple, Env(Dev))
 import           Shpadoinkle.Backend.ParDiff (runParDiff)
 
@@ -67,31 +72,48 @@ import Chopaan.Ui.GraphView
 import qualified Clay as C
 import Data.Colour
 import Chopaan.Ui.Style
+import qualified Data.Time as Ti
 
 default (T.Text, [])
 
-main :: IO ()
-main = runJSorWarp 8080 $ do
-  H.setTitle "Chopaan"
-  simple runParDiff initial ((template Dev initial) . view) H.getBody
-  where
-    initial = (MAddNode (KbtzId "this") Nothing emptyNodeForm)
+-- main :: IO ()
+-- main = runJSorWarp 8080 $ do
+--   H.setTitle "Chopaan"
+--   simple runParDiff initial ((template Dev initial) . view) H.getBody
+--   where
+--     initial = (MAddNode (KbtzId "this") Nothing emptyNodeForm)
 
-ainit :: (MonadJSM m) => Route -> m Frontend
-ainit _ = return (MAddNode (KbtzId "this") Nothing emptyNodeForm)
-  -- return MHomePage --
+ainit :: (Monad m, CRUDChopaan m) => Route -> m Frontend
+ainit _ = return MHomePage --(loadG defGView)
 
 defGView :: GView
-defGView = GView (KbtzId "thing") FlowG --defPlanSG
+defGView = GView (KbtzId "test") StatusG t0 t1 Nothing
+  where
+    t0 = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
+    t1 = Ti.UTCTime (Ti.fromGregorian 2021 4 7) (Ti.secondsToDiffTime 0)
 
-mkGView :: KbtzName -> GraphType -> GView 
-mkGView = GView
+requestGView :: (CRUDChopaan m) => GView -> m (SG NodeMAC) 
+requestGView (GView k g t0 t1 _) = getGraph k g t0 t1 
 
-ginit :: Frontend
-ginit = MGraph $ defGView
 
-ginitM :: (MonadJSM m) => Route -> m Frontend
-ginitM = pure . (const ginit)
+mkGView :: KbtzName -> GraphType -> Ti.UTCTime -> Ti.UTCTime -> GView 
+mkGView k g t0 t1 = GView k g t0 t1 Nothing
+
+ginitM :: (MonadIO m, CRUDChopaan m) => Route -> m Frontend
+ginitM _ = do
+  g <- (requestGView defGView)
+  liftIO . print $ g
+  return $ MGraph (defGView { _currentG = (Just g) })
+
+
+loadGraph :: (Monad m, CRUDChopaan m) => GView -> m (GView)
+loadGraph gv = do
+  g <- (requestGView gv)
+  return $ (gv { _currentG = (Just g) })
+
+loadG g = (pure . MGraph) =<< loadGraph g
+
+
 
 onRouteChange :: (Monad m, CRUDChopaan m) => Route -> m Frontend
 onRouteChange = \case
@@ -99,16 +121,10 @@ onRouteChange = \case
   RKibbutzim -> MKibbutzim . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
   RKibbutz k -> MKibbutz . RosterNodezim (SortCol NId ASC) mempty <$> (listNodezim k)
   RAddNode k -> return $ MAddNode k Nothing emptyNodeForm
-  RGraph k -> return . MGraph $ mkGView k FlowG --(return  defPlanSG))
-    
-  -- RSearch k s -> MKibbutz . RosterNodezim (SortCol NId ASC) s <$> (listNodezim k) 
-defPlanSG :: SG NodeMAC
-defPlanSG = G.Flow . G.SG $ defStakeSnapshot
-  where
-    defStakeSnapshot = ([], [])
-    
+  RGraph k -> loadG (defGView {_whichK = k})
 
-view :: forall m. (MonadJSM m) => Frontend -> Html m Frontend
+
+view :: forall m. (MonadJSM m, CRUDChopaan m) => Frontend -> Html m Frontend
 view fe = case fe of
   MKibbutzim kbtzRoster -> onSum _MKibbutzim $ H.div "container-fluid"
     [ H.div "row justify-content-between align-items-center"
@@ -131,8 +147,8 @@ view fe = case fe of
   MHomePage -> H.div_
     [ H.h1_ ["Welcome To Chopaan"]
     , H.a [ H.onClickM_ . navigate @(SPA m) $ RKibbutzim ] ["Add Kibbutz"]
-    , H.a [ H.onClickM_ . navigate @(SPA m) $ RKibbutzim ] ["View Kibbutzim"]
-    ] 
+    , H.a [ H.onClickM_ . navigate @(SPA m) $ RGraph (KbtzId "test") ] ["View Kibbutzim"]
+    ]
   MAddNode k n form -> onSum (_MAddNode . _3) $ H.div "row"
     [ H.div "col-sm-8 offset-sm-2"
       [ H.h1_ [ text $ maybe "Add New Node" (const "Edit Node") n
@@ -226,6 +242,8 @@ staticTemplate s = voidC $ H.html_
     ]
   ]
 
+--x = H.addScript
+
 template :: Env -> Frontend -> Html m a -> Html m a
 template ev fe stage = H.html_
   [ H.head_
@@ -241,6 +259,12 @@ template ev fe stage = H.html_
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
     , toHydration fe
     , H.script [ H.src $ entrypoint ev ] []
+    , H.script [ H.src $
+       "https://unpkg.com/three@0.129.0/build/three.js"] []
+    , H.script [ H.src $
+       "https://unpkg.com/three@0.129.0/examples/jsm/controls/TrackBallControls.js"] []
+    , H.script [ H.src $
+       "https://unpkg.com/three@0.129.0/examples/jsm/renderers/CSS3DRenderer.js"] []
     ]
   , H.body_
     [ stage
@@ -265,22 +289,25 @@ fuzzyK = flip (^.) <$>
 
 
 
-gView :: (MonadJSM m) => GView -> Html m GView
-gView gv = H.div [H.class' $ relative <> flex_grow <> flex_col]
-  [ voidC $ renderKbtzGraph defPlanSG
-  , onRecord whichG $ graphSelectButtons ]
+gView :: forall m. (MonadJSM m, CRUDChopaan m) => GView -> Html m (GView)
+gView g = H.div [H.class' $ relative <> flex_grow <> flex_col]
+  [ case _currentG g of
+      Nothing -> voidC $ H.text "No Graph Found Yet"
+      Just sg -> voidC $ renderGrid sg
+  , graphSelectButtons
+  --, onRecord whichK $ getGraph
+  ]
   where
-    sgNow = runXHR $ getHistoryC (gv ^. whichK) (gv ^. whichG) undefined undefined
-    graphSelectButtons :: Html m (GraphType)
+    graphSelectButtons :: Html m (GView)
     graphSelectButtons = H.div [H.class' $ flex
                                  <> flex_row
                                  <> justify_center
                                  <> w_full
                                  <> content_end ]
-      [ H.button [ H.onClick $ (const g)
+      [ H.button [ H.onClickM (do
+                                  gv' <- loadGraph (g {_whichG = gt})
+                                  return (\g' -> g' {_currentG = _currentG gv'}))
                , H.class' "btn btn-primary"
-               , H.class' $ flex <> justify_center <> w_full ] [ text . humanize $ g ]
-      | g <- [(minBound @GraphType)..maxBound] ]
+               , H.class' $ flex <> justify_center <> w_full ] [ text . humanize $ gt ]
+      | gt <- [(minBound @GraphType)..maxBound] ]
 
-
-(getHistoryC) = client (Proxy @HistoryAPI)
