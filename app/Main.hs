@@ -12,7 +12,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main (main) where
 
-import Chopaan.Run
+import Chopaan
 import RIO
 import RIO.Process
 import qualified RIO.Text as T

@@ -30,6 +30,7 @@ let
     src = haskell-nix.haskellLib.cleanGit { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
     index-state = "2021-02-01T00:00:00Z";
+    plan-sha256 = "0alsqcbfh5dr0z86v9ms0im3yy86qn1kbys57xb4r5rgaczxzskg";
     # these extras will provide additional packages
     # ontop of the package set derived from cabal resolution.
     pkg-def-extras = [(hackage: {

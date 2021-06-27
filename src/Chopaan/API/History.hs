@@ -6,6 +6,7 @@ module Chopaan.API.History where
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader hiding (ask)
 import Control.Monad.Reader.Class
+import Control.Monad.Catch
 
 import Data.Greskell (FromGraphSON, ToGreskell(..))
 
@@ -59,7 +60,7 @@ data SpiderOpts = SpiderOpts String Int
 
 newtype HistoryApp a = HistoryApp { runHistoryApp :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
-                    MonadBase IO, MonadBaseControl IO)
+                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
 
 
 type HistoryAPI = "history"

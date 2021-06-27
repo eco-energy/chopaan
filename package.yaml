@@ -244,8 +244,9 @@ executables:
       else:
         buildable: false
   kbtzim:
-    main:                Dev.hs
-    other-modules: []
+    main:                Main.hs
+    other-modules:
+      - Paths_chopaan
     source-dirs:         app
     when:
       condition: "!impl(ghcjs)"

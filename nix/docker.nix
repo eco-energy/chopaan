@@ -19,6 +19,7 @@
 
 let
   exes = c.chopaan;
+  #ui = undefined
 in
 {
   server = pkgs.dockerTools.buildImage {

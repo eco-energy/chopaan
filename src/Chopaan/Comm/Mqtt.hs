@@ -2,10 +2,10 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE OverloadedStrings#-}
+{-# LANGUAGE TypeApplications, RankNTypes #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeOperators #-}
 
-module Chopaan.Comm.Mqtt (runMqtt, client, pub, MQ.Topic) where
+module Chopaan.Comm.Mqtt (runMqtt, client, pub, MQ.Topic, MonadMQ, runMQ, pubQ) where
 
 -- Different string modules should be unified under one interface
 import qualified Data.Text as Text 
@@ -13,6 +13,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString as B
 
+import Control.Monad.Trans.Reader
 
 
 import qualified Network.MQTT.Client as MQ
@@ -42,8 +43,11 @@ import Chopaan.Types (MQTTOpts(..))
 import Chopaan.Comm.Comm (Address(..), PubQueue, initMessageQs, MessageQs(..))
 import Chopaan.Comm.Queues (NodeQueue(..))
 import Chopaan.Utils.Retry
+import Chopaan.Graph.Spider
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame)
-
+import Streamly as S
+import qualified Streamly.Prelude as S
+import qualified Streamly.Data.Fold as FL
 
 
 -- I want to setup an MQTT client that subscribes to kibuttz/node/{mac}/state and publishes to /kibbutz/node/{mac}/control
@@ -78,22 +82,27 @@ mkTLSSettingsFromDisk cert key caPath hostName name = do
   return (TLSSettings clientParams)
 
 
--- need reader for creds and logs
 runMqtt ::
-  forall m a. (MonadIO m, Address a)
-  => MQTTOpts
-  -> [a]
-  -> (MessageQs a -> MQ.MessageCallback)
+  forall m n. (MonadIO m, Address n)
+  => [n]
+  -> (MessageQs n -> MQ.MessageCallback)
+  -> MQTTOpts
   -> MQTTCreds
-  -> m (MessageQs a)
-runMqtt opts ts msgCB creds = do
+  -> m (MessageQs n)
+runMqtt ns msgCB opts creds = do
   qs@MessageQs{..} <- liftIO initMessageQs
-  mc <- liftIO $ client opts (msgCB qs) creds
-  _ <- liftIO . forkIO $ forever $ catches (pub mc outbox) [(Handler errorHandler)]
-  connStatus <- liftIO $ sequence $ (resub mc) <$> ts
-  liftIO $ print connStatus
-  void . liftIO . forkIO $ recoverC "waiting for client" 10 (MQ.waitForClient mc)
+  c <- liftIO $ client opts (msgCB qs) creds
+  runMQ c $ (runMqtt' ns outbox)
   return qs
+
+-- need reader for creds and logs
+runMqtt' :: forall m a. (MonadIO m, Address a) => [a] -> PubQueue -> MonadMQ m ()
+runMqtt' ts outbox = do
+  _ <- pubQ outbox
+  -- liftIO . forkIO $ forever $ catches (runReaderT mc) [(Handler errorHandler)]
+  connStatus <- resub ts
+  liftIO $ print connStatus
+  liftIO . (recoverC "waiting for client" 10) . (liftIO . MQ.waitForClient) =<< ask
 
 
 client ::
@@ -114,26 +123,36 @@ client fileOpts msgCB awsCreds = do
            , MQ._tlsSettings=tlsConf}
   MQ.connectURI conf uri
 
-subscribe :: (Address n) => MQ.MQTTClient -> n -> IO (Either MQTy.SubErr MQ.QoS)
-subscribe c n = head <$> (fst <$> MQ.subscribe c [subTopic n] [])
+subscribe :: (Address n) => MQ.MQTTClient -> [n] -> IO [(Either MQTy.SubErr MQ.QoS)]
+subscribe c ns = fst <$> (MQ.subscribe c (subTopic <$> ns) [])
 
 subTopic :: (Address n) => n -> (MQ.Topic, MQ.SubOptions)
 subTopic n = (stateTopic n, MQ.subOptions { MQ._subQoS = MQ.QoS1 })
 
 -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
     -- not stateful.
-pub :: MQ.MQTTClient -> PubQueue -> IO ()
-pub c tv = do
-  (\s -> recoverC (getMsgLog s) 10 (pub' s)) =<< (atomically $ do readTBQueue (runNodeQueue tv))
+pubQ :: (MonadIO m) => PubQueue -> MonadMQ m ()
+pubQ tv = do
+  pub =<< (liftIO . atomically $ do readTBQueue (runNodeQueue tv))
+
+type MonadMQ m = ReaderT MQ.MQTTClient m
+
+runMQ :: MQ.MQTTClient -> MonadMQ m ~> m
+runMQ c a = runReaderT a c 
+
+pub :: (MonadIO m) => (MQ.Topic, MeshFrame) -> MonadMQ m ()
+pub s = do
+  c <- ask
+  liftIO $ recoverC (getMsgLog s) 10 (pub' c s)
     where
-      getMsgLog (nId, _) = "Message Publish: " <> show nId 
-      pub' :: (MQ.Topic, MeshFrame) -> IO ()
-      pub' (nId, mf) =
-        MQ.publish c nId (encode mf) False
+      getMsgLog (nId, _) = False 
+      pub' :: MQ.MQTTClient -> (MQ.Topic, MeshFrame) -> IO ()
+      pub' c (nId, mf) =
+        liftIO $ MQ.publish c nId (encode mf) False
       encode = BL.fromStrict . encodeMessage
 
-resub :: (Address n) => MQ.MQTTClient -> n -> IO (Either MQTy.SubErr MQ.QoS)
-resub c n = retryEither n (subscribe c)
+resub :: (MonadIO m, Address n) => [n] -> MonadMQ m [(Either MQTy.SubErr MQ.QoS)]
+resub ns = (\c -> liftIO $ (subscribe c ns)) =<< ask
 
 
 errorHandler :: MQ.MQTTException -> IO ()
@@ -143,3 +162,6 @@ errorHandler (MQ.Discod d) = printError d
 errorHandler (MQ.MQTTException e) =  printError e
 printError :: Show e => e -> IO ()
 printError e = print $ "MQTT Publisher Exception:\n" <> (show e)
+
+
+

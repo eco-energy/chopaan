@@ -9,7 +9,7 @@ import GHC.Generics
 import Network.AWS.S3 (BucketName)
 import Chopaan.Types hiding (DBOpts)
 
-
+import Control.Applicative
 import Control.Arrow
 import Control.Monad.IO.Class
 import Control.Monad
@@ -47,6 +47,7 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          , unfoldChan
                          , initQs
                          , writeChan
+                         , Address
                          )
 import Chopaan.Graph
 
@@ -66,13 +67,23 @@ data KbtzC n = KbtzC
 mkKbtzConf :: KbtzName -> [n] -> ChannelOpts -> String -> Int -> KbtzC n
 mkKbtzConf = KbtzC
 
-qSrc :: forall t m. (KbtzConn t m NodeMAC)
-  => MessageQs NodeMAC
-  -> m (t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue)
+qSrc :: forall t m n. (KbtzConn t m n)
+  => MessageQs n
+  -> m (t m (n, EnergyState), t m (n, RuntimeStats), PubQueue)
 qSrc (MessageQs{stateChan, statsChan, outbox}) = do
   sk <- unfoldChan stateChan
   rk <- unfoldChan statsChan
   return $ (sk, rk, outbox)
+
+
+twoSrc :: (KbtzConn t m n)
+  => MessageQs n
+  -> MessageQs n
+  -> m (t m (n, EnergyState), t m (n, RuntimeStats), PubQueue)
+twoSrc q q' = do
+  (e, r, p) <- qSrc q
+  (e', r', p') <- qSrc q'
+  return $ (e `parallel` e', r `parallel` r', p')
 
 
 s3Qs :: forall m. (MonadAsync m)
@@ -90,12 +101,17 @@ s3Qs ns bucket = do
   return $ qs 
   
 
+s3Src :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> S3Opts
+  -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
+s3Src k ns opts = qSrc =<< (s3Qs ns opts)
+
+
 mqttQs :: (MonadIO m) => MQTTOpts -> KbtzName -> [NodeMAC] -> m (MessageQs NodeMAC)
 mqttQs opts name ns = do
   lg <- liftIO $ newLogger Info stdout
   liftIO $ (A.wait
               =<< A.async (liftIO $ withMqttAuth lg name
-                            (runMqtt opts ns mkCallback)))
+                            (runMqtt ns mkCallback opts)))
 
 mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOpts
   -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))

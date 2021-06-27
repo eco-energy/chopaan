@@ -36,6 +36,7 @@ let
     # Grab the executable component of our package.
     chopaan = (haskellPackages.chopaan.components.exes);
 
+    passthru = (chopaanHaskellPackages.plan-nix.passthru);
     projectCross = (chopaanHaskellPackages.projectCross);
     # `tests` are the test suites which have been built.
     tests = collectComponents' "tests" haskellPackages;

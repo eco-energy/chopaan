@@ -1,7 +1,7 @@
 version: '3'
 
 services:
-  janusgraph:
+  db:
     image: docker.io/janusgraph/janusgraph:latest
     container_name: janusgraph-default
     ports:
@@ -11,7 +11,31 @@ services:
       - "janusgraph-default-data:/var/lib/janusgraph"
       - "./janusgraph-config/config/:/etc/opt/janusgraph:ro"
       - "./janusgraph-config/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
-      
+  server:
+    depends_on:
+      - db
+    image: chopaan-server:latest
+    container_name : server
+    links:
+      - db
+    ports:
+      - "8888:8888"
+  ui:
+    depends_on:
+      - server
+    image: chopaan-ui:latest
+    container_name : ui
+    links:
+      - server
+    ports:
+      - "8080:8080"
+  kbtzim:
+    depends_on:
+      - db
+    image: chopaan-kbtzim:latest
+    container_name : kbtzim
+    links:
+      - db
   # timescale:
   #   build:
   #     context: .

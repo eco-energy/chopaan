@@ -1,8 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: bb413439e161d1029e32c1f45a06360add4dec252e7f717410004c2a06a6fdd3
 
 name:           chopaan
 version:        0.1.0.0
@@ -381,7 +383,9 @@ executable hydrate
   default-language: Haskell2010
 
 executable kbtzim
-  main-is: Dev.hs
+  main-is: Main.hs
+  other-modules:
+      Paths_chopaan
   hs-source-dirs:
       app
   build-depends:

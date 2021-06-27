@@ -45,7 +45,7 @@ import ConCat.Misc
 
 import System.IO
 
-type KbtzConn t m n = (IsStream t, MonadAsync m, Ord n, Show n)
+type KbtzConn t m n = (IsStream t, MonadAsync m, Ord n, Show n, Address n)
 
 instance KbtzConn t m n => LScan (Kbtz t m n) where
   lscan :: forall a. (Monoid a) => Kbtz t m n a -> (Kbtz t m n a :* a)

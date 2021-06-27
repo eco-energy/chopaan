@@ -1,11 +1,11 @@
 module Main where
 
-import Chopaan as C
+--import Chopaan as C
 import           Shpadoinkle.Run (runJSorWarp)
 
 
 main :: IO ()
-main = C.app
+main = undefined
 
   -- liveAndWait 8080 C.app $ S.application Dev "./assets"
 
