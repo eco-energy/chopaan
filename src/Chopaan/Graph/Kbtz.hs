@@ -42,6 +42,7 @@ import Network.Greskell.WebSocket
 
 import NetSpider.Graph (writeNodeAttributes)
 
+import Chopaan.Utils.Retry
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 import Chopaan.Node.HW
@@ -74,7 +75,7 @@ addNodeToKbtz :: MonadIO m => Client -> KbtzName -> NodeMAC -> m ()
 addNodeToKbtz c k n = addHHToKbtz c k (ANode n)
 
 kbtzPool :: String -> Int -> IO (KbtzPool)
-kbtzPool host port = createPool (connect host port) close 10 100 10
+kbtzPool host port = createPool ((recoverC "retrying kbtz janusgraph connection" 100) (connect host port)) close 10 100 10
 
 fetchResult c = (pure . V.toList) <=< (liftIO . slurpResults) <=< (liftIO . submitPair c . runBinder)
 runTraversal c = (liftIO . drainResults) <=< (liftIO . submitPair c . runBinder)

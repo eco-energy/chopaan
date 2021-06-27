@@ -35,6 +35,7 @@ import Chopaan.Node.Folds
 import Chopaan.Node.Mesh (MeshNode, RxSignal, rsToFN, initMeshNode)
 import qualified Proto.NodeMessageSchema.NodeMessages as N
 
+import Chopaan.Utils.Retry
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Kibbutz
 import Chopaan.Kibbutz.Transactor ( TxStatus
@@ -250,7 +251,7 @@ hasConfig (h, p) label = defConfig
 {-# INLINE hasConfig #-}
 
 spiderPool :: forall m n v e. MonadIO m => Config n v e -> m (Pool (Spider n v e))
-spiderPool c = liftIO $ createPool (connectWith c) close 10 100 10
+spiderPool c = liftIO $ createPool ((recoverC "retrying kbtz janusgraph connection" 100) connectWith c) close 10 100 10
 
 
 gridSnapshotSimple :: forall m n v e. (MonadIO m, SpiderConn n v e)
