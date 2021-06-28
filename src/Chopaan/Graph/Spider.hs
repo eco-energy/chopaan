@@ -251,7 +251,8 @@ hasConfig (h, p) label = defConfig
 {-# INLINE hasConfig #-}
 
 spiderPool :: forall m n v e. MonadIO m => Config n v e -> m (Pool (Spider n v e))
-spiderPool c = liftIO $ createPool ((recoverC "retrying kbtz janusgraph connection" 100) connectWith c) close 10 100 10
+spiderPool c = liftIO $ createPool
+  ((recoverC "retrying kbtz janusgraph connection" 100) (connectWith c)) close 10 100 10
 
 
 gridSnapshotSimple :: forall m n v e. (MonadIO m, SpiderConn n v e)
