@@ -59,7 +59,8 @@ processors:
       cacheMaxSize: 1000
   - className: org.apache.tinkerpop.gremlin.server.op.standard.StandardOpProcessor
     config:
-      maxParameters: 512    
+      maxParameters: 512
+      evaluationTimeout: 300000
 metrics:
   consoleReporter:
     enabled: true
