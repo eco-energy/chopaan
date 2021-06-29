@@ -21,20 +21,21 @@ import Chopaan.Node.NodeId
 import Chopaan.Node.NodeT
 import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Kibbutz.KbtzId
-
-
+import Chopaan.Graph
+import Data.Time
 
 
 class CRUDChopaan m where
   listKibbutzim :: m (KbtzList)
   listNodezim :: KbtzName -> m (NodeList)
-  nodeDetails :: NodeMAC -> m (Nodezim)
+  getGraph :: KbtzName -> GraphType -> UTCTime -> UTCTime -> m (SG NodeMAC)
   --sensorMonitor :: (IsStream t) => NodeMAC -> t m SensorR
 
 instance (MonadTrans t, Monad m, CRUDChopaan m) => CRUDChopaan (t m) where
   listKibbutzim = lift listKibbutzim
   listNodezim = lift . listNodezim
-  nodeDetails = lift . nodeDetails
+  getGraph k g t0 t1 = lift (getGraph k g t0 t1)
+  --nodeDetails = lift . nodeDetails
   --sensorMonitor :: (IsStream t') => NodeMAC -> t' (t m) SensorR
   --sensorMonitor = lift . sensorMonitor
 

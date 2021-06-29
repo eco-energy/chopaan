@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances #-}
 module Chopaan.Kibbutz.Transactor--  ( -- runTransactor
 --                                   statePipe
 --                                   , Stake(..)
@@ -61,12 +61,12 @@ import Data.ProtoLens
 import Data.Convertible
 import Data.Convertible.Instances ()
 import Data.ULID
-import Data.Aeson (ToJSON, FromJSON, parseJSON)
+import Data.Aeson as A
 
 import GHC.Generics (Generic)
 
 import qualified Streamly.Prelude as S
-import Streamly.Prelude (IsStream, MonadAsync, adapt)
+import Streamly (IsStream, MonadAsync, adapt)
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Pipe as P
@@ -80,12 +80,14 @@ import Chopaan.Kibbutz.LinOpt
 import Data.SBV
 import ConCat.Misc (R)
 
-import Data.Greskell (lookupAs, Key, pMapToFail, FromGraphSON(..), parseGraphSON)
+import Data.Greskell (lookupAs, Key, pMapToFail, FromGraphSON(..), parseGraphSON, PMapLookupException(..))
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 import Data.Greskell.GraphSON.GValue (unwrapOne)
 import NetSpider.Found (LinkState(..))
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), EFinds, VFoundNode)
 import Chopaan.Graph.Greskell
+import qualified Data.ByteString.Lazy as BL
+
 
 newtype Tx n a = Tx { unTx :: M.Map n a }
   deriving stock (Eq, Ord, Show, Generic, Traversable)
@@ -108,6 +110,7 @@ type NodeStates n = Tx n SensorR
 
 curryTx :: forall n a. (Address n) => a -> Tx n a -> n -> a
 curryTx defA (Tx p) n = fromMaybe defA $ M.lookup n p
+{-# INLINE curryTx #-}
 
 data TxStatus' e = TxStatus'
   { energyDispatched :: e
@@ -152,18 +155,19 @@ instance  (Ord e, RealFrac e) => Monoid (TxStatus' e) where
 
 toNodeStates :: (MonadAsync m, Address n, Ord n, IsStream t) => Kbtz t m n SensorR -> t m (NodeStates n)
 toNodeStates k = Tx <$> (unKibbutz k)
-
+{-# INLINE toNodeStates #-}
 
 planTx :: (MonadAsync m, MonadCatch m, Address n, Ord n, Show n, IsStream t) => Time.DiffTime -> t m (NodeStates n) -> t m (Maybe (TxPlan n))
 planTx horizon k = S.postscan (transactionPlanner horizon) k 
-                   
+{-# INLINE planTx #-}
+
 
 dispatchTx :: forall m n. (MonadIO m, MonadCatch m, Address n)
   => PubQueue
   -> TxPlan n
   -> m ()
 dispatchTx = dispatchNodeTx
-
+{-# INLINE dispatchTx #-}
 
 dispatchNodeTx :: forall m n. (MonadIO m, MonadCatch m, Address n)
   => PubQueue
@@ -172,7 +176,7 @@ dispatchNodeTx :: forall m n. (MonadIO m, MonadCatch m, Address n)
 dispatchNodeTx q (Tx tx) = do
   let txDispatches =  (\(nid, st) -> (stateTopic nid, fromStake st)) <$> (M.toList tx)
   sequence_ $ (\(t, s) -> liftIO $ writeToPubQ q t s) <$> txDispatches
-
+{-# INLINE dispatchNodeTx #-}
 
 foldTxState :: TxState n -> TxStatus
 foldTxState (Tx gt) = let
@@ -180,39 +184,47 @@ foldTxState (Tx gt) = let
       loss = energyDispatched gridTx - energyReceived gridTx
       lossPerWS = loss / (energyDispatched gridTx)
       in gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
-
+{-# INLINE foldTxState #-}
 -- The state will just be carried across as a TxStatus
 
 idFold :: (Monad m, Monoid a) => FL.Fold m a a
-idFold = FL.mkAccum_ (flip const) mempty
+idFold = FL.mkPureId (flip const) mempty
+{-# INLINE idFold #-}
 
 secondF :: (Monad m, Monoid a) => FL.Fold m b c -> FL.Fold m (a, b) (a, c)
 secondF = FL.unzip idFold
+{-# INLINE secondF #-}
 
 firstF :: (Monad m, Monoid c) => FL.Fold m a b -> FL.Fold m (a, c) (b, c)
 firstF = (flip FL.unzip) idFold 
-
+{-# INLINE firstF #-}
 
 dupF :: (Monad m, Monoid a) => FL.Fold m a b -> FL.Fold m a (a, b)
 dupF f = (,) <$> idFold <*> f  
+{-# INLINE dupF #-}
 
 txFold :: forall m n. (MonadIO m, MonadCatch m, Address n, Ord n)
        => TxPlan n
        -> FL.Fold m (NodeStates n, Maybe (TxPlan n)) ((NodeStates n, Maybe (TxPlan n)), TxState n)
 txFold = dupF . transactionFold
+{-# INLINE txFold #-}
+
 
 transactionFold :: forall m n. (MonadIO m, MonadCatch m, Address n, Ord n)
                 => TxPlan n -> FL.Fold m (NodeStates n, Maybe (TxPlan n)) (TxState n)
 transactionFold participants = FL.Fold step start end
   where
-    step t n = pure . FL.Partial $ incTxState t n
+    step t n = pure $ incTxState t n
+    {-# INLINE step #-}
     start :: m (TxState n)
     start = return $ stakeStatus <$> participants
+    {-# INLINE start #-}
     end :: TxState n -> m (TxState n)
     end = pure
+    {-# INLINE end #-}
     -- shouldQuit (Tx t) = if (all ((\x -> timeRemaining x <= 0) . snd . snd) (M.toList t))
-    --                then (FL.Partial . Tx $ t)
-    --                else (FL.Partial . Tx $ t)
+    --                then ( . Tx $ t)
+    --                else ( . Tx $ t)
 
 
 stakeStatus :: Stake -> (Role, TxStatus)
@@ -220,12 +232,15 @@ stakeStatus (Stake (px, w, t)) = (px, mempty{ timeRemaining = t
                                        , energyRemaining = (pToE @Double) (realToFrac t) w
                                        , startLag = 0
                                        })
+{-# INLINE stakeStatus #-}
 
 planToState :: TxPlan n -> TxState n
 planToState = fmap stakeStatus
+{-# INLINE planToState #-}
 
 zipWith3 :: (Ord n) => (a -> b -> c -> d) -> M.Map n a -> M.Map n b -> M.Map n c -> M.Map n d 
 zipWith3 f a b c = M.intersectionWith ($) (M.intersectionWith f a b) c
+
 
 incTxState :: (Ord n) => TxState n -> (NodeStates n, Maybe (TxPlan n)) -> TxState n
 incTxState (Tx ts) (Tx ns, plan) = case plan of
@@ -235,6 +250,7 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
       True -> Tx $ zipWith updateTS ts ns
       False -> Tx $ zipWith updateTS (fmap stakeStatus p) ns 
   where
+    {-# INLINE updateTS #-}
     updateTS :: (Role, TxStatus) -> SensorR -> (Role, TxStatus)
     updateTS (px, prevTx) SensorMetrics{..} = let
       nextTS = case px of
@@ -266,15 +282,20 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
                    }
       in (px, nextTS)
       where
+        {-# INLINE txEnergy #-}
         txEnergy :: WattSeconds
         txEnergy = (pToE @Double) (realToFrac lastTimeDiff) (tx _powerT)
+        {-# INLINE hasStarted #-}
         hasStarted Source = (abs $ tx _powerT) >= eta
         hasStarted Sink = (abs $ tx _powerT) >= eta
+        {-# INLINE hasEnded #-}
         hasEnded Source =  shouldHaveEnded && (abs $ tx _powerT) <= eta
         hasEnded Sink = shouldHaveEnded && (abs $ tx _powerT) <= eta
+        {-# INLINE shouldHaveEnded#-}
         shouldHaveEnded = (timeRemaining prevTx) <= 0
+        {-# INLINE eta #-}
         eta = 0.5
-
+{-# INLINE incTxState #-}
     
 -- transactor :: forall m n. P.Pipe m (NodeStates n) (TxPlan n, TxState)
 -- transactor = P.Pipe consumer producer i
@@ -322,14 +343,13 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
 
 
 transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Address n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
-transactionPlanner timeHorizon = FL.Fold step start end
-  where
-    step _ n = (pure . FL.Partial) =<< txn timeHorizon n
-    start = pure mempty
-    end = pure
+transactionPlanner timeHorizon = FL.Fold (\_ n -> txn timeHorizon n) (pure mempty) pure
+{-# INLINE transactionPlanner#-}
 
 
 txn' h t = (pure . (fromMaybe mempty)) =<< txn h t
+{-# INLINE txn' #-}
+
 
 txn :: forall m n. (MonadIO m, MonadCatch m, Ord n, Show n) => Time.DiffTime -> NodeStates n -> m (TxPlan' n)
 txn h (Tx ns) = do
@@ -342,31 +362,40 @@ txn h (Tx ns) = do
       reindexTx (Tx n) = Tx $ M.fromList $
                          fmap (\(i, a) -> (getAtI i, a)) $ M.toList n
   sched <- schedule
-  liftIO . print $ sched
+  --liftIO . print $ sched
   return $ fmap reindexTx sched
       where
         consumption = M.toAscList $ fmap _demand ns
+        {-# INLINE consumption #-}
         storage = M.toAscList $
                   fmap (\n ->
                           (totalCapacity . _battery $ n) * (soc . _battery $ n))
                   ns
+        {-# INLINE storage #-}
         d = fmap (\(i, (c, s))
                      -> (i, c - s)) $ zip [1..] $ zip (snd <$> consumption) (snd <$> storage)
+        {-# INLINE d #-}
         (sources, sinks) = L.partition (\x -> snd x > 0) d
+        {-# INLINE better #-}
         better f ss = uncurry f $ unzip $ (second fromWattSeconds) <$> ss
+        {-# INLINE schedule #-}
         schedule :: m (TxPlan' Int)
         schedule =  (fmap join) . tryForMaybe $ (solveTP h)
                     (better mkSources sources)
                     (better mkSinks sinks)
-          [[10 -- (fromIntegral $ mod j 2) * 1000
+          [[1 -- (fromIntegral $ mod j 2) * 1000
            | i <- [1..length sources]] | j <- [1..length sinks]]
+{-# INLINE txn #-}
 
 tryForMaybe :: (MonadIO m, MonadCatch m) => m a -> m (Maybe a) 
 tryForMaybe m = expToMaybe =<< (try m)
+{-# INLINE tryForMaybe #-}
 
 expToMaybe :: (MonadIO m) => Either SomeException a -> m (Maybe a)
 expToMaybe (Left e) = (liftIO . print $ e) >> return Nothing
 expToMaybe (Right a) = return $ Just a
+{-# INLINE expToMaybe #-}
+
 
 type TxPlan' n = Maybe (TxPlan n)
 
@@ -417,6 +446,7 @@ solveTP timeHorizon sources sinks cs = do
       toSinkStake t (i, e) = (i, Stake (Sink, (- e2p t e), t))
       e2p :: Time.DiffTime -> WattSeconds -> Watts
       e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
+{-# INLINE solveTP #-}
 
 {---
     Concretely
@@ -435,41 +465,27 @@ newtype Stake' p = Stake
 
 type Stake = Stake' Watts
 
-roleKey :: forall n. Key n Role
-roleKey = "roleTx"
+stakeKey :: forall n. Key n BL.ByteString
+stakeKey = "txStake"
 
-powerKey :: forall n p. (GreskellC p) => Key n p
-powerKey = "powerTx"
-
-durationKey :: forall n. Key n Time.DiffTime
-durationKey = "durationTx"
-
-instance (GreskellC p) => NodeAttributes (Stake' p) where
-  writeNodeAttributes (Stake (r, w, t)) = fmap writeKeyValues $
-    sequence [ (roleKey @VFoundNode <=:> r)
-             , (powerKey @VFoundNode <=:> w)
-             , (durationKey @VFoundNode <=:> t)
+instance (ToJSON n, FromJSON n) => NodeAttributes (Stake' n) where
+  writeNodeAttributes s = fmap writeKeyValues $
+    sequence [ (stakeKey @VFoundNode <=:> A.encode s)
              ]
-  parseNodeAttributes props = pMapToFail (Stake <$> tupleUp)
-    where
-      tupleUp = (,,)
-                <$> lookupAs (roleKey @VFoundNode) props
-                <*> lookupAs (powerKey @VFoundNode) props
-                <*> lookupAs (durationKey @VFoundNode) props
+  parseNodeAttributes props = pMapToFail (decodeBin $ lookupAs stakeKey props)
 
 
-instance (GreskellC p) => LinkAttributes (Stake' p) where
-  writeLinkAttributes (Stake (r, w, t)) = fmap writeKeyValues $
-    sequence [ (roleKey @EFinds <=:> r)
-             , (powerKey @EFinds <=:> w)
-             , (durationKey @EFinds <=:> t)
+decodeBin (Left a) = (Left a)
+decodeBin (Right x) = case A.decode x of
+        Nothing -> (Left $
+                    PMapParseError "Transactor or Stake Key" "aeson decode failed for sensor metrics")
+        Just x' -> Right x'
+
+instance (ToJSON n, FromJSON n) => LinkAttributes (Stake' n) where
+  writeLinkAttributes s = fmap writeKeyValues $
+    sequence [ (stakeKey @EFinds <=:> A.encode s)
              ]
-  parseLinkAttributes props = pMapToFail (Stake <$> tupleUp)
-    where
-      tupleUp = (,,)
-                <$> lookupAs (roleKey @EFinds) props
-                <*> lookupAs (powerKey @EFinds) props
-                <*> lookupAs (durationKey @EFinds) props
+  parseLinkAttributes props = pMapToFail (decodeBin $ lookupAs stakeKey props)
 
 
 
@@ -480,14 +496,17 @@ roleLinkDir r = case r of
 
 stakeLinkDir :: Stake -> LinkState
 stakeLinkDir (Stake (r, _, _)) = roleLinkDir r
+{-# INLINE stakeLinkDir #-}
 
 txStatusLinkDir :: TxStatus -> LinkState
-txStatusLinkDir = const LinkBidirectional
--- txStatusLinkDir TxStatus{energyDispatched, energyReceived} = if energyDispatched > 0 && energyDispatched == 0
---   then LinkToTarget
---   else if energyReceived > 0 && energyDispatched == 0
---        then LinkToSubject
---        else LinkBidirectional
+--txStatusLinkDir = const LinkBidirectional
+txStatusLinkDir TxStatus'{energyDispatched, energyReceived} = if energyDispatched > 0 && energyDispatched == 0
+  then LinkToTarget
+  else if energyReceived > 0 && energyDispatched == 0
+       then LinkToSubject
+       else LinkBidirectional
+{-# INLINE txStatusLinkDir #-}
+
 
 instance (RealFrac p) => Semigroup (Stake' p) where
   (Stake (Source, w, t)) <> (Stake (Source, w', t')) = Stake (Source, w + w', t + t')
@@ -528,50 +547,18 @@ fromStake (Stake (role, watts, duration)) = defMessage
 
 
 
-keyED :: (GreskellC e) => Key EFinds e
-keyED = "txStatusEnergyDispatched"
-
-keyERec :: (GreskellC e) => Key EFinds e
-keyERec = "txStatusEnergyReceived"
-
-keyTR :: Key EFinds Time.DiffTime
-keyTR = "txStatusTimeRemaining"
-
-keyERem :: (GreskellC e) => Key EFinds e
-keyERem = "txStatusEnergyRemaining"
-
-keyLPW :: (GreskellC e) => Key EFinds e
-keyLPW = "txStatusLossPerWattSecond"
-
-keyTL :: (GreskellC e) => Key EFinds e
-keyTL = "txStatusTotalLoss"
-
-keySL :: Key EFinds Time.DiffTime
-keySL = "txStatusStartLag"
-
-keyEL :: Key EFinds Time.DiffTime
-keyEL = "txStatusEndLag"
+txStatusKey :: forall n. Key n BL.ByteString
+txStatusKey = "txStatusKey"
 
 
+instance (ToJSON n, FromJSON n) => LinkAttributes (TxStatus' n) where
+  writeLinkAttributes s = fmap writeKeyValues $
+    sequence [ (txStatusKey @EFinds <=:> A.encode s)
+             ]
+  parseLinkAttributes props = pMapToFail (decodeBin $ lookupAs txStatusKey props)
 
-instance (GreskellC e) => LinkAttributes (TxStatus' e) where
-  writeLinkAttributes TxStatus'{..} = fmap writeKeyValues $ sequence $
-    [ keyED <=:> energyDispatched
-    , keyERec <=:> energyReceived
-    , keyTR <=:> timeRemaining
-    , keyERem <=:> energyRemaining
-    , keyLPW <=:> lossPerWattSecond
-    , keyTL <=:> totalLoss
-    , keySL <=:> startLag
-    , keyEL <=:> endLag
-    ]
-  parseLinkAttributes props =
-    pMapToFail (TxStatus'
-                <$> lookupAs keyED props
-                <*> lookupAs keyERec props
-                <*> lookupAs keyERem props
-                <*> lookupAs keyLPW props
-                <*> lookupAs keyTL props
-                <*> lookupAs keyTR props
-                <*> lookupAs keySL props
-                <*> lookupAs keyEL props)
+instance (ToJSON n, FromJSON n) => NodeAttributes (TxStatus' n) where
+  writeNodeAttributes s = fmap writeKeyValues $
+    sequence [ (txStatusKey @VFoundNode <=:> A.encode s)
+             ]
+  parseNodeAttributes props = pMapToFail (decodeBin $ lookupAs txStatusKey props)

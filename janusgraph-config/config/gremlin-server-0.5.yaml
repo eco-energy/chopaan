@@ -18,7 +18,6 @@
 
 host: 0.0.0.0
 port: 8182
-scriptEvaluationTimeout: 30000
 channelizer: org.apache.tinkerpop.gremlin.server.channel.WebSocketChannelizer
 graphs:
   graph: /etc/opt/janusgraph/janusgraph.properties
@@ -59,15 +58,16 @@ processors:
       cacheMaxSize: 1000
   - className: org.apache.tinkerpop.gremlin.server.op.standard.StandardOpProcessor
     config:
-      maxParameters: 512    
+      maxParameters: 512
+      evaluationTimeout: 300000
 metrics:
   consoleReporter:
     enabled: true
     interval: 180000
   csvReporter:
-    enabled: true
-    interval: 180000
-    fileName: /tmp/gremlin-server-metrics.csv
+    enabled: false
+    #interval: 180000
+    #fileName: /tmp/gremlin-server-metrics.csv
   jmxReporter:
     enabled: false
   slf4jReporter:
@@ -80,13 +80,15 @@ metrics:
   graphiteReporter:
     enabled: false
     interval: 180000
+
+scriptEvaluationTimeout: 300000
 maxInitialLineLength: 4096
 maxHeaderSize: 8192
 maxChunkSize: 8192
 maxContentLength: 65536
-maxAccumulationBufferComponents: 1024
-resultIterationBatchSize: 64
+maxAccumulationBufferComponents: 8192
+resultIterationBatchSize: 16
 writeBufferLowWaterMark: 32768
-writeBufferHighWaterMark: 65536
-threadPoolWorker: 1
-gremlinPool: 8
+writeBufferHighWaterMark: 131072
+threadPoolWorker: 2
+gremlinPool: 0

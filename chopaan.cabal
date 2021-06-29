@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4ed0b467be944f7a46e344791cf8ba19d60af19121a554e0a5e5fbcf160be2b1
+-- hash: bb413439e161d1029e32c1f45a06360add4dec252e7f717410004c2a06a6fdd3
 
 name:           chopaan
 version:        0.1.0.0
@@ -20,6 +20,10 @@ build-type:     Simple
 extra-source-files:
     README.md
     ChangeLog.md
+    assets/style.css
+    assets/tailwind.min.css
+    js/gridRenderer.js
+    js/gridRenderer.html
 data-files:
     options.dhall
 
@@ -122,6 +126,7 @@ library
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
+    , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -151,7 +156,9 @@ library
     , distributive
     , estimator
     , exceptions
+    , file-embed
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -180,6 +187,7 @@ library
     , servant
     , servant-blaze
     , servant-client
+    , servant-client-js
     , servant-js
     , stm
     , streamly >=0.7.2
@@ -196,7 +204,7 @@ library
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -226,6 +234,7 @@ library
       , suavemente
       , tls
       , wai
+      , wai-cors
       , warp
       , websockets
       , x509-store
@@ -233,139 +242,6 @@ library
   else
     build-depends:
         ghcjs-three
-  default-language: Haskell2010
-
-executable dev
-  main-is: Dev.hs
-  hs-source-dirs:
-      app
-  build-depends:
-      SVGFonts
-    , Shpadoinkle >=0.3.0.0
-    , Shpadoinkle-backend-pardiff
-    , Shpadoinkle-html
-    , Shpadoinkle-lens
-    , Shpadoinkle-router
-    , Shpadoinkle-widgets
-    , ad
-    , aeson
-    , algebraic-graphs >=0.5
-    , async
-    , base >=4.11 && <10
-    , base64
-    , binary
-    , blaze-markup
-    , bytestring
-    , cassava
-    , clay
-    , colour
-    , comonad
-    , constraints-extras
-    , containers
-    , data-default-class
-    , deepseq
-    , dependent-map
-    , dependent-sum
-    , dependent-sum-template
-    , diagrams-contrib >=1.4.4
-    , diagrams-lib
-    , diagrams-svg >=1.4.3
-    , dimensional
-    , directory
-    , distributive
-    , estimator
-    , exceptions
-    , filepath
-    , ghc-prim
-    , ghcjs-dom
-    , greskell >=1.2.0.0
-    , greskell-core >=0.1.3.5
-    , hashable
-    , haxl
-    , interpolatedstring-perl6
-    , jsaddle >=0.9.7.1
-    , katip
-    , keys
-    , lens
-    , linear
-    , microlens
-    , monad-bayes
-    , monad-control
-    , mtl
-    , newtype-generics
-    , pointed
-    , proto-lens
-    , proto-lens-runtime
-    , raw-strings-qq
-    , resource-pool
-    , resourcet
-    , retry
-    , rio >=0.1.8.0
-    , servant
-    , servant-blaze
-    , servant-client
-    , servant-js
-    , stm
-    , streamly >=0.7.2
-    , text
-    , time
-    , time-compat >=1.9.2.2
-    , transformers
-    , transformers-base
-    , typerep-map
-    , ulid
-    , unagi-chan
-    , unliftio
-    , unordered-containers
-    , vector
-    , vector-sized
-  if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
-    build-depends:
-        amazonka
-      , amazonka-iot
-      , amazonka-s3
-      , beam-core
-      , beam-migrate
-      , beam-postgres
-      , compensated
-      , concat-classes
-      , concat-examples
-      , concat-graphics
-      , concat-plugin
-      , conduit
-      , connection
-      , convertible
-      , dhall >=1.33.0
-      , greskell-websocket >=0.1.2.5
-      , http-client
-      , net-mqtt >=0.7.0
-      , net-spider
-      , network >=3.1.2.1
-      , network-uri
-      , postgresql-simple
-      , sbv
-      , servant-server
-      , servant-websockets
-      , suavemente
-      , tls
-      , wai
-      , warp
-      , websockets
-      , x509-store
-      , x509-validation
-  else
-    build-depends:
-        ghcjs-three
-  if !impl(ghcjs)
-    ghc-options: -threaded -O2
-    build-depends:
-        base
-      , chopaan
-      , optparse-simple
-    buildable: True
-  else
-    buildable: False
   default-language: Haskell2010
 
 executable hydrate
@@ -379,6 +255,7 @@ executable hydrate
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
+    , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -408,7 +285,9 @@ executable hydrate
     , distributive
     , estimator
     , exceptions
+    , file-embed
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -437,6 +316,7 @@ executable hydrate
     , servant
     , servant-blaze
     , servant-client
+    , servant-client-js
     , servant-js
     , stm
     , streamly >=0.7.2
@@ -453,7 +333,7 @@ executable hydrate
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -483,6 +363,7 @@ executable hydrate
       , suavemente
       , tls
       , wai
+      , wai-cors
       , warp
       , websockets
       , x509-store
@@ -501,8 +382,10 @@ executable hydrate
     buildable: False
   default-language: Haskell2010
 
-executable server
+executable kbtzim
   main-is: Main.hs
+  other-modules:
+      Paths_chopaan
   hs-source-dirs:
       app
   build-depends:
@@ -512,6 +395,7 @@ executable server
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
+    , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -541,7 +425,9 @@ executable server
     , distributive
     , estimator
     , exceptions
+    , file-embed
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -570,6 +456,7 @@ executable server
     , servant
     , servant-blaze
     , servant-client
+    , servant-client-js
     , servant-js
     , stm
     , streamly >=0.7.2
@@ -586,7 +473,7 @@ executable server
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -616,6 +503,145 @@ executable server
       , suavemente
       , tls
       , wai
+      , wai-cors
+      , warp
+      , websockets
+      , x509-store
+      , x509-validation
+  else
+    build-depends:
+        ghcjs-three
+  if !impl(ghcjs)
+    ghc-options: -threaded -O2 -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin
+    build-depends:
+        base
+      , chopaan
+      , optparse-simple
+    buildable: True
+  else
+    buildable: False
+  default-language: Haskell2010
+
+executable server
+  main-is: Server.hs
+  hs-source-dirs:
+      app
+  build-depends:
+      SVGFonts
+    , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-template
+    , Shpadoinkle-widgets
+    , ad
+    , aeson
+    , algebraic-graphs >=0.5
+    , async
+    , base >=4.11 && <10
+    , base64
+    , binary
+    , blaze-markup
+    , bytestring
+    , cassava
+    , clay
+    , colour
+    , comonad
+    , constraints-extras
+    , containers
+    , data-default-class
+    , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , estimator
+    , exceptions
+    , file-embed
+    , filepath
+    , fusion-plugin
+    , ghc-prim
+    , ghcjs-dom
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
+    , hashable
+    , haxl
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
+    , katip
+    , keys
+    , lens
+    , linear
+    , microlens
+    , monad-bayes
+    , monad-control
+    , mtl
+    , newtype-generics
+    , pointed
+    , proto-lens
+    , proto-lens-runtime
+    , raw-strings-qq
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , servant
+    , servant-blaze
+    , servant-client
+    , servant-client-js
+    , servant-js
+    , stm
+    , streamly >=0.7.2
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , transformers
+    , transformers-base
+    , typerep-map
+    , ulid
+    , unagi-chan
+    , unliftio
+    , unordered-containers
+    , vector
+    , vector-sized
+  if !impl(ghcjs)
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -O2
+    build-depends:
+        amazonka
+      , amazonka-iot
+      , amazonka-s3
+      , beam-core
+      , beam-migrate
+      , beam-postgres
+      , compensated
+      , concat-classes
+      , concat-examples
+      , concat-graphics
+      , concat-plugin
+      , conduit
+      , connection
+      , convertible
+      , dhall >=1.33.0
+      , greskell-websocket >=0.1.2.5
+      , http-client
+      , net-mqtt >=0.7.0
+      , net-spider
+      , network >=3.1.2.1
+      , network-uri
+      , postgresql-simple
+      , sbv
+      , servant-server
+      , servant-websockets
+      , suavemente
+      , tls
+      , wai
+      , wai-cors
       , warp
       , websockets
       , x509-store
@@ -628,7 +654,7 @@ executable server
   else
     other-modules:
         Paths_chopaan
-    ghc-options: -threaded -O2
+    ghc-options: -threaded -O2 -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin
     build-depends:
         base
       , chopaan
@@ -646,6 +672,7 @@ executable tx
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
+    , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -675,7 +702,9 @@ executable tx
     , distributive
     , estimator
     , exceptions
+    , file-embed
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -704,6 +733,7 @@ executable tx
     , servant
     , servant-blaze
     , servant-client
+    , servant-client-js
     , servant-js
     , stm
     , streamly >=0.7.2
@@ -720,7 +750,7 @@ executable tx
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -750,6 +780,7 @@ executable tx
       , suavemente
       , tls
       , wai
+      , wai-cors
       , warp
       , websockets
       , x509-store
@@ -778,6 +809,7 @@ executable ui
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
+    , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -807,7 +839,9 @@ executable ui
     , distributive
     , estimator
     , exceptions
+    , file-embed
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -836,6 +870,7 @@ executable ui
     , servant
     , servant-blaze
     , servant-client
+    , servant-client-js
     , servant-js
     , stm
     , streamly >=0.7.2
@@ -852,7 +887,7 @@ executable ui
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -882,6 +917,7 @@ executable ui
       , suavemente
       , tls
       , wai
+      , wai-cors
       , warp
       , websockets
       , x509-store
@@ -922,6 +958,7 @@ test-suite chopaan-test
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
+    , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
     , aeson
@@ -951,7 +988,9 @@ test-suite chopaan-test
     , distributive
     , estimator
     , exceptions
+    , file-embed
     , filepath
+    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -980,6 +1019,7 @@ test-suite chopaan-test
     , servant
     , servant-blaze
     , servant-client
+    , servant-client-js
     , servant-js
     , stm
     , streamly >=0.7.2
@@ -996,7 +1036,7 @@ test-suite chopaan-test
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -1026,6 +1066,7 @@ test-suite chopaan-test
       , suavemente
       , tls
       , wai
+      , wai-cors
       , warp
       , websockets
       , x509-store
@@ -1038,7 +1079,7 @@ test-suite chopaan-test
         base
     buildable: False
   else
-    ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
+    ghc-options: -threaded -with-rtsopts=-N -O2
     build-tool-depends:
         hspec-discover:hspec-discover
     build-depends:

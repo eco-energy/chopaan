@@ -2,7 +2,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module SpiderSpec (spec, hydrateKbtz) where
 
-import Streamly.Prelude (IsStream, MonadAsync)
+import Streamly as S
+
 import qualified Streamly.Prelude as S
 import Test.Hspec
 import Test.QuickCheck.Checkers
@@ -25,10 +26,13 @@ import Chopaan.Graph.Spider
 import Chopaan.Comm.Comm (initQs, writeChan, MessageQs(..), readPubQ)
 import Chopaan.Utils.Time (timeToUIntSeconds)
 
+import Chopaan.Node.Folds
+import Chopaan.Node.Storage (defBatteryParams)
 import Chopaan.Graph
 import Chopaan.Graph.Kbtz
 import Chopaan.API.History
 import Chopaan.Kibbutz.KbtzId
+
 
 import qualified Data.Text as T
 import qualified Data.Time as Ti
@@ -38,6 +42,7 @@ import qualified Network.Wai.Handler.Warp         as Warp
 import           Servant
 import           Servant.Client
 
+import qualified Streamly.Internal.Data.Fold as FL
 import Common
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
@@ -46,55 +51,86 @@ import Control.Concurrent hiding (writeChan)
 import Control.Applicative
 import NetSpider.Spider
   (withSpider, clearAll)
-
-
+import Control.Monad.Catch
+import Data.Pool
     
 spec :: Spec
 spec = do
   let
-    nNodes = 5
-    nMessages = 5
+    nNodes = 40
+    nMessages = 400
     kId = KbtzId "test"
     t0 = t
     tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
-    --tn = Ti.addUTCTime (d * (fromIntegral $ nNodes * nMessages)) t0
-    
   beforeAll (do
                 let c = mkConfG ("localhost", 8182)
                 withSpider (unConf $ meshG c) clearAll
                 withSpider (unConf $ txG c) clearAll
                 withSpider (unConf $ flowG c) clearAll
                 withSpider (unConf $ statusG c) clearAll
+                kp <- kbtzPool "localhost" 8182                 
                 ns <- liftIO $ arbs @NodeMAC nNodes
+                withResource kp (\c -> addKbtz c kId)
+                mapM_ (\n -> withResource kp (\c -> addNodeToKbtz c kId n)) ns
                 sp <- mkSpool c
                 return (ns, sp)
             ) $ do
     describe "Spiders are great" $ do
+      it "Check each fold" $ \(ns, sp) -> do
+        es <- orderedES Source nMessages
+        let
+          tf = S.postscan timeFold es
+          pf = S.postscan powerFold es
+          ef = S.postscan energyFold es
+          bf = S.postscan (batteryFold defBatteryParams) es
+          df = S.postscan demandFold es
+          lc f = do
+            l <- S.length f
+            l `shouldBe` nMessages
+        lc tf
+        lc pf
+        lc ef
+        lc bf
+        lc df
+        
+      it "Sensor Fold works" $ \(ns, sp) -> do
+        es <- do
+          xs'' <- mapM (\(i, n) ->
+                          (return . (S.map (\x -> (n, x))))
+                          =<<
+                          orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
+                  $ zip [1..nNodes] ns
+          return $ foldl S.wSerial S.nil xs''
+        let s = S.postscan (FL.classify sensorFold) es
+        print =<< (S.last s)
+        l <- S.length s
+        l `shouldBe` (nMessages * nNodes)
+        
       it "qKbtz processor processes all messages!" $ \(ns, sp) -> do
         es <- do
           xs'' <- mapM (\i ->
-                          (orderedES (if (mod i 2 == 0) then Source else Sink) nMessages))
+                          orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
                   $ [1..nNodes]
-          return $ foldl S.wSerial S.nil xs''
+          return $ foldl S.wAsync S.nil xs''
         rs <- do
           xs'' <- mapM (\i ->
-                          (orderedRS (if (i == 1) then Root else Child) nMessages (head ns)))
+                          orderedRS (if (i == 1) then Root else Child) nMessages (head ns))
                   $ [1..nNodes]
-          return $ foldl S.wSerial S.nil xs''
+          return $ foldl S.wAsync S.nil xs''
         qs <- initQs
-        k <- runKibbutz $
+        k <- (S.avgRate 1000) <$> (runKibbutz $
           KbtzC { name = kId
                 , nodes = ns
                 , channelOpts = Left qs
                 , spiderHost = "localhost"
                 , spiderPort = 8182
-                }
-        let ns' = (S.fromList $ cycle ns) 
+                })
+        let ns' = S.fromList $ cycle ns
         forkIO $ do
           S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
           S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
           print "Messages Queued"
-        l <- S.length $ S.take ((2 * nNodes * nMessages)) k
+        l <- S.length $ S.take ((2 * nNodes * nMessages) + 0) k
         l `shouldBe` (2 * nNodes * nMessages)
 
     it "RS snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
@@ -102,7 +138,7 @@ spec = do
       oneNodePerMACPlusRoot gotNs nNodes
       -- $ for a tree structure with one root node, each node should have the root as its parent,
       -- $ while the root node should be linked to router
-      treePlusStructure gotLs nNodes
+      -- treePlusStructure gotLs nNodes
       
     it "Stake snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
       (gotNs, gotLs) <- snapDebug txNodesSnapshot sp ns t0 tn
@@ -130,9 +166,9 @@ snapDebug snapfn sp ns t0 tn = do
   (gotNs, gotLs) <-  runSpider sp (snapfn ns t0 tn)
   print $ "Num Nodes: " <> (show . length  $ gotNs)
   print $ "Num Links: " <> (show . length  $ gotLs)
-  --print $ (fmap nodeId gotNs)
-  --print $ (fmap nodeAttributes gotNs)
-  --print $ (gotLs)
+  print $ (fmap nodeId gotNs)
+  print $ (fmap nodeAttributes gotNs)
+  print $ (fmap linkNodeTuple gotLs)
   return $ (gotNs, gotLs)
 
 
@@ -176,9 +212,11 @@ orderedES et n = do
       & NM.solarVoltage .~ sv et
       & NM.solarInputCurrent .~ si et
       & NM.batteryToLoadCurrent .~ li et
-      & NM.gridToBatteryCurrent .~ 0
-      & NM.batteryToGridCurrent .~ 0
+      -- & NM.gridToBatteryCurrent .~ 0
+      -- & NM.batteryToGridCurrent .~ 0
+      & NM.gridCurrent .~ 0
       & NM.gridVoltage .~ 60
+      & NM.temperature .~ 0
       where
         v Source = 14.8
         v Sink = 8.0

@@ -46,12 +46,6 @@ import Chopaan.Graph.G
 type R = Double
 
 
-deriving instance Generic Timestamp
-deriving instance NFData Timestamp
-deriving instance (NFData n, NFData a) => NFData (SnapshotNode n a)
-deriving instance (NFData n, NFData e) => NFData (SnapshotLink n e)
-
-
 -- $ Constraints for edge labels and nodes
 type GrConn f s = (Bounded s, Show s, Ord s, Eq s, Enum s, Show f, Monoid f, Ord f)
 
@@ -74,15 +68,15 @@ instance N.Newtype (Gr flow state)
 -- $ Shpadoinkle Instances
 instance (Show state, Show flow) => Humanize (Gr flow state)
 
-fromSnapshot :: forall n l v. (Monoid l, Ord n) => SnapshotGraph n v l -> Gr l v
+fromSnapshot :: forall n l v. (Monoid l, Ord n) => SnapshotGraph n v l -> Gr l (Maybe v)
 fromSnapshot g = Gr . AG.edges $ fmap (\(x, (_, y), (_, z)) -> (x, y, z)) $ castLinks g
 
-castLinks :: forall n v l. (Monoid l, Ord n) => SnapshotGraph n v l -> [(l, (n, v), (n, v))]
+castLinks :: forall n v l. (Monoid l, Ord n) => SnapshotGraph n v l -> [(l, (n, Maybe v), (n, Maybe v))]
 castLinks (nodes, links) = (\l -> (linkAttributes l, sourceAttrs l, destAttrs l)) <$> links
   where
     nmap = Map.fromList $ zip (nodeId <$> nodes) (nodeAttributes <$> nodes)
-    sourceAttrs l = (sourceNode l, fromJust $ nmap Map.! (sourceNode l))
-    destAttrs l = (destinationNode l, fromJust $ nmap Map.! (destinationNode l))
+    sourceAttrs l = (sourceNode l, nmap Map.! (sourceNode l))
+    destAttrs l = (destinationNode l, nmap Map.! (destinationNode l))
     
 newtype GrNode = GrNode Int
   deriving (Eq, Ord, Typeable, Show)

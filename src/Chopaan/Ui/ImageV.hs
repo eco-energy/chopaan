@@ -56,7 +56,7 @@ newtype ShaderEff = ShaderEff { unShaderEff :: T.Text }
 
 shaderH :: GenBuses a => Widgets a -> (a :> ImageC) -> ShaderEff
 shaderH widgets effect = ShaderEff . T.pack . shaderDefs $ glsl widgets effect
- 
+{-# INLINE shaderH #-} 
 
 addShader :: MonadJSM m => ShaderEff -> m ()
 addShader = H.addScriptSrc . unShaderEff
@@ -71,6 +71,8 @@ deltaDiskPlot :: forall f.
 deltaDiskPlot toC xs ys = (toC . fst) `C.over` im
   where
     im = toImageC $ deltaPlot disk xs ys
+{-# INLINE deltaDiskPlot #-}
+
 
 deltaPlot :: forall f.
   (Foldable f, Functor f, Zip f)
@@ -85,7 +87,7 @@ deltaPlot toR xs ys = foldl xorR noThing $
     noThing :: Region
     noThing = nothing
     deltas = fmap toR ys
-
+{-# INLINE deltaPlot #-}
 
 
 installEffect :: (MonadJSM m) => RawNode -> ShaderEff -> m ()

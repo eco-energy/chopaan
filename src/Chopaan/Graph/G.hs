@@ -38,6 +38,10 @@ import NetSpider.Snapshot
 import NetSpider.Spider.Config
 import Data.Pool
 import NetSpider.Spider
+import NetSpider.Timestamp as NT
+
+import GHCJS.Marshal
+
 
 data G k n where
   Mesh :: k n MeshNode RxSignal -> G k n
@@ -47,6 +51,11 @@ data G k n where
   deriving (Generic)
 
 
+
+deriving instance (forall a b. (Eq a, Eq b) => Eq (k n a b)) => Eq (G k n)
+
+deriving instance (forall a b. (Eq a, Eq b) => Eq (k n a b), forall a b. (Ord a, Ord b) => Ord (k n a b)) => Ord (G k n)
+
 deriving instance (forall a b. (ToJSON a, ToJSON b) => ToJSON (k n a b)) => ToJSON (G k n)
 
 deriving instance (forall a b. (FromJSON a, FromJSON b) => FromJSON (k n a b)) => FromJSON (G k n)
@@ -55,9 +64,19 @@ deriving instance (forall a b. (NFData a, NFData b) => NFData (k n a b)) => NFDa
 
 deriving instance (forall a b. (Show a, Show b) => Show (k n a b)) => Show (G k n)
 
+-- deriving instance (forall a b. (ToJSVal a, ToJSVal b) => ToJSVal (k n a b)) => ToJSVal (G k n)
+
+-- deriving instance (forall a b. (FromJSVal a, FromJSVal b) => FromJSVal (k n a b)) => FromJSVal (G k n)
+
+--deriving instance NFData (SnapshotGraph n v e)
+deriving instance Generic NT.Timestamp
+deriving instance NFData NT.Timestamp
+deriving instance (NFData n, NFData v) => NFData (SnapshotNode n v)
+deriving instance (NFData n, NFData e) => NFData (SnapshotLink n e)
+--deriving instance NFData (([SnapshotNode n v], [SnapshotLink n e]))
 
 newtype SG' n v e = SG { unSnapshot :: SnapshotGraph n v e }
-  deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
+  deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
 
 type SG n = G SG' n
 

@@ -39,7 +39,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent.STM
 import Control.Concurrent (forkIO)
 
-import Streamly.Prelude (IsStream, MonadAsync)
+import Streamly (IsStream, MonadAsync)
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Unfold as UF
 
@@ -74,6 +74,7 @@ data MessageQs n = MessageQs
 unfoldChan :: (IsStream t, MonadAsync m) => WriteChan n a -> m (t m (n, a))
 unfoldChan (WriteChan wc) = (\rc -> pure $ S.repeatM (liftIO $ UC.readChan rc))
                             =<< (liftIO . UC.dupChan $ wc) 
+{-# INLINE unfoldChan #-}
 
 initPubQ :: STM (PubQueue)
 initPubQ = initNodeQueue
@@ -137,5 +138,5 @@ subStream n (WriteChan wc) = do
     $ S.filter (\(n', _) -> n' == n)
     -- $ S.trace (liftIO . (\(n', _) -> print $ "Before Filter " <> show n' <> "\n Expected " <> show n))
     $ S.repeatM . liftIO $ UC.readChan rc
-
+{-# INLINE subStream #-}
 

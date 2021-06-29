@@ -33,7 +33,8 @@ import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStat
 
 
 import qualified Streamly.Prelude as S
-import Streamly.Prelude (IsStream, MonadAsync, adapt)
+import Streamly (IsStream, MonadAsync, adapt)
+import qualified Streamly as S
 import Streamly.Internal.Data.Stream.StreamK (hoist)
 import Control.Monad.Trans.Resource
 

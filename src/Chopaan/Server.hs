@@ -14,7 +14,7 @@ module Chopaan.Server (application) where
 
 import GHC.Generics hiding (R)
 
-import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Reader hiding (ask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader.Class
 
@@ -43,13 +43,11 @@ import Chopaan.API.History
 import Chopaan.View (view, template, onRouteChange)
 
 
-data Opts = Opts String Int
-
-newtype App a = App { runApp :: ReaderT Opts IO a }
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader Opts)
+newtype App a = App { runApp :: ReaderT SpiderOpts IO a }
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader SpiderOpts)
 
 
-appToHandler :: MonadIO m => Opts -> App ~> m
+appToHandler :: MonadIO m => SpiderOpts -> App ~> m
 appToHandler c a = liftIO $ runReaderT (runApp a) c
 
 
@@ -58,19 +56,21 @@ newtype Noop a = Noop (JSM a)
   deriving anyclass CRUDChopaan
 
 instance CRUDChopaan App where
-  listNodezim = undefined
-  listKibbutzim = undefined
-  nodeDetails = undefined
+  listNodezim k = (\(SpiderOpts h p) -> (toHandlerH h p) $ listNodezim k)
+                  =<< ask 
+  listKibbutzim = (\(SpiderOpts h p) -> (toHandlerH h p) listKibbutzim) =<< ask
+  getGraph  g k t t' = ask
+                       >>= (\(SpiderOpts h p) -> toHandlerH h p $ getGraph g k t t')
 
-app :: Env -> FilePath -> Opts -> Application
-app ev root (Opts h p) = serve (Proxy @ (SPA App :<|> HistoryAPI)) (serveSPA :<|> (serveHistoryAPI h p))
+app :: Env -> FilePath -> SpiderOpts -> Application
+app ev root (SpiderOpts h p) = serve (Proxy @ (SPA App :<|> HistoryAPI)) (serveSPA :<|> (serveHistoryAPI h p))
   where
     serveSPA :: Server (SPA App)
     serveSPA = serveUI @ (SPA App) root
-      (\r -> appToHandler (undefined) $ do
+      (\r -> appToHandler (SpiderOpts h p) $ do
           i <- onRouteChange r
           return . template ev i $ view @ Noop i) routes
 
 
 application :: Env -> FilePath -> IO Application
-application e f = return $ app e f (Opts "localhost" 8182) 
+application e f = return $ app e f (SpiderOpts "localhost" 8182) 

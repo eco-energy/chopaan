@@ -71,3 +71,11 @@ s2nix:
 
 image:
 	docker load < $$(nix-build ./nix/docker.nix)
+
+images:
+	$(./load_docker.sh)
+
+reload:
+	docker-compose down
+	images
+	docker-compose up

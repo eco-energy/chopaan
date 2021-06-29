@@ -22,7 +22,7 @@ import qualified Data.Text as T
 import qualified Network.AWS.S3 as S3
 
 import qualified Streamly.Prelude as S
-import Streamly.Prelude (IsStream, MonadAsync, ParallelT, adapt)
+import Streamly as S --(IsStream, MonadAsync, ParallelT, adapt)
 import qualified Streamly.FileSystem.Handle as FH
 import qualified Streamly.Data.Unfold as UF
 import qualified Streamly.Internal.Data.Unfold as UF
@@ -83,9 +83,9 @@ writeDataFold n = FL.Fold step start en
       return (f, S3.ObjectKey "")
     step :: (I.Handle, S3.ObjectKey)
          -> S3.ObjectKey
-         -> IO (FL.Step (I.Handle, S3.ObjectKey) S3.ObjectKey)
+         -> IO ((I.Handle, S3.ObjectKey))
     step (h, _) (S3.ObjectKey n) =
-      ((I.hPutStrLn h) . T.unpack $ n) >> (return . FL.Partial $ (h, S3.ObjectKey $ n))
+      ((I.hPutStrLn h) . T.unpack $ n) >> (return $ (h, S3.ObjectKey $ n))
     en (h, s) = (I.hClose h) >> (print "Paths Written!") >> pure s
     fp = "data/" <> (mac2Path n) <> ".s3path"
 
@@ -97,8 +97,8 @@ writePathsFold n = FL.Fold step start en
       return (f, S3.ObjectKey "")
     step :: (I.Handle, S3.ObjectKey)
          -> S3.ObjectKey
-         -> IO (FL.Step (I.Handle, S3.ObjectKey) S3.ObjectKey)
+         -> IO ((I.Handle, S3.ObjectKey))
     step (h, _) (S3.ObjectKey n) =
-      ((I.hPutStrLn h) . T.unpack $ n) >> (return . FL.Partial $ (h, S3.ObjectKey $ n))
+      ((I.hPutStrLn h) . T.unpack $ n) >> (return $ (h, S3.ObjectKey $ n))
     en (h, s) = (I.hClose h) >> (print "Paths Written!") >> pure s
     fp = "data/" <> (show n) <> ".s3path"

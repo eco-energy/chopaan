@@ -12,7 +12,7 @@ import Chopaan.Comm.Mqtt.AWS (withMqttAuth
                              )
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Transactor (Tx(..), TxPlan, Role(..), mkStake, dispatchNodeTx, Stake, Stake'(..))
-import Chopaan.Comm.Mqtt (pub, client)
+import Chopaan.Comm.Mqtt (pub, client, pubQ, runMQ)
 import Chopaan.Comm.Comm (initPubQ, trivialCallback)
 import Chopaan.Types
 import qualified Data.Map.Strict as Map
@@ -43,7 +43,7 @@ runTx mqttCreds = do
   Options{mqttOpts} <- input auto "./txOpts.dhall"
   outbox <- atomically $ initPubQ
   cl <- client mqttOpts{connId = unKbtzId kname} trivialCallback mqttCreds
-  _ <- forkIO $ forever $ (pub cl outbox)
+  _ <- forkIO $ forever $ (runMQ cl (pubQ outbox))
   mapM_ (\tx -> (dispatchNodeTx outbox tx)
           >> print ("Dispatched! " <> show tx)
           >> (threadDelay delay)) $ loop srcs
