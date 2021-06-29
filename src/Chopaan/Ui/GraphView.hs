@@ -145,17 +145,19 @@ createGridObject = undefined
 
 
 renderWith3 :: (ToJSON n, ToJSON v, ToJSON e) => SnapshotGraph n v e -> Html m ()
-renderWith3 a = baked $ do
-  -- $(embedHtml "src/Chopaan/Ui/gridRenderer.html")
-  (notify, stream) <- H.mkGlobalMailboxAfforded constUpdate
-  let file = $(embedFile "js/gridRenderer.js")
-  liftIO . print $ file
-  doc' <- currentDocumentUnchecked
-  container' <- toJSVal =<< createElement doc' "div"
-  eval $ T.decodeUtf8 file 
-  --  \a' -> (liftIO . print $ a') >>  
-  --jsg1 "initGrid" (A.toJSON a)
-  return (RawNode container', stream)
+renderWith3 a = cview
+  where
+    b = baked $ do
+      -- $(embedHtml "src/Chopaan/Ui/gridRenderer.html")
+      (notify, stream) <- H.mkGlobalMailboxAfforded constUpdate
+      let file = $(embedFile "js/gridRenderer.js")
+      liftIO . print $ file
+      doc' <- currentDocumentUnchecked
+      container' <- toJSVal =<< createElement doc' "div"
+      eval $ T.decodeUtf8 file 
+      --  \a' -> (liftIO . print $ a') >>  
+      --jsg1 "initGrid" (A.toJSON a)
+      return (RawNode container', stream)
 
 
 cview :: Html m a
