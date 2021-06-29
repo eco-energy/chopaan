@@ -8,7 +8,7 @@ import Control.Monad.Trans.Reader hiding (ask)
 import Control.Monad.Reader.Class
 import Control.Monad.Catch
 
-import Data.Greskell (FromGraphSON, ToGreskell(..))
+import Data.Greskell (FromGraphSON)
 
 import NetSpider.Spider (Spider)
 import NetSpider.Spider.Config (Config(..))
@@ -42,9 +42,11 @@ import Chopaan.Graph.Spider ( Spools
                             , flowNodesSnapshot
                             )
 
-import Servant (Server, Get, Capture, Proxy(..), (:>)
+import Servant (Server, Get, Capture, QueryParam, Proxy(..), (:>)
                , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer, serve)
 
+import Servant.API.Modifiers
+import Servant.API.QueryParam
 import Data.Pool
 import Data.Aeson (ToJSON, FromJSON)
 import Network.Wai (Application)
@@ -63,11 +65,13 @@ newtype HistoryApp a = HistoryApp { runHistoryApp :: ReaderT (DBPools) IO a }
                     MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
 
 
+type QueryParamR = QueryParam' '[Required, Strict]
+
 type HistoryAPI = "history"
-  :> (Capture "kbtzId" KbtzName)
-  :> (Capture "graphType" GraphType)
-  :> (Capture "startTime" UTCTime)
-  :> (Capture "endTime" UTCTime)
+  :> (QueryParamR "kbtzId" KbtzName)
+  :> (QueryParamR "graphType" GraphType)
+  :> (QueryParamR "startTime" UTCTime)
+  :> (QueryParamR "endTime" UTCTime)
   :> Get '[JSON] (G.SG NodeMAC)
 
 
