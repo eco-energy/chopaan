@@ -21,7 +21,7 @@ import qualified Control.Concurrent.Async as A
 
 import Streamly as S
 import qualified Streamly.Prelude as S
-import qualified Streamly.Internal.Data.Stream.IsStream as Internal
+import qualified Streamly.Internal.Prelude as Internal
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Pipe as P
 
@@ -117,12 +117,12 @@ mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOp
   -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
 mqttSrc k ns o = qSrc  =<< (mqttQs o k ns)
 
-propagateLastMaybe :: (IsStream t, MonadAsync m, Monoid a) => t m (Maybe a) -> t m a
-propagateLastMaybe = S.postscan mf
-  where
-    mf = FL.mkAccum_ lastOnNothingCurrentOnJust mempty
-    lastOnNothingCurrentOnJust a (Just a') = a'
-    lastOnNothingCurrentOnJust a Nothing = a
+-- propagateLastMaybe :: (IsStream t, MonadAsync m, Monoid a) => t m (Maybe a) -> t m a
+-- propagateLastMaybe = S.postscan mf
+--   where
+--     mf = FL.mkFoldId lastOnNothingCurrentOnJust mempty
+--     lastOnNothingCurrentOnJust a (Just a') = a'
+--     lastOnNothingCurrentOnJust a Nothing = a
 
 
 runKibbutz :: forall t m. (IsStream t, MonadAsync m, MonadCatch m, Monad (t m)) => KbtzC NodeMAC -> m (t m Bool)
@@ -145,7 +145,6 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
       plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
   let tx = tapCount "statePipe"
            $ S.parallely . S.adapt
-           $ S.map (uncurry (&&))
            $ S.postscan gridFold
            -- $ constBool
            -- $ S.trace (liftIO . print)
@@ -163,11 +162,11 @@ runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
   where
     getLatest ::
       (NodeMAC, ((NodeStates NodeMAC, Maybe (TxPlan NodeMAC)), (TxState NodeMAC)))
-      -> (NodeMAC, (SensorR, Maybe Stake, TxStatus))
+      -> (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus))
     getLatest (n, ((Tx a, b), c)) = let
       a' = fromMaybe initSM (M.lookup n a)
       b' = (\x -> M.lookup n (unTx x)) =<< b
-      c' = fromMaybe mempty $ snd <$> (M.lookup n (unTx c))
+      c' = snd <$> (M.lookup n (unTx c))
       in (n, (a', b', c'))
       where
         getN :: M.Map NodeMAC a -> a
