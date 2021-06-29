@@ -57,7 +57,7 @@ import Data.Pool
 spec :: Spec
 spec = do
   let
-    nNodes = 40
+    nNodes = 10
     nMessages = 400
     kId = KbtzId "test"
     t0 = t
@@ -166,9 +166,9 @@ snapDebug snapfn sp ns t0 tn = do
   (gotNs, gotLs) <-  runSpider sp (snapfn ns t0 tn)
   print $ "Num Nodes: " <> (show . length  $ gotNs)
   print $ "Num Links: " <> (show . length  $ gotLs)
-  print $ (fmap nodeId gotNs)
-  print $ (fmap nodeAttributes gotNs)
-  print $ (fmap linkNodeTuple gotLs)
+  -- print $ (fmap nodeId gotNs)
+  -- print $ (fmap nodeAttributes gotNs)
+  -- print $ (fmap linkNodeTuple gotLs)
   return $ (gotNs, gotLs)
 
 
