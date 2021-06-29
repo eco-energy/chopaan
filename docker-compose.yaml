@@ -36,35 +36,6 @@ services:
     container_name : kbtzim
     links:
       - db
-  # timescale:
-  #   build:
-  #     context: .
-  #     dockerfile: ./Dockerfile.db 
-  #   image: chopaan/timescale
-  #   command: postgres -c shared_preload_libraries=timescaledb -c log_statement=all -c log_destination=stderr
-  #   ports:
-  #     - 5432:5432
-  #   environment:
-  #     - POSTGRES_USER=chopaan
-  #     - POSTGRES_PASSWORD=testPassword
-  #     - PGPASSWORD=testPassword
-  #   volumes:
-  #     #- ./data:/var/lib/postgresql
-  #     - ./db_migrations/1.psql:/docker-entrypoint-initdb.d/init.sql
-  # chopaan:
-  #   image: chopaan
-  #   depends_on:
-  #     - timescale
-  #   restart: always
-  #   ports:
-  #     - 3000:3000
-  #     - 8080:8080
-  #     - 443:443
-  #   volumes:
-  #     - ~/.aws/credentials:/.aws/credentials
-  #   links:
-  #     - "timescale"
-  #   #command: /opt/chopaan/chopaan
 
 volumes:
   janusgraph-default-data:
