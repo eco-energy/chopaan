@@ -390,7 +390,7 @@ nodesSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadAsync m)
   -> UTCTime
   -> Pool (Spider n v e)
   -> m (SnapshotGraph n v e)
-nodesSnapshot ns t t' p = S.fold FL.mconcat $ S.parallely $ S.mapM (\n -> liftIO $ withResource p (\s -> getSnapshot s $ rangeQuery t t' [n])) $ S.fromList ns
+nodesSnapshot ns t t' p = liftIO $ withResource p (\s -> getSnapshot s $ rangeQuery t t' ns)
 {-# INLINE nodesSnapshot #-}
 
 statusGridSnapshot :: KbtzName
