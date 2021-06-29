@@ -57,8 +57,8 @@ import Data.Pool
 spec :: Spec
 spec = do
   let
-    nNodes = 20
-    nMessages = 1000
+    nNodes = 40
+    nMessages = 400
     kId = KbtzId "test"
     t0 = t
     tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
@@ -167,7 +167,7 @@ snapDebug snapfn sp ns t0 tn = do
   print $ "Num Nodes: " <> (show . length  $ gotNs)
   print $ "Num Links: " <> (show . length  $ gotLs)
   print $ (fmap nodeId gotNs)
-  --print $ (fmap nodeAttributes gotNs)
+  print $ (fmap nodeAttributes gotNs)
   print $ (fmap linkNodeTuple gotLs)
   return $ (gotNs, gotLs)
 
