@@ -293,7 +293,7 @@ gView :: forall m. (MonadJSM m, CRUDChopaan m) => GView -> Html m (GView)
 gView g = H.div [H.class' $ relative <> flex_grow <> flex_col]
   [ case _currentG g of
       Nothing -> voidC $ H.text "No Graph Found Yet"
-      Just sg -> voidC $ renderKbtzGraph sg
+      Just sg -> voidC $ renderGrid sg
   , graphSelectButtons
   --, onRecord whichK $ getGraph
   ]
