@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d481f4aedd7766d43094a71502eb6308cee9c9fc262c288bd9e507890f1fc426
+-- hash: 7de0996d63912aa8de7c6062c9acf64fe923a9486f3b35b40745454f953655d6
 
 name:           chopaan
 version:        0.1.0.0
@@ -174,6 +174,7 @@ library
     , microlens
     , monad-control
     , mtl
+    , network >=3.1.2.1
     , newtype-generics
     , pointed
     , proto-lens
@@ -189,7 +190,6 @@ library
     , servant-client-js
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -226,12 +226,12 @@ library
       , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
-      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -301,6 +301,7 @@ executable hydrate
     , microlens
     , monad-control
     , mtl
+    , network >=3.1.2.1
     , newtype-generics
     , pointed
     , proto-lens
@@ -316,7 +317,6 @@ executable hydrate
     , servant-client-js
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -353,12 +353,12 @@ executable hydrate
       , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
-      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -439,6 +439,7 @@ executable kbtzim
     , microlens
     , monad-control
     , mtl
+    , network >=3.1.2.1
     , newtype-generics
     , pointed
     , proto-lens
@@ -454,7 +455,6 @@ executable kbtzim
     , servant-client-js
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -491,12 +491,12 @@ executable kbtzim
       , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
-      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -575,6 +575,7 @@ executable server
     , microlens
     , monad-control
     , mtl
+    , network >=3.1.2.1
     , newtype-generics
     , pointed
     , proto-lens
@@ -590,7 +591,6 @@ executable server
     , servant-client-js
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -627,12 +627,12 @@ executable server
       , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
-      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -712,6 +712,7 @@ executable tx
     , microlens
     , monad-control
     , mtl
+    , network >=3.1.2.1
     , newtype-generics
     , pointed
     , proto-lens
@@ -727,7 +728,6 @@ executable tx
     , servant-client-js
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -764,12 +764,12 @@ executable tx
       , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
-      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -847,6 +847,7 @@ executable ui
     , microlens
     , monad-control
     , mtl
+    , network >=3.1.2.1
     , newtype-generics
     , pointed
     , proto-lens
@@ -862,7 +863,6 @@ executable ui
     , servant-client-js
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -899,12 +899,12 @@ executable ui
       , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
-      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai
@@ -999,6 +999,7 @@ test-suite chopaan-test
     , microlens
     , monad-control
     , mtl
+    , network >=3.1.2.1
     , newtype-generics
     , pointed
     , proto-lens
@@ -1014,7 +1015,6 @@ test-suite chopaan-test
     , servant-client-js
     , servant-js
     , stm
-    , streamly >=0.7.2
     , text
     , time
     , time-compat >=1.9.2.2
@@ -1051,12 +1051,12 @@ test-suite chopaan-test
       , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
-      , network >=3.1.2.1
       , network-uri
       , postgresql-simple
       , sbv
       , servant-server
       , servant-websockets
+      , streamly >=0.7.2
       , suavemente
       , tls
       , wai

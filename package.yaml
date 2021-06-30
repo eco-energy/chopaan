@@ -33,7 +33,7 @@ description:         Please see the README on Github at <https://github.com/faez
 dependencies:
 - base >= 4.11 && < 10
 - rio >= 0.1.8.0
-- streamly >= 0.7.2
+- network >= 3.1.2.1
 - async
 - exceptions
 - deepseq
@@ -117,10 +117,10 @@ dependencies:
 when:
   - condition: "!impl(ghcjs)"
     dependencies:
+      - streamly >= 0.7.2
       - beam-core
       - beam-postgres
       - beam-migrate
-      - network >= 3.1.2.1
       - postgresql-simple
       - concat-classes
       - concat-examples
