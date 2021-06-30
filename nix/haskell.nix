@@ -140,8 +140,8 @@ let
         packages.free.package.buildType = lib.mkForce "Simple";
         packages.network.package.buildType = lib.mkForce "Simple";
         packages.streamly.package.buildType = lib.mkForce "Simple";
-        packages.streamly.components.library.doCheck = false;
-        packages.streamly.components.library.doHaddock = false;
+        packages.streamly.doCheck = false;
+        packages.streamly.doHaddock = false;
         #packages.streamly.flags = {
         #    fusion-plugin = false;
         #    inspection = false;
