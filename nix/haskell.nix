@@ -139,18 +139,18 @@ let
         packages.semigroupoids.package.buildType = lib.mkForce "Simple";
         packages.free.package.buildType = lib.mkForce "Simple";
         #packages.streamly.package.buildType = lib.mkForce "Simple";
-        packages.streamly.components.library.doCheck = false;
-        packages.streamly.components.library.doHaddock = false;
-        packages.streamly.flags = {
-            fusion-plugin = false;
-            inspection = false;
-            debug = false;
-            dev = false;
-            has-llvm = false;
-            streamk = false;
-            examples = false;
-            examples-sdl = false;
-          };
+        #packages.streamly.components.library.doCheck = false;
+        #packages.streamly.components.library.doHaddock = false;
+        #packages.streamly.flags = {
+        #    fusion-plugin = false;
+        #    inspection = false;
+        #    debug = false;
+        #    dev = false;
+        #    has-llvm = false;
+        #    streamk = false;
+        #    examples = false;
+        #    examples-sdl = false;
+        #  };
         packages.newtype-generics.package.doHaddock = false;
         packages.numtype-dk.package.doHaddock = false;
         packages.MemoTrie.package.doHaddock = false;
@@ -166,6 +166,7 @@ let
 
         # Remove hsc2hs build-tool dependencies (suitable version will be available as part of the ghc derivation)
         packages.network.components.library.build-tools = lib.mkForce [];
+        packages.streamly.components.library.build-tools = lib.mkForce [];
       })
     ];
   };
