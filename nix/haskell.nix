@@ -138,9 +138,10 @@ let
         packages.nonempty-vector.package.buildType = lib.mkForce "Simple";
         packages.semigroupoids.package.buildType = lib.mkForce "Simple";
         packages.free.package.buildType = lib.mkForce "Simple";
-        #packages.streamly.package.buildType = lib.mkForce "Simple";
-        #packages.streamly.components.library.doCheck = false;
-        #packages.streamly.components.library.doHaddock = false;
+        packages.network.package.buildType = lib.mkForce "Simple";
+        packages.streamly.package.buildType = lib.mkForce "Simple";
+        packages.streamly.components.library.doCheck = false;
+        packages.streamly.components.library.doHaddock = false;
         #packages.streamly.flags = {
         #    fusion-plugin = false;
         #    inspection = false;
