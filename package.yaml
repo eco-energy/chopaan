@@ -34,7 +34,6 @@ dependencies:
 - base >= 4.11 && < 10
 - rio >= 0.1.8.0
 - streamly >= 0.7.2
-- fusion-plugin
 - async
 - exceptions
 - deepseq
@@ -114,6 +113,7 @@ dependencies:
 - clay
 - colour
 - file-embed
+- envy
 when:
   - condition: "!impl(ghcjs)"
     dependencies:
@@ -151,6 +151,7 @@ when:
       - dhall >= 1.33.0
       - sbv
       - http-client
+      - fusion-plugin
     ghc-options:
       - -fplugin=ConCat.Plugin
       - -fdicts-strict

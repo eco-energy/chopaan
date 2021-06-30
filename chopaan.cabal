@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 29cfeff074c00a15c92947d6b6c6ec52864cce84963c3890bf4766cdadc656c9
+-- hash: d481f4aedd7766d43094a71502eb6308cee9c9fc262c288bd9e507890f1fc426
 
 name:           chopaan
 version:        0.1.0.0
@@ -154,11 +154,11 @@ library
     , dimensional
     , directory
     , distributive
+    , envy
     , estimator
     , exceptions
     , file-embed
     , filepath
-    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -220,6 +220,7 @@ library
       , connection
       , convertible
       , dhall >=1.33.0
+      , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
       , monad-bayes
@@ -280,11 +281,11 @@ executable hydrate
     , dimensional
     , directory
     , distributive
+    , envy
     , estimator
     , exceptions
     , file-embed
     , filepath
-    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -346,6 +347,7 @@ executable hydrate
       , connection
       , convertible
       , dhall >=1.33.0
+      , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
       , monad-bayes
@@ -417,11 +419,11 @@ executable kbtzim
     , dimensional
     , directory
     , distributive
+    , envy
     , estimator
     , exceptions
     , file-embed
     , filepath
-    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -483,6 +485,7 @@ executable kbtzim
       , connection
       , convertible
       , dhall >=1.33.0
+      , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
       , monad-bayes
@@ -552,11 +555,11 @@ executable server
     , dimensional
     , directory
     , distributive
+    , envy
     , estimator
     , exceptions
     , file-embed
     , filepath
-    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -618,6 +621,7 @@ executable server
       , connection
       , convertible
       , dhall >=1.33.0
+      , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
       , monad-bayes
@@ -688,11 +692,11 @@ executable tx
     , dimensional
     , directory
     , distributive
+    , envy
     , estimator
     , exceptions
     , file-embed
     , filepath
-    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -754,6 +758,7 @@ executable tx
       , connection
       , convertible
       , dhall >=1.33.0
+      , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
       , monad-bayes
@@ -822,11 +827,11 @@ executable ui
     , dimensional
     , directory
     , distributive
+    , envy
     , estimator
     , exceptions
     , file-embed
     , filepath
-    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -888,6 +893,7 @@ executable ui
       , connection
       , convertible
       , dhall >=1.33.0
+      , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
       , monad-bayes
@@ -973,11 +979,11 @@ test-suite chopaan-test
     , dimensional
     , directory
     , distributive
+    , envy
     , estimator
     , exceptions
     , file-embed
     , filepath
-    , fusion-plugin
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -1039,6 +1045,7 @@ test-suite chopaan-test
       , connection
       , convertible
       , dhall >=1.33.0
+      , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
       , monad-bayes
