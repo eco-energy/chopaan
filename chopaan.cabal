@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bb413439e161d1029e32c1f45a06360add4dec252e7f717410004c2a06a6fdd3
+-- hash: dc399fa12c7160e579cf5c7f73e57199f41ea475105fdfddec40d37753c270a8
 
 name:           chopaan
 version:        0.1.0.0
@@ -172,7 +172,6 @@ library
     , lens
     , linear
     , microlens
-    , monad-bayes
     , monad-control
     , mtl
     , newtype-generics
@@ -223,6 +222,7 @@ library
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
       , http-client
+      , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -241,7 +241,7 @@ library
       , x509-validation
   else
     build-depends:
-        ghcjs-three
+        ghcjs-dom-ffi
   default-language: Haskell2010
 
 executable hydrate
@@ -301,7 +301,6 @@ executable hydrate
     , lens
     , linear
     , microlens
-    , monad-bayes
     , monad-control
     , mtl
     , newtype-generics
@@ -352,6 +351,7 @@ executable hydrate
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
       , http-client
+      , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -370,7 +370,7 @@ executable hydrate
       , x509-validation
   else
     build-depends:
-        ghcjs-three
+        ghcjs-dom-ffi
   if !impl(ghcjs)
     ghc-options: -threaded -O2
     build-depends:
@@ -441,7 +441,6 @@ executable kbtzim
     , lens
     , linear
     , microlens
-    , monad-bayes
     , monad-control
     , mtl
     , newtype-generics
@@ -492,6 +491,7 @@ executable kbtzim
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
       , http-client
+      , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -510,7 +510,7 @@ executable kbtzim
       , x509-validation
   else
     build-depends:
-        ghcjs-three
+        ghcjs-dom-ffi
   if !impl(ghcjs)
     ghc-options: -threaded -O2 -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin
     build-depends:
@@ -579,7 +579,6 @@ executable server
     , lens
     , linear
     , microlens
-    , monad-bayes
     , monad-control
     , mtl
     , newtype-generics
@@ -630,6 +629,7 @@ executable server
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
       , http-client
+      , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -648,7 +648,7 @@ executable server
       , x509-validation
   else
     build-depends:
-        ghcjs-three
+        ghcjs-dom-ffi
   if impl(ghcjs)
     buildable: False
   else
@@ -718,7 +718,6 @@ executable tx
     , lens
     , linear
     , microlens
-    , monad-bayes
     , monad-control
     , mtl
     , newtype-generics
@@ -769,6 +768,7 @@ executable tx
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
       , http-client
+      , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -787,7 +787,7 @@ executable tx
       , x509-validation
   else
     build-depends:
-        ghcjs-three
+        ghcjs-dom-ffi
   if impl(ghcjs)
     buildable: False
   else
@@ -855,7 +855,6 @@ executable ui
     , lens
     , linear
     , microlens
-    , monad-bayes
     , monad-control
     , mtl
     , newtype-generics
@@ -906,6 +905,7 @@ executable ui
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
       , http-client
+      , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -924,7 +924,7 @@ executable ui
       , x509-validation
   else
     build-depends:
-        ghcjs-three
+        ghcjs-dom-ffi
   if !impl(ghcjs)
     ghc-options: -threaded -O2 -fplugin=ConCat.Plugin
     build-depends:
@@ -933,7 +933,12 @@ executable ui
       , optparse-simple
     buildable: True
   else
-    buildable: False
+    ghc-options: -threaded -O2
+    build-depends:
+        base
+      , chopaan
+      , optparse-simple
+    buildable: True
   default-language: Haskell2010
 
 test-suite chopaan-test
@@ -1004,7 +1009,6 @@ test-suite chopaan-test
     , lens
     , linear
     , microlens
-    , monad-bayes
     , monad-control
     , mtl
     , newtype-generics
@@ -1055,6 +1059,7 @@ test-suite chopaan-test
       , dhall >=1.33.0
       , greskell-websocket >=0.1.2.5
       , http-client
+      , monad-bayes
       , net-mqtt >=0.7.0
       , net-spider
       , network >=3.1.2.1
@@ -1073,7 +1078,7 @@ test-suite chopaan-test
       , x509-validation
   else
     build-depends:
-        ghcjs-three
+        ghcjs-dom-ffi
   if impl(ghcjs)
     build-depends:
         base

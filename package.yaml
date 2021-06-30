@@ -81,7 +81,6 @@ dependencies:
 - algebraic-graphs >= 0.5
 - katip
 - resource-pool
-- monad-bayes
 - base64
 - servant
 - servant-js
@@ -132,6 +131,7 @@ when:
       - websockets
       - servant-server
       - servant-websockets
+      - monad-bayes
       - amazonka
       - amazonka-iot
       - amazonka-s3
@@ -161,7 +161,7 @@ when:
       - -O2
   else:
     dependencies:
-     - ghcjs-three
+      - ghcjs-dom-ffi
 
 
 # ghc-options:
@@ -242,7 +242,14 @@ executables:
           - -O2
           - -fplugin=ConCat.Plugin
       else:
-        buildable: false
+        buildable: true
+        dependencies:
+          - chopaan
+          - optparse-simple
+          - base
+        ghc-options:
+          - -threaded
+          - -O2
   kbtzim:
     main:                Main.hs
     other-modules:
