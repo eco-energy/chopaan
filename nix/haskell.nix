@@ -139,7 +139,7 @@ let
         packages.nonempty-vector.package.buildType = lib.mkForce "Simple";
         packages.semigroupoids.package.buildType = lib.mkForce "Simple";
         packages.free.package.buildType = lib.mkForce "Simple";
-        packages.network.package.buildType = lib.mkForce "Simple";
+        #packages.network.package.buildType = lib.mkForce "Simple";
         packages.streamly.package.buildType = lib.mkForce "Simple";
         packages.streamly.package.doCheck = false;
         packages.streamly.package.doHaddock = false;
@@ -167,8 +167,8 @@ let
 
 
         # Remove hsc2hs build-tool dependencies (suitable version will be available as part of the ghc derivation)
-        packages.network.package.doCheck = false;
-        packages.network.components.library.build-tools = lib.mkForce [];
+        #packages.network.package.doCheck = false;
+        #packages.network.components.library.build-tools = lib.mkForce [];
         #packages.streamly.components.library.build-tools = lib.mkForce [];
       })
     ];
