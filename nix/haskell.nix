@@ -127,6 +127,7 @@ let
         packages.terminfo.package.identifier.name = "terminfo";
         packages.conduit.package.identifier.name = "conduit";
         packages.ekg.package.identifier.name = "ekg";
+        packages.streamly.package.identifier.name = "streamly";
       }
 
       (lib.optionalAttrs stdenv.hostPlatform.isGhcjs {
@@ -140,8 +141,8 @@ let
         packages.free.package.buildType = lib.mkForce "Simple";
         packages.network.package.buildType = lib.mkForce "Simple";
         packages.streamly.package.buildType = lib.mkForce "Simple";
-        packages.streamly.doCheck = false;
-        packages.streamly.doHaddock = false;
+        packages.streamly.package.doCheck = false;
+        packages.streamly.package.doHaddock = false;
         #packages.streamly.flags = {
         #    fusion-plugin = false;
         #    inspection = false;
@@ -167,7 +168,7 @@ let
 
         # Remove hsc2hs build-tool dependencies (suitable version will be available as part of the ghc derivation)
         packages.network.components.library.build-tools = lib.mkForce [];
-        packages.streamly.components.library.build-tools = lib.mkForce [];
+        #packages.streamly.components.library.build-tools = lib.mkForce [];
       })
     ];
   };
