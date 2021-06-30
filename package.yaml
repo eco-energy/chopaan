@@ -115,8 +115,7 @@ dependencies:
 - colour
 - file-embed
 when:
-  condition: "!impl(ghcjs)"
-  then:
+  - condition: "!impl(ghcjs)"
     dependencies:
       - beam-core
       - beam-postgres
@@ -159,9 +158,6 @@ when:
       - -fspec-constr-recursive=16
       #- -fplugin Fusion.Plugin
       - -O2
-  else:
-    dependencies:
-      - ghcjs-dom-ffi
 
 
 # ghc-options:
