@@ -167,6 +167,7 @@ let
 
 
         # Remove hsc2hs build-tool dependencies (suitable version will be available as part of the ghc derivation)
+        packages.network.package.doCheck = false;
         packages.network.components.library.build-tools = lib.mkForce [];
         #packages.streamly.components.library.build-tools = lib.mkForce [];
       })
