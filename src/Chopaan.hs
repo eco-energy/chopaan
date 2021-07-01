@@ -16,10 +16,10 @@ import RIO hiding (view, async, withAsync, Async)
 
 runKbtzim :: forall t m.
   (IsStream t, MonadIO m, Monad (t m))
-  => SpiderOpts
+  => TinkerConf
   -> MQTTOpts
   -> m (t m Bool)
-runKbtzim (SpiderOpts h p) mq = (toHandlerH h p) . (fmap S.adapt)
+runKbtzim (TinkerConf h p) mq = (toHandlerH h p) . (fmap S.adapt)
                                 . (fmap (S.hoist (toHandlerH h p) . S.serially)) $  do
   ks <- withKbtzPool getKbtzim
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks
@@ -46,5 +46,5 @@ run = do
   S.drain $
     runKbtzim @SerialT spiderOpts mqttOpts
   where
-    spiderOpts = SpiderOpts "localhost" 8182
+    spiderOpts = TinkerConf "localhost" 8182
     --mqttOpts = undefined
