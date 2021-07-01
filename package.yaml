@@ -56,6 +56,7 @@ dependencies:
 - filepath
 - directory
 - microlens
+- base64
 - mtl
 - transformers
 - transformers-base
@@ -148,7 +149,6 @@ when:
       - servant-client
       - blaze-markup
       - servant-blaze
-      - base64
       - servant-js
       - katip
     ghc-options:

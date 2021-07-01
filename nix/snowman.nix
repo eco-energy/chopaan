@@ -117,12 +117,19 @@ let
         "compensated" = pkgs.haskell.lib.dontCheck hsuper.compensated;
         "log-domain" = pkgs.haskell.lib.dontCheck hsuper.log-domain;
         "rio" = pkgs.haskell.lib.dontCheck hsuper.rio;
+        "base64" = pkgs.haskell.lib.dontCheck hsuper.base64;
         "exact-pi" = pkgs.haskell.lib.dontCheck hsuper.exact-pi;
         "dimensional" = pkgs.haskell.lib.dontCheck hsuper.dimensional;
         "shelly" = pkgs.haskell.lib.dontCheck hsuper.shelly;
         "fingertree" = pkgs.haskell.lib.dontCheck hsuper.fingertree;
         "diagrams-lib" = pkgs.haskell.lib.dontCheck hsuper.diagrams-lib;
         "generic-deriving" = pkgs.haskell.lib.dontCheck hsuper.generic-deriving;
+        "monad-bayes" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "monad-bayes";
+          ver = "0.1.1.0";
+          sha256 = "10aaaaaaaib7niiix0j9429j4f3yzlrxviz7rb1i46mwnx077b5m";
+        } {});
+
         "greskell" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
           pkg = "greskell";
           ver = "1.2.0.0";
