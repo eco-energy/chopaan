@@ -3,6 +3,7 @@
 
 module Chopaan.API.History where
 
+import GHC.Generics
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader hiding (ask)
 import Control.Monad.Reader.Class
@@ -56,9 +57,14 @@ import Chopaan.CRUD
 import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Node.NodeT
 import Servant.Links
+import System.Envy
 
 
-data SpiderOpts = SpiderOpts String Int
+data TinkerConf = TinkerConf
+  { janusHost :: String
+  , janusPort :: Int
+  } deriving (Generic, FromEnv)
+
 
 newtype HistoryApp a = HistoryApp { runHistoryApp :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
