@@ -33,6 +33,7 @@ description:         Please see the README on Github at <https://github.com/faez
 dependencies:
 - base >= 4.11 && < 10
 - rio >= 0.1.8.0
+- streamly >= 0.7.2
 - network >= 3.1.2.1
 - async
 - exceptions
@@ -59,7 +60,6 @@ dependencies:
 - transformers
 - transformers-base
 - monad-control
-- typerep-map
 - dependent-sum
 - dependent-map
 - dependent-sum-template
@@ -78,12 +78,8 @@ dependencies:
 - dimensional
 - retry
 - algebraic-graphs >= 0.5
-- katip
 - resource-pool
-- base64
 - servant
-- servant-js
-- servant-client
 - diagrams-lib
 - diagrams-svg >= 1.4.3
 - diagrams-contrib >= 1.4.4
@@ -91,8 +87,6 @@ dependencies:
 - comonad
 - pointed
 - interpolatedstring-perl6
-- blaze-markup
-- servant-blaze
 - retry
 - Shpadoinkle >= 0.3.0.0
 - Shpadoinkle-backend-pardiff
@@ -114,10 +108,10 @@ dependencies:
 - colour
 - file-embed
 - envy
+- compensated
 when:
   - condition: "!impl(ghcjs)"
     dependencies:
-      - streamly >= 0.7.2
       - beam-core
       - beam-postgres
       - beam-migrate
@@ -146,12 +140,17 @@ when:
       - net-spider
       - greskell-websocket >= 0.1.2.5
       - suavemente
-      - compensated
       - convertible
       - dhall >= 1.33.0
       - sbv
       - http-client
       - fusion-plugin
+      - servant-client
+      - blaze-markup
+      - servant-blaze
+      - base64
+      - servant-js
+      - katip
     ghc-options:
       - -fplugin=ConCat.Plugin
       - -fdicts-strict
