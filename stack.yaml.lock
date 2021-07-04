@@ -721,6 +721,13 @@ packages:
       sha256: c5c294ecfbe759becf84a555c578995788c98a5b3944066b167bea8b143efb1e
   original:
     hackage: html-parse-0.2.0.2@sha256:268c6c3a723aae77ff799bf501d60a91e60536facab3ae70df7a74cea75e29c3,3898
+- completed:
+    hackage: ghcjs-base-stub-0.3.0.2@sha256:1ce3ac155173b8036873ad990d3ed86137a643264fb6dad294a935a32e1105a2,3669
+    pantry-tree:
+      size: 10987
+      sha256: d964317fd3f263a02f210259e7f9c1ce4f2c1e5f9748347267c2986fa512c6f5
+  original:
+    hackage: ghcjs-base-stub-0.3.0.2@sha256:1ce3ac155173b8036873ad990d3ed86137a643264fb6dad294a935a32e1105a2,3669
 snapshots:
 - completed:
     size: 524799

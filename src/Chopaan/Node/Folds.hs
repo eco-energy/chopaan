@@ -8,6 +8,7 @@ LANGUAGE ScopedTypeVariables
 , ExistentialQuantification
 , RankNTypes
 , QuantifiedConstraints
+, CPP
 #-}
 module Chopaan.Node.Folds where
 
@@ -17,8 +18,10 @@ import qualified Streamly.Internal.Data.Fold as FL
 import Data.Time
 import Data.Bifunctor
 import Numeric.Estimator (KalmanFilter(..))
-import ConCat.Misc (R)
 
+#ifndef ghcjs_HOST_OS
+import ConCat.Misc (R)
+#endif
 
 import Chopaan.Node.Storage
 import Chopaan.Node.Metrics
@@ -27,6 +30,11 @@ import Chopaan.Utils.Time
 import Proto.NodeMessageSchema.NodeMessages (EnergyState, RuntimeStats)
 
 import Chopaan.Node.Mesh
+
+
+#ifdef ghcjs_HOST_OS
+type R = Double
+#endif
 
 {----------------------------------------------------------------------------------------------------
 

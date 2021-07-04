@@ -17,6 +17,7 @@ import Data.Aeson (ToJSON, FromJSON)
 import Data.Text
 import Data.Greskell
 import Data.Hashable (Hashable)
+import Data.Bifunctor
 import Data.Maybe (fromMaybe)
 import Data.Time (UTCTime(..), getCurrentTime, fromGregorian, secondsToDiffTime)
 import Data.Pool
@@ -55,7 +56,7 @@ import NetSpider.Spider.Config (Config(..), defConfig, LogLevel(..))
 import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..), VNode(..))
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Timestamp (fromUTCTime, now, Timestamp)
-import NetSpider.Snapshot (SnapshotGraph)
+import Chopaan.Graph.Snapshot (SnapshotGraph, fromNSGraph)
 import NetSpider.Query (defQuery, Query(..), Extended(..), (<=..<=), policyAppend)
 
 
@@ -263,11 +264,14 @@ spiderPool c = liftIO $ createPool
   ((recoverC "retrying kbtz janusgraph connection" 100) (connectWith c)) close 10 100 10
 
 
+fromNSGraphM = (pure . fromNSGraph)
+
 gridSnapshotSimple :: forall m n v e. (MonadIO m, SpiderConn n v e)
   => KbtzName
   -> Spider NodeMAC v e
   -> m (SnapshotGraph NodeMAC v e)
-gridSnapshotSimple k s = liftIO $ getSnapshotSimple s $ getGridRoot k
+gridSnapshotSimple k s = liftIO $
+                         fromNSGraphM =<< (getSnapshotSimple s $ getGridRoot k)
 {-# INLINE gridSnapshotSimple #-}
 
 
@@ -298,7 +302,9 @@ subscribeSnapshot :: forall t m v e.
   => KbtzName
   -> Config NodeMAC v e
   -> t m (SnapshotGraph NodeMAC v e)
-subscribeSnapshot k c = getSnapshotStream c (\s -> liftIO $ getSnapshotSimple s (getRoot . mkKbtzRoot $ k))
+subscribeSnapshot k c = getSnapshotStream c (\s ->
+                                               liftIO $ fromNSGraphM
+                                               =<< (getSnapshotSimple s (getRoot . mkKbtzRoot $ k)))
 
 
 
@@ -417,9 +423,10 @@ gridSnapshot :: forall m v e. (SpiderConn NodeMAC v e, MonadIO m)
   -> UTCTime
   -> Spider NodeMAC v e
   -> m (SnapshotGraph NodeMAC v e)
-gridSnapshot r t t' s = liftIO
+gridSnapshot r t t' s = fromNSGraphM
+                        =<< (liftIO
                            . (getSnapshot s)
-                           . (rangeQuery t t') $ [getGridRoot r]
+                           . (rangeQuery t t') $ [getGridRoot r])
 
 
 nodesSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadAsync m)
@@ -428,7 +435,9 @@ nodesSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadAsync m)
   -> UTCTime
   -> Pool (Spider n v e)
   -> m (SnapshotGraph n v e)
-nodesSnapshot ns t t' p = liftIO $ withResource p (\s -> getSnapshot s $ rangeQuery t t' ns)
+nodesSnapshot ns t t' p = liftIO $ withResource p (\s ->
+                                                     fromNSGraphM
+                                                     =<< (getSnapshot s $ rangeQuery t t' ns))
 {-# INLINE nodesSnapshot #-}
 
 statusGridSnapshot :: KbtzName

@@ -6,7 +6,6 @@ author:              Faez Shakil
 maintainer:          faez.shakil@gmail.com
 copyright:           2019 Faez Shakil
 
-
 extra-source-files:
 - README.md
 - ChangeLog.md
@@ -14,10 +13,8 @@ extra-source-files:
 - js/*.js
 - js/*.html
 
-
 data-files:
  - options.dhall
-
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -27,8 +24,6 @@ data-files:
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
 description:         Please see the README on Github at <https://github.com/faezs/chopaan#readme>
-
-
 
 dependencies:
 - base >= 4.11 && < 10
@@ -110,10 +105,15 @@ dependencies:
 - file-embed
 - envy
 - compensated
+- beam-core
+- monad-bayes
+- convertible
+- regex-applicative
 when:
-  - condition: "!impl(ghcjs)"
+  condition: "!impl(ghcjs)"
+  then:
     dependencies:
-      - beam-core
+      - net-spider
       - beam-postgres
       - beam-migrate
       - postgresql-simple
@@ -125,7 +125,6 @@ when:
       - websockets
       - servant-server
       - servant-websockets
-      - monad-bayes
       - amazonka
       - amazonka-iot
       - amazonka-s3
@@ -138,10 +137,8 @@ when:
       - tls
       - x509-store
       - x509-validation
-      - net-spider
       - greskell-websocket >= 0.1.2.5
       - suavemente
-      - convertible
       - dhall >= 1.33.0
       - sbv
       - http-client
@@ -158,28 +155,143 @@ when:
       - -fspec-constr-recursive=16
       #- -fplugin Fusion.Plugin
       - -O2
-
-
-# ghc-options:
-# - -Wall
-# - -Wcompat
-# - -Widentities
-# - -Wincomplete-record-updates
-# - -Wincomplete-uni-patterns
-# - -Wpartial-fields
-# - -Wredundant-constraints
-
-
+  else:
+    dependencies:
+      - ghcjs-base
+      
 library:
   source-dirs: src
-  install-includes: src/Chopaan/Node/UpdateInst.inc
-
-#  when:
-#    condition: "impl(ghcjs)"
-#      then:
-        
-#        - Chopaan.UI.
-#      else:
+  when:
+    condition: "!impl(ghcjs)"
+    then:
+      exposed-modules:
+        - Chopaan
+        - Chopaan.Client
+        - Chopaan.API.History
+        - Chopaan.Graph
+        - Chopaan.Graph.Greskell
+        - Chopaan.Graph.G
+        - Chopaan.Graph.Snapshot
+        - Chopaan.CRUD
+        - Chopaan.Ui.AddKbtz
+        - Chopaan.Ui.Foreign.Utils
+        - Chopaan.Ui.Foreign.WebSocket
+        - Chopaan.Ui.FormCommon
+        - Chopaan.Ui.Grable
+        - Chopaan.Ui.GraphView
+        - Chopaan.Ui.ImageV
+        - Chopaan.Ui.Style
+        - Chopaan.Ui.WebGL
+        - Chopaan.Ui.WebSocket
+        - Chopaan.UiTypes
+        - Chopaan.View
+        - Chopaan.Kibbutz.KbtzId
+        - Chopaan.Kibbutz.KbtzimT
+        - Chopaan.Kibbutz.Kibbutz
+        - Chopaan.Kibbutz.Transactor
+        - Chopaan.Monad.Env
+        - Chopaan.Node.Calibration
+        - Chopaan.Node.Components
+        - Chopaan.Node.Folds
+        - Chopaan.Node.HW
+        - Chopaan.Node.Mesh
+        - Chopaan.Node.Metrics
+        - Chopaan.Node.Node
+        - Chopaan.Node.NodeId
+        - Chopaan.Node.NodeOpts
+        - Chopaan.Node.NodeSensors
+        - Chopaan.Node.NodeT
+        - Chopaan.Node.SoC
+        - Chopaan.Node.Storage
+        - Chopaan.Node.Structure
+        - Chopaan.Node.Tf
+        - Chopaan.Comm.Address
+        - Chopaan.Comm.Dispatch
+        - Chopaan.Comm.Comm
+        - Chopaan.Comm.Mqtt
+        - Chopaan.Comm.Mqtt.AWS
+        - Chopaan.Comm.Queues
+        - Chopaan.Comm.S3
+        - Chopaan.Comm.Socket
+        - Chopaan.DB
+        - Chopaan.DB.Nodes
+        - Chopaan.DB.Sensors
+        - Chopaan.Graph.DataSource
+        - Chopaan.Graph.Kbtz
+        - Chopaan.Graph.Spider
+        - Chopaan.Graph.VI
+        - Chopaan.Haxl.Kbtz
+        - Chopaan.Kibbutz
+        - Chopaan.Kibbutz.Allocate
+        - Chopaan.Kibbutz.AWS.Common
+        - Chopaan.Kibbutz.AWS.Things
+        - Chopaan.Kibbutz.LinOpt
+        - Chopaan.Kibbutz.Registry
+        - Chopaan.Kibbutz.Serve
+        - Chopaan.Kibbutz.Ui
+        - Chopaan.Run
+        - Chopaan.Server
+        - Chopaan.Testing
+        - Chopaan.Types
+        - Chopaan.Utils.JSON
+        - Chopaan.Utils.Retry
+        - Chopaan.Utils.Streamly
+        - Chopaan.Utils.StreamsInterop
+        - Chopaan.Utils.Time
+        - Kbtz
+        - Proto.NodeMessageSchema.NodeMessages
+        - Proto.NodeMessageSchema.NodeMessages_Fields
+        - Servant.Streamly
+        - SimNode
+        - Streamly.Binary
+        - TxModel
+      other-modules: []
+      install-includes: src/Chopaan/Node/UpdateInst.inc
+    else:
+      source-dirs: src
+      exposed-modules:
+        - Chopaan.Client
+        - Chopaan.API.History
+        - Chopaan.Graph.Greskell
+        - Chopaan.Graph.G
+        - Chopaan.Graph
+        - Chopaan.Graph.Snapshot
+        - Chopaan.CRUD
+        - Chopaan.Ui.AddKbtz
+        - Chopaan.Ui.Foreign.Utils
+        - Chopaan.Ui.Foreign.WebSocket
+        - Chopaan.Ui.FormCommon
+        - Chopaan.Ui.Grable
+        - Chopaan.Ui.GraphView
+        - Chopaan.Ui.Style
+        - Chopaan.Ui.WebGL
+        - Chopaan.Ui.WebSocket
+        - Chopaan.UiTypes
+        - Chopaan.View
+        - Chopaan.Kibbutz.KbtzId
+        - Chopaan.Kibbutz.KbtzimT
+        - Chopaan.Kibbutz.Transactor
+        - Chopaan.Monad.Env
+        - Chopaan.Node.Calibration
+        - Chopaan.Node.Components
+        - Chopaan.Node.Folds
+        - Chopaan.Node.HW
+        - Chopaan.Node.Mesh
+        - Chopaan.Node.Metrics
+        - Chopaan.Node.Node
+        - Chopaan.Node.NodeId
+        - Chopaan.Node.NodeSensors
+        - Chopaan.Node.NodeT
+        - Chopaan.Node.SoC
+        - Chopaan.Node.Storage
+        - Chopaan.Utils.JSON
+        - Chopaan.Utils.Retry
+        - Chopaan.Utils.Streamly
+        - Chopaan.Utils.Time
+        - Proto.NodeMessageSchema.NodeMessages
+        - Proto.NodeMessageSchema.NodeMessages_Fields
+      other-modules: []
+      install-includes: src/Chopaan/Node/UpdateInst.inc
 
 executables:
   server:
@@ -220,7 +332,6 @@ executables:
         ghc-options:
           - -threaded
           - -O2
-
   ui:
     main:                Ui.hs
     other-modules: []
@@ -316,6 +427,3 @@ tests:
           - -O2
         build-tools:
           hspec-discover:hspec-discover
-
-
-

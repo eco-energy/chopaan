@@ -3,26 +3,14 @@
 , RankNTypes, FlexibleContexts, AllowAmbiguousTypes, ScopedTypeVariables, GADTs, QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings, PackageImports, ExtendedDefaultRules #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable, DeriveDataTypeable #-}
-{-# LANGUAGE LambdaCase, TypeOperators, TypeApplications, LiberalTypeSynonyms  #-}
+{-# LANGUAGE LambdaCase, TypeOperators, TypeApplications, LiberalTypeSynonyms, CPP  #-}
 module Chopaan.Ui.GraphView where
 
-import ConCat.Misc (inNew, inNew2, (:*), (:+), Unop)
-import GHC.Generics (Generic, Generic1)
-import qualified Control.Newtype.Generics as N
-import Control.DeepSeq (NFData)
-import Control.PseudoInverseCategory
 import Data.Aeson as A
 import Data.Text hiding (empty, zip)
 import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding as T
-import qualified Data.Map as M
-import Data.Map (Map)
-import Data.Bifunctor
-import Data.Typeable
-import Data.Int
-import Lens.Micro
 
-import Text.InterpolatedString.Perl6 (q)
 
 import           GHCJS.DOM                               (currentDocumentUnchecked,
                                                           currentWindowUnchecked)
@@ -35,18 +23,24 @@ import           GHCJS.DOM.Window                        (Window,
                                                           requestAnimationFrame,
                                                           getInnerHeight,
                                                           getInnerWidth)
+
+#ifndef ghcjs_HOST_OS
 import           Language.Javascript.JSaddle
+#else
+import           Language.Javascript.JSaddle hiding (JSM, MonadJSM)
+#endif
+
 import           Shpadoinkle
 import           UnliftIO.Concurrent                     (forkIO, threadDelay)
 
 
-import Shpadoinkle (Html(..), liftC, text, MonadJSM, Continuation, Html,
-                                                            RawNode (..),
-                                                            atomically, baked,
-                                                            constUpdate, done,
-                                                            kleisli, mapC, pur,
-                                                            readTVarIO, text,
-                                                            writeTVar)
+import Shpadoinkle (Html(..), liftC, text, JSM, MonadJSM, Continuation, Html,
+                     RawNode (..),
+                     atomically, baked,
+                     constUpdate, done,
+                     kleisli, mapC, pur,
+                     readTVarIO, text,
+                     writeTVar)
 import Control.Monad.IO.Class
 import Shpadoinkle.Run (runJSorWarp, simple)
 import Shpadoinkle.Html (div_, getBody, input', onInput
@@ -54,60 +48,20 @@ import Shpadoinkle.Html (div_, getBody, input', onInput
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Widgets.Types.Core
 
-import qualified Algebra.Graph.Labelled as AG
-import qualified Algebra.Graph as G
---import Algebra.Graph.Label
 
---import Diagrams.Prelude
-import qualified Diagrams.Envelope as E
-import Diagrams.Backend.SVG (B)
-import qualified Diagrams.TwoD.Text as DT
-import Diagrams.TwoD.Layout.Grid
-import Graphics.SVGFonts
 import qualified Clay as C
 
-import NetSpider.Snapshot
-import qualified NetSpider.Timestamp as N
 
 import Shpadoinkle.Template.TH
 
-import Chopaan.Node.Mesh
-import Chopaan.Node.Folds
-import Chopaan.Kibbutz.Transactor
-import Chopaan.Graph
+
 import Chopaan.Graph.G as G
-import Chopaan.Node.NodeId
-import qualified Chopaan.Ui.Style as Css 
+import qualified Chopaan.Ui.Style as Css
+import Chopaan.Graph.Snapshot
 import Chopaan.CRUD
 import Data.FileEmbed
 
 default (Text)
-
--- newtype Pos = Pos Double
---   deriving stock (Generic)
---   deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
---   deriving anyclass (Humanize, Present, NFData)
---   deriving (Semigroup, Monoid) via (Sum Double)
-
-
-
--- meshEndo :: EndoIso (SnapshotGraph NodeMAC MeshNode RxSignal) (SG NodeMAC)
--- meshEndo = EndoIso id fwd back
---   where
---     fwd = MeshG
---     back (MeshG a) = a
-
--- stakeEndo :: EndoIso (SnapshotGraph NodeMAC SensorR Stake) (SG NodeMAC)
--- stakeEndo = EndoIso id fwd back
---   where
---     fwd = StakeG
---     back (StakeG a) = a
-
--- statusEndo :: EndoIso (SnapshotGraph NodeMAC SensorR TxStatus) (SG NodeMAC)
--- statusEndo = EndoIso id fwd back
---   where
---     fwd = StatusG
---     back (StatusG a) = a
 
 
 renderKbtzGraph :: forall m n. (Applicative m, Ord n, Show n) => SG n -> Html m () -- SG
@@ -123,11 +77,11 @@ renderKbtzGraph sg = case sg of
     renderThis (ns, ls) = H.div
       [ H.class' $ Css.flex <> Css.flex_grow]
       (
-        [ H.div (nodeClasses i) $ [ nodeHtml n ] | (i, n) <- zip [0,(1 :: Double)..] $ ns]
+        [ H.div_ $ [ nodeHtml n ] | n <- ns]
         <>
-        [ H.div (edgeClasses i) $ [ edgeHtml l n n' ]
-        | (i, (l, (n, _), (n', _))) <- zip [(0 :: Double), 1..] $ castLinks (ns, ls)
-        ] <> [ cview ]
+        [ H.div_ $
+          [ edgeHtml (_linkAttributes l) (_sourceNode l) (_destinationNode l)] | l <- ls ]
+        <> [ cview ]
       )
       where
         grNameC i = H.class' $ "graph-" <> (pack . show $ i)
@@ -148,7 +102,7 @@ renderWith3 :: (ToJSON n, ToJSON v, ToJSON e) => SnapshotGraph n v e -> Html m (
 renderWith3 a = cview
   where
     b = baked $ do
-      -- $(embedHtml "src/Chopaan/Ui/gridRenderer.html")
+      --   $(embedHtml "src/Chopaan/Ui/gridRenderer.html")
       (notify, stream) <- H.mkGlobalMailboxAfforded constUpdate
       let file = $(embedFile "js/gridRenderer.js")
       liftIO . print $ file

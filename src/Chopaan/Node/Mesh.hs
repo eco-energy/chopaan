@@ -17,6 +17,7 @@
 , InstanceSigs
 , OverloadedStrings
 , NamedFieldPuns
+, CPP
 #-}
 module Chopaan.Node.Mesh where
 
@@ -47,26 +48,29 @@ import qualified Streamly.Internal.Data.Fold as FL
 import Data.Greskell.GraphSON.GValue (unwrapOne)
 import Data.Greskell (newBind, gProperty, lookupAs, lookupAs', Key, pMapToFail, FromGraphSON(..))
 import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
+
+#ifndef ghcjs_HOST_OS
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Spider
   (Spider, addFoundNode, withSpider)
 
 import NetSpider.Graph (LinkAttributes(..), EFinds, NodeAttributes(..), VFoundNode)
 import NetSpider.Timestamp (fromUTCTime)
-
+#endif
 
 newtype RxSignal = RxSignal (Maybe Double)
   deriving stock (Generic)
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON, NFData, Binary)
   deriving (Semigroup, Monoid) via (Last Double)
 
+#ifndef ghcjs_HOST_OS
 instance LinkAttributes RxSignal where
   writeLinkAttributes (RxSignal s) = do
     sv <- newBind s
     return $ gProperty "rx_signal" sv
   parseLinkAttributes props =
     pMapToFail $ RxSignal <$> lookupAs' ("rx_signal" :: Key EFinds (Maybe Double)) props
-
+#endif
 
 data MeshLink = MeshLink
   deriving (Eq, Show, Ord, Generic, ToJSON, FromJSON, NFData)
@@ -96,6 +100,36 @@ instance FromJSON MeshNode where
 initMeshNode :: MeshNode
 initMeshNode = MeshNode Nothing 0 0 Nothing
 {-# INLINE initMeshNode #-}
+
+
+parseRTSToNode :: N.RuntimeStats -> MeshNode
+parseRTSToNode rts = m
+  where
+    {-# INLINE m #-}
+    m = MeshNode
+      { isRoot = (rts ^? N.isRoot)
+      , uptime = (fromIntegral $ rts ^. N.uptime)
+      , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
+      , version = (Just . NodeVersion $ rts ^. N.version)
+  }
+{-# INLINE parseRTSToNode #-}
+
+parseRxSignal :: N.RuntimeStats -> RxSignal
+parseRxSignal rts = RxSignal . Just . fromIntegral $ rts ^. N.meshParentStrength
+{-# INLINE parseRxSignal #-}
+
+nodeLinkPair :: N.RuntimeStats -> (MeshNode, RxSignal)
+nodeLinkPair rts = (parseRTSToNode rts, parseRxSignal rts)
+{-# INLINE nodeLinkPair #-}
+
+
+meshF :: forall m. (Applicative m) => FL.Fold m (N.RuntimeStats) (MeshNode, RxSignal)
+meshF = FL.Fold (\_ r -> pure . nodeLinkPair $ r) (pure (initMeshNode, mempty)) pure
+{-# INLINE meshF #-}
+
+
+
+#ifndef ghcjs_HOST_OS
 
 rootKey :: Key VFoundNode (Maybe Bool)
 rootKey = "isRoot"
@@ -149,27 +183,4 @@ rsToFN (n, rts) = let
   in finding
 {-# INLINE rsToFN #-}
 
-parseRTSToNode :: N.RuntimeStats -> MeshNode
-parseRTSToNode rts = m
-  where
-    {-# INLINE m #-}
-    m = MeshNode
-      { isRoot = (rts ^? N.isRoot)
-      , uptime = (fromIntegral $ rts ^. N.uptime)
-      , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
-      , version = (Just . NodeVersion $ rts ^. N.version)
-  }
-{-# INLINE parseRTSToNode #-}
-
-parseRxSignal :: N.RuntimeStats -> RxSignal
-parseRxSignal rts = RxSignal . Just . fromIntegral $ rts ^. N.meshParentStrength
-{-# INLINE parseRxSignal #-}
-
-nodeLinkPair :: N.RuntimeStats -> (MeshNode, RxSignal)
-nodeLinkPair rts = (parseRTSToNode rts, parseRxSignal rts)
-{-# INLINE nodeLinkPair #-}
-
-
-meshF :: forall m. (Applicative m) => FL.Fold m (N.RuntimeStats) (MeshNode, RxSignal)
-meshF = FL.Fold (\_ r -> pure . nodeLinkPair $ r) (pure (initMeshNode, mempty)) pure
-{-# INLINE meshF #-}
+#endif

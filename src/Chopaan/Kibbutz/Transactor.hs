@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances, CPP #-}
 module Chopaan.Kibbutz.Transactor--  ( -- runTransactor
 --                                   statePipe
 --                                   , Stake(..)
@@ -34,8 +34,6 @@ import Control.Monad.Catch
 import Control.DeepSeq (NFData)
 
 import Chopaan.Utils.Streamly
-import Chopaan.Kibbutz.Kibbutz (Kbtz(..))
-import Chopaan.Comm.Comm (Address(..), PubQueue, writeToPubQ)
 import Chopaan.Node.Node (SensorR)
 import Chopaan.Node.Metrics (toWattSeconds, toWatts
                             , fromWattSeconds, fromWatts
@@ -76,7 +74,9 @@ import qualified Data.Map.Strict as M
 import Data.Key hiding (Key)
 import qualified Data.List as L
 
+#ifndef ghcjs_HOST_OS
 import Chopaan.Kibbutz.LinOpt
+import Chopaan.Comm.Comm (Address(..), PubQueue, writeToPubQ)
 import Data.SBV
 import ConCat.Misc (R)
 
@@ -86,6 +86,7 @@ import Data.Greskell.GraphSON.GValue (unwrapOne)
 import NetSpider.Found (LinkState(..))
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), EFinds, VFoundNode)
 import Chopaan.Graph.Greskell
+#endif
 import qualified Data.ByteString.Lazy as BL
 
 
@@ -108,7 +109,7 @@ type NodeStates n = Tx n SensorR
 
 
 
-curryTx :: forall n a. (Address n) => a -> Tx n a -> n -> a
+curryTx :: forall n a. (Ord n) => a -> Tx n a -> n -> a
 curryTx defA (Tx p) n = fromMaybe defA $ M.lookup n p
 {-# INLINE curryTx #-}
 
@@ -152,12 +153,8 @@ instance  (Ord e, RealFrac e) => Monoid (TxStatus' e) where
     , endLag = 0
     }
 
-
-toNodeStates :: (MonadAsync m, Address n, Ord n, IsStream t) => Kbtz t m n SensorR -> t m (NodeStates n)
-toNodeStates k = Tx <$> (unKibbutz k)
-{-# INLINE toNodeStates #-}
-
-planTx :: (MonadAsync m, MonadCatch m, Address n, Ord n, Show n, IsStream t) => Time.DiffTime -> t m (NodeStates n) -> t m (Maybe (TxPlan n))
+#ifndef ghcjs_HOST_OS
+planTx :: (MonadAsync m, MonadCatch m,  Ord n, Show n, IsStream t) => Time.DiffTime -> t m (NodeStates n) -> t m (Maybe (TxPlan n))
 planTx horizon k = S.postscan (transactionPlanner horizon) k 
 {-# INLINE planTx #-}
 
@@ -177,6 +174,16 @@ dispatchNodeTx q (Tx tx) = do
   let txDispatches =  (\(nid, st) -> (stateTopic nid, fromStake st)) <$> (M.toList tx)
   sequence_ $ (\(t, s) -> liftIO $ writeToPubQ q t s) <$> txDispatches
 {-# INLINE dispatchNodeTx #-}
+
+mkTxDispatch :: (Address n) => Text.Text -> Time.UTCTime -> TxPlan n -> NM.Transaction
+mkTxDispatch uid stime (Tx txns) = defMessage
+                         & NM.start .~ (utcToWord64 stime)
+                         & NM.etrs .~ (M.mapKeys (toRemoteId) $ fromStake <$> txns) 
+  where
+    utcToWord64 :: Time.UTCTime -> Word64
+    utcToWord64 = (convert @Int @Word64) . (convert @Time.UTCTime @Int)
+
+
 
 foldTxState :: TxState n -> TxStatus
 foldTxState (Tx gt) = let
@@ -203,14 +210,14 @@ dupF :: (Monad m, Monoid a) => FL.Fold m a b -> FL.Fold m a (a, b)
 dupF f = (,) <$> idFold <*> f  
 {-# INLINE dupF #-}
 
-txFold :: forall m n. (MonadIO m, MonadCatch m, Address n, Ord n)
+txFold :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
        => TxPlan n
        -> FL.Fold m (NodeStates n, Maybe (TxPlan n)) ((NodeStates n, Maybe (TxPlan n)), TxState n)
 txFold = dupF . transactionFold
 {-# INLINE txFold #-}
 
 
-transactionFold :: forall m n. (MonadIO m, MonadCatch m, Address n, Ord n)
+transactionFold :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
                 => TxPlan n -> FL.Fold m (NodeStates n, Maybe (TxPlan n)) (TxState n)
 transactionFold participants = FL.Fold step start end
   where
@@ -307,42 +314,42 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
 --     producer = undefined
 
 
--- planPipe :: forall m n. (MonadIO m, MonadCatch m, Address n, Ord n)
+-- planPipe :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
 --   => Time.DiffTime -> P.Pipe m (NodeStates n) (Maybe (TxPlan n))
 -- planPipe = P.mapM . txn
 
--- planToStatus :: forall m n. (MonadIO m, MonadCatch m, Address n, Ord n)
+-- planToStatus :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
 --              => P.Pipe m (Maybe (TxPlan n)) (Maybe (TxPlan n, TxState n)) 
 -- planToStatus = P.zipWith (\x y -> (,) <$> x <*> y) C.id (P.map (fmap planToState))
 
--- ntos :: (MonadIO m, MonadCatch m, Address n, Ord n) => Time.DiffTime ->  P.Pipe m (NodeStates n) (Maybe (TxPlan n, TxState n))
+-- ntos :: (MonadIO m, MonadCatch m,  Ord n) => Time.DiffTime ->  P.Pipe m (NodeStates n) (Maybe (TxPlan n, TxState n))
 -- ntos t = planToStatus C.. (planPipe t)
 
--- statePipe :: (MonadIO m, MonadCatch m, Address n, Ord n) => Time.DiffTime -> P.Pipe m (NodeStates n) (Maybe (NodeStates n, TxPlan n, TxState n))
+-- statePipe :: (MonadIO m, MonadCatch m,  Ord n) => Time.DiffTime -> P.Pipe m (NodeStates n) (Maybe (NodeStates n, TxPlan n, TxState n))
 -- statePipe t = (P.zipWith status (ntos t) (P.map Just))
 
 -- statePipeWithId h = P.zipWith (,) (P.map fst) (P.compose (statePipe h) (P.map snd))
 
--- statusPipe :: forall m n. (MonadIO m, MonadCatch m, Address n, Ord n)
+-- statusPipe :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
 --   => P.Pipe m (TxState n) (NodeStates n -> TxState n)
 -- statusPipe = P.map incTxState
 
 --stateP = P.zipWith statusPipe 
 --applyInPipe = 
 
--- status :: (Address n, Ord n)
+-- status :: ( Ord n)
 --   => Maybe (TxPlan n, TxState n)
 --   -> Maybe (NodeStates n)
 --   -> Maybe (NodeStates n, TxPlan n, TxState n)
 -- status x y = (,,) <$> y <*> (fst <$> x) <*> (liftA2 incTxState (snd <$> x) y)
 
--- statusS :: (IsStream t, MonadAsync m, Address n, Ord n)
+-- statusS :: (IsStream t, MonadAsync m,  Ord n)
 --         => t m (n, NodeStates n, TxPlan n)
 --         -> t m (n, NodeStates n, TxPlan n, TxState n)
 -- statusS = fmap status
 
 
-transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Address n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
+transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
 transactionPlanner timeHorizon = FL.Fold (\_ n -> txn timeHorizon n) (pure mempty) pure
 {-# INLINE transactionPlanner#-}
 
@@ -399,6 +406,7 @@ expToMaybe (Right a) = return $ Just a
 
 type TxPlan' n = Maybe (TxPlan n)
 
+
 solveTP :: forall m . (MonadIO m, MonadCatch m) => Time.DiffTime -> Sources Int -> Sinks Int -> [[Double]] -> m (TxPlan' Int)
 solveTP timeHorizon sources sinks cs = do
   liftIO $ do
@@ -447,6 +455,8 @@ solveTP timeHorizon sources sinks cs = do
       e2p :: Time.DiffTime -> WattSeconds -> Watts
       e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
 {-# INLINE solveTP #-}
+#endif
+
 
 {---
     Concretely
@@ -455,8 +465,10 @@ solveTP timeHorizon sources sinks cs = do
 data Role = Source | Sink
   deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
+#ifndef ghcjs_HOST_OS
 instance FromGraphSON Role where
   parseGraphSON = parseJSON . unwrapOne
+#endif
 
 newtype Stake' p = Stake
   { unStake :: (Role, p, Time.DiffTime) }
@@ -465,6 +477,7 @@ newtype Stake' p = Stake
 
 type Stake = Stake' Watts
 
+#ifndef ghcjs_HOST_OS
 stakeKey :: forall n. Key n BL.ByteString
 stakeKey = "txStake"
 
@@ -506,7 +519,7 @@ txStatusLinkDir TxStatus'{energyDispatched, energyReceived} = if energyDispatche
        then LinkToSubject
        else LinkBidirectional
 {-# INLINE txStatusLinkDir #-}
-
+#endif
 
 instance (RealFrac p) => Semigroup (Stake' p) where
   (Stake (Source, w, t)) <> (Stake (Source, w', t')) = Stake (Source, w + w', t + t')
@@ -526,13 +539,6 @@ instance (RealFrac p) => Monoid (Stake' p) where
 mkStake :: Role -> Double -> Int -> Stake
 mkStake r p t = Stake (r, toWatts p, fromIntegral t)
 
-mkTxDispatch :: (Address n) => Text.Text -> Time.UTCTime -> TxPlan n -> NM.Transaction
-mkTxDispatch uid stime (Tx txns) = defMessage
-                         & NM.start .~ (utcToWord64 stime)
-                         & NM.etrs .~ (M.mapKeys (toRemoteId) $ fromStake <$> txns) 
-  where
-    utcToWord64 :: Time.UTCTime -> Word64
-    utcToWord64 = (convert @Int @Word64) . (convert @Time.UTCTime @Int)
 
 fromStake :: Stake -> NM.EnergyTransactionRequest
 fromStake (Stake (role, watts, duration)) = defMessage
@@ -546,7 +552,7 @@ fromStake (Stake (role, watts, duration)) = defMessage
     timeToWord = (convert @Int @Word64) . (round @Time.DiffTime @Int)
 
 
-
+#ifndef ghcjs_HOST_OS
 txStatusKey :: forall n. Key n BL.ByteString
 txStatusKey = "txStatusKey"
 
@@ -562,3 +568,4 @@ instance (ToJSON n, FromJSON n) => NodeAttributes (TxStatus' n) where
     sequence [ (txStatusKey @VFoundNode <=:> A.encode s)
              ]
   parseNodeAttributes props = pMapToFail (decodeBin $ lookupAs txStatusKey props)
+#endif

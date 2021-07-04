@@ -5,9 +5,14 @@
 , RankNTypes, FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable, DeriveDataTypeable #-}
-{-# LANGUAGE LambdaCase, TypeOperators, TypeApplications #-}
+{-# LANGUAGE LambdaCase, TypeOperators, TypeApplications, CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Chopaan.Graph (module Chopaan.Graph, module Chopaan.Graph.G, module Chopaan.Graph.Spider) where
+module Chopaan.Graph ( module Chopaan.Graph
+                     , module Chopaan.Graph.G
+#ifndef ghcjs_HOST_OS
+                     , module Chopaan.Graph.Spider
+#endif
+                     ) where
 
 import Prelude hiding ((.), id)
 
@@ -22,23 +27,14 @@ import Data.Bifunctor
 import Data.Maybe (fromJust)
 import qualified Data.Map.Strict as Map
 
-
-import NetSpider.Graph as NG (NodeAttributes(..), LinkAttributes(..), VFoundNode)
-import NetSpider.Spider.Config
-import NetSpider.Snapshot
-import NetSpider.Timestamp (Timestamp(..))
+import Chopaan.Graph.Snapshot
 import qualified Algebra.Graph.Labelled as AG
 
-
-import Chopaan.Node.NodeId
-import Chopaan.Node.Mesh
-import Chopaan.Node.Folds (SensorR)
-import Chopaan.Node.Metrics hiding (Timestamp)
-import Chopaan.Node.NodeSensors
-import Chopaan.Kibbutz.Transactor (Stake, TxStatus)
+#ifndef ghcjs_HOST_OS
 import Chopaan.Graph.Spider
 import Chopaan.Graph.Kbtz
-import Chopaan.Graph.Greskell
+#endif
+
 import Shpadoinkle.Widgets.Types
 
 import Chopaan.Graph.G
@@ -68,15 +64,16 @@ instance N.Newtype (Gr flow state)
 -- $ Shpadoinkle Instances
 instance (Show state, Show flow) => Humanize (Gr flow state)
 
+
 fromSnapshot :: forall n l v. (Monoid l, Ord n) => SnapshotGraph n v l -> Gr l (Maybe v)
 fromSnapshot g = Gr . AG.edges $ fmap (\(x, (_, y), (_, z)) -> (x, y, z)) $ castLinks g
 
 castLinks :: forall n v l. (Monoid l, Ord n) => SnapshotGraph n v l -> [(l, (n, Maybe v), (n, Maybe v))]
-castLinks (nodes, links) = (\l -> (linkAttributes l, sourceAttrs l, destAttrs l)) <$> links
+castLinks (nodes, links) = (\l -> (_linkAttributes l, sourceAttrs l, destAttrs l)) <$> links
   where
-    nmap = Map.fromList $ zip (nodeId <$> nodes) (nodeAttributes <$> nodes)
-    sourceAttrs l = (sourceNode l, nmap Map.! (sourceNode l))
-    destAttrs l = (destinationNode l, nmap Map.! (destinationNode l))
+    nmap = Map.fromList $ zip (_nodeId <$> nodes) (_nodeAttributes <$> nodes)
+    sourceAttrs l = (_sourceNode l, nmap Map.! (_sourceNode l))
+    destAttrs l = (_destinationNode l, nmap Map.! (_destinationNode l))
     
 newtype GrNode = GrNode Int
   deriving (Eq, Ord, Typeable, Show)
@@ -85,7 +82,3 @@ newtype GrNode = GrNode Int
 
 data GraphType = MeshG | PlanG | StatusG | FlowG
   deriving (Eq, Ord, Show, Read, Bounded, Enum, Generic, ToJSON, FromJSON, NFData, Humanize)
-
-
-
-  

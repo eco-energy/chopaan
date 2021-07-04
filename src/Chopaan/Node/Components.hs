@@ -1,9 +1,8 @@
-{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia, FlexibleInstances, OverloadedStrings, ScopedTypeVariables, FlexibleContexts, DeriveTraversable, TypeApplications #-}
+{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia, FlexibleInstances, OverloadedStrings, ScopedTypeVariables, FlexibleContexts, DeriveTraversable, TypeApplications, CPP #-}
 
 module Chopaan.Node.Components where
 
 import GHC.Generics
-import ConCat.Pair
 import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON(..), FromJSON(..), genericParseJSON, genericToEncoding, genericToJSON)
 import qualified Data.Aeson as Aeson
@@ -18,7 +17,11 @@ import Data.Greskell (FromGraphSON(..), Key(..), PMap
                      , parseUnwrapList, parseJSONViaGValue, (.:)
                      , lookup, lookupM)
 import Chopaan.Graph.Greskell
+
+#ifndef ghcjs_HOST_OS
 import NetSpider.Graph (NodeAttributes(..), VFoundNode)
+#endif
+
 import Data.Greskell.Extra (writeKeyValues, (<=:>), pMapToFail, lookupAs)
 import Data.Text.Encoding (encodeUtf8)
 import Data.ByteString.Lazy (fromStrict)
@@ -48,18 +51,8 @@ data BatteryConf a = BatteryConf
 
 instance (GreskellC a, Num a) => FromGraphSON (BatteryConf a) where
   parseGraphSON = parseUnwrapTraversable
-    -- fromPMap =<< parseGraphSON gv
-    -- where
-    --   lookupAsF k pm = pMapToFail $ lookupAs k pm
-    --   fromPMap :: PMap Single GValue -> Parser (BatteryConf a)
-    --   fromPMap pm = do
-    --     m <- lookupAsF minVKey pm
-    --     m' <- lookupAsF maxVKey pm
-    --     c <- lookupAsF capacityAHKey pm
-    --     b <- lookupAsF batTypeKey pm
-    --     return $ BatteryConf m m' c b
 
-
+#ifndef ghcjs_HOST_OS
 minVKey :: (GreskellC a, Num a) => Key VFoundNode a
 minVKey = "minV"
 maxVKey :: (GreskellC a, Num a) => Key VFoundNode a
@@ -82,7 +75,7 @@ instance (GreskellC a, Num a) => NodeAttributes (BatteryConf a) where
                                           <*> lookupAs capacityAHKey props
                                           <*> lookupAs batTypeKey props
                                          )
-
+#endif
 
 defBC :: Num a => BatteryConf a
 defBC = BatteryConf 0 0 0 LeadAcidFlooded
@@ -108,7 +101,7 @@ instance (Binary a) => FromJSON (BatteryTop a) where
 instance (GreskellC a, Num a, Read a) => FromGraphSON (BatteryTop a) where
   parseGraphSON = parseJSON . unwrapAll
 
-type VI a = Pair a
+type VI a = (a, a)
 
 type EvolveB a = (BatteryConf a -> VI a -> VI a)
 
@@ -120,8 +113,8 @@ data Battery a where
 
 
 runBB :: (Fractional a) => Battery a -> VI a -> VI a
-runBB (ParB a b) (v :# i) = combinePar (runBB a (v :# (i/2))) (runBB b (v :# (i/2)))
-runBB (SeqB a b) (v :# i) = combineSeq (runBB a (v/2 :# i)) (runBB b (v/2 :# i))
+runBB (ParB a b) (v , i) = combinePar (runBB a (v , (i/2))) (runBB b (v , (i/2)))
+runBB (SeqB a b) (v , i) = combineSeq (runBB a (v/2 , i)) (runBB b (v/2 , i))
 runBB (ABattery bConf evolve) vi = evolve bConf vi 
 
 combinePar :: VI a -> VI a -> VI a
@@ -140,21 +133,6 @@ data PVConf a = PVConf
 
 instance (GreskellC a, Num a) => FromGraphSON (PVConf a) where
   parseGraphSON = parseUnwrapTraversable
-  -- fromPMap =<< parseGraphSON gv
-    -- where
-    --   lookupAsF k pm = pMapToFail $ lookupAs k pm
-    --   fromPMap :: PMap Single GValue -> Parser (PVConf a)
-    --   fromPMap pm = do
-    --     m <- lookupAsF ocvKey pm
-    --     m' <- lookupAsF vmppKey pm
-    --     c <- lookupAsF imppKey pm
-    --     b <- lookupAsF pvPwKey pm
-    --     return $ PVConf m m' c b
-    --   ocvKey = "ocv" :: Key x a
-    --   vmppKey = "vmpp" :: Key x a
-    --   imppKey = "impp" :: Key x a
-    --   pvPwKey = "pvPw" :: Key x a
-
 
 
 defPC :: Num a => PVConf a
@@ -174,22 +152,7 @@ instance (Binary a) => FromJSON (PVTop a) where
   parseJSON = binaryJSONRead "PVTop"
 
 instance (GreskellC a, Num a) => FromGraphSON (PVTop a) where
-  parseGraphSON = parseJSON . unwrapAll -- do
-    -- fromPMap =<< parseGraphSON gv
-    --   where
-    --     fromPMap :: PMap Single GValue -> Parser (PVTop a)
-    --     fromPMap pm = do
-    --       s <- maybe (fail "no pvTag") (parseGraphSON @(PVTop a)) (Data.Greskell.lookup ("pvContent" :: Text) pm)
-    --       return s
-          -- case s of
-          --   Nothing -> fail "no pv tag"
-          --   (Just k) -> case k of
-          --     "singlc" -> parseGraphSON (batC pm) 
-          --     "seqbc" -> parseGraphSON (batC pm)
-          --     "parbc" -> parseGraphSON . batC $ pm
-          --   --ParPC <$>  <*> parseGraphSON
-          -- where
-          --   batC pm = (Data.Greskell.lookup pm "pvContent")
+  parseGraphSON = parseJSON . unwrapAll
     
 
 data PVEnv a = PVEnv deriving (Eq, Ord, Show, Read, Generic, Binary, NFData)

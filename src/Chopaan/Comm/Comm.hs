@@ -9,8 +9,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveFunctor #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses, CPP #-}
 module Chopaan.Comm.Comm (Chopaan.Comm.Dispatch.Dispatch(..)
+                         , WriteChan(..)
                          , Chopaan.Comm.Address.Address(..)
                          , initQs
                          , initMessageQs
@@ -18,7 +19,6 @@ module Chopaan.Comm.Comm (Chopaan.Comm.Dispatch.Dispatch(..)
                          , initPubQIO
                          , MessageQs(..)
                          , PubQueue
-                         , WriteChan(..)
                          , writeToPubQ
                          , readPubQ
                          , mkCallback
@@ -28,8 +28,11 @@ module Chopaan.Comm.Comm (Chopaan.Comm.Dispatch.Dispatch(..)
                          , unfoldChan
                          ) where
 
+
 import qualified Network.MQTT.Topic as MQ
 import qualified Network.MQTT.Client as MQ
+import Chopaan.Comm.Address
+
 
 import qualified Data.ByteString.Lazy as BL
 import Data.ProtoLens.TextFormat
@@ -47,13 +50,14 @@ import Chopaan.Node.NodeId
 import Chopaan.Comm.Queues
 import qualified Control.Concurrent.Chan.Unagi as UC
 
-import Chopaan.Comm.Address
 import Chopaan.Comm.Dispatch
 import Proto.NodeMessageSchema.NodeMessages hiding (Outgoing, Incoming)
 
 {--------------------------------- Queue Implementation -----------------------------------}
 
+
 type PubQueue = NodeQueue MQ.Topic MeshFrame
+
 
 newtype WriteChan n a = WriteChan (UC.InChan (n, a))
 
@@ -97,6 +101,7 @@ initMessageQs = do
     incomingMonitor :: forall a. (Show n, Show a) => UC.OutChan (n, a) -> IO ()
     incomingMonitor ic = S.drain $ S.repeatM (UC.readChan ic) 
 
+
 writeToPubQ :: (Dispatch a) => PubQueue -> MQ.Topic -> a -> IO ()
 writeToPubQ p n et = atomically $ writeNodeQ p n (frame et)
 
@@ -125,7 +130,6 @@ mkCallback (MessageQs { stateChan, statsChan })  = MQ.SimpleCallback $ writer
       where
         nodeId :: Maybe n
         nodeId = fromStateTopic $ t
-  
 
 {------------------------- Streaming from Queues ---------------------------}
 

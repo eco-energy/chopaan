@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables, GADTs, FlexibleContexts, NamedFieldPuns #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia, UndecidableInstances, OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia, UndecidableInstances, OverloadedStrings, CPP #-}
 
 module Chopaan.API.History where
 
@@ -8,30 +8,34 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader hiding (ask)
 import Control.Monad.Reader.Class
 import Control.Monad.Catch
+import Control.Monad.Base
+import Control.Monad.Trans.Control
 
+import Data.Aeson (ToJSON, FromJSON)
 import Data.Greskell (FromGraphSON)
-
-import NetSpider.Spider (Spider)
-import NetSpider.Spider.Config (Config(..))
-import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..))
-import NetSpider.Timestamp (fromUTCTime)
-import NetSpider.Query
-import NetSpider.Snapshot
 
 
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
 
 
-import Chopaan.Comm.Address
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 
+import qualified Chopaan.Graph.G as G
 
+
+import Servant.API.Modifiers
+import Servant.API.QueryParam
+import Chopaan.CRUD
+import Chopaan.Graph hiding (toLink)
+
+#ifndef ghcjs_HOST_OS
+import Servant (Server, Get, Capture, QueryParam, Proxy(..), (:>)
+               , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer, serve)
+import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..))
 import Network.Greskell.WebSocket (Client)
 import Chopaan.Graph.Kbtz (getKbtzim, addHHToKbtz, getKbtzNodes, kbtzPool, KbtzPool)
-import Chopaan.Graph hiding (toLink)
-import qualified Chopaan.Graph.G as G
 import Chopaan.Graph.Spider ( Spools
                             , SpiderM
                             , mkSpool
@@ -42,36 +46,17 @@ import Chopaan.Graph.Spider ( Spools
                             , statusNodesSnapshot
                             , flowNodesSnapshot
                             )
-
-import Servant (Server, Get, Capture, QueryParam, Proxy(..), (:>)
-               , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer, serve)
-
-import Servant.API.Modifiers
-import Servant.API.QueryParam
+import Chopaan.Comm.Address
 import Data.Pool
-import Data.Aeson (ToJSON, FromJSON)
+
 import Network.Wai (Application)
-import Control.Monad.Base
-import Control.Monad.Trans.Control
-import Chopaan.CRUD
+
 import Chopaan.Kibbutz.KbtzimT
-import Chopaan.Node.NodeT
-import Servant.Links
 import System.Envy
+#else
+import Servant.API
+#endif
 
-
-data TinkerConf = TinkerConf
-  { janusHost :: String
-  , janusPort :: Int
-  } deriving (Generic, FromEnv)
-
-
-newtype HistoryApp a = HistoryApp { runHistoryApp :: ReaderT (DBPools) IO a }
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
-                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
-
-
-type QueryParamR = QueryParam' '[Required, Strict]
 
 type HistoryAPI = "history"
   :> (QueryParamR "kbtzId" KbtzName)
@@ -79,6 +64,8 @@ type HistoryAPI = "history"
   :> (QueryParamR "startTime" UTCTime)
   :> (QueryParamR "endTime" UTCTime)
   :> Get '[JSON] (G.SG NodeMAC)
+
+type QueryParamR = QueryParam' '[Required, Strict]
 
 
 toUrlPieceViaEnum :: Enum a => a -> Text.Text
@@ -92,6 +79,18 @@ instance ToHttpApiData GraphType where
 
 instance FromHttpApiData GraphType where
   parseUrlPiece = parseUrlPieceViaEnum
+
+
+#ifndef ghcjs_HOST_OS
+data TinkerConf = TinkerConf
+  { janusHost :: String
+  , janusPort :: Int
+  } deriving (Generic, FromEnv)
+
+
+newtype HistoryApp a = HistoryApp { runHistoryApp :: ReaderT (DBPools) IO a }
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
+                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
 
 
 type IsoGConn n a e = (Address n
@@ -163,3 +162,4 @@ getHistoryForGraph kn g t0 t1 = do
     PlanG -> (G.Transactor . G.SG) <$> (spoolSnap $ txNodesSnapshot ns t0 t1)
     StatusG -> (G.Status . G.SG)  <$> (spoolSnap $ statusNodesSnapshot ns t0 t1)
     FlowG -> (G.Flow . G.SG) <$> (spoolSnap $ flowNodesSnapshot ns t0 t1)
+#endif

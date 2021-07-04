@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction, ScopedTypeVariables #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports, CPP #-}
 module Chopaan.Node.Metrics where
 
 import GHC.Generics hiding (R)
@@ -33,7 +33,10 @@ import Text.Printf
 import GHCJS.Marshal
 import Proto.NodeMessageSchema.NodeMessages hiding (NodeId)
 import Proto.NodeMessageSchema.NodeMessages_Fields
+
+#ifndef ghcjs_HOST_OS
 import ConCat.Misc (R)
+#endif
 
 {---- NetSpider Imports ----}
 import Data.Greskell (Key, lookupAs, lookupAs', pMapToFail
@@ -41,10 +44,11 @@ import Data.Greskell (Key, lookupAs, lookupAs', pMapToFail
 import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
 import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
 
-
+#ifndef ghcjs_HOST_OS
 import NetSpider.Graph (NodeAttributes(..), VFoundNode, LinkAttributes(..), EFinds)
 import NetSpider.Timestamp (fromS)
 import NetSpider.Snapshot (nodeId, nodeTimestamp)
+#endif
 
 import Chopaan.Node.NodeId
 import Chopaan.Node.Storage
@@ -59,11 +63,6 @@ headerOrder = Csv.headerOrder
 
 {----- Basic Types ------}
 
-
--- instance (ToJSVal a, Compensable a) => ToJSVal (Compensated a) where
---   toJSVal = toJSVal . uncompensated 
--- instance (FromJSVal a, Compensable a) => FromJSVal (Compensated a) where
---   fromJSVal = (pure . (fmap (\a -> add a 0 compensated))) =<< (fromJSVal @a)
 
 
 newtype WattSeconds = WS { unWs :: Compensated Double }
@@ -163,7 +162,7 @@ instance (Num a) => Monoid (Node a) where
   mempty = initEA
 
 
-
+#ifndef ghcjs_HOST_OS
 txKey :: (FromJSON a, ToJSON a) => Key n a
 txKey = "tx"
 
@@ -201,7 +200,7 @@ instance (GreskellC a) => NodeAttributes (Node a) where
 
 instance (GreskellC a) => FromGraphSON (Node a) where
   parseGraphSON = parseJSON . unwrapAll
-
+#endif
 
 deriving instance Generic UTCTime
 --deriving instance ToJSVal UTCTime
@@ -242,7 +241,7 @@ initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0
 -- instance (Binary e, Binary p) => FromJSON (SensorMetrics e p) where
 --   parseJSON = binaryJSONRead "SensorMetrics"
 
-
+#ifndef ghcjs_HOST_OS
 timeKey :: Key VFoundNode (Maybe UTCTime)
 timeKey = "timeKey"
 
@@ -300,6 +299,7 @@ instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
       decodeBin (Right x) = case A.decode x of
         Nothing -> (Left $ PMapParseError "sensorMetric Key" "aeson decode failed for sensor metrics")
         Just x' -> Right x'
+#endif
 
 instance ToJSON (EnergyState) where
   toJSON a = object $ zipWith (A..=) esFieldNamesJSON (fieldAccessorsJSON a)
@@ -322,6 +322,7 @@ instance FromJSON (EnergyState) where
                          & solarInputCurrent .~ si
   parseJSON _ = mempty
 
+
 esFieldNamesJSON :: [T.Text]
 esFieldNamesJSON = ["batteryV",
                      "gridV",
@@ -338,7 +339,7 @@ fieldAccessorsJSON es = es ^.. ( batteryVoltage
                           <> gridToBatteryCurrent
                           <> solarInputCurrent
                         )
-
+#ifndef ghcjs_HOST_OS
 esFieldNamesCSV :: [Csv.Name]
 esFieldNamesCSV = ["batteryV",
                    "gridV",
@@ -370,12 +371,6 @@ instance Csv.DefaultOrdered EnergyState where
 instance Csv.ToField UTCTime where
   toField t = pack (show t)
 
-instance FromGraphSON UTCTime where
-  parseGraphSON = parseJSON . unwrapOne
-
-instance FromGraphSON DiffTime where
-  parseGraphSON = parseJSON . unwrapOne
-
 instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (SensorMetrics e p) where
   toNamedRecord (SensorMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
     [ toNamedRecord _battery,
@@ -384,8 +379,17 @@ instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (SensorMetrics e p)
       --toNamedRecord _sensorsT,
       HM.fromList [("demand", toField _demand)]
     ]
+#endif
 
-showDec :: R -> String
+instance FromGraphSON UTCTime where
+  parseGraphSON = parseJSON . unwrapOne
+
+instance FromGraphSON DiffTime where
+  parseGraphSON = parseJSON . unwrapOne
+
+
+
+showDec :: Double -> String
 showDec = (printf ("%.2g"))
 
 prettyShow :: (Show e, Show p, Fractional e) => SensorMetrics e p -> String
@@ -406,8 +410,9 @@ secsToMinutes = (* 60)
 nmFilter :: (NodeId a) -> SensorMetrics e p -> Bool
 nmFilter _ = isJust . _time
 
-
+#ifndef ghcjs_HOST_OS
 instance Csv.DefaultOrdered (SensorMetrics e p)
+#endif
 
 type Timestamp = (Maybe UTCTime, DiffTime)
 
@@ -432,7 +437,7 @@ instance Bifunctor Battery where
 instance (ToJSON e, ToJSON p) => ToJSON (Battery e p)
 instance (FromJSON e, FromJSON p) => FromJSON (Battery e p)
 
-
+#ifndef ghcjs_HOST_OS
 instance (GreskellC e, GreskellC p) => FromGraphSON (Battery e p) where
   parseGraphSON = parseJSON . unwrapAll
 
@@ -463,13 +468,15 @@ instance (GreskellC e, GreskellC p) => NodeAttributes (Battery e p) where
                                           <*> lookupAs dischargeLimKey props
                                           <*> lookupAs totalCapacityKey props
                                          )
-
+#endif
 
 emptyB :: (Fractional e, Fractional p) => Battery e p
 emptyB = Battery 0 0 0 0
 
+#ifndef ghcjs_HOST_OS
 instance Csv.DefaultOrdered (Battery e p)
 instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (Battery e p)
+#endif
 
 instance (Fractional e, Fractional p, Ord e, Ord p) => Semigroup (Battery e p) where
   b <> b' = emptyB { soc = min (soc b)  (soc b')
@@ -510,7 +517,7 @@ type PowerNR = EnergyN Watts
 type EnergyNR = EnergyN WattSeconds
 
 
-storageSensors :: EnergyState -> SensorVector R
+storageSensors :: EnergyState -> SensorVector Double
 storageSensors es = SensorVector
   { sensorTerminalV = es ^. batteryVoltage
   , sensorCurrent =  i + o
@@ -558,7 +565,7 @@ zeroMsg = defMessage
 ----------------------------------------------------------}
 
 
-
+#ifndef ghcjs_HOST_OS
 -- Identified sensor type for monitoring
 newtype TaggedNode n e p = TaggedNode (n, SensorMetrics e p) deriving (Generic)
 
@@ -570,3 +577,4 @@ instance Csv.DefaultOrdered (TaggedNode n e p) where
                   <> (headerOrder (undefined :: EnergyState))
                   <> (headerOrder (undefined :: PowerNR))
                   <> (headerOrder (undefined :: EnergyNR))
+#endif

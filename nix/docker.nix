@@ -19,6 +19,7 @@
 
 let
   exes = c.chopaan;
+  uiJS = import (./snowman.nix) { isJS = true; }
   
   alp = pkgs.dockerTools.pullImage {
       imageName = "alpine";
@@ -41,10 +42,6 @@ let
     };
   };
   
-  kbtzim = chopaanImage "kbtzim" exes.kbtzim 9999;
-  server = chopaanImage "server" exes.server 8888;
-  ui = chopaanImage "ui" exes.ui 8080;
-
 in
 
 {

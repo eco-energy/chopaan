@@ -3,10 +3,15 @@
 , RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable #-}
-{-# LANGUAGE LambdaCase, TypeOperators, TypeApplications, TupleSections #-}
+{-# LANGUAGE LambdaCase, TypeOperators, TypeApplications, TupleSections, CPP #-}
 module Chopaan.Ui.Grable where
 
+#ifndef ghcjs_HOST_OS
 import ConCat.Misc (inNew2)
+#else
+import qualified Control.Category as C
+#endif
+
 import Control.PseudoInverseCategory (pimap, EndoIso(..), PseudoInverseCategory(..))
 import qualified Control.Newtype.Generics as N
 import Control.DeepSeq (NFData)
@@ -161,6 +166,24 @@ type GrConn f s = (Bounded s, Show s, Ord s, Eq s, Enum s, Show f, Monoid f, Ord
 
 -- $ Constraints for edge labels and nodes, along with monad constraints
 type GrConnM m f s = (Monad m, GrConn f s)
+
+
+
+#ifdef ghcjs_HOST_OS
+(<~) :: (C.Category k)
+     => (b `k` b') -> (a' `k` a) -> ((a `k` b) -> (a' `k` b'))
+(h <~ f) g = h C.. g C.. f
+
+inNew :: (N.Newtype p, N.Newtype q) =>
+         (N.O p -> N.O q) -> (p -> q)
+inNew = N.pack <~ N.unpack
+{-# INLINE inNew #-}
+
+inNew2 :: (N.Newtype p, N.Newtype q, N.Newtype r) =>
+          (N.O p -> N.O q -> N.O r) -> (p -> q -> r)
+inNew2 = inNew <~ N.unpack
+{-# INLINE inNew2 #-}
+#endif
 
 -- $ Overlay two Gr
 ov :: (GrConn f s) => Gr f s -> Gr f s -> Gr f s

@@ -22,8 +22,10 @@ import Data.Greskell (Key, lookupAs, lookupM, lookup, pMapToFail
 import Data.Greskell.GraphSON.GValue (unwrapAll)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 
-import NetSpider.Found (FoundNode(..), FoundLink(..))
+#ifndef ghcjs_HOST_OS
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), VFoundNode, EFinds)
+#endif
+
 import Data.Monoid (Sum(..))
 
 import Chopaan.Node.Components
@@ -67,6 +69,7 @@ defHW = HW (SingBC defBC) (SingPC defPC) (SingLC defLC)
 
 instance (Show a) => Humanize (HW a)
 
+#ifndef ghcjs_HOST_OS
 storageKey :: (Num a) => Key VFoundNode (BatteryTop a)
 storageKey = "hw_storage"
 
@@ -99,7 +102,7 @@ instance (GreskellC a, Num a, Read a) => FromGraphSON (HW a) where
         g <- (lookupAsF generationKey pm)
         c <- (lookupAsF loadKey pm)
         return $ HW s g c
-      
+#endif
 
 
 newtype WattHours = WattHours Double
@@ -267,22 +270,3 @@ emptyHWForm = HWUpdate
   , _loadU = loadForm
   }
 
-
-
-{--
-distanceKey :: Key EFinds Double
-distanceKey = "distance"
-
-gaugeKey :: Key EFinds Double
-gaugeKey = "gauge"
-
-instance LinkAttributes Wire where
-  writeLinkAttributes w = fmap writeKeyValues $ sequence $
-    [ distanceKey <=:> distance w
-    , gaugeKey <=:> gauge w
-    ] 
-  parseLinkAttributes props = pMapToFail (Wire
-                                          <$> lookupAs distanceKey props
-                                          <*> lookupAs gaugeKey props
-                                         )
---}

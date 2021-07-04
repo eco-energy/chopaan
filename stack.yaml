@@ -138,6 +138,7 @@ extra-deps:
  - ghc-byteorder-4.11.0.0.10@sha256:d47fdef63f2a145091e91b1aedbd46bf61ca03bb935e81e3462a1d904c319de3,1594
  - constraints-extras-0.3.1.0@sha256:c70fcf437e1d640cfd50a8eda1db47a64e49c96857e08fd0d8c438327d908ac1,1846
  - html-parse-0.2.0.2@sha256:268c6c3a723aae77ff799bf501d60a91e60536facab3ae70df7a74cea75e29c3,3898
+ - ghcjs-base-stub-0.3.0.2@sha256:1ce3ac155173b8036873ad990d3ed86137a643264fb6dad294a935a32e1105a2,3669
  #- z3-408.2@sha256:1f8b6ccbcc6d06a6701900a09fcfcbaf86ed8a8495615710bef4da5cdb073a3f,4226
 # Override default flag values for local packages and extra-deps
 flags:

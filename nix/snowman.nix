@@ -72,19 +72,19 @@ let
         sha256 = "0cbsj3dyycykh0lcnsglrzzh898n2iydyw8f2nwyfvfnyx6ac2im";
       };
 
-      streamlySrc = fetchFromGitHub {
-        owner = "composewell";
-        repo = "streamly";
-        rev = "4e48b52e8709390a47e99c107ebed2d1c9420076";
-        sha256 = "1824vqnx9ncs8f1vzgl08r5bd274vhabsdkirqqa88fxl0f2jyw5";
-      };
-
-      streamly =
-        pkgs.haskell.packages.${compilerjs}.callCabal2nix "streamly" streamlySrc {};
+      # streamlySrc = fetchFromGitHub {
+      #   owner = "composewell";
+      #   repo = "streamly";
+      #   rev = "4e48b52e8709390a47e99c107ebed2d1c9420076";
+      #   sha256 = "1824vqnx9ncs8f1vzgl08r5bd274vhabsdkirqqa88fxl0f2jyw5";
+      # };
+      
+      # streamly =
+      #   pkgs.haskell.packages.${compilerjs}.callCabal2nix "streamly" streamlySrc {};
+      
       foundation =
         pkgs.haskell.packages.${compilerjs}.callCabal2nix "foundation" (fdnSrc + /foundation) {};
-
-
+      
       concatPkg = p:
         pkgs.haskell.packages.${compilerjs}.callCabal2nix ("concat-${p}") (concat + "/${p}") {};
 
@@ -101,7 +101,11 @@ let
         "concat-plugin" = concatPkg "plugin";
         "concat-examples" = concatPkg "examples";
         "concat-graphics" = concatPkg "graphics";
-        "streamly" = streamly;
+        "streamly" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "streamly";
+          ver = "0.7.3";
+          sha256 = "0lwjyl9ygfppxcia9zkpgr7502ncx6sf6c5np2vriy5jm283xkza";
+        } {});
         "abstract-dequeue" = pkgs.haskell.lib.dontCheck hsuper.abstract-dequeue;
         "lockfree-queue" = pkgs.haskell.lib.dontCheck hsuper.lockfree-queue;
         "http-date" = pkgs.haskell.lib.dontCheck hsuper.http-date;
@@ -124,16 +128,27 @@ let
         "fingertree" = pkgs.haskell.lib.dontCheck hsuper.fingertree;
         "diagrams-lib" = pkgs.haskell.lib.dontCheck hsuper.diagrams-lib;
         "generic-deriving" = pkgs.haskell.lib.dontCheck hsuper.generic-deriving;
+        "streaming-commons" = pkgs.haskell.lib.dontCheck hsuper.streaming-commons;
+        "lattices" = pkgs.haskell.lib.dontCheck hsuper.lattices;
         "monad-bayes" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
           pkg = "monad-bayes";
           ver = "0.1.1.0";
-          sha256 = "10aaaaaaaib7niiix0j9429j4f3yzlrxviz7rb1i46mwnx077b5m";
+          sha256 = "18wxizq5nn61i3b9g8j8g2mb14wmyxwi4w1hdygqc27r55gpbqz2";
         } {});
-
+        "net-spider" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "net-spider";
+          ver = "0.4.3.6";
+          sha256 = "1qhm9aw2pqfarc8l28s57vz4rzk2yjaq194iyxhkbj85y8r99xmw";
+        } {});
         "greskell" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
           pkg = "greskell";
           ver = "1.2.0.0";
           sha256 = "00c62j4bsib7niiix0j9429j4f3yzlrxviz7rb1i46mwnx077b5m";
+        } {});
+        "greskell-websocket" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "greskell-websocket";
+          ver = "0.1.2.5";
+          sha256 = "0ycn921xxk1lyrg8hxlaxn2r4m22skpvvbl3v2qkq4ndz1cc2kqv";
         } {});
         "network" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
           pkg = "network";
@@ -225,10 +240,10 @@ let
             packages    = _: [ chopaan ];
             COMPILER    = compilerjs;
             buildInputs = ghcTools;
-            shellHook   = ''
-              ${lolcat}/bin/lolcat ${../figlet}
-              cat ${../intro}
-            '';
+            # shellHook   = ''
+            #   ${lolcat}/bin/lolcat ${../figlet}
+            #   cat ${../intro}
+            # '';
           };
       }.${build-or-shell};
 in

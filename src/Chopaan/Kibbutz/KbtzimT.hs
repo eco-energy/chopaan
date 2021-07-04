@@ -3,7 +3,7 @@
 , DerivingStrategies, DeriveAnyClass, StandaloneDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, CPP #-}
 module Chopaan.Kibbutz.KbtzimT where
 
 
@@ -13,15 +13,13 @@ import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Text (Text)
 import Control.Lens (makeFieldsNoPrefix)
+
 import Database.Beam (Beamable, Columnar, Nullable) --, Table (..), TableEntity)
-
-
 
 import Shpadoinkle.Widgets.Types (Humanize (..))
                                  --, Field, Hygiene (Clean))
 
 import Chopaan.Kibbutz.KbtzId
-
 
 
 data KbtzimT f = Kbtzim

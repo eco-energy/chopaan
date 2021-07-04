@@ -1,6 +1,6 @@
 {-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds, InstanceSigs #-}
 {-# LANGUAGE DeriveGeneric, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies #-}
-{-# LANGUAGE TypeOperators, QuantifiedConstraints, TypeFamilies #-}
+{-# LANGUAGE TypeOperators, QuantifiedConstraints, TypeFamilies, CPP #-}
 module Chopaan.Kibbutz.Kibbutz where
 
 import Prelude hiding (zipWith)
@@ -21,10 +21,12 @@ import Data.Key
 import Data.Bifunctor
 import Control.Monad.IO.Class (liftIO, MonadIO)
 
-import Chopaan.Comm.Comm ( Address
-                         , Dispatch
+import Chopaan.Comm.Comm ( Dispatch
                          , subStream
                          , WriteChan
+#ifndef ghcjs_HOST_OS
+                         , Address
+#endif
                          )
        
 
@@ -33,6 +35,8 @@ import Chopaan.Node.NodeId ( NodeMAC
                            )
 
 import Chopaan.Kibbutz.KbtzId
+
+#ifndef ghcjs_HOST_OS
 import Chopaan.Kibbutz.AWS.Things ( getThings
                                   , thingName
                                   , inIotContext
@@ -41,9 +45,8 @@ import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
 
 import ConCat.Scan
 import ConCat.Misc
-
-
 import System.IO
+#endif
 
 type KbtzConn t m n = (IsStream t, MonadAsync m, Ord n, Show n, Address n)
 
@@ -114,11 +117,13 @@ sub :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a)
   -> m (t m a)
 sub = flip (subStream @t @m @n @a) 
 
+#ifndef ghcjs_HOST_OS
 getNodes :: (MonadIO m) => KbtzName -> m [NodeMAC]
 getNodes (KbtzId n) = do
   lgr <- liftIO $ newLogger Info stdout
   ((fmap $ NodeId . fromJust . thingName)
               <$> (liftIO . (inIotContext lgr) . getThings $ n))
+#endif
 
 logNode :: (MonadIO m, Show n, Show a) => n -> a -> m ()
 logNode k v = liftIO . print $ "Node: "

@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, TypeOperators, DataKinds, FlexibleContexts, TypeFamilies, FlexibleInstances, LambdaCase, TypeApplications, ScopedTypeVariables, MultiParamTypeClasses, UndecidableInstances, InstanceSigs, RecordWildCards #-}
+{-# LANGUAGE KindSignatures, TypeOperators, DataKinds, FlexibleContexts, TypeFamilies, FlexibleInstances, LambdaCase, TypeApplications, ScopedTypeVariables, MultiParamTypeClasses, UndecidableInstances, InstanceSigs, RecordWildCards, CPP #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving
 , DerivingStrategies, DeriveAnyClass, StandaloneDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -15,8 +15,6 @@ import Data.Text (Text)
 import Data.Aeson (ToJSON, FromJSON)
 
 import Data.Proxy (Proxy (Proxy))
-
-
 
 import Servant.API (Capture, Delete
                    , FromHttpApiData, Get, JSON
@@ -58,8 +56,6 @@ data GView = GView
   , _endTime :: Ti.UTCTime
   , _currentG :: Maybe (SG NodeMAC)
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
-
-makeFieldsNoPrefix ''GView
 
 data Frontend = MHomePage
               | MKibbutzim (RosterKbtzim)
@@ -118,8 +114,15 @@ data RosterNodezim = RosterNodezim
   , _tableN :: NodeList
   } deriving (Generic, Eq, Ord, Show, NFData, ToJSON, FromJSON)
 
+
+
+-- #ifndef ghcjs_HOST_OS
+makePrisms ''Frontend
+
+makeFieldsNoPrefix ''GView
+
 makeFieldsNoPrefix ''RosterKbtzim
 
 makeFieldsNoPrefix ''RosterNodezim
 
-makePrisms ''Frontend
+-- #endif

@@ -1,17 +1,18 @@
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, DeriveDataTypeable, StandaloneDeriving, GADTs #-}
 {-# LANGUAGE FlexibleInstances, TypeOperators, TypeApplications, ScopedTypeVariables #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses, QuantifiedConstraints, AllowAmbiguousTypes, UndecidableInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, RankNTypes, CPP #-}
 
 module Chopaan.Graph.G where
 
 import Prelude hiding (id, (.), curry, uncurry)
 import GHC.Generics (Generic, Generic1)
 
+#ifndef ghcjs_HOST_OS
 import ConCat.Category
 import ConCat.Misc
+#endif
 
 import Data.Constraint.Extras.TH (deriveArgDict)
 import Data.Dependent.Map (DMap, fromList, singleton, union, unionWithKey)
@@ -33,14 +34,17 @@ import Chopaan.Node.Folds
 import Chopaan.Node.Metrics
 import Chopaan.Node.Mesh
 import Chopaan.Kibbutz.Transactor
+import Chopaan.Graph.Snapshot
 
-import NetSpider.Snapshot
+#ifndef ghcjs_HOST_OS
 import NetSpider.Spider.Config
 import Data.Pool
 import NetSpider.Spider
-import NetSpider.Timestamp as NT
+#endif
 
+import Algebra.Graph.Labelled
 import GHCJS.Marshal
+
 
 
 data G k n where
@@ -49,7 +53,6 @@ data G k n where
   Status :: k n SensorR Stake -> G k n
   Flow :: k n BatteryR PowerNR -> G k n
   deriving (Generic)
-
 
 
 deriving instance (forall a b. (Eq a, Eq b) => Eq (k n a b)) => Eq (G k n)
@@ -64,22 +67,14 @@ deriving instance (forall a b. (NFData a, NFData b) => NFData (k n a b)) => NFDa
 
 deriving instance (forall a b. (Show a, Show b) => Show (k n a b)) => Show (G k n)
 
--- deriving instance (forall a b. (ToJSVal a, ToJSVal b) => ToJSVal (k n a b)) => ToJSVal (G k n)
 
--- deriving instance (forall a b. (FromJSVal a, FromJSVal b) => FromJSVal (k n a b)) => FromJSVal (G k n)
-
---deriving instance NFData (SnapshotGraph n v e)
-deriving instance Generic NT.Timestamp
-deriving instance NFData NT.Timestamp
-deriving instance (NFData n, NFData v) => NFData (SnapshotNode n v)
-deriving instance (NFData n, NFData e) => NFData (SnapshotLink n e)
---deriving instance NFData (([SnapshotNode n v], [SnapshotLink n e]))
 
 newtype SG' n v e = SG { unSnapshot :: SnapshotGraph n v e }
   deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
 
 type SG n = G SG' n
 
+#ifndef ghcjs_HOST_OS
 newtype CG' n v e = CG { unConf :: Config n v e }
   deriving (Generic)
 
@@ -89,6 +84,19 @@ type SnapshotG = G' SG'
 
 type SpoolG = G' SpoolG'
 
+type ConfG n = G'' CG' n
+
+type SG'' n = G'' SG' n 
+
+type SpG'' n = G'' SpoolG' n
+
+type SnGr n v e = G' SG' n v e
+
+type CGr n v e = G' CG' n v e
+
+type SpGr n v e = G' SpoolG' n v e
+
+#endif
 
 data G'' k n = G''
   { meshG :: k n MeshNode RxSignal
@@ -98,11 +106,6 @@ data G'' k n = G''
   } deriving (Generic)
 
 
-type ConfG n = G'' CG' n
-
-type SG'' n = G'' SG' n 
-
-type SpG'' n = G'' SpoolG' n 
 
 
 data G' k n v e where
@@ -110,22 +113,3 @@ data G' k n v e where
   Transactor' :: k n Stake TxStatus -> G' k n Stake TxStatus
   Status' :: k n SensorR Stake -> G' k n SensorR Stake
   Flow' :: k n BatteryR PowerNR -> G' k n BatteryR PowerNR
-
-type SnGr n v e = G' SG' n v e
-
-type CGr n v e = G' CG' n v e
-
-type SpGr n v e = G' SpoolG' n v e
-
-
--- GId :: ((k n) e e) -> G k n e e
--- gId :: G k n e p
--- gId = GId id
-
--- compG :: G k n a b -> G k n b c -> G k n a c
--- compG = undefined
-
-
--- instance Category (k n) => Category (G k n) where
---   id = gId
---   (.) = flip compG

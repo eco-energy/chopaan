@@ -54,7 +54,7 @@ import           Shpadoinkle.Run             (runJSorWarp, simple, Env(Dev))
 import           Shpadoinkle.Backend.ParDiff (runParDiff)
 
 
-import NetSpider.Snapshot
+import Chopaan.Graph.Snapshot
 import Servant.API                 ((:<|>) (..))
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.API.History
