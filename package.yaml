@@ -217,7 +217,6 @@ library:
         - Chopaan.DB
         - Chopaan.DB.Nodes
         - Chopaan.DB.Sensors
-        - Chopaan.Graph.DataSource
         - Chopaan.Graph.Kbtz
         - Chopaan.Graph.Spider
         - Chopaan.Graph.VI

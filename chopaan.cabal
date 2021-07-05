@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 83b84d8fc4e5bcfb009d9dd3a492f10fd118609c21a770a89d30b569c019f565
+-- hash: f1edf6ad3f9ff75f822b0d28d6a3a011998850552d5e7073ec6a68c3aa60fb54
 
 name:           chopaan
 version:        0.1.0.0
@@ -214,7 +214,6 @@ library
         Chopaan.DB
         Chopaan.DB.Nodes
         Chopaan.DB.Sensors
-        Chopaan.Graph.DataSource
         Chopaan.Graph.Kbtz
         Chopaan.Graph.Spider
         Chopaan.Graph.VI

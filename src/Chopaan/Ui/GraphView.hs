@@ -15,14 +15,7 @@ import Data.Text.Encoding as T
 import           GHCJS.DOM                               (currentDocumentUnchecked,
                                                           currentWindowUnchecked)
 import "ghcjs-dom" GHCJS.DOM.Document                      (createElement)
-import           GHCJS.DOM.Element                       (setId)
-import           GHCJS.DOM.NonElementParentNode          (getElementById)
-import           GHCJS.DOM.RequestAnimationFrameCallback (RequestAnimationFrameCallback,
-                                                          newRequestAnimationFrameCallback)
-import           GHCJS.DOM.Window                        (Window,
-                                                          requestAnimationFrame,
-                                                          getInnerHeight,
-                                                          getInnerWidth)
+
 
 #ifndef ghcjs_HOST_OS
 import           Language.Javascript.JSaddle
@@ -31,8 +24,6 @@ import           Language.Javascript.JSaddle hiding (JSM, MonadJSM)
 #endif
 
 import           Shpadoinkle
-import           UnliftIO.Concurrent                     (forkIO, threadDelay)
-
 
 import Shpadoinkle (Html(..), liftC, text, JSM, MonadJSM, Continuation, Html,
                      RawNode (..),
@@ -42,23 +33,13 @@ import Shpadoinkle (Html(..), liftC, text, JSM, MonadJSM, Continuation, Html,
                      readTVarIO, text,
                      writeTVar)
 import Control.Monad.IO.Class
-import Shpadoinkle.Run (runJSorWarp, simple)
-import Shpadoinkle.Html (div_, getBody, input', onInput
-                        , onOption, option, select, value, Prop(..))
 import qualified Shpadoinkle.Html as H
-import Shpadoinkle.Widgets.Types.Core
-
-
-import qualified Clay as C
-
-
 import Shpadoinkle.Template.TH
 
 
 import Chopaan.Graph.G as G
 import qualified Chopaan.Ui.Style as Css
 import Chopaan.Graph.Snapshot
-import Chopaan.CRUD
 import Data.FileEmbed
 
 default (Text)
@@ -84,10 +65,6 @@ renderKbtzGraph sg = case sg of
         <> [ cview ]
       )
       where
-        grNameC i = H.class' $ "graph-" <> (pack . show $ i)
-        posCss = H.class' . toStrict . C.render . C.position $ C.static
-        nodeClasses i = [grNameC i, posCss]
-        edgeClasses i = [grNameC i,  posCss]
         nodeHtml = H.text . pack . show
         edgeHtml l n n' = H.div_ [ H.text . pack . show $ n
                                  , H.text . pack . show $ l
@@ -129,7 +106,7 @@ cview = H.div [
 --   (G.Status (SG ms)) -> G.Status . SG . f $ ms
 --   (G.Flow (SG ms)) -> G.Flow . SG . f $ ms
 
-renderGrid :: forall m n. (MonadJSM m, CRUDChopaan m, ToJSON n) => SG n -> Html m ()
+renderGrid :: forall m n. (MonadJSM m, ToJSON n) => SG n -> Html m ()
 renderGrid sg = case sg of
   (G.Mesh (SG ms)) -> renderWith3 ms
   (G.Transactor (SG ms)) -> renderWith3 ms 

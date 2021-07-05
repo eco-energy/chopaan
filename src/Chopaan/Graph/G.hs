@@ -1,28 +1,19 @@
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, DeriveDataTypeable, StandaloneDeriving, GADTs #-}
 {-# LANGUAGE FlexibleInstances, TypeOperators, TypeApplications, ScopedTypeVariables #-}
 {-# LANGUAGE MultiParamTypeClasses, QuantifiedConstraints, AllowAmbiguousTypes, UndecidableInstances #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies, RankNTypes, CPP #-}
+{-# LANGUAGE TypeFamilies, RankNTypes, CPP, PackageImports #-}
 
 module Chopaan.Graph.G where
 
 import Prelude hiding (id, (.), curry, uncurry)
-import GHC.Generics (Generic, Generic1)
+import GHC.Generics (Generic)
 
 #ifndef ghcjs_HOST_OS
 import ConCat.Category
 import ConCat.Misc
 #endif
 
-import Data.Constraint.Extras.TH (deriveArgDict)
-import Data.Dependent.Map (DMap, fromList, singleton, union, unionWithKey)
-import Data.Dependent.Sum ((==>))
-import Data.Functor.Identity (Identity(..))
-import Data.GADT.Compare.TH (deriveGCompare, deriveGEq)
-import Data.GADT.Show.TH (deriveGShow)
 
-
---TODO:
 import Control.DeepSeq (NFData)
 
 import Data.Aeson
@@ -42,8 +33,6 @@ import Data.Pool
 import NetSpider.Spider
 #endif
 
-import Algebra.Graph.Labelled
-import GHCJS.Marshal
 
 
 

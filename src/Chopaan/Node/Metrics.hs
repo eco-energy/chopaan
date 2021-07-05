@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction, ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction, ScopedTypeVariables, PackageImports #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports, CPP #-}
 module Chopaan.Node.Metrics where
 
@@ -30,8 +30,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Text.Printf
 
-import GHCJS.Marshal
-import Proto.NodeMessageSchema.NodeMessages hiding (NodeId)
+
+import Proto.NodeMessageSchema.NodeMessages
 import Proto.NodeMessageSchema.NodeMessages_Fields
 
 #ifndef ghcjs_HOST_OS
