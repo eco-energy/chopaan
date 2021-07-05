@@ -2,16 +2,23 @@ let
   region = "ap-southeast-1";
   app = (import ./.) {};
   accessKeyId = "default";
-  uijs = (import ./nix/snowman.nix).build { isJS = true; };
-  janusPort = 8182;
-  serverPort = 8080;
-  mqttPort = 8883;
+  ui = (import ./nix/snowman.nix).build { isJS = true; };
 in
 {
   network.description = "Chopaan and DB.";
 
   
-  machine = { config, pkgs, resources, lib, ... }: {
+  machine = { config, pkgs, resources, lib, ... }:
+    let
+      uijs = "${ui}/bin/ui.jsexe";
+      janusPort = 8182;
+      serverPort = 8080;
+      mqttPort = 8883;
+      tinkerHost = "localhost";
+      janusConf = ./janusgraph-config;
+      dnsName = "dosti.ecoenergy.global";
+    in
+     {
       deployment = {
         targetEnv = "ec2";
         
@@ -27,6 +34,7 @@ in
 
           securityGroups = [
             resources.ec2SecurityGroups."http"
+            resources.ec2SecurityGroups."https"
             resources.ec2SecurityGroups."ssh"
           ];
           elasticIPv4 = resources.elasticIPs.chopaan-ip;
@@ -34,22 +42,22 @@ in
 
         route53 = {
           inherit accessKeyId region;
-          hostName = "dosti.ecoenergy.global";
+          hostName = dnsName;
           usePublicDNSName = true;
         };
       };
 
       boot.loader.grub.device = lib.mkForce "/dev/nvme0n1";
 
-      networking.firewall.allowedTCPPorts = [ 80 8093 ];
+      networking.firewall.allowedTCPPorts = [ 80 443 ];
 
       docker-containers."janusgraph" = {
            image = "docker.io/janusgraph/janusgraph:latest";
            ports = [ "${toString janusPort}:${toString janusPort}" ];
            volumes = [
              "janusgraph-default-data:/var/lib/janusgraph"
-             "./janusgraph-config/config/:/etc/opt/janusgraph:ro"
-             "./janusgraph-config/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
+             "${janusConf}/config:/etc/opt/janusgraph:ro"
+             "${janusConf}/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
                      ];
       };
       
@@ -63,7 +71,7 @@ in
             chopaan = app.chopaan.kbtzim;
           in
             ''
-            ${chopaan}/bin/kbtzim --tinkerHost "janusgraph" --tinkerPort ${toString janusPort}
+            ${chopaan}/bin/kbtzim --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
             '';
       };
 
@@ -78,26 +86,43 @@ in
             server = app.chopaan.server;
           in
             ''
-            ${server}/bin/server --assets ${uijs}/bin/ui.jsexe --port ${toString serverPort} --tinkerHost "janusgraph" --tinkerPort ${toString janusPort}
+            ${server}/bin/server --assets ${uijs} --port ${toString serverPort} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
             '';
       };
 
-
       
-      # systemd.services.ui = {
-      #   wantedBy = [ "multi-user.target" ];
+      users.users.nginx.extraGroups = [ "acme" ];
+      security.acme.acceptTerms = true;
+      security.acme.email = "faez@ecoenergy.global";
+      security.acme.server = "https://acme-staging-v02.api.letsencrypt.org/directory";
+      services.nginx = {
+        enable = true;
+        logError = "/dev/stdout info";
+        recommendedTlsSettings = true;
+        recommendedOptimisation = true;
+        recommendedGzipSettings = true;
+        recommendedProxySettings = true;
+        
+        virtualHosts.${dnsName} = {
+          addSSL = true;
+          enableACME = true;
+          locations."/" = {
+            proxyPass = "http://127.0.0.1:${toString serverPort}";
+            root = uijs;
+          };
+        };
+        virtualHosts."acmechallenge.${dnsName}" = {
+          # Catchall vhost, will redirect users to HTTPS for all vhosts
+          serverAliases = [ "*.${dnsName}" ];
+          locations."/.well-known/acme-challenge" = {
+            root = "/var/lib/acme/.challenges";
+          };
+          locations."/" = {
+            return = "301 https://$host$request_uri";
+          };
+        };
+      };
 
-      #   after = [ "server.service" ];
-
-      #   script =
-      #     let
-      #       ui = app.chopaan.ui;
-      #       # --connectPort ${toString config.services.postgresql.port}
-      #     in
-      #       ''
-      #       ${ui}/bin/ui
-      #       '';
-      # };
     };
 
     resources = {
@@ -112,6 +137,14 @@ in
           ];
         };
 
+        "https" = {
+          inherit accessKeyId region;
+
+          rules = [
+            { fromPort = 443; toPort = 443; sourceIp = "0.0.0.0/0"; }
+          ];
+        };
+
         "ssh" = {
           inherit accessKeyId region;
 
@@ -120,6 +153,7 @@ in
           ];
         };
       };
+      
       elasticIPs.chopaan-ip = { inherit region accessKeyId; };
     };
   }
