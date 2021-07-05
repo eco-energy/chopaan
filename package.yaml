@@ -113,6 +113,7 @@ when:
   condition: "!impl(ghcjs)"
   then:
     dependencies:
+      - optparse-applicative
       - net-spider
       - beam-postgres
       - beam-migrate
