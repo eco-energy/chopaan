@@ -52,7 +52,8 @@ import Data.Pool
 import Network.Wai (Application)
 
 import Chopaan.Kibbutz.KbtzimT
-import System.Envy
+import qualified System.Envy as E
+import Options.Applicative
 #else
 import Servant.API
 #endif
@@ -85,7 +86,19 @@ instance FromHttpApiData GraphType where
 data TinkerConf = TinkerConf
   { janusHost :: String
   , janusPort :: Int
-  } deriving (Generic, FromEnv)
+  } deriving (Generic, E.FromEnv)
+
+
+tkParser :: Parser TinkerConf
+tkParser = TinkerConf
+  <$> strOption   (long "tinkerHost" <> metavar "TINKERHOST")
+  <*> option auto (long "tinkerPort" <> metavar "TINKERPORT" <> showDefault <> value 8182)
+
+tkOptions :: ParserInfo TinkerConf
+tkOptions = info (tkParser <**> helper) $
+    fullDesc <> progDesc "Chopaan"
+             <> header "Control and Monitor Kbtzim"
+
 
 
 newtype HistoryApp a = HistoryApp { runHistoryApp :: ReaderT (DBPools) IO a }
