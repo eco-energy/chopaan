@@ -110,19 +110,11 @@ in
             proxyPass = "http://127.0.0.1:${toString serverPort}";
             root = uijs;
           };
-        };
-        virtualHosts."acmechallenge.${dnsName}" = {
-          # Catchall vhost, will redirect users to HTTPS for all vhosts
-          serverAliases = [ "*.${dnsName}" ];
           locations."/.well-known/acme-challenge" = {
             root = "/var/lib/acme/.challenges";
           };
-          locations."/" = {
-            return = "301 https://$host$request_uri";
-          };
         };
       };
-
     };
 
     resources = {
