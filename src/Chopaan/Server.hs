@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveAnyClass, DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 --{-# OPTIONS_GHC -fno-warn-missing-methods #-}
 
-module Chopaan.Server (application) where
+module Chopaan.Server (application, main) where
 
 import GHC.Generics hiding (R)
 
@@ -22,7 +22,7 @@ import           Data.Proxy
 
 import           Network.Wai               (Application)
 import           Network.Wai.Handler.Warp  (run)
-
+import           Network.Wai.Middleware.Cors
 
 import           Servant.API.WebSocket (WebSocket)
 import           Servant.Links
@@ -30,11 +30,18 @@ import           Servant.Links
 import           Servant.API
 import           Servant.Server            (Server, hoistServer, serve)
 
+
 import           Shpadoinkle               (JSM, type (~>))
 import           Shpadoinkle.Router        (MonadJSM)
 import           Shpadoinkle.Router.Server (serveUI)
 import           Shpadoinkle.Run           (Env (Prod))
 
+
+import           Options.Applicative       (Parser, ParserInfo, auto,
+                                            execParser, fullDesc, header,
+                                            helper, info, long, metavar, option,
+                                            progDesc, short, showDefault,
+                                            strOption, value, (<**>))
 
 
 import Chopaan.UiTypes
@@ -72,5 +79,30 @@ app ev root (TinkerConf h p) = serve (Proxy @ (SPA App :<|> HistoryAPI)) (serveS
           return . template ev i $ view @ Noop i) routes
 
 
-application :: Env -> FilePath -> IO Application
-application e f = return $ app e f (TinkerConf "localhost" 8182) 
+data ServerOpts = ServerOpts
+  { assets :: FilePath
+  , port :: Int
+  , tinkerHost :: String
+  , tinkerPort :: Int
+  } deriving (Generic)
+
+parser :: Parser ServerOpts
+parser = ServerOpts
+  <$> strOption   (long "assets" <> short 'a' <> metavar "FILEPATH")
+  <*> option auto (long "port"   <> short 'p' <> metavar "PORT" <> showDefault <> value 8080)
+  <*> strOption   (long "tinkerHost" <> metavar "TINKERHOST")
+  <*> option auto (long "tinkerPort" <> metavar "TINKERPORT" <> showDefault <> value 8182)
+
+options :: ParserInfo ServerOpts
+options = info (parser <**> helper) $
+    fullDesc <> progDesc "Chopaan Server"
+             <> header "Servers the SPA and the Backend API"
+
+application :: Env -> FilePath -> TinkerConf -> IO Application
+application e f tk = return . simpleCors $ app e f tk 
+
+
+main :: IO ()
+main = do
+  ServerOpts{..} <- execParser options
+  run port =<< application Prod assets (TinkerConf tinkerHost tinkerPort)
