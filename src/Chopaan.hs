@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications, ScopedTypeVariables, RecordWildCards #-}
+{-# LANGUAGE TypeApplications, ScopedTypeVariables, RecordWildCards, FlexibleContexts #-}
 module Chopaan where
 
 import Control.Monad.IO.Class
@@ -11,11 +11,12 @@ import Streamly as S
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Prelude as S
 
+import Options.Applicative
 import RIO hiding (view, async, withAsync, Async)
 
 
 runKbtzim :: forall t m.
-  (IsStream t, MonadIO m, Monad (t m))
+  (IsStream t, MonadAsync m)
   => TinkerConf
   -> MQTTOpts
   -> m (t m Bool)
@@ -43,8 +44,6 @@ run = do
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
-  S.drain $
-    runKbtzim @SerialT spiderOpts mqttOpts
-  where
-    spiderOpts = TinkerConf "localhost" 8182
-    --mqttOpts = undefined
+  tkOpts <- liftIO $ execParser tkOptions
+  ks <- liftIO $ runKbtzim @ParallelT tkOpts mqttOpts
+  liftIO . S.drain $ S.adapt ks
