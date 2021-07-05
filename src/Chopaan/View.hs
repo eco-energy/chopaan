@@ -76,12 +76,6 @@ import qualified Data.Time as Ti
 
 default (T.Text, [])
 
--- main :: IO ()
--- main = runJSorWarp 8080 $ do
---   H.setTitle "Chopaan"
---   simple runParDiff initial ((template Dev initial) . view) H.getBody
---   where
---     initial = (MAddNode (KbtzId "this") Nothing emptyNodeForm)
 
 ainit :: (Monad m, CRUDChopaan m) => Route -> m Frontend
 ainit _ = return MHomePage --(loadG defGView)
@@ -242,7 +236,6 @@ staticTemplate s = voidC $ H.html_
     ]
   ]
 
---x = H.addScript
 
 template :: Env -> Frontend -> Html m a -> Html m a
 template ev fe stage = H.html_
@@ -259,12 +252,6 @@ template ev fe stage = H.html_
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
     , toHydration fe
     , H.script [ H.src $ entrypoint ev ] []
-    , H.script [ H.src $
-       "https://unpkg.com/three@0.129.0/build/three.js"] []
-    , H.script [ H.src $
-       "https://unpkg.com/three@0.129.0/examples/jsm/controls/TrackBallControls.js"] []
-    , H.script [ H.src $
-       "https://unpkg.com/three@0.129.0/examples/jsm/renderers/CSS3DRenderer.js"] []
     ]
   , H.body_
     [ stage
