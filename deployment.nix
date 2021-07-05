@@ -2,7 +2,10 @@ let
   region = "ap-southeast-1";
   app = (import ./.) {};
   accessKeyId = "default";
-
+  uijs = (import ./nix/snowman.nix).build { isJS = true; };
+  janusPort = 8182;
+  serverPort = 8080;
+  mqttPort = 8883;
 in
 {
   network.description = "Chopaan and DB.";
@@ -26,6 +29,13 @@ in
             resources.ec2SecurityGroups."http"
             resources.ec2SecurityGroups."ssh"
           ];
+          elasticIPv4 = resources.elasticIPs.chopaan-ip;
+        };
+
+        route53 = {
+          inherit accessKeyId region;
+          hostName = "dosti.ecoenergy.global";
+          usePublicDNSName = true;
         };
       };
 
@@ -35,7 +45,12 @@ in
 
       docker-containers."janusgraph" = {
            image = "docker.io/janusgraph/janusgraph:latest";
-           ports = [ "8182:8182" ];
+           ports = [ "${toString janusPort}:${toString janusPort}" ];
+           volumes = [
+             "janusgraph-default-data:/var/lib/janusgraph"
+             "./janusgraph-config/config/:/etc/opt/janusgraph:ro"
+             "./janusgraph-config/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
+                     ];
       };
       
       systemd.services.chopaan = {
@@ -48,7 +63,7 @@ in
             chopaan = app.chopaan.kbtzim;
           in
             ''
-            ${chopaan}/bin/kbtzim
+            ${chopaan}/bin/kbtzim --tinkerHost "janusgraph" --tinkerPort ${toString janusPort}
             '';
       };
 
@@ -61,29 +76,28 @@ in
         script =
           let
             server = app.chopaan.server;
-            # --connectPort ${toString config.services.postgresql.port}
           in
             ''
-            ${server}/bin/server
+            ${server}/bin/server --assets ${uijs}/bin/ui.jsexe --port ${toString serverPort} --tinkerHost "janusgraph" --tinkerPort ${toString janusPort}
             '';
       };
 
 
       
-      systemd.services.ui = {
-        wantedBy = [ "multi-user.target" ];
+      # systemd.services.ui = {
+      #   wantedBy = [ "multi-user.target" ];
 
-        after = [ "server.service" ];
+      #   after = [ "server.service" ];
 
-        script =
-          let
-            ui = app.chopaan.ui;
-            # --connectPort ${toString config.services.postgresql.port}
-          in
-            ''
-            ${ui}/bin/ui
-            '';
-      };
+      #   script =
+      #     let
+      #       ui = app.chopaan.ui;
+      #       # --connectPort ${toString config.services.postgresql.port}
+      #     in
+      #       ''
+      #       ${ui}/bin/ui
+      #       '';
+      # };
     };
 
     resources = {
@@ -106,5 +120,6 @@ in
           ];
         };
       };
+      elasticIPs.chopaan-ip = { inherit region accessKeyId; };
     };
   }
