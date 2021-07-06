@@ -1,8 +1,9 @@
-{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies, DeriveGeneric #-}
 module Chopaan.Comm.S3 where
 
 import Lens.Micro
 
+import GHC.Generics
 import Control.Applicative
 import Control.Monad.IO.Class
 import Control.Monad.Trans.AWS
@@ -51,7 +52,7 @@ toNodeMAC :: S3.ObjectKey -> Maybe (NodeMAC, Time.UTCTime)
 toNodeMAC (S3.ObjectKey txt) = do
   (nodePath, filename) <- cleanMAC txt
   nodeId <- topicToNodeId "/state/" nodePath
-  ts <- Just . parseUTCTime $ filename 
+  ts <- Just . parseUTCTime $ filename
   return (nodeId, ts)
 
 cleanMAC :: T.Text -> Maybe (T.Text, T.Text)
@@ -117,8 +118,8 @@ s3frames :: forall t m. (IsStream t, MonadAsync m)
          => Logger
          -> S3.BucketName
          -> t m (S3.ObjectKey)
-         -> t m ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame)
-s3frames l bucket = S.mapM (downloadFromKey l bucket)
+         -> t m (S3.ObjectKey, ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame))
+s3frames l bucket = S.mapM (\p -> ((\x -> return (p, x)) =<< (downloadFromKey l bucket p)))
 
 
 
@@ -126,48 +127,56 @@ s3Prefix :: (Address n) => n -> Maybe T.Text
 s3Prefix = Just . stateTopic
 
 
-process :: forall t m. (IsStream t, MonadAsync m)
-      => t m ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame)
-      -> t m ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats)
-process = S.map ((fromRight undefined))
-          . S.filter (isRight)
-          . S.map toRL
-          . S.filter (isRight . snd)
-          . unpackMAC
-  where
-    unpackMAC :: t m ((Maybe a, Maybe c), b)
-              -> t m ((a, Maybe c), b)
-    unpackMAC = S.map (first (first fromJust))
-      . S.filter (isJust . fst . fst)
-    toRL :: ((NodeMAC, Maybe Time.UTCTime), Either String MeshFrame)
-         -> Either () ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats)
-    toRL ((n, t), m') = case m' of
-      Left _ -> Left ()
-      Right m ->
-        case accessEnergyState m of
-          Just e -> Right $ ((n, t), Left e)
-          Nothing ->
-            case accessRTS m of
-              Just r -> Right $ ((n, t), Right r)
-              Nothing -> Left ()
+
+data S3Meshframe = S3Meshframe
+  { mfMAC :: NodeMAC
+  , objectKey :: S3.ObjectKey
+  , createdOn :: Maybe Time.UTCTime
+  , mf :: Either EnergyState RuntimeStats
+  } deriving (Eq, Ord, Show, Generic)
+
 
 nodeS3 :: forall t m. (IsStream t, MonadAsync m) => Logger
        -> S3.BucketName
        -> NodeMAC
        -> Maybe S3.ObjectKey
-       -> t m ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats)
-nodeS3 l bucket n startAfter = process S.|$ (s3frames l) bucket
-                  -- $ S.trace (liftIO . print)
-                  $ s3Paths l bucket (s3Prefix n) startAfter
+       -> t m (S3.ObjectKey, ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats))
+nodeS3 l bucket n startAfter = (process . (s3frames l bucket))
+                               S.|$ s3Paths l bucket (s3Prefix n) startAfter
+  where
+    process :: forall t m x. (IsStream t, MonadAsync m)
+      => t m (x, ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame))
+      -> t m (x, ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats))
+    process = -- S.map (second (fromRight undefined))
+              -- . S.filter (isRight . snd)
+              S.map (second . second $ throwMFError)
+              . S.filter (isRight . snd . snd)
+              . unpackMAC
+      where
+        unpackMAC :: t m (x, ((Maybe a, Maybe c), b))
+                  -> t m (x, ((a, Maybe c), b))
+        unpackMAC = S.map (second . first . first $ fromJust)
+                    . S.filter (isJust . fst . fst . snd)
+        throwMFError :: Either String MeshFrame -> (Either EnergyState RuntimeStats)
+        throwMFError m' = case m' of
+          Left e -> error $ "nodeS3 ::" <> (show n) <> "Parse Meshframe Failed: " <> e 
+          Right m ->
+            case accessEnergyState m of
+              Just e -> Left e
+              Nothing ->
+                case accessRTS m of
+                  Just r -> Right r
+                  Nothing -> error $ ""
+
     
 
-sensorS3 :: (IsStream t, MonadAsync m) =>  Logger -> S3.BucketName -> NodeMAC -> t m (EnergyState)
-sensorS3 l bucket n = S.map ((fromLeft undefined) . snd)
-                  S.|$ S.filter (isLeft . snd)
-                  S.|$ nodeS3 l bucket n Nothing
+-- sensorS3 :: (IsStream t, MonadAsync m) =>  Logger -> S3.BucketName -> NodeMAC -> t m (EnergyState)
+-- sensorS3 l bucket n = S.map ((fromLeft undefined) . snd)
+--                   S.|$ S.filter (isLeft . snd)
+--                   S.|$ nodeS3 l bucket n Nothing
 
-rsS3 :: (IsStream t, MonadAsync m) => Logger -> S3.BucketName -> NodeMAC -> t m (RuntimeStats)
-rsS3 l bucket n = S.map ((fromRight undefined) . snd)
-         $ S.filter (isRight . snd)
-         $ nodeS3 l bucket n Nothing
+-- rsS3 :: (IsStream t, MonadAsync m) => Logger -> S3.BucketName -> NodeMAC -> t m (RuntimeStats)
+-- rsS3 l bucket n = S.map ((fromRight undefined) . snd)
+--          $ S.filter (isRight . snd)
+--          $ nodeS3 l bucket n Nothing
 

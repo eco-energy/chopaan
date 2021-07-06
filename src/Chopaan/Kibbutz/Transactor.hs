@@ -194,6 +194,12 @@ foldTxState (Tx gt) = let
 {-# INLINE foldTxState #-}
 -- The state will just be carried across as a TxStatus
 
+--idFold' :: (Monad m) => FL.Fold m a (Maybe a)
+--idFold' = FL.lcatMaybes idFold 
+
+--composeFold :: FL.Fold m a b -> FL.Fold m b c -> FL.Fold m a c
+--composeFold f g = g . f
+  
 idFold :: (Monad m, Monoid a) => FL.Fold m a a
 idFold = FL.mkPureId (flip const) mempty
 {-# INLINE idFold #-}

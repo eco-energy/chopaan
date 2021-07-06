@@ -21,14 +21,15 @@ import Data.Text.Encoding (decodeUtf8)
 import Data.ByteString.Lazy (toStrict)
 import qualified Data.Vector as V
 import Data.Monoid
-
+import Data.Either
+import Data.Greskell.Greskell (Greskell)
 import Data.Greskell.Graph (AVertex, AEdge, ElementData, Element, Vertex, Edge, Key, Keys(..))
 import Data.Greskell.GraphSON (FromGraphSON(..), GValue)
 import Data.Greskell.Binder
 import Data.Greskell.GTraversal
-  ( GTraversal, Walk, Transform, SideEffect, Filter, gAddV, gAddE, gOut, gOutE, gId, gIn, gInE, gHasLabel, gProperty,
-    source, sV, sV', gV, (&.), unsafeCastStart, unsafeCastEnd, (<*.>), sAddV, gHas2, liftWalk, gFrom, gTo, gSideEffect, gValueMap )
-import Data.Greskell.Extra (writeKeyValues, (<=:>))
+  ( GTraversal, Walk, Transform, SideEffect, Filter, gAddV, gAddE, gOut, gOutE, gId, gIn, gInV, gInE, gHasLabel, gProperty,
+    source, sV, sV', gV, ($.), (&.), unsafeCastStart, unsafeCastEnd, (<*.>), sAddV, gHas2, liftWalk, gFrom, gTo, gSideEffect, gValueMap )
+import Data.Greskell.Extra (writeKeyValues, (<=:>), gWhenEmptyInput)
 import Data.Greskell.PMap
   ( PMap, Multi, Single, PMapLookupException,
     lookupAs, lookupAs', pMapToFail
@@ -64,6 +65,12 @@ addHWToHH c n hw = runTraversal c (addHWToHH' n hw)
 
 getNodeHW :: MonadIO m => Client -> NodeMAC -> m [HW Double]
 getNodeHW c n = fetchResult c (getNodeHW' n)
+
+getNodeLastSync :: MonadIO m => Client -> NodeMAC -> m [T.Text]
+getNodeLastSync c n = (pure . rights . (fmap parseLS)) =<< fetchResult c (getNodeLastSync' n)
+
+addLastSyncToHH :: MonadIO m => Client -> NodeMAC -> T.Text -> m ()
+addLastSyncToHH c n ls = runTraversal c (addLastSyncToHH' n ls)
 
 addKbtz :: MonadIO m => Client -> KbtzName -> m ()
 addKbtz c k = runTraversal c (addKbtz' (AKbtz k))
@@ -175,20 +182,16 @@ allKbtz =  source "g" & sV [] &. (liftWalk isKbtz)
 allHH :: GTraversal Transform () VHH
 allHH = source "g" & sV [] &. (liftWalk isHH)
 
-getHHById' :: NodeMAC -> Binder (Walk Filter VHH VHH)
-getHHById' n = do
-  nid <- newBind n
-  return $ gHas2 "@hh_id" nid
+getHHById' :: Greskell NodeMAC -> Walk Filter VHH VHH
+getHHById' n = gHas2 "@hh_id" n
 
-getVHHById :: NodeMAC -> Binder (GTraversal Transform () VHH)
-getVHHById n = do
-  n' <- getHHById' n
-  return $ allHH &. (liftWalk n')
+getVHHById :: Greskell NodeMAC -> GTraversal Transform () VHH
+getVHHById n = allHH &. (liftWalk $ getHHById' n)
 
 getHHById :: NodeMAC -> Binder (GTraversal Transform () ANode)
 getHHById n = do
-  n' <- getHHById' n
-  return $ allHH &. (liftWalk n') &. toANode
+  n' <- newBind n
+  return $ allHH &. (liftWalk $ getHHById' n') &. toANode
 
 
 toANode :: Walk Transform VHH ANode
@@ -248,7 +251,8 @@ addHW' hw = (addProps hw) <*.> (pure $ sAddV "hwConfig" $ source "g")
       ]
     textS :: ToJSON a => a -> T.Text
     textS = decodeUtf8 . toStrict . encode . toJSON
-    --storageKey :: (Num a) => Key VHW (BatteryTop a)
+
+--storageKey :: (Num a) => Key VHW (BatteryTop a)
 storagKey = "hw_storage"
     --generationKey :: (Num a) => Key VHW (PVTop a)
 generatioKey = "hw_generation"
@@ -265,6 +269,34 @@ toHW = unsafeCastEnd aHWProps
 newtype EHHHasHW = EHasHW AEdge
   deriving (Eq, Show)
   deriving newtype (FromGraphSON, ElementData, Element, Edge)
+
+newtype HHLastSynced = HHLastSynced AEdge
+  deriving (Eq, Show)
+  deriving newtype (FromGraphSON, ElementData, Element, Edge)
+
+newtype VLastSync = VLastSync AVertex
+  deriving (Eq, Show)
+  deriving newtype (FromGraphSON, ElementData, Element, Vertex)
+
+
+addLastSyncToHH' :: NodeMAC -> T.Text -> Binder (GTraversal SideEffect () VLastSync) 
+addLastSyncToHH' n ls = do
+  n' <- newBind n
+  l' <- newBind ls
+  return $ (upsert n') &. (gProperty "lastSynced" l')
+  where
+    upsert :: Greskell NodeMAC -> GTraversal SideEffect () VLastSync 
+    upsert n = (liftWalk (getNodeLSWalk n) &. gWhenEmptyInput ((liftWalk gInV)
+                                                               <<< (hhEdge n)
+                                                               <<< insert))
+    insert :: Walk SideEffect [VLastSync] VLastSync
+    insert = (gAddV "hhLastSync")
+    hhEdge :: Greskell NodeMAC -> Walk SideEffect VLastSync HHLastSynced
+    hhEdge n' = gAddE "hasLS" (gFrom (gV @VLastSync [] >>> gHas2 "@hh_id" n'))
+
+
+hhHasLS :: Walk Transform VHH VLastSync
+hhHasLS = gOut ["hasLS"]
 
 hhHasHW :: Walk Transform VHH VHW
 hhHasHW = gOut ["hasHW"]
@@ -290,8 +322,8 @@ addHWToHH' n hw = (hhHas) <*.> (addHW' hw)
 
 getNodeHWPM :: NodeMAC -> Binder (GTraversal Transform () (PMap Multi GValue))
 getNodeHWPM n = do
-  n' <- getVHHById n
-  return $ n' &. ((gValueMap KeysNil) <<< hhHasHW)
+  n' <- newBind n
+  return $ (getVHHById n') &. ((gValueMap KeysNil) <<< hhHasHW)
 
 parseHW :: PMap Multi GValue -> Either PMapLookupException (HW Double)
 parseHW pm = HW
@@ -300,11 +332,24 @@ parseHW pm = HW
              <*> (lookupAs loaKey pm)
 
 
+parseLS :: PMap Multi GValue -> Either PMapLookupException (T.Text)
+parseLS pm = lookupAs lsKey pm
+  where
+    lsKey :: Key VLastSync T.Text
+    lsKey = "lastSynced"
+
+getNodeLSWalk :: Greskell NodeMAC -> GTraversal Transform () VLastSync
+getNodeLSWalk n = getVHHById n &. hhHasLS
+
+getNodeLastSync' :: NodeMAC -> Binder (GTraversal Transform () (PMap Multi GValue))
+getNodeLastSync' n = (\n' -> return $ (getVHHById n') &. ((gValueMap KeysNil) <<< hhHasLS))
+  =<< (newBind n)
+
 
 getNodeHW' :: NodeMAC -> Binder (GTraversal Transform () (HW Double))
 getNodeHW' n = do
-  n' <- getVHHById n
-  return $ n' &. (toHW <<< hhHasHW)
+  n' <- newBind n
+  return $ getVHHById n' &. (toHW <<< hhHasHW)
 
 
 

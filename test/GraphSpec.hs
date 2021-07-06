@@ -3,6 +3,7 @@
 module GraphSpec (spec) where
 
 import Data.Foldable (toList)
+import Data.Text (pack)
 import qualified Data.Aeson as Aeson
 import Test.Hspec
 import Data.Greskell.Greskell (toGremlin)
@@ -101,3 +102,13 @@ spec = do
             addHWToHH client n hw
             got_h1 <- getNodeHW client n
             got_h1 `shouldBe` [hw]
+            
+        it "adding a last sync date always returns the latest and there's only ever one node" $ do
+          bracket (connect host port) close $ \client -> do
+            drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
+            addKbtz client k
+            addHHToKbtz client k an
+            let ls = fmap (\i -> pack $ "ThisLastSync-" <> (show i)) [1..10]
+            mapM_ (addLastSyncToHH client n) ls
+            got_h1 <- getNodeLastSync client n
+            got_h1 `shouldBe` [head . reverse $ ls]

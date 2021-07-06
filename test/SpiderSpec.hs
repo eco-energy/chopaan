@@ -58,7 +58,7 @@ spec :: Spec
 spec = do
   let
     nNodes = 10
-    nMessages = 400
+    nMessages = 100
     spiderHost = "localhost"
     spiderPort = 8182
     kId = KbtzId "test"
@@ -144,6 +144,10 @@ spec = do
 
     it "Status snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
       (gotNs, gotLs) <- snapDebug statusNodesSnapshot sp ns t0 tn
+      oneNodePerMACPlusRoot gotNs nNodes
+      constHypergraphLinks gotLs nNodes
+    it "Flow snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
+      (gotNs, gotLs) <- snapDebug flowNodesSnapshot sp ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
 

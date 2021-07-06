@@ -197,6 +197,13 @@ toLink' n' e dir = FoundLink
                      }
 {-# INLINE toLink' #-}
 
+
+addFNMaybe :: forall m n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
+           => Pool (Spider n v e) -> Maybe (FoundNode n v e) -> m Bool
+addFNMaybe _ Nothing = return True
+addFNMaybe p (Just n) = withResource p ((flip addFN) n)
+
+
 spiderFold :: forall m a n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
            => Pool (Spider n v e)
            -> ((n, a) -> m (Maybe (FoundNode n v e)))
@@ -204,14 +211,9 @@ spiderFold :: forall m a n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
 spiderFold p asFN = FL.mkFold step (pure True) end
   where
     {-# INLINE step #-}
-    step :: (Bool)
-         -> (n, a)
-         -> m Bool
-    step _ a = addMaybe =<< (asFN a)
-      where
-        addMaybe Nothing = return True
-        addMaybe (Just n) = withResource p ((flip addFN) n)
-    end x = liftIO $ destroyAllResources p >> return x
+    step :: Bool -> (n, a) -> m Bool
+    step _ a = (addFNMaybe p) =<< (asFN a)
+    end x = return x
 {-# INLINE spiderFold #-}
 
 --utcToRange :: UTCTime -> UTCTime -> _
@@ -358,18 +360,26 @@ addTxNode k = do
       pure $ toFN (fromUTCTime . (fromMaybe t') $ t) n v [toLink (getGridRoot k) e]
 
 
+flowFN :: (MonadAsync m, MonadCatch m) => KbtzName -> NodeMAC -> SensorR -> m (FoundNode NodeMAC BatteryR PowerNR)
+flowFN k n v = do
+  t' <- liftIO getCurrentTime
+  let t = (fromUTCTime . (fromMaybe t') $ (_time v))
+  pure $
+    toFN t n (_battery v) [toLink (getGridRoot k) (_powerT v)]
+
+addFlow :: KbtzName -> (NodeMAC, SensorR) -> SpiderM (Bool)
+addFlow k (n, v) = do
+  spool <- ask
+  fn <- flowFN k n v
+  addFNMaybe (unSpool . flowG $ spool) (Just fn)
+
 addFlowNode :: forall m. (MonadAsync m, MonadCatch m)
-  => KbtzName -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus)) Bool)
+  => KbtzName -> SpiderM (FL.Fold m (NodeMAC, SensorR) Bool)
 addFlowNode k = do
   spool <- ask
   return $ spiderFold (unSpool . flowG $ spool)
-    (\(n, (s, stake, status)) -> Just <$> (x (_time s) n s))
-  where
-    x :: Maybe UTCTime -> NodeMAC -> SensorR -> m (FoundNode NodeMAC BatteryR PowerNR)
-    x t n v = do
-      t' <- liftIO getCurrentTime
-      pure $ toFN (fromUTCTime . (fromMaybe t') $ t) n (_battery v)
-        [toLink (getGridRoot k) (_powerT v)]
+    (\(n, s) -> Just <$> (flowFN k n s))
+
 
 
 gridState :: KbtzName -> NodeStates n -> TxPlan n -> TxState n -> IO (Bool)
@@ -377,10 +387,10 @@ gridState k = undefined
 
 
 addMonNode :: forall m. (MonadAsync m, MonadCatch m)
-  => KbtzName -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus)) Bool)
+  => KbtzName -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake)) Bool)
 addMonNode k = do
   spool <- ask
-  return $ spiderFold (unSpool . statusG $ spool) (\(n, (s, st, _)) -> x n s st)
+  return $ spiderFold (unSpool . statusG $ spool) (\(n, (s, st)) -> x n s st)
   where
     x :: NodeMAC
       -> SensorR
@@ -398,9 +408,12 @@ saveTx ::  forall m. (MonadAsync m, MonadCatch m)
   => KbtzName
   -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus)) (Bool))
 saveTx k = do
-  stakeF <- addTxNode k
-  monF <- addMonNode k
-  flowF <- addFlowNode k
+  stakeF' <- addTxNode k
+  monF' <- addMonNode k
+  flowF' <- addFlowNode k
+  let flowF = FL.lmap (\(n, (a, _, _)) -> (n, a)) flowF'
+  let monF = FL.lmap (\(n, (a, s, _)) -> (n, (a, s))) monF'
+  let stakeF = stakeF'
   return $ (\(a, b, c) -> a && b && c) <$> ((,,) <$> stakeF <*> monF <*> flowF)
 
 -- saveTx' ::  forall m. (MonadAsync m, MonadCatch m)

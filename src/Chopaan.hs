@@ -26,7 +26,9 @@ runKbtzim mq = do
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks
   qss <- mapM (\(k, ns) -> mqttQs mq k ns) $ zip ks nss
   let confss = fmap sConf $ zip (zip ks nss) qss
-  return $ S.concatMapWith S.parallel (S.concatM . runKibbutz @t) $ S.fromList confss
+      past = S.concatMapWith S.parallel (S.concatM . hydrateKbtz @t) $ S.fromList confss
+      present = S.concatMapWith S.parallel (S.concatM . runKibbutz @t) $ S.fromList confss
+  return $ past `parallel` present
   where
     sConf ((k, ns), qs) = KbtzC { Chopaan.Kibbutz.name = k
                                 , nodes = ns

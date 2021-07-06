@@ -37,65 +37,66 @@ import qualified Data.ByteString.Lazy as BSL (toStrict)
 import Data.Binary as B
 
 main :: IO ()
-main = do
-  tings <- getNodes thingType
-  l <- newLogger Info I.stdout
-  S.drain $ S.parallely $ S.mapM (downloadNode l) $ S.fromList tings
-  where
-    thingType = KbtzId "kibbutz-pilot-node"
-    janusHost = "localhost"
-    janusPort = 8182
+main = print "NO HYDRATION EXEC"
+-- do
+--   tings <- getNodes thingType
+--   l <- newLogger Info I.stdout
+--   S.drain $ S.parallely $ S.mapM (downloadNode l) $ S.fromList tings
+--   where
+--     thingType = KbtzId "kibbutz-pilot-node"
+--     janusHost = "localhost"
+--     janusPort = 8182
 
 
 
-downloadNode :: Logger -> NodeMAC -> IO () -- forall t. (S.IsStream t) => t IO ()  
-downloadNode l n = S.drain $ S.bracket opF cF $ \h -> S.scan (FH.write h)
-  S.|$ S.concatMap (S.unfoldr (BS.uncons))
-  S.|$ S.map (BSL.toStrict . B.encode . bimap (fst) (either encodeMessage encodeMessage))
-  --S.|$ S.trace print
-  S.|$ process
-  S.|$ S.asyncly $ s3frames l bucketN
-  S.|$ S.tap (writePathsFold n)
-  --S.|$ S.trace print
-  S.|$ S.parallely $ s3Paths l bucketN (nodePrefix n) Nothing
-  where
-    opF = I.openFile fp I.WriteMode
-    cF = I.hClose
-    fp = "data/nodes/"
-         <> mac2Path n
-         <> ".data"
+-- downloadNode :: Logger -> NodeMAC -> IO () -- forall t. (S.IsStream t) => t IO ()  
+-- downloadNode l n = S.drain $ S.bracket opF cF $ \h -> S.scan (FH.write h)
+--   S.|$ S.concatMap (S.unfoldr (BS.uncons))
+--   S.|$ S.map (BSL.toStrict . B.encode . bimap (fst) (either encodeMessage encodeMessage))
+--   --S.|$ S.trace print
+--   S.|$ process
+--   S.|$ S.asyncly $ s3frames l bucketN
+--   S.|$ S.tap (writePathsFold n)
+--   --S.|$ S.trace print
+--   S.|$ S.parallely $ s3Paths l bucketN (nodePrefix n) Nothing
+--   where
+--     opF = I.openFile fp I.WriteMode
+--     cF = I.hClose
+--     fp = "data/nodes/"
+--          <> mac2Path n
+--          <> ".data"
 
-mac2Path :: NodeMAC -> String
-mac2Path (NodeId n) = T.unpack .  (T.replace ":" "") . (T.replace "\"" "") $ n
+-- mac2Path :: NodeMAC -> String
+-- mac2Path (NodeId n) = T.unpack .  (T.replace ":" "") . (T.replace "\"" "") $ n
 
-nodePrefix :: (Address a) => a -> Maybe T.Text
-nodePrefix n = Just $ stateTopic n
+-- nodePrefix :: (Address a) => a -> Maybe T.Text
+-- nodePrefix n = Just $ stateTopic n
 
---writeDataFold :: (Monad m) =>T.Text -> FL.Fold m
-writeDataFold n = FL.Fold step start en
-  where
-    start :: IO (I.Handle, S3.ObjectKey)
-    start = do
-      f <- I.openFile fp I.WriteMode
-      return (f, S3.ObjectKey "")
-    step :: (I.Handle, S3.ObjectKey)
-         -> S3.ObjectKey
-         -> IO ((I.Handle, S3.ObjectKey))
-    step (h, _) (S3.ObjectKey n) =
-      ((I.hPutStrLn h) . T.unpack $ n) >> (return $ (h, S3.ObjectKey $ n))
-    en (h, s) = (I.hClose h) >> (print "Paths Written!") >> pure s
-    fp = "data/" <> (mac2Path n) <> ".s3path"
+-- --writeDataFold :: (Monad m) =>T.Text -> FL.Fold m
+-- writeDataFold n = FL.Fold step start en
+--   where
+--     start :: IO (I.Handle, S3.ObjectKey)
+--     start = do
+--       f <- I.openFile fp I.WriteMode
+--       return (f, S3.ObjectKey "")
+--     step :: (I.Handle, S3.ObjectKey)
+--          -> S3.ObjectKey
+--          -> IO ((I.Handle, S3.ObjectKey))
+--     step (h, _) (S3.ObjectKey n) =
+--       ((I.hPutStrLn h) . T.unpack $ n) >> (return $ (h, S3.ObjectKey $ n))
+--     en (h, s) = (I.hClose h) >> (print "Paths Written!") >> pure s
+--     fp = "data/" <> (mac2Path n) <> ".s3path"
 
-writePathsFold n = FL.Fold step start en
-  where
-    start :: IO (I.Handle, S3.ObjectKey)
-    start = do
-      f <- I.openFile fp I.WriteMode
-      return (f, S3.ObjectKey "")
-    step :: (I.Handle, S3.ObjectKey)
-         -> S3.ObjectKey
-         -> IO ((I.Handle, S3.ObjectKey))
-    step (h, _) (S3.ObjectKey n) =
-      ((I.hPutStrLn h) . T.unpack $ n) >> (return $ (h, S3.ObjectKey $ n))
-    en (h, s) = (I.hClose h) >> (print "Paths Written!") >> pure s
-    fp = "data/" <> (show n) <> ".s3path"
+-- writePathsFold n = FL.Fold step start en
+--   where
+--     start :: IO (I.Handle, S3.ObjectKey)
+--     start = do
+--       f <- I.openFile fp I.WriteMode
+--       return (f, S3.ObjectKey "")
+--     step :: (I.Handle, S3.ObjectKey)
+--          -> S3.ObjectKey
+--          -> IO ((I.Handle, S3.ObjectKey))
+--     step (h, _) (S3.ObjectKey n) =
+--       ((I.hPutStrLn h) . T.unpack $ n) >> (return $ (h, S3.ObjectKey $ n))
+--     en (h, s) = (I.hClose h) >> (print "Paths Written!") >> pure s
+--     fp = "data/" <> (show n) <> ".s3path"
