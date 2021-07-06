@@ -18,23 +18,20 @@ import RIO hiding (view, async, withAsync, Async)
 
 
 runKbtzim :: forall t.
-  (IsStream t)--, MonadAsync m)
-  => TinkerConf
-  -> MQTTOpts
+  (IsStream t) --, MonadAsync m, MonadCatch m)
+  => MQTTOpts
   -> GraphM (t GraphM Bool)
-runKbtzim (TinkerConf h p) mq = do
+runKbtzim mq = do
   ks <- withKbtzPool getKbtzim
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks
   qss <- mapM (\(k, ns) -> mqttQs mq k ns) $ zip ks nss
   let confss = fmap sConf $ zip (zip ks nss) qss
-  S.concatMapWith S.parallel (runKibbutz @t @GraphM) $ S.fromList confss
+  return $ S.concatMapWith S.parallel (S.concatM . runKibbutz @t) $ S.fromList confss
   where
     sConf ((k, ns), qs) = KbtzC { Chopaan.Kibbutz.name = k
                                 , nodes = ns
                                 , channelOpts = qs
-                                , s3Opts = BucketName "dosti-datastream" 
-                                , spiderHost = h
-                                , spiderPort = p
+                                , s3Opts = Just (BucketName "dosti-datastream")
                                 }
 
 
@@ -44,6 +41,7 @@ run = do
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
-  tkOpts <- liftIO $ execParser tkOptions
-  ks <- liftIO $ runKbtzim @ParallelT tkOpts mqttOpts
-  liftIO . S.drain $ S.adapt ks
+  TinkerConf{..} <- liftIO $ execParser tkOptions
+  liftIO $ runGraphM (janusHost) (janusPort) $ do
+    ks <- runKbtzim @ParallelT mqttOpts
+    S.drain $ S.parallely ks

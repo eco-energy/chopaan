@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, TypeApplications, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, OverloadedStrings, FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module SpiderSpec (spec, hydrateKbtz) where
+module SpiderSpec (spec) where
 
 import Streamly as S
 
@@ -59,6 +59,8 @@ spec = do
   let
     nNodes = 10
     nMessages = 400
+    spiderHost = "localhost"
+    spiderPort = 8182
     kId = KbtzId "test"
     t0 = t
     tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
@@ -118,13 +120,11 @@ spec = do
                   $ [1..nNodes]
           return $ foldl S.wAsync S.nil xs''
         qs <- initQs
-        k <- (S.avgRate 1000) <$> (runKibbutz $
-          KbtzC { name = kId
-                , nodes = ns
-                , channelOpts = Left qs
-                , spiderHost = "localhost"
-                , spiderPort = 8182
-                })
+        k <- runKibbutzM spiderHost spiderPort KbtzC { name = kId
+                                                     , nodes = ns
+                                                     , channelOpts = qs
+                                                     , s3Opts = Nothing
+                }
         let ns' = S.fromList $ cycle ns
         forkIO $ do
           S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
@@ -173,28 +173,27 @@ data ESType = Source | Sink deriving (Eq, Ord, Show, Bounded, Enum)
 
 data RSType = Root | Child deriving (Eq, Ord, Show, Bounded, Enum)
 
-hydrateKbtz :: (IsStream t, Monad (t IO)) => KbtzName -> [NodeMAC] -> Int -> Int -> IO (t IO Bool)
-hydrateKbtz kId ns nNodes nMessages = do
-    es <- do
-      xs'' <- mapM (\i ->
-                      orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
-              $ [1..nNodes]
-      return $ foldl S.wSerial S.nil xs''
-    rs <- do
-      xs'' <- mapM (\i ->
-                      orderedRS (if (i == 1) then Root else Child) nMessages (head ns))
-              $ [1..nNodes]
-      return $ foldl S.wSerial S.nil xs''
-    qs <- liftIO $ initQs
-    let ns' = S.fromList $ cycle ns
-    S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
-    S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
-    runKibbutz KbtzC { name = kId
-                     , nodes = ns
-                     , channelOpts = Left qs
-                     , spiderHost = "localhost"
-                     , spiderPort = 8182
-                     }
+-- hydrateKbtz :: (IsStream t) => KbtzName -> [NodeMAC] -> Int -> Int -> GraphM (t GraphM Bool)
+-- hydrateKbtz kId ns nNodes nMessages = do
+--     es <- do
+--       xs'' <- mapM (\i ->
+--                       orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
+--               $ [1..nNodes]
+--       return $ foldl S.wSerial S.nil xs''
+--     rs <- do
+--       xs'' <- mapM (\i ->
+--                       orderedRS (if (i == 1) then Root else Child) nMessages (head ns))
+--               $ [1..nNodes]
+--       return $ foldl S.wSerial S.nil xs''
+--     qs <- liftIO $ initQs
+--     let ns' = S.fromList $ cycle ns
+--     S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
+--     S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
+--     runKibbutz KbtzC { name = kId
+--                      , nodes = ns
+--                      , channelOpts = qs
+--                      , s3Opts = Nothing
+--                      }
 
 
 orderedES :: ESType -> Int -> IO (S.Serial NM.EnergyState)

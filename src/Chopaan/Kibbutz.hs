@@ -21,7 +21,7 @@ import qualified Control.Concurrent.Async as A
 
 import Streamly as S
 import qualified Streamly.Prelude as S
-import qualified Streamly.Internal.Prelude as Internal
+import qualified Streamly.Internal.Prelude as S
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Pipe as P
 
@@ -49,6 +49,7 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          , writeChan
                          , Address
                          )
+import Chopaan.Graph.Kbtz
 import Chopaan.Graph
 import Data.Time
 
@@ -59,13 +60,11 @@ data KbtzC n = KbtzC
   { name :: KbtzName
   , nodes :: [n]
   , channelOpts :: ChannelOpts
-  , s3Opts :: S3Opts
-  , spiderHost :: String
-  , spiderPort :: Int
+  , s3Opts :: Maybe S3Opts
   } deriving (Generic)
 
 
-mkKbtzConf :: KbtzName -> [n] -> ChannelOpts -> S3Opts -> String -> Int -> KbtzC n
+mkKbtzConf :: KbtzName -> [n] -> ChannelOpts -> Maybe S3Opts -> KbtzC n
 mkKbtzConf = KbtzC
 
 qSrc :: forall t m n. (KbtzConn t m n)
@@ -124,40 +123,48 @@ mqttSrc k ns o = qSrc  =<< (mqttQs o k ns)
 
 
 
-runKibbutz :: forall t m. (IsStream t, MonadAsync m, MonadCatch m, Monad (t m)) => KbtzC NodeMAC -> m (t m Bool)
-runKibbutz KbtzC{name, nodes, channelOpts, s3Opts, spiderHost, spiderPort} = do
-  (es, rs, outbox) <- qSrc @t channelOpts
-  
-  --(esS3, rsS3, outboxS3) <- qSrc @t =<< s3Qs nodes s3Opts
+runKibbutz' :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
+  => String -> Int -> KbtzC NodeMAC -> t m Bool
+runKibbutz' h p = S.concatM . (runKibbutzM h p)
 
-  
-  spool <- mkSpool $ mkConfG (spiderHost, spiderPort)
-  --_ <- liftIO $ runSpider spool $ initGridRoot name nodes
-  gridFold <- liftIO $ runSpider spool (saveTx @m name)
-  meshF <- runSpider spool (addMeshNode @m)
+runKibbutzM :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
+  => String -> Int -> KbtzC NodeMAC -> m (t m Bool)
+runKibbutzM h p = (pure . S.adapt . S.hoist (runGraphM h p)) <=< (runGraphM h p . runKibbutz)
+
+
+
+runKibbutz :: forall t.  (IsStream t) --m., MonadAsync m, MonadCatch m) =>
+  => KbtzC NodeMAC -> GraphM (t GraphM Bool)
+runKibbutz KbtzC{name, nodes, channelOpts, s3Opts} = do
+  --nodes <- withKbtzPool (flip getKbtzNodes name)
+  (es, rs, outbox) <- qSrc @t channelOpts
+  --case s3Opts of
+  --  Nothing ->
+  --    (esS3, rsS3, outboxS3) <- qSrc @t =<< s3Qs nodes s3Opts
+  --_ <- withSpider $ initGridRoot name nodes
+ 
+  gridFold <- withSpider $ saveTx name
+  meshF <- withSpider addMeshNode
 
   let gridSensorR = S.postscan ((,)
                      <$> (FL.mkPureId ((const (Just . fst))) Nothing)
-                     <*> sensorFD) es
+                     <*> (sensorFD nodes)) es
       initPlan = Tx . M.fromList $ [(n, mempty @Stake) | n <- nodes]
-      plan :: t m (NodeMAC, NodeStates NodeMAC)
-        -> t m (NodeMAC, (NodeStates NodeMAC, Maybe (TxPlan NodeMAC)))
+      --plan :: t m (NodeMAC, NodeStates NodeMAC)
+      --  -> t m (NodeMAC, (NodeStates NodeMAC, Maybe (TxPlan NodeMAC)))
       plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
-  let tx = tapCount "statePipe"
-           $ S.parallely . S.adapt
+
+      tx = tapCount "statePipe"
            $ S.postscan gridFold
-           -- $ constBool
-           -- $ S.trace (liftIO . print)
            $ S.map getLatest
            $ S.postscan (secondF (txFold initPlan))
            $ plan
            $ S.map (\(n, a) -> (fromJust n, a))
            $ S.filter (isJust . fst)
-           $ fmap (\(x, y) -> (x, Tx y)) -- <$> gridSensorR)
-           -- $ S.onException (liftIO . print $ "Exception Thrown")
+           $ fmap (\(x, y) -> (x, Tx y))
            $ gridSensorR
 
-  let meshS = tapCount "rsPipe" $ S.parallely . S.adapt $ S.postscan meshF rs -- constBool rs
+  let meshS = tapCount "rsPipe" $ S.postscan meshF rs
   return $ (meshS `parallel` tx)
   where
     getLatest ::
@@ -175,10 +182,9 @@ runKibbutz KbtzC{name, nodes, channelOpts, s3Opts, spiderHost, spiderPort} = do
     printCount s = FL.mkFoldId (\x _ -> (liftIO . print $ s <> ": " <> (show x))
                                   >> (return $ x + (1 :: Int)))
                    (pure 0)
-    constBool :: t m a -> t m Bool
-    constBool = S.map (const True)
-    sensorFD = FL.demux $ M.fromList $ (, sensorFold) <$> nodes
-    rsFD saveMF = saveMF
+    --constBool :: t m a -> t m Bool
+    --constBool = S.map (const True)
+    sensorFD ns = FL.demux $ M.fromList $ (, sensorFold) <$> ns
     --processEither = FL.partition sensorFD rsFD
     --tryToBool = expToBool <=< try
     dispatchTxSafe o t = tryJust t

@@ -44,12 +44,12 @@ import Chopaan.Graph.Snapshot
 
 
 #ifndef ghcjs_HOST_OS
-newtype GraphM a = GraphM { runGraphM :: ReaderT (DBPools) IO a }
+newtype GraphM a = GraphM { runGraphM' :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
                     MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
 
 runGraphM :: MonadIO m => String -> Int -> GraphM ~> m
-runGraphM h p a = liftIO $ runReaderT (runGraphM a) =<< (mkDBPools h p)
+runGraphM h p a = liftIO $ runReaderT (runGraphM' a) =<< (mkDBPools h p)
 
 mkDBPools :: MonadIO m => String -> Int -> m (DBPools)
 mkDBPools h p = do
