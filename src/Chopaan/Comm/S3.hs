@@ -83,12 +83,15 @@ listObjects :: forall t m. (IsStream t, MonadAsync m)
               => Logger
               -> S3.BucketName
               -> Maybe T.Text
+              -> Maybe S3.ObjectKey
               -> t m (S3.ListObjectsV2Response)
-listObjects l bucket prefix = hoist (liftIO . inS3Context l) $
+listObjects l bucket prefix startAfter = hoist (liftIO . inS3Context l) $
                      S.asyncly $ S.unfold pageUF $ S3.listObjectsV2 bucket
-                                     & S3.lovPrefix
-                                     .~ prefix
-
+                                     & S3.lovPrefix .~ prefix
+                                     & S3.lovStartAfter .~ (fmap unObject startAfter)
+  where
+    unObject (S3.ObjectKey k) = k
+    
 bucketN :: S3.BucketName
 bucketN = S3.BucketName "dosti-datastream"
 
@@ -97,11 +100,12 @@ s3Paths :: forall t m. (IsStream t, MonadAsync m)
         => Logger
         -> S3.BucketName
         -> Maybe T.Text
+        -> Maybe S3.ObjectKey
         -> t m (S3.ObjectKey)
-s3Paths l bucket prefix =
+s3Paths l bucket prefix startAfter =
   S.concatMapWith S.parallel sortConsume
    S.|$ fmap (((^. S3.oKey) <$>) . (^. S3.lovrsContents))
-   S.|$ listObjects l bucket prefix
+   S.|$ listObjects l bucket prefix startAfter
   where
     -- S.|$ S.trace (liftIO . print) 
     comparator = (\a b -> fromMaybe EQ $ liftA2 compare (x a) (x b) )
@@ -150,19 +154,20 @@ process = S.map ((fromRight undefined))
 nodeS3 :: forall t m. (IsStream t, MonadAsync m) => Logger
        -> S3.BucketName
        -> NodeMAC
+       -> Maybe S3.ObjectKey
        -> t m ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats)
-nodeS3 l bucket n = process S.|$ (s3frames l) bucket
+nodeS3 l bucket n startAfter = process S.|$ (s3frames l) bucket
                   -- $ S.trace (liftIO . print)
-                  $ s3Paths l bucket $ s3Prefix n
+                  $ s3Paths l bucket (s3Prefix n) startAfter
     
 
 sensorS3 :: (IsStream t, MonadAsync m) =>  Logger -> S3.BucketName -> NodeMAC -> t m (EnergyState)
 sensorS3 l bucket n = S.map ((fromLeft undefined) . snd)
                   S.|$ S.filter (isLeft . snd)
-                  S.|$ nodeS3 l bucket n
+                  S.|$ nodeS3 l bucket n Nothing
 
 rsS3 :: (IsStream t, MonadAsync m) => Logger -> S3.BucketName -> NodeMAC -> t m (RuntimeStats)
 rsS3 l bucket n = S.map ((fromRight undefined) . snd)
          $ S.filter (isRight . snd)
-         $ nodeS3 l bucket n
+         $ nodeS3 l bucket n Nothing
 

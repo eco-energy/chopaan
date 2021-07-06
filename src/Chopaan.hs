@@ -19,7 +19,7 @@ runKbtzim :: forall t m.
   (IsStream t, MonadAsync m)
   => TinkerConf
   -> MQTTOpts
-  -> m (t m Bool)
+  -> HistoryApp (t HistoryApp Bool)
 runKbtzim (TinkerConf h p) mq = (toHandlerH h p) . (fmap S.adapt)
                                 . (fmap (S.hoist (toHandlerH h p) . S.serially)) $  do
   ks <- withKbtzPool getKbtzim

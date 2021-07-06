@@ -4,13 +4,9 @@
 module Chopaan.API.History where
 
 import GHC.Generics
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader hiding (ask)
-import Control.Monad.Reader.Class
-import Control.Monad.Catch
-import Control.Monad.Base
-import Control.Monad.Trans.Control
 
+import Control.Monad.IO.Class
+import Control.Monad.Reader.Class
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Greskell (FromGraphSON)
 
@@ -28,20 +24,14 @@ import qualified Chopaan.Graph.G as G
 import Servant.API.Modifiers
 import Servant.API.QueryParam
 import Chopaan.CRUD
-import Chopaan.Graph hiding (toLink)
+import Chopaan.Graph
 
 #ifndef ghcjs_HOST_OS
 import Servant (Server, Get, Capture, QueryParam, Proxy(..), (:>)
                , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer, serve)
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..))
-import Network.Greskell.WebSocket (Client)
 import Chopaan.Graph.Kbtz (getKbtzim, addHHToKbtz, getKbtzNodes, kbtzPool, KbtzPool)
-import Chopaan.Graph.Spider ( Spools
-                            , SpiderM
-                            , mkSpool
-                            , runSpider
-                            , mkConfG
-                            , meshNodesSnapshot
+import Chopaan.Graph.Spider ( meshNodesSnapshot
                             , txNodesSnapshot
                             , statusNodesSnapshot
                             , flowNodesSnapshot
@@ -101,11 +91,6 @@ tkOptions = info (tkParser <**> helper) $
 
 
 
-newtype HistoryApp a = HistoryApp { runHistoryApp :: ReaderT (DBPools) IO a }
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
-                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
-
-
 type IsoGConn n a e = (Address n
                       , LinkAttributes e
                       , NodeAttributes a
@@ -120,37 +105,11 @@ type HistoryConn n a e =
   , ToJSON a, FromJSON a
   , FromGraphSON n, IsoGConn n a e)
 
-toHandlerH :: MonadIO m => String -> Int -> HistoryApp ~> m
-toHandlerH h p a = liftIO $ runReaderT (runHistoryApp a) =<< (mkDBPools h p)
-
-mkDBPools :: MonadIO m => String -> Int -> m (DBPools)
-mkDBPools h p = do
-  kp <- liftIO $ kbtzPool h p
-  spools <- liftIO $ mkSpool $ mkConfG (h, p)
-  return $ DBPools spools kp
-
-serveHistoryAPI :: String -> Int -> Server (HistoryAPI)
-serveHistoryAPI h p = hoistServer (Proxy @ HistoryAPI) (toHandlerH h p) getHistoryForGraph 
-
-historyApp :: String -> Int -> Application
-historyApp h p = serve (Proxy :: Proxy HistoryAPI) $ serveHistoryAPI h p
-
-
-data DBPools = DBPools
-  { spools :: Spools
-  , gremlinPool :: KbtzPool
-  }
-
-
-withKbtzPool :: (Client -> HistoryApp a) -> HistoryApp a
-withKbtzPool f = do
-    (DBPools _ kp) <- ask
-    withResource kp f
     
 defKbtz :: Int -> KbtzName -> Kbtzim
 defKbtz i k = Kbtzim (KbtzId i) k Nothing
 
-instance CRUDChopaan (HistoryApp) where
+instance CRUDChopaan (GraphM) where
   listKibbutzim = do
     ks <- withKbtzPool getKbtzim
     return . KbtzList $ (uncurry defKbtz) <$> (zip [1..] ks)  
@@ -163,16 +122,22 @@ getHistoryForGraph :: KbtzName
   -> GraphType
   -> UTCTime
   -> UTCTime
-  -> HistoryApp (G.SG NodeMAC)
+  -> GraphM (G.SG NodeMAC)
 getHistoryForGraph kn g t0 t1 = do
   DBPools{gremlinPool, spools} <- ask  
   ns <- withResource gremlinPool ((flip getKbtzNodes) kn)
-  let
-    spoolSnap :: SpiderM ~> HistoryApp
-    spoolSnap = liftIO . (runSpider spools)
   case g of
-    MeshG -> (G.Mesh . G.SG) <$> (spoolSnap $ meshNodesSnapshot ns t0 t1)
-    PlanG -> (G.Transactor . G.SG) <$> (spoolSnap $ txNodesSnapshot ns t0 t1)
-    StatusG -> (G.Status . G.SG)  <$> (spoolSnap $ statusNodesSnapshot ns t0 t1)
-    FlowG -> (G.Flow . G.SG) <$> (spoolSnap $ flowNodesSnapshot ns t0 t1)
+    MeshG -> (G.Mesh . G.SG) <$> (withSpider $ meshNodesSnapshot ns t0 t1)
+    PlanG -> (G.Transactor . G.SG) <$> (withSpider $ txNodesSnapshot ns t0 t1)
+    StatusG -> (G.Status . G.SG)  <$> (withSpider $ statusNodesSnapshot ns t0 t1)
+    FlowG -> (G.Flow . G.SG) <$> (withSpider $ flowNodesSnapshot ns t0 t1)
+
+serveHistoryAPI :: String -> Int -> Server (HistoryAPI)
+serveHistoryAPI h p = hoistServer (Proxy @ HistoryAPI) (toHandlerH h p) getHistoryForGraph 
+
+historyApp :: String -> Int -> Application
+historyApp h p = serve (Proxy :: Proxy HistoryAPI) $ serveHistoryAPI h p
 #endif
+
+
+

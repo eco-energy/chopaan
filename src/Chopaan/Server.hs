@@ -31,7 +31,7 @@ import           Servant.API
 import           Servant.Server            (Server, hoistServer, serve)
 
 
-import           Shpadoinkle               (JSM, type (~>))
+import           Shpadoinkle               (JSM)
 import           Shpadoinkle.Router        (MonadJSM)
 import           Shpadoinkle.Router.Server (serveUI)
 import           Shpadoinkle.Run           (Env (Prod))
@@ -47,6 +47,7 @@ import           Options.Applicative       (Parser, ParserInfo, auto,
 import Chopaan.UiTypes
 import Chopaan.CRUD
 import Chopaan.API.History
+import Chopaan.Graph
 import Chopaan.View (view, template, onRouteChange)
 
 

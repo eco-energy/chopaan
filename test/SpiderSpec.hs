@@ -102,7 +102,7 @@ spec = do
                   $ zip [1..nNodes] ns
           return $ foldl S.wSerial S.nil xs''
         let s = S.postscan (FL.classify sensorFold) es
-        print =<< (S.last s)
+        --print =<< (S.last s)
         l <- S.length s
         l `shouldBe` (nMessages * nNodes)
         
@@ -136,9 +136,6 @@ spec = do
     it "RS snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
       (gotNs, gotLs) <- snapDebug meshNodesSnapshot sp ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
-      -- $ for a tree structure with one root node, each node should have the root as its parent,
-      -- $ while the root node should be linked to router
-      -- treePlusStructure gotLs nNodes
       
     it "Stake snapshot graph has the right number of nodes and links" $ \(ns, sp) -> do
       (gotNs, gotLs) <- snapDebug txNodesSnapshot sp ns t0 tn

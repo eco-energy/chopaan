@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f1edf6ad3f9ff75f822b0d28d6a3a011998850552d5e7073ec6a68c3aa60fb54
+-- hash: 8b6807b53ba3719a932d2f57951bccc10813a2f46f18ea2d55161a92272cef76
 
 name:           chopaan
 version:        0.1.0.0
@@ -32,6 +32,8 @@ source-repository head
   location: https://github.com/faezs/chopaan
 
 library
+  exposed-modules:
+      Chopaan.Graph.Algebraic
   other-modules:
       Paths_chopaan
   hs-source-dirs:

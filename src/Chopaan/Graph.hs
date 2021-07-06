@@ -15,69 +15,62 @@ module Chopaan.Graph ( module Chopaan.Graph
                      ) where
 
 import Prelude hiding ((.), id)
+import Control.Category
+import Control.Monad
 
 import GHC.Generics (Generic, Generic1)
-import qualified Control.Newtype.Generics as N
-import Control.DeepSeq (NFData)
-
-import Control.Category
-import Data.Aeson
-import Data.Typeable
-import Data.Bifunctor
-import Data.Maybe (fromJust)
-import qualified Data.Map.Strict as Map
-
-import Chopaan.Graph.Snapshot
-import qualified Algebra.Graph.Labelled as AG
+import Control.DeepSeq
+import Data.Aeson (ToJSON, FromJSON)
+import Data.Greskell (FromGraphSON)
 
 #ifndef ghcjs_HOST_OS
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader hiding (ask)
+import Control.Monad.Reader.Class
+import Control.Monad.Catch
+import Control.Monad.Base
+import Control.Monad.Trans.Control
+
 import Chopaan.Graph.Spider
 import Chopaan.Graph.Kbtz
+import Network.Greskell.WebSocket (Client)
+import Data.Pool
 #endif
-
-import Shpadoinkle.Widgets.Types
+import Shpadoinkle.Widgets.Types (Humanize)
 
 import Chopaan.Graph.G
-
-type R = Double
-
-
--- $ Constraints for edge labels and nodes
-type GrConn f s = (Bounded s, Show s, Ord s, Eq s, Enum s, Show f, Monoid f, Ord f)
-
--- $ Constraints for edge labels and nodes, along with monad constraints
-type GrConnM m f s = (Monad m, GrConn f s)
-
-deriving instance Generic1 (AG.Graph flow)
-
-newtype Gr flow state = Gr { unGr :: (AG.Graph flow state) }
-  deriving stock (Eq, Ord, Show, Generic, Generic1)
-  deriving newtype (Num, Functor, Bifunctor)
+import Chopaan.Graph.Snapshot
 
 
-emptyGr :: (GrConn flow state) => Gr flow state
-emptyGr = Gr AG.empty
 
+#ifndef ghcjs_HOST_OS
+newtype GraphM a = GraphM { runGraphM :: ReaderT (DBPools) IO a }
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
+                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
 
-instance N.Newtype (Gr flow state)
+toHandlerH :: MonadIO m => String -> Int -> GraphM ~> m
+toHandlerH h p a = liftIO $ runReaderT (runGraphM a) =<< (mkDBPools h p)
 
--- $ Shpadoinkle Instances
-instance (Show state, Show flow) => Humanize (Gr flow state)
+mkDBPools :: MonadIO m => String -> Int -> m (DBPools)
+mkDBPools h p = do
+  kp <- liftIO $ kbtzPool h p
+  spools <- liftIO $ mkSpool $ mkConfG (h, p)
+  return $ DBPools spools kp
 
+data DBPools = DBPools
+  { spools :: Spools
+  , gremlinPool :: KbtzPool
+  }
 
-fromSnapshot :: forall n l v. (Monoid l, Ord n) => SnapshotGraph n v l -> Gr l (Maybe v)
-fromSnapshot g = Gr . AG.edges $ fmap (\(x, (_, y), (_, z)) -> (x, y, z)) $ castLinks g
+withKbtzPool :: (Client -> GraphM a) -> GraphM a
+withKbtzPool f = do
+    (DBPools _ kp) <- ask
+    withResource kp f
 
-castLinks :: forall n v l. (Monoid l, Ord n) => SnapshotGraph n v l -> [(l, (n, Maybe v), (n, Maybe v))]
-castLinks (nodes, links) = (\l -> (_linkAttributes l, sourceAttrs l, destAttrs l)) <$> links
-  where
-    nmap = Map.fromList $ zip (_nodeId <$> nodes) (_nodeAttributes <$> nodes)
-    sourceAttrs l = (_sourceNode l, nmap Map.! (_sourceNode l))
-    destAttrs l = (_destinationNode l, nmap Map.! (_destinationNode l))
-    
-newtype GrNode = GrNode Int
-  deriving (Eq, Ord, Typeable, Show)
-  deriving newtype (Num)
+withSpider :: SpiderM ~> GraphM
+withSpider f = (\s -> runSpider s f) =<< (fmap spools ask)
+#endif
+
 
 
 data GraphType = MeshG | PlanG | StatusG | FlowG

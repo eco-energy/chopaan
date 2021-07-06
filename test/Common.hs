@@ -26,9 +26,8 @@ import qualified Chopaan.Node.Components as C
 import Chopaan.Kibbutz.KbtzId (KbtzId(..))
 import Chopaan.Kibbutz
 import Chopaan.Graph.Spider
+import Chopaan.Graph.Snapshot
 
-import NetSpider.Snapshot
-import qualified NetSpider.Timestamp as NT
 
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
@@ -70,24 +69,8 @@ instance Arbitrary (NM.EnergyState) where
   arbitrary = arbitraryMessage
 
 instance Arbitrary (NM.RuntimeStats) where
-  arbitrary = arbitraryMessage -- do
-    -- mFH <- arbitrary @Word32
-    -- cFH <- arbitrary @Word32
-    -- cu <-  arbitrary @Word32
-    -- r <- arbitrary @Bool
-    -- w <- arbitrary @Int
-    -- ps <- arbitrary @Int
-    -- u <- arbitrary @Word64
-    -- return $ defMessage
-    --   & (NM.minFreeHeap .~ mFH)
-    --   & (NM.currentFreeHeap .~ cFH)
-    --   & (NM.cpuUtilization .~ cu)
-    --   & (NM.isRoot .~ r)
+  arbitrary = arbitraryMessage
 
-
-
-instance Arbitrary NT.Timestamp where
-  arbitrary = genericArbitrary
 
 instance (Arbitrary n, Arbitrary v) => Arbitrary (SnapshotNode n v) where
   arbitrary = genericArbitrary

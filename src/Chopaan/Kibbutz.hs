@@ -6,7 +6,7 @@ module Chopaan.Kibbutz where
 
 import GHC.Generics
 
-import Network.AWS.S3 (BucketName)
+import Network.AWS.S3 (BucketName, ObjectKey)
 import Chopaan.Types hiding (DBOpts)
 
 import Control.Applicative
@@ -50,15 +50,16 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          , Address
                          )
 import Chopaan.Graph
-
+import Data.Time
 
 type S3Opts = BucketName
-type ChannelOpts = Either (MessageQs NodeMAC) S3Opts
+type ChannelOpts = (MessageQs NodeMAC)
 
 data KbtzC n = KbtzC
   { name :: KbtzName
   , nodes :: [n]
   , channelOpts :: ChannelOpts
+  , s3Opts :: S3Opts
   , spiderHost :: String
   , spiderPort :: Int
   } deriving (Generic)
@@ -87,13 +88,14 @@ twoSrc q q' = do
 
 
 s3Qs :: forall m. (MonadAsync m)
-  => [NodeMAC]
+  => [(NodeMAC, Maybe ObjectKey)]
   -> S3Opts
   -> m (MessageQs NodeMAC)
 s3Qs ns bucket = do
   lg <- liftIO $ newLogger Info stdout
   qs <- liftIO $ initQs
-  let x = (first fst) <$> (S.concatMapWith S.parallel (nodeS3 lg bucket) $ S.fromList ns)
+  let x = (first fst)
+        <$> (S.concatMapWith S.parallel (uncurry (nodeS3 lg bucket)) $ S.fromList ns)
   liftIO . forkIO $ S.mapM_ (\(n, x) -> case x of
               Left e -> liftIO $ writeChan (stateChan qs) n e
               Right r -> liftIO $ writeChan (statsChan qs) n r
@@ -101,8 +103,11 @@ s3Qs ns bucket = do
   return $ qs 
   
 
-s3Src :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> S3Opts
-  -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
+s3Src :: forall t m. (KbtzConn t m NodeMAC)
+      => KbtzName
+      -> [(NodeMAC, Maybe ObjectKey)]
+      -> S3Opts
+      -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
 s3Src k ns opts = qSrc =<< (s3Qs ns opts)
 
 
@@ -117,20 +122,15 @@ mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOp
   -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
 mqttSrc k ns o = qSrc  =<< (mqttQs o k ns)
 
--- propagateLastMaybe :: (IsStream t, MonadAsync m, Monoid a) => t m (Maybe a) -> t m a
--- propagateLastMaybe = S.postscan mf
---   where
---     mf = FL.mkFoldId lastOnNothingCurrentOnJust mempty
---     lastOnNothingCurrentOnJust a (Just a') = a'
---     lastOnNothingCurrentOnJust a Nothing = a
 
 
 runKibbutz :: forall t m. (IsStream t, MonadAsync m, MonadCatch m, Monad (t m)) => KbtzC NodeMAC -> m (t m Bool)
-runKibbutz KbtzC{name, nodes, channelOpts, spiderHost, spiderPort} = do
-  (es, rs, outbox) <- case channelOpts of
-    Left queues -> qSrc @t queues
-    Right s3Opts -> qSrc =<< s3Qs nodes s3Opts
+runKibbutz KbtzC{name, nodes, channelOpts, s3Opts, spiderHost, spiderPort} = do
+  (es, rs, outbox) <- qSrc @t channelOpts
+  
+  --(esS3, rsS3, outboxS3) <- qSrc @t =<< s3Qs nodes s3Opts
 
+  
   spool <- mkSpool $ mkConfG (spiderHost, spiderPort)
   --_ <- liftIO $ runSpider spool $ initGridRoot name nodes
   gridFold <- liftIO $ runSpider spool (saveTx @m name)
