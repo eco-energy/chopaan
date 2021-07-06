@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications, ScopedTypeVariables, RecordWildCards, FlexibleContexts #-}
+{-# LANGUAGE TypeApplications, ScopedTypeVariables, RecordWildCards, FlexibleContexts, OverloadedStrings #-}
 module Chopaan where
 
 import Control.Monad.IO.Class
@@ -6,7 +6,9 @@ import Chopaan.Kibbutz
 import Chopaan.API.History
 import Chopaan.Types
 import Chopaan.Graph.Kbtz
+import Chopaan.Graph
 
+import Network.AWS.S3 (BucketName(..))
 import Streamly as S
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Prelude as S
@@ -19,12 +21,12 @@ runKbtzim :: forall t m.
   (IsStream t, MonadAsync m)
   => TinkerConf
   -> MQTTOpts
-  -> HistoryApp (t HistoryApp Bool)
+  -> m (t m Bool)
 runKbtzim (TinkerConf h p) mq = (toHandlerH h p) . (fmap S.adapt)
                                 . (fmap (S.hoist (toHandlerH h p) . S.serially)) $  do
   ks <- withKbtzPool getKbtzim
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks
-  qss <- mapM (\(k, ns) -> Left <$> mqttQs mq k ns) $ zip ks nss
+  qss <- mapM (\(k, ns) -> mqttQs mq k ns) $ zip ks nss
   let confss = fmap sConf $ zip (zip ks nss) qss
   return
     $ S.concatMapM runKibbutz
@@ -33,6 +35,7 @@ runKbtzim (TinkerConf h p) mq = (toHandlerH h p) . (fmap S.adapt)
     sConf ((k, ns), qs) = KbtzC { Chopaan.Kibbutz.name = k
                                 , nodes = ns
                                 , channelOpts = qs
+                                , s3Opts = BucketName "dosti-datastream" 
                                 , spiderHost = h
                                 , spiderPort = p
                                 }

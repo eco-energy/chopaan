@@ -65,7 +65,7 @@ data KbtzC n = KbtzC
   } deriving (Generic)
 
 
-mkKbtzConf :: KbtzName -> [n] -> ChannelOpts -> String -> Int -> KbtzC n
+mkKbtzConf :: KbtzName -> [n] -> ChannelOpts -> S3Opts -> String -> Int -> KbtzC n
 mkKbtzConf = KbtzC
 
 qSrc :: forall t m n. (KbtzConn t m n)
