@@ -17,20 +17,17 @@ import Options.Applicative
 import RIO hiding (view, async, withAsync, Async)
 
 
-runKbtzim :: forall t m.
-  (IsStream t, MonadAsync m)
+runKbtzim :: forall t.
+  (IsStream t)--, MonadAsync m)
   => TinkerConf
   -> MQTTOpts
-  -> m (t m Bool)
-runKbtzim (TinkerConf h p) mq = (toHandlerH h p) . (fmap S.adapt)
-                                . (fmap (S.hoist (toHandlerH h p) . S.serially)) $  do
+  -> GraphM (t GraphM Bool)
+runKbtzim (TinkerConf h p) mq = do
   ks <- withKbtzPool getKbtzim
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks
   qss <- mapM (\(k, ns) -> mqttQs mq k ns) $ zip ks nss
   let confss = fmap sConf $ zip (zip ks nss) qss
-  return
-    $ S.concatMapM runKibbutz
-    $ S.fromList confss
+  S.concatMapWith S.parallel (runKibbutz @t @GraphM) $ S.fromList confss
   where
     sConf ((k, ns), qs) = KbtzC { Chopaan.Kibbutz.name = k
                                 , nodes = ns

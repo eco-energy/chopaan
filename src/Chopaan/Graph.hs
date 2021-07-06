@@ -48,8 +48,8 @@ newtype GraphM a = GraphM { runGraphM :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
                     MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
 
-toHandlerH :: MonadIO m => String -> Int -> GraphM ~> m
-toHandlerH h p a = liftIO $ runReaderT (runGraphM a) =<< (mkDBPools h p)
+runGraphM :: MonadIO m => String -> Int -> GraphM ~> m
+runGraphM h p a = liftIO $ runReaderT (runGraphM a) =<< (mkDBPools h p)
 
 mkDBPools :: MonadIO m => String -> Int -> m (DBPools)
 mkDBPools h p = do

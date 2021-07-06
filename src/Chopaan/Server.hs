@@ -64,11 +64,11 @@ newtype Noop a = Noop (JSM a)
   deriving anyclass CRUDChopaan
 
 instance CRUDChopaan App where
-  listNodezim k = (\(TinkerConf h p) -> (toHandlerH h p) $ listNodezim k)
+  listNodezim k = (\(TinkerConf h p) -> (runGraphM h p) $ listNodezim k)
                   =<< ask 
-  listKibbutzim = (\(TinkerConf h p) -> (toHandlerH h p) listKibbutzim) =<< ask
+  listKibbutzim = (\(TinkerConf h p) -> (runGraphM h p) listKibbutzim) =<< ask
   getGraph  g k t t' = ask
-                       >>= (\(TinkerConf h p) -> toHandlerH h p $ getGraph g k t t')
+                       >>= (\(TinkerConf h p) -> runGraphM h p $ getGraph g k t t')
 
 app :: Env -> FilePath -> TinkerConf -> Application
 app ev root (TinkerConf h p) = serve (Proxy @ (SPA App :<|> HistoryAPI)) (serveSPA :<|> (serveHistoryAPI h p))

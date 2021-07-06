@@ -133,7 +133,7 @@ getHistoryForGraph kn g t0 t1 = do
     FlowG -> (G.Flow . G.SG) <$> (withSpider $ flowNodesSnapshot ns t0 t1)
 
 serveHistoryAPI :: String -> Int -> Server (HistoryAPI)
-serveHistoryAPI h p = hoistServer (Proxy @ HistoryAPI) (toHandlerH h p) getHistoryForGraph 
+serveHistoryAPI h p = hoistServer (Proxy @ HistoryAPI) (runGraphM h p) getHistoryForGraph 
 
 historyApp :: String -> Int -> Application
 historyApp h p = serve (Proxy :: Proxy HistoryAPI) $ serveHistoryAPI h p

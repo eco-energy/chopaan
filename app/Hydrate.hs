@@ -41,14 +41,11 @@ main = do
   tings <- getNodes thingType
   l <- newLogger Info I.stdout
   S.drain $ S.parallely $ S.mapM (downloadNode l) $ S.fromList tings
-  --S.parallely (downloadNode @S.AheadT <$>
   where
     thingType = KbtzId "kibbutz-pilot-node"
     janusHost = "localhost"
     janusPort = 8182
-    -- (\n ->
-    --          S.fold (writePathsFold n)
-    --          $ s3Paths bucketN (nodePrefix n))
+
 
 
 downloadNode :: Logger -> NodeMAC -> IO () -- forall t. (S.IsStream t) => t IO ()  
@@ -60,7 +57,7 @@ downloadNode l n = S.drain $ S.bracket opF cF $ \h -> S.scan (FH.write h)
   S.|$ S.asyncly $ s3frames l bucketN
   S.|$ S.tap (writePathsFold n)
   --S.|$ S.trace print
-  S.|$ S.parallely $ s3Paths l bucketN $ nodePrefix n
+  S.|$ S.parallely $ s3Paths l bucketN (nodePrefix n) Nothing
   where
     opF = I.openFile fp I.WriteMode
     cF = I.hClose
@@ -69,7 +66,7 @@ downloadNode l n = S.drain $ S.bracket opF cF $ \h -> S.scan (FH.write h)
          <> ".data"
 
 mac2Path :: NodeMAC -> String
-mac2Path (NodeId n) = T.unpack .  (T.replace ":" "_") . (T.replace "\"" "") $ n
+mac2Path (NodeId n) = T.unpack .  (T.replace ":" "") . (T.replace "\"" "") $ n
 
 nodePrefix :: (Address a) => a -> Maybe T.Text
 nodePrefix n = Just $ stateTopic n
