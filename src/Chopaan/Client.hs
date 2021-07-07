@@ -50,7 +50,7 @@ instance CRUDChopaan AppC where
   getGraph k g t0 t1 = AppC $ do
     let
       r = historyAPI k g t0 t1
-      env = (ClientEnv $ BaseUrl Http "localhost" 8888 "")
+      env = (ClientEnv $ BaseUrl Https "dosti.ecoenergy.global" 443 "")
     runXHR' r env
 
 
@@ -68,5 +68,3 @@ app =
 
 main :: IO ()
 main = runJSorWarp 8080 app
-  --where
-  --  init = (MAddNode (KbtzId "this") Nothing emptyNodeForm)

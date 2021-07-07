@@ -22,12 +22,13 @@
 module Main where
 
 import qualified Chopaan.Client as C
-import           Shpadoinkle.Run (runJSorWarp)
+import           Shpadoinkle.Run (runJSorWarp, live)
 
 
 main :: IO ()
 main = runJSorWarp 8080 C.app
 
+dev = live 8080 C.app
 
 -- import GHC.Generics
 
