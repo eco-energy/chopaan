@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8b6807b53ba3719a932d2f57951bccc10813a2f46f18ea2d55161a92272cef76
+-- hash: 06af6cba254caef3b7d3ed0cb0b055e62a18a451ee1763f660d1b1541b886788
 
 name:           chopaan
 version:        0.1.0.0
@@ -22,7 +22,11 @@ extra-source-files:
     ChangeLog.md
     assets/style.css
     assets/tailwind.min.css
+    js/CSS3DRenderer.js
     js/gridRenderer.js
+    js/three.min.js
+    js/TrackballControls.js
+    js/Tween.js
     js/gridRenderer.html
 data-files:
     options.dhall
