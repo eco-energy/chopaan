@@ -8,7 +8,7 @@ in
   network.description = "Chopaan and DB.";
 
   
-  machine = { config, pkgs, resources, lib, ... }:
+  chopaan = { config, pkgs, resources, lib, ... }:
     let
       uijs = "${ui}/bin/ui.jsexe";
       janusPort = 8182;
@@ -25,7 +25,7 @@ in
         ec2 = {
           inherit accessKeyId region;
 
-          instanceType = "t3.nano";
+          instanceType = "t3.micro";
 
           ebsBoot = true;
           ebsInitialRootDiskSize = 100;
@@ -94,25 +94,23 @@ in
       users.users.nginx.extraGroups = [ "acme" ];
       security.acme.acceptTerms = true;
       security.acme.email = "faez@ecoenergy.global";
-      security.acme.server = "https://acme-staging-v02.api.letsencrypt.org/directory";
       services.nginx = {
         enable = true;
-        logError = "/dev/stdout info";
+        logError = "stdout info";
         recommendedTlsSettings = true;
         recommendedOptimisation = true;
         recommendedGzipSettings = true;
         recommendedProxySettings = true;
         
         virtualHosts.${dnsName} = {
-          addSSL = true;
+          #addSSL = true;
+          forceSSL = true;
           enableACME = true;
           locations."/" = {
             proxyPass = "http://127.0.0.1:${toString serverPort}";
             root = uijs;
           };
-          locations."/.well-known/acme-challenge" = {
-            root = "/var/lib/acme/.challenges";
-          };
+          # root = uijs;
         };
       };
     };
