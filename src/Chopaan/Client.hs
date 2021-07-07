@@ -3,7 +3,7 @@
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE FlexibleInstances, TypeOperators  #-}
 
 module Chopaan.Client where
 
@@ -58,7 +58,7 @@ instance CRUDChopaan AppC where
   = client (Proxy @ API)
 
 (historyAPI)
-  = client (Proxy @ HistoryAPI)
+  = client (Proxy @ (HistoryAPI))
 
   
 app :: JSM ()

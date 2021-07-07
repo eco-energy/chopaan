@@ -71,7 +71,8 @@ instance CRUDChopaan App where
                        >>= (\(TinkerConf h p) -> runGraphM h p $ getGraph g k t t')
 
 app :: Env -> FilePath -> TinkerConf -> Application
-app ev root (TinkerConf h p) = serve (Proxy @ (SPA App :<|> HistoryAPI)) (serveSPA :<|> (serveHistoryAPI h p))
+app ev root (TinkerConf h p) =
+  serve (Proxy @ (HistoryAPI :<|> SPA App)) ((serveHistoryAPI h p) :<|> serveSPA) 
   where
     serveSPA :: Server (SPA App)
     serveSPA = serveUI @ (SPA App) root
