@@ -5,14 +5,15 @@
 
 let
   artifact = (import ./snowman.nix).build { isJS = true; };
-  pkgs = fetchFromGitHub = (import (builtins.fetchTarball {
-        url = "https://github.com/NixOS/nixpkgs/archive/${c}.tar.gz";
+  pkgs = (import (builtins.fetchTarball {
+        url = "https://github.com/NixOS/nixpkgs/archive/${chan}.tar.gz";
   }) { inherit system; });
-  file = if optimize then "all.min.js" else "all.js"
+  file = if optimize then "all.min.js" else "all.js";
   jslib = ../js;
+  assets = ../assets;
 in
 pkgs.runCommand "website" {
-  LANG = "C.UTF-8"
+  LANG = "C.UTF-8";
 } ''
   mkdir $out
   mkdir $out/assets

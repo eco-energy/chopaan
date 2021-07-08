@@ -3,6 +3,7 @@ let
   app = (import ./.) {};
   accessKeyId = "default";
   ui = (import ./nix/snowman.nix).build { isJS = true; };
+  staticUi = (import ./nix/website.nix) {};
 in
 {
   network.description = "Chopaan and DB.";
@@ -90,7 +91,6 @@ in
             '';
       };
 
-      
       users.users.nginx.extraGroups = [ "acme" ];
       security.acme.acceptTerms = true;
       security.acme.email = "faez@ecoenergy.global";
@@ -101,6 +101,17 @@ in
         recommendedOptimisation = true;
         recommendedGzipSettings = true;
         recommendedProxySettings = true;
+        appendHttpConfig = ''
+        proxy_cache_path /tmp/cache/ levels=1:2 keys_zone=chop-cache:100m max_size=10g inactive=60m use_temp_path=off;
+        # Cache only success status codes; in particular we don't want to cache 404s.
+        # See https://serverfault.com/a/690258/128321
+        map $status $cache_header {
+          200     "public";
+          302     "public";
+          default "no-cache";
+        }
+        access_log logs/access.log;
+      '';
         
         virtualHosts.${dnsName} = {
           #addSSL = true;
@@ -109,6 +120,12 @@ in
           locations."/" = {
             proxyPass = "http://127.0.0.1:${toString serverPort}";
             root = uijs;
+          };
+          #extraConfig = ""
+          locations."~* .(jpe?g|svg|png|gif|ico|css|js|webmanifest|json|fbx)$" = {
+            root = staticUi;
+            extraConfig = "proxy_cache chop-cache;";
+            tryFiles = "$uri uri/ =404";
           };
           # root = uijs;
         };

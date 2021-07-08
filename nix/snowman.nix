@@ -94,11 +94,11 @@ let
         "happy" = pkgs.haskell.lib.dontCheck hsuper.happy;
         "digits" = pkgs.haskell.lib.dontCheck hsuper.digits;
         "haxl" = pkgs.haskell.lib.dontCheck hsuper.haxl;
-        "concat-inline" = concatPkg "inline";
+        "concat-inline" = pkgs.haskell.lib.dontHaddock (concatPkg "inline");
         "concat-known" = concatPkg "known";
         "concat-satisfy" = concatPkg "satisfy";
         "concat-classes" = concatPkg "classes";
-        "concat-plugin" = concatPkg "plugin";
+        "concat-plugin" = pkgs.haskell.lib.dontHaddock (concatPkg "plugin");
         "concat-examples" = concatPkg "examples";
         "concat-graphics" = concatPkg "graphics";
         "streamly" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
