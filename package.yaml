@@ -315,9 +315,9 @@ executables:
           - -fdicts-strict
           - -fmax-worker-args=16
           - -fspec-constr-recursive=16
-          - -fplugin Fusion.Plugin          
-  tx:
-    main:             Tx.hs
+          #- -fplugin Fusion.Plugin          
+  dev:
+    main:             Dev.hs
     other-modules: []
     source-dirs:         app
     when:
@@ -347,7 +347,7 @@ executables:
         ghc-options:
           - -threaded
           - -O2
-          - -fplugin=ConCat.Plugin
+          #- -fplugin=ConCat.Plugin
       else:
         buildable: true
         dependencies:
@@ -376,26 +376,26 @@ executables:
           - -fdicts-strict
           - -fmax-worker-args=16
           - -fspec-constr-recursive=16
-          - -fplugin Fusion.Plugin          
+          #- -fplugin Fusion.Plugin          
       else:
         buildable: false
-  hydrate:
-    main:                Hydrate.hs
-    other-modules: []
-    source-dirs:         app
-    when:
-      condition: "!impl(ghcjs)"
-      then:
-        buildable: true
-        dependencies:
-          - chopaan
-          - optparse-simple
-          - base
-        ghc-options:
-          - -threaded
-          - -O2
-      else:
-        buildable: false
+  # hydrate:
+  #   main:                Hydrate.hs
+  #   other-modules: []
+  #   source-dirs:         app
+  #   when:
+  #     condition: "!impl(ghcjs)"
+  #     then:
+  #       buildable: true
+  #       dependencies:
+  #         - chopaan
+  #         - optparse-simple
+  #         - base
+  #       ghc-options:
+  #         - -threaded
+  #         - -O2
+  #     else:
+  #       buildable: false
 
 
 tests:
