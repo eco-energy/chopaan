@@ -34,6 +34,7 @@ import Shpadoinkle (Html(..), liftC, text, JSM, MonadJSM, Continuation, Html,
                      writeTVar)
 import Control.Monad.IO.Class
 import qualified Shpadoinkle.Html as H
+--import Shpadoinkle.Html.TH.AssetLink (assetLink)
 import Shpadoinkle.Template.TH
 
 
@@ -76,17 +77,23 @@ createGridObject = undefined
 
 
 renderWith3 :: (ToJSON n, ToJSON v, ToJSON e) => SnapshotGraph n v e -> Html m ()
-renderWith3 a = cview
-  -- baked $ do
-      -- (notify, stream) <- H.mkGlobalMailboxAfforded constUpdate
-      -- let file = $(embedFile "js/gridRenderer.js")
-      -- liftIO . print $ file
-      -- doc' <- currentDocumentUnchecked
-      -- container' <- toJSVal =<< createElement doc' "div"
-      -- eval $ T.decodeUtf8 file 
-      -- --  \a' -> (liftIO . print $ a') >>  
-      -- jsg1 "initGrid" (A.toJSON a)
-      -- return (RawNode container', stream)
+renderWith3 a = baked $ do
+  (notify, stream) <- H.mkGlobalMailboxAfforded constUpdate
+  let gr = $(embedFile "js/gridRenderer.js")
+      thr = $(embedFile "js/three.min.js")
+      thrCss = $(embedFile "js/CSS3DRenderer.js")
+      thrCtrl = $(embedFile "js/TrackballControls.js")
+      tween = $(embedFile "js/Tween.js")
+  doc' <- currentDocumentUnchecked
+  container' <- toJSVal =<< createElement doc' "div"
+  eval $ T.decodeUtf8 thr
+  eval $ T.decodeUtf8 thrCss
+  eval $ T.decodeUtf8 thrCtrl
+  eval $ T.decodeUtf8 tween
+  eval $ T.decodeUtf8 gr 
+  --  \a' -> (liftIO . print $ a') >>  
+  jsg1 "initGrid" (A.toJSON a)
+  return (RawNode container', stream)
 
 
 cview :: Html m a
