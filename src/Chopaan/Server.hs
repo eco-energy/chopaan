@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 --{-# OPTIONS_GHC -fno-warn-missing-methods #-}
 
-module Chopaan.Server (application, main) where
+module Chopaan.Server (application, main, TinkerConf(..)) where
 
 import GHC.Generics hiding (R)
 
