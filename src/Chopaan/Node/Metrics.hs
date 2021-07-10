@@ -34,6 +34,8 @@ import Text.Printf
 import Proto.NodeMessageSchema.NodeMessages
 import Proto.NodeMessageSchema.NodeMessages_Fields
 
+import Shpadoinkle.Widgets.Types (Humanize(..))
+
 #ifndef ghcjs_HOST_OS
 import ConCat.Misc (R)
 #endif
@@ -68,12 +70,12 @@ headerOrder = Csv.headerOrder
 newtype WattSeconds = WS { unWs :: Compensated Double }
   deriving stock (Eq, Ord, Generic)
   deriving newtype (Num, Fractional, Binary, Real, RealFrac, NFData)
-
+  deriving anyclass (Humanize)
 
 newtype Watts = W { unW :: Compensated Double }
   deriving stock (Eq, Ord, Generic)
   deriving newtype (Num, Fractional, Real, Binary, RealFrac, NFData)
-
+  deriving anyclass (Humanize)
 
 instance Show WattSeconds where
   show = (printf ("%.2g")) . fromWattSeconds
@@ -89,10 +91,10 @@ fromWattSeconds :: WattSeconds -> Double
 fromWattSeconds = uncompensated . unWs
 
 toWatts :: Double -> Watts
-toWatts a = W $ add a 0.000000001 compensated
+toWatts a = W $ add a 0 compensated
 
 toWattSeconds :: Double -> WattSeconds
-toWattSeconds a = WS $ add a 0.0000000001 compensated
+toWattSeconds a = WS $ add a 0 compensated
 
 pToE :: (Real t) => t -> Watts -> WattSeconds
 pToE t (W p') = WS $ (*^) (realToFrac t) p'
@@ -127,7 +129,7 @@ data Node a = Node
   { tx :: ! a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Ord, Show, Binary, Generic, Functor, NFData, ToJSON, FromJSON)
+  } deriving (Eq, Ord, Show, Binary, Generic, Functor, NFData, ToJSON, FromJSON, Humanize)
   
 
 instance (Csv.ToField a) => Csv.ToNamedRecord (Node a)
@@ -227,7 +229,7 @@ data SensorMetrics e p = SensorMetrics
   , _energyT :: !(Node e)
   , _battery :: !(Battery e p)
   , _demand :: !e
-  } deriving (Eq, Ord, Generic, Binary, Show, NFData, ToJSON, FromJSON)
+  } deriving (Eq, Ord, Generic, Binary, Show, NFData, ToJSON, FromJSON, Humanize)
 
 initSM :: (Fractional e, Fractional p) => SensorMetrics e p
 initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0 
@@ -423,7 +425,7 @@ data Battery e p = Battery
   , chargeLim :: !p
   , dischargeLim :: !p
   , totalCapacity :: !e
-  } deriving (Eq, Ord, Show, Binary, Generic, NFData, Functor)
+  } deriving (Eq, Ord, Show, Binary, Generic, NFData, Functor, Humanize)
 
 instance Bifunctor Battery where
   bimap f g Battery{soc, chargeLim, dischargeLim, totalCapacity} = Battery

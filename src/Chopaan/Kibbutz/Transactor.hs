@@ -44,6 +44,7 @@ import Chopaan.Node.Metrics (toWattSeconds, toWatts
                             , Battery(..)
                             )
 
+import GHC.Generics (Generic)
 
 import qualified Data.Time as Time
 import qualified Data.Text as Text
@@ -60,8 +61,9 @@ import Data.Convertible
 import Data.Convertible.Instances ()
 import Data.ULID
 import Data.Aeson as A
+import qualified Data.ByteString.Lazy as BL
 
-import GHC.Generics (Generic)
+
 
 import qualified Streamly.Prelude as S
 import Streamly (IsStream, MonadAsync, adapt)
@@ -73,6 +75,8 @@ import qualified Streamly.Internal.Data.Pipe.Types as P
 import qualified Data.Map.Strict as M
 import Data.Key hiding (Key)
 import qualified Data.List as L
+
+import Shpadoinkle.Widgets.Types (Humanize(..))
 
 #ifndef ghcjs_HOST_OS
 import Chopaan.Kibbutz.LinOpt
@@ -87,12 +91,14 @@ import NetSpider.Found (LinkState(..))
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), EFinds, VFoundNode)
 import Chopaan.Graph.Greskell
 #endif
-import qualified Data.ByteString.Lazy as BL
+
+
 
 
 newtype Tx n a = Tx { unTx :: M.Map n a }
   deriving stock (Eq, Ord, Show, Generic, Traversable)
   deriving newtype (ToJSON, FromJSON, NFData, Functor, Foldable)
+  deriving anyclass (Humanize)
 
 instance (Ord n) => Semigroup (Tx n a) where
   (Tx m) <> (Tx m') = Tx (m <> m')
@@ -122,7 +128,7 @@ data TxStatus' e = TxStatus'
   , timeRemaining :: Time.DiffTime
   , startLag :: Time.DiffTime
   , endLag :: Time.DiffTime
-  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
+  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData, Humanize)
 
 
 type TxStatus = TxStatus' WattSeconds
@@ -480,6 +486,7 @@ newtype Stake' p = Stake
   { unStake :: (Role, p, Time.DiffTime) }
   deriving stock (Eq, Ord, Show, Generic)
   deriving newtype (NFData, ToJSON, FromJSON)
+  deriving anyclass (Humanize)
 
 type Stake = Stake' Watts
 

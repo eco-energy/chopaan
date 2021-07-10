@@ -66,10 +66,10 @@ spec = do
     tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
   beforeAll (do
                 let c = mkConfG ("localhost", 8182)
-                NS.withSpider (unConf $ meshG c) NS.clearAll
-                NS.withSpider (unConf $ txG c) NS.clearAll
-                NS.withSpider (unConf $ flowG c) NS.clearAll
-                NS.withSpider (unConf $ statusG c) NS.clearAll
+                -- NS.withSpider (unConf $ meshG c) NS.clearAll
+                -- NS.withSpider (unConf $ txG c) NS.clearAll
+                -- NS.withSpider (unConf $ flowG c) NS.clearAll
+                -- NS.withSpider (unConf $ statusG c) NS.clearAll
                 kp <- kbtzPool "localhost" 8182                 
                 ns <- liftIO $ arbs @NodeMAC nNodes
                 withResource kp (\c -> addKbtz c kId)

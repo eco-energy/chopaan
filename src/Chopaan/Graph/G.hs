@@ -36,12 +36,11 @@ import NetSpider.Spider
 
 
 
-data G k n where
-  Mesh :: k n MeshNode RxSignal -> G k n
-  Transactor :: k n Stake TxStatus -> G k n 
-  Status :: k n SensorR Stake -> G k n
-  Flow :: k n BatteryR PowerNR -> G k n
-  deriving (Generic)
+data G k n = Mesh (k n MeshNode RxSignal) -- -> G k n
+           | Transactor (k n Stake TxStatus) -- -> G k n 
+           | Status (k n SensorR Stake)
+           | Flow (k n BatteryR PowerNR)
+           deriving (Generic)
 
 
 deriving instance (forall a b. (Eq a, Eq b) => Eq (k n a b)) => Eq (G k n)

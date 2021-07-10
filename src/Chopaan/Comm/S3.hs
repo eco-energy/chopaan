@@ -92,10 +92,6 @@ listObjects l bucket prefix startAfter = hoist (liftIO . inS3Context l) $
                                      & S3.lovStartAfter .~ (fmap unObject startAfter)
   where
     unObject (S3.ObjectKey k) = k
-    
-bucketN :: S3.BucketName
-bucketN = S3.BucketName "dosti-datastream"
-
 
 s3Paths :: forall t m. (IsStream t, MonadAsync m)
         => Logger
@@ -168,7 +164,18 @@ nodeS3 l bucket n startAfter = (process . (s3frames l bucket))
                   Just r -> Right r
                   Nothing -> error $ ""
 
-    
+
+metadataKey :: S3.ObjectKey
+metadataKey = "chopaanMetadata"
+
+bucketN :: S3.BucketName
+bucketN = S3.BucketName "dosti-datastream"
+
+-- What would the structure of the metadata be?
+-- Is there a greskell expression to fetch all nodes and edges in a graph?
+fetchMetadata = undefined
+
+writeMetadata = undefined
 
 -- sensorS3 :: (IsStream t, MonadAsync m) =>  Logger -> S3.BucketName -> NodeMAC -> t m (EnergyState)
 -- sensorS3 l bucket n = S.map ((fromLeft undefined) . snd)

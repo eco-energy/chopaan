@@ -3,7 +3,7 @@
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE FlexibleInstances, TypeOperators  #-}
+{-# LANGUAGE FlexibleInstances, TypeOperators, TemplateHaskell  #-}
 
 module Chopaan.Client where
 
@@ -17,9 +17,13 @@ import           Shpadoinkle                 (JSM, MonadJSM, MonadUnliftIO (..),
 import           Shpadoinkle                 (JSM, MonadUnliftIO (..),
                                               UnliftIO (..), askJSM, runJSM)
 #endif
+
+import           Data.FileEmbed              (embedFile)
+import           Data.Text.Encoding          (decodeUtf8)
+
 import           Servant.API                 ((:<|>) (..))
 import           Shpadoinkle.Backend.ParDiff (runParDiff)
-import           Shpadoinkle.Html.Utils      (getBody)
+import           Shpadoinkle.Html.Utils      (getBody, addInlineStyle)
 import           Shpadoinkle.Router          (fullPageSPA, withHydration)
 import           Shpadoinkle.Router.Client   (client, runXHR', runXHR)
 import           Servant.Client.JS
@@ -66,7 +70,8 @@ prodEnv = ClientEnv $ BaseUrl Https prodHost 443 ""
 
   
 app :: JSM ()
-app =
+app = do
+  addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
   fullPageSPA @(SPA JSM) runAppC runParDiff (withHydration ainit) view getBody onRouteChange routes
 
 
