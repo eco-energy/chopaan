@@ -4,7 +4,7 @@
 {-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE DuplicateRecordFields     #-}
 {-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules #-}
+{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies #-}
 
 module Chopaan.Ui.ThreeD where
 
@@ -22,6 +22,7 @@ import Shpadoinkle.Lens
 import Control.Lens (_1, _2)
 import Data.Generics.Product
 import Data.Generics.Labels
+import Data.Key as K
 
 default(T.Text)
 
@@ -41,6 +42,22 @@ data ThreeModel a = ThreeModel
   }
   deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
+
+cameraCSSMatrix :: Camera -> (T.Text, H.Prop m Camera)
+cameraCSSMatrix c = H.textProperty "style" ("transform: " <> mkCameraStyle c)
+  where
+    mkCameraStyle c = ""
+
+objectCSSMatrix :: forall f a. (Key f ~ Int, Functor f, Keyed f, Foldable f, Fractional a, Num a, Ord a, Show a) => f a -> T.Text
+objectCSSMatrix mat = foldl (\x y -> x <> ((uncurry epsilon y) <> ",")) "matrix3d(" $
+                      K.keyed mat
+  where
+    epsilon ::  Int -> a -> T.Text
+    epsilon i x = if (abs x) < 1e-10
+                  then (T.pack . show $ (0 :: a))
+                  else (T.pack . show . sgn i $ x)
+    sgn i z = if (((mod i 4) - 2) == 0) then (z * (-1)) else z 
+    
 defMod xs = ThreeModel (Scene xs) defCam
 
 threeD :: forall m a. (Functor m, Humanize a) => ThreeModel a -> Html m (ThreeModel a)
