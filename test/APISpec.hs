@@ -16,6 +16,7 @@ import           Servant.Client
 
 import Chopaan.Graph
 import Chopaan.API.History
+import Chopaan.Server
 import Chopaan.Kibbutz.KbtzId
 
 import qualified Data.Time as Ti

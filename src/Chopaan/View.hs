@@ -69,16 +69,14 @@ import Chopaan.Node.Components
 import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Ui.FormCommon
 import Chopaan.Ui.GraphView
-import qualified Clay as C
-import Data.Colour
-import Chopaan.Ui.Style
+import qualified Chopaan.Ui.Style as Css
 import qualified Data.Time as Ti
 
 default (T.Text, [])
 
 
 ainit :: (Monad m, CRUDChopaan m) => Route -> m Frontend
-ainit _ = return MHomePage --(loadG defGView)
+ainit _ = return MHomePage
 
 defGView :: GView
 defGView = GView (KbtzId "test") StatusG t0 t1 Nothing
@@ -117,9 +115,45 @@ onRouteChange = \case
   RAddNode k -> return $ MAddNode k Nothing emptyNodeForm
   RGraph k -> loadG (defGView {_whichK = k})
 
+homePage :: forall m a. MonadJSM m => Html m a
+homePage = H.div
+    [ H.class' $ Css.flex <> Css.flex_col <> Css.flex_grow <> Css.h_screen ]
+    [ H.div headingBox [ H.h1 headingText [ "Welcome To Chopaan" ] ]
+    , H.div menuBox
+      [ H.div (headingBox  <> boxingCss) [
+          H.a ([ H.onClickM_ . navigate @(SPA m) $ RKibbutzim ]) ["Add Kibbutz"]
+          ]
+      , H.div (headingBox <> boxingCss) [
+          H.a ([ H.onClickM_ . navigate @(SPA m) $ RGraph (KbtzId "test") ]) ["View Kibbutzim"]
+          ]
+      ]
+    ]
+    where
+      menuBox = [H.class'
+                  $ Css.flex
+                  <> Css.flex_row
+                  <> Css.flex_auto
+                  <> Css.grid
+                  <> Css.grid_cols_2
+                  <> Css.place_items_stretch
+                  <> Css.h_full
+                ]
+      headingBox = [ H.class' $ Css.h_full <> Css.grid <> Css.place_items_center ]
+      headingText = [ H.class' $ Css.text_3xl <> Css.flex_grow]
+      boxingCss = [ H.class'
+                    $ Css.border_solid
+                    <> Css.border_4
+                    <> Css.border_blue_500
+                    <> Css.h_full
+                    <> Css.flex_grow
+                    <> Css.text_center
+                    <> "hover:underline"
+                  ]
+
 
 view :: forall m. (MonadJSM m, CRUDChopaan m) => Frontend -> Html m Frontend
 view fe = case fe of
+  MHomePage -> onSum _MHomePage $ homePage
   MKibbutzim kbtzRoster -> onSum _MKibbutzim $ H.div "container-fluid"
     [ H.div "row justify-content-between align-items-center"
      [ H.h2_ [ "Kibbutzim" ]
@@ -138,11 +172,6 @@ view fe = case fe of
     ]
   MKibbutz nodeRoster -> onSum _MKibbutz $ H.div "container-fluid"
     []
-  MHomePage -> H.div_
-    [ H.h1_ ["Welcome To Chopaan"]
-    , H.a [ H.onClickM_ . navigate @(SPA m) $ RKibbutzim ] ["Add Kibbutz"]
-    , H.a [ H.onClickM_ . navigate @(SPA m) $ RGraph (KbtzId "test") ] ["View Kibbutzim"]
-    ]
   MAddNode k n form -> onSum (_MAddNode . _3) $ H.div "row"
     [ H.div "col-sm-8 offset-sm-2"
       [ H.h1_ [ text $ maybe "Add New Node" (const "Edit Node") n
@@ -163,7 +192,7 @@ view fe = case fe of
     where
       sectionTitle cr ed = H.h3_ [ text $ maybe cr (const ed) n ]
   MGraph gv -> onSum (_MGraph) $ gView gv
-
+                
 addBattery :: (MonadJSM m) => StorageUpdate 'Edit -> Html m (StorageUpdate 'Edit)
 addBattery bc = H.div [ H.onClick (\a-> undefined) ]
       [ realControl @WattHours capacity "Battery Capacity" errs bc
@@ -223,10 +252,10 @@ staticTemplate s = voidC $ H.html_
         [ H.rel "stylesheet"
         , H.href "https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
         ]
-    , H.link'
-        [ H.rel "stylesheet"
-        , H.href "https://unpkg.com/tailwindcss@2.1.2/dist/tailwind.min.css"
-        ]
+    -- , H.link'
+    --     [ H.rel "stylesheet"
+    --     , H.href "https://unpkg.com/tailwindcss@2.1.2/dist/tailwind.min.css"
+    --     ]
     , H.meta [ H.charset "ISO-8859-1" ] []
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
     --, H.script [ H.src $ entrypoint ev ] []
@@ -246,7 +275,7 @@ template ev fe stage = H.html_
         ]
     , H.link'
         [ H.rel "stylesheet"
-        , H.href "https://unpkg.com/tailwindcss@2.1.2/dist/tailwind.min.css"
+        , H.href "./assets/tailwind.min.css"
         ]
     , H.meta [ H.charset "ISO-8859-1" ] []
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
@@ -277,24 +306,26 @@ fuzzyK = flip (^.) <$>
 
 
 gView :: forall m. (MonadJSM m, CRUDChopaan m) => GView -> Html m (GView)
-gView g = H.div [H.class' $ relative <> flex_grow <> flex_col]
+gView g = H.div [H.class' $ Css.relative <> Css.flex_grow <> Css.flex_col]
   [ case _currentG g of
       Nothing -> voidC $ H.text "No Graph Found Yet"
-      Just sg -> voidC $ renderGrid sg
+      Just sg -> voidC $ renderKbtzGraph sg
   , graphSelectButtons
   --, onRecord whichK $ getGraph
   ]
   where
     graphSelectButtons :: Html m (GView)
-    graphSelectButtons = H.div [H.class' $ flex
-                                 <> flex_row
-                                 <> justify_center
-                                 <> w_full
-                                 <> content_end ]
+    graphSelectButtons = H.div [H.class' $ Css.flex
+                                 <> Css.flex_row
+                                 <> Css.justify_center
+                                 <> Css.w_full
+                                 <> Css.content_end ]
       [ H.button [ H.onClickM (do
                                   gv' <- loadGraph (g {_whichG = gt})
                                   return (\g' -> g' {_currentG = _currentG gv'}))
-               , H.class' "btn btn-primary"
-               , H.class' $ flex <> justify_center <> w_full ] [ text . humanize $ gt ]
+               , H.class' $ Css.flex
+                 <> Css.justify_center
+                 <> Css.w_full
+               ] [ text . humanize $ gt ]
       | gt <- [(minBound @GraphType)..maxBound] ]
 

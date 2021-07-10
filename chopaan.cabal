@@ -1,8 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 04831f6517861f999212d2df405044ef36fe8a3e1d2e25edf86203a0ee7bc120
 
 name:           chopaan
 version:        0.1.0.0
@@ -82,6 +84,7 @@ library
     , exceptions
     , file-embed
     , filepath
+    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -185,6 +188,7 @@ library
         Chopaan.Ui.Style
         Chopaan.Ui.WebGL
         Chopaan.Ui.WebSocket
+        Chopaan.Ui.ThreeD
         Chopaan.UiTypes
         Chopaan.View
         Chopaan.Kibbutz.KbtzId
@@ -266,6 +270,7 @@ library
         Chopaan.Ui.Style
         Chopaan.Ui.WebGL
         Chopaan.Ui.WebSocket
+        Chopaan.Ui.ThreeD
         Chopaan.UiTypes
         Chopaan.View
         Chopaan.Kibbutz.KbtzId
@@ -342,6 +347,7 @@ executable dev
     , exceptions
     , file-embed
     , filepath
+    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -483,6 +489,7 @@ executable kbtzim
     , exceptions
     , file-embed
     , filepath
+    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -623,6 +630,7 @@ executable server
     , exceptions
     , file-embed
     , filepath
+    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -764,6 +772,7 @@ executable ui
     , exceptions
     , file-embed
     , filepath
+    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0
@@ -920,6 +929,7 @@ test-suite chopaan-test
     , exceptions
     , file-embed
     , filepath
+    , generic-lens
     , ghc-prim
     , ghcjs-dom
     , greskell >=1.2.0.0

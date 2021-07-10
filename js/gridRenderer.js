@@ -1,7 +1,8 @@
-import * as THREE from './three.module.js';
-import { TWEEN } from './Tween.module.min.js';
-import { TrackballControls } from './TrackballControls.js';
-import { CSS3DRenderer, CSS3DObject } from './CSS3DRenderer.js'
+var THREE = window.THREE;
+var TWEEN = window.TWEEN;
+var TrackballControls = window.THREE.TrackballControls;
+var CSS3DRenderer = window.THREE.CSS3DRenderer;
+var CSS3DObject = window.THREE.CSS3DObject;
 
 
 function initGrid(elements) {

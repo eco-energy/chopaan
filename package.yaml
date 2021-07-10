@@ -12,6 +12,7 @@ extra-source-files:
 - assets/*.css
 - js/*.js
 - js/*.html
+- assets/*.css
 
 data-files:
  - options.dhall
@@ -109,6 +110,7 @@ dependencies:
 - monad-bayes
 - convertible
 - regex-applicative
+- generic-lens
 when:
   condition: "!impl(ghcjs)"
   then:
@@ -184,6 +186,7 @@ library:
         - Chopaan.Ui.Style
         - Chopaan.Ui.WebGL
         - Chopaan.Ui.WebSocket
+        - Chopaan.Ui.ThreeD
         - Chopaan.UiTypes
         - Chopaan.View
         - Chopaan.Kibbutz.KbtzId
@@ -266,6 +269,7 @@ library:
         - Chopaan.Ui.Style
         - Chopaan.Ui.WebGL
         - Chopaan.Ui.WebSocket
+        - Chopaan.Ui.ThreeD
         - Chopaan.UiTypes
         - Chopaan.View
         - Chopaan.Kibbutz.KbtzId

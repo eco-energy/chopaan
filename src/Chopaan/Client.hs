@@ -3,12 +3,12 @@
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE FlexibleInstances, TypeOperators  #-}
+{-# LANGUAGE FlexibleInstances, TypeOperators, TemplateHaskell  #-}
 
 module Chopaan.Client where
 
 import           Control.Monad.Catch         (MonadThrow)
-import           Control.Monad.Reader        (MonadIO, MonadTrans)
+import           Control.Monad.Reader        (MonadIO)
 import           Data.Proxy                  (Proxy (..))
 #ifndef ghcjs_HOST_OS
 import           Shpadoinkle                 (JSM, MonadJSM, MonadUnliftIO (..),
@@ -17,9 +17,13 @@ import           Shpadoinkle                 (JSM, MonadJSM, MonadUnliftIO (..),
 import           Shpadoinkle                 (JSM, MonadUnliftIO (..),
                                               UnliftIO (..), askJSM, runJSM)
 #endif
+
+import           Data.FileEmbed              (embedFile)
+import           Data.Text.Encoding          (decodeUtf8)
+
 import           Servant.API                 ((:<|>) (..))
 import           Shpadoinkle.Backend.ParDiff (runParDiff)
-import           Shpadoinkle.Html.Utils      (getBody)
+import           Shpadoinkle.Html.Utils      (getBody, addInlineStyle)
 import           Shpadoinkle.Router          (fullPageSPA, withHydration)
 import           Shpadoinkle.Router.Client   (client, runXHR', runXHR)
 import           Servant.Client.JS
@@ -50,9 +54,13 @@ instance CRUDChopaan AppC where
   getGraph k g t0 t1 = AppC $ do
     let
       r = historyAPI k g t0 t1
-      env = (ClientEnv $ BaseUrl Https "dosti.ecoenergy.global" 443 "")
+      env = (ClientEnv $ BaseUrl Http devHost 8080 "")
     runXHR' r env
 
+prodHost = "dosti.ecoenergy.global"
+devHost = "localhost"
+devEnv = ClientEnv $ BaseUrl Http devHost 8080 ""
+prodEnv = ClientEnv $ BaseUrl Https prodHost 443 ""
 
 (listKibbutzimM :<|> listNodezimM)
   = client (Proxy @ API)
@@ -62,7 +70,8 @@ instance CRUDChopaan AppC where
 
   
 app :: JSM ()
-app =
+app = do
+  addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
   fullPageSPA @(SPA JSM) runAppC runParDiff (withHydration ainit) view getBody onRouteChange routes
 
 

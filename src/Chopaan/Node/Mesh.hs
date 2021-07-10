@@ -48,6 +48,7 @@ import qualified Streamly.Internal.Data.Fold as FL
 import Data.Greskell.GraphSON.GValue (unwrapOne)
 import Data.Greskell (newBind, gProperty, lookupAs, lookupAs', Key, pMapToFail, FromGraphSON(..))
 import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
+import Shpadoinkle.Widgets.Types (Humanize(..))
 
 #ifndef ghcjs_HOST_OS
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
@@ -62,6 +63,7 @@ newtype RxSignal = RxSignal (Maybe Double)
   deriving stock (Generic)
   deriving newtype (Eq, Ord, Show, ToJSON, FromJSON, NFData, Binary)
   deriving (Semigroup, Monoid) via (Last Double)
+  deriving anyclass (Humanize)
 
 #ifndef ghcjs_HOST_OS
 instance LinkAttributes RxSignal where
@@ -89,13 +91,13 @@ data MeshNode = MeshNode
   , routerRSSI :: Int
   , version :: Maybe NodeVersion
   }
-  deriving (Eq, Ord, Show, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic, NFData, Humanize)
 
 
 instance ToJSON MeshNode where
   
 instance FromJSON MeshNode where
-  
+
 
 initMeshNode :: MeshNode
 initMeshNode = MeshNode Nothing 0 0 Nothing

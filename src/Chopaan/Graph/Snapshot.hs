@@ -34,6 +34,8 @@ import GHC.Generics (Generic)
 import qualified Text.Regex.Applicative as RE
 import Data.Time
 
+import Shpadoinkle.Widgets.Types (Humanize(..))
+
 #ifndef ghcjs_HOST_OS
 import Data.Time.Clock.System (systemToUTCTime)
 import qualified NetSpider.Snapshot as N
@@ -65,7 +67,7 @@ data SnapshotLink n la =
     -- Maybe it's a good idea to include 'observationLogs', which can
     -- contain warnings or other logs about making this SnapshotLink.
   }
-  deriving (Show,Eq,Generic, NFData)
+  deriving (Show,Eq,Generic, NFData, Humanize)
 
 -- | Comparison by node-tuple (source node, destination node).
 instance (Ord n, Eq la) => Ord (SnapshotLink n la) where
@@ -121,7 +123,7 @@ data SnapshotNode n na =
     _nodeTimestamp :: Maybe UTCTime,
     _nodeAttributes :: Maybe na
   }
-  deriving (Show,Eq,Generic, NFData)
+  deriving (Show,Eq,Generic, NFData, Humanize)
 
 -- | Comparison by node ID.
 instance (Ord n, Eq na) => Ord (SnapshotNode n na) where
