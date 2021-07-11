@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 04831f6517861f999212d2df405044ef36fe8a3e1d2e25edf86203a0ee7bc120
+-- hash: 7565ca23ebb2063b1f15e66f086bc49df2a551f7ec78bf1f87198bfbd75c70ef
 
 name:           chopaan
 version:        0.1.0.0
@@ -883,6 +883,7 @@ test-suite chopaan-test
       NodeSpec
       SpiderSpec
       StorageSpec
+      ThreeDSpec
       TransactorSpec
       Paths_chopaan
   hs-source-dirs:

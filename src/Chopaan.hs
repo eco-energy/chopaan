@@ -18,7 +18,7 @@ import RIO hiding (view, async, withAsync, Async)
 
 
 runKbtzim :: forall t.
-  (IsStream t) --, MonadAsync m, MonadCatch m)
+  (IsStream t)
   => MQTTOpts
   -> GraphM (t GraphM Bool)
 runKbtzim mq = do
