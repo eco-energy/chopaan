@@ -112,8 +112,10 @@ mkObj pos rot scale = Obj pos rot scale locT locT
   where
     locT = transformMat pos rot scale
 
+defQuat = axisAngle (V3 1 1 1) 
+
 zeroObj :: Obj
-zeroObj = mkObj zero zero zero
+zeroObj = mkObj zero zero (V3 1 1 1)
 
 
 data Camera = Camera
@@ -127,7 +129,12 @@ data Camera = Camera
   }
   deriving (Eq, Show, Generic, NFData)
 
+
 toRad = (* (pi / 180))
+nanEr v x = if (isNaN x) then error (v <> " is NaN") else x
+matNaN v = (fmap (fmap (nanEr v)))
+hasNaN :: (Functor f, Functor g, Foldable f, Foldable g, RealFloat a) => f (g a) -> Bool
+hasNaN = isNaN . sum . (fmap sum)
 
 mkCam :: Obj -> Double -> Double -> Double -> Double -> Camera
 mkCam obj fov asp near far = Camera fov asp near far worldInv perspectiveProj obj
@@ -140,19 +147,19 @@ mkCam obj fov asp near far = Camera fov asp near far worldInv perspectiveProj ob
                            & (column _w) %~ (_z .~ d)
       where
         zoom = 1.0
-        top = near * (tan $ (toRad fov) * 0.5 * fov) / zoom
-        height = 2 * top
-        width = asp * height
-        left = 0.5 * width
-        right = left + width
-        bottom = top - height
-        x = 2 * near / (right - left)
-        y = 2 * near / (top - bottom)
-        a = (right + left) / (right - left)
-        b = (top + bottom) / (top - bottom)
-        c = - (far + near) / (far - near)
-        d = (- 2) * (far * near) / (far - near)
-    worldInv = inv44 $ asT obj 
+        top =  near * (tan $ (toRad fov) * 0.5 * fov) / zoom
+        height =  2 * top
+        width =  asp * height
+        left =  0.5 * width
+        right =  left + width
+        bottom =  top - height
+        x =  2 * near / (right - left)
+        y =  2 * near / (top - bottom)
+        a =  (right + left) / width
+        b =  (top + bottom) / height
+        c =  (- (far + near) / (far - near))
+        d =  (- 2) * (far * near) / (far - near)
+    worldInv = inv44 $ asT obj
 
 worldDirection :: Camera -> V3 R
 worldDirection = normalize . (view (_xyz . column _z)) . matrixWorldInverse 
@@ -188,7 +195,7 @@ cssMatEp = cssMat . (fmap epsilon)
 
 
 cameraCSSMat :: Camera -> T.Text
-cameraCSSMat c = (tz (fov c) <>) . cssMatEp . negativeRowY . inv44 . matrixWorldInverse $ c 
+cameraCSSMat c = (tz (fov c) <>) . cssMatEp . negativeRowY . matrixWorldInverse $ c 
   where
     -- Second Row Should be Negative
     tz x = "translateZ(" <> (textS $ x) <> "px)"
@@ -213,35 +220,56 @@ defMod objF xs = do
   case w' of
     Nothing -> error "NO WINDOW"
     Just w -> do
-      height <- realToFrac <$> getInnerHeight w
-      width <- realToFrac <$> getInnerWidth w
-      return $ ThreeModel (mkScene objF xs) (defCam 3000 width height) width height
+      (width, height) <- getWH
+      let cam = (defCam 3000 width height)
+      return $ ThreeModel (mkScene (objF' (_rot . cameraObj $ cam)) xs) cam width height
+  where
+    objF' q = (rotateObj q) . objF
+
+
+getWH = do
+  w <- currentWindowUnchecked
+  height <- realToFrac <$> getInnerHeight w
+  width <- realToFrac <$> getInnerWidth w
+  return (width, height)
 
 -- 
 -- 
 
 threeD :: forall m a. (MonadJSM m, Humanize a) => ThreeModel a -> Html m (ThreeModel a)
-threeD (ThreeModel (Scene xs) c width height) = voidC $ H.div rootCSS [
+threeD (ThreeModel (Scene xs) c widthG heightG) = H.div rootProps [
   H.div (cameraCSS) $
     (\(x, y) -> H.div (objCSS y) . pure . H.text . humanize $ x) <$> xs
   ]
   where
+    rootProps = rootHandler <> rootCSS
+    resizeHandler = do
+      (w, h) <- getWH
+      return $ \(ThreeModel s c _ _) -> (ThreeModel s c w h) 
+    rootHandler = [H.onResizeM resizeHandler]
+    fov' = (c ^. #projectionTransform . _y . _y) * (heightG / 2)
     rootCSS = [ H.textProperty "id" "renderer"
               , styleP "overflow:hidden"
-              , styleP ("perspective:" <> (textS . fov $ c) <> "px")
-              , H.class' Css.flex
+              , styleP ("perspective:" <> (textS fov') <> "px")
               , H.class' Css.w_screen
+              , H.class' Css.h_screen
+              , styleP "background-color: black"
               ]
-    objCSS y = [ styleP "position:absolute"
-               , transformP $ objectCSSMat y
-               , H.class' "element"
-               ]
     cameraCSS =
       [ H.textProperty "id" "camera"
-      ,  transformP $ (cameraCSSMat c) -- <> (translatePx width height)
-      , styleP "transform-style:preserve-3d"
+      , transformP $ (cameraCSSMat c) <> (translatePx (widthG / 2) (heightG / 2))
+      , styleP "transform-style: preserve-3d"
       , styleP "pointer-events: none"
+      , H.class' Css.w_screen
+      , H.class' Css.h_screen
       ]
+      
+    objCSS y = [ styleP "position:absolute"
+               , styleP "pointer-events: auto"
+               , transformP $ objectCSSMat y
+               , H.class' "element"
+               , styleP "background-color: white"
+               ]
 
 
 grid3D :: Int -> Int -> Int -> (Int -> Obj)
@@ -280,7 +308,7 @@ main = runJSorWarp 8080 $ do
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
   let objF = grid3D 5 5 25
       --model = zip (repeat testText) (objF <$> [1..10])
-  mod <- (defMod objF (take 3 $ repeat testText))
+  mod <- (defMod objF (take 250 $ repeat testText))
   model <- liftIO $ newTVarIO mod
   w <- currentWindowUnchecked
   _ <- (liftIO . forkIO $ threadDelay wait) >> animation w model
