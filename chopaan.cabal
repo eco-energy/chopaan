@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7565ca23ebb2063b1f15e66f086bc49df2a551f7ec78bf1f87198bfbd75c70ef
+-- hash: a91c97dc263e3ebb83da0f4f24f1d6190f8cf7a67cf4f932a1b84da0165c17f3
 
 name:           chopaan
 version:        0.1.0.0
@@ -52,6 +52,7 @@ library
     , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
+    , adjunctions
     , aeson
     , algebraic-graphs >=0.5
     , async
@@ -315,6 +316,7 @@ executable dev
     , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
+    , adjunctions
     , aeson
     , algebraic-graphs >=0.5
     , async
@@ -457,6 +459,7 @@ executable kbtzim
     , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
+    , adjunctions
     , aeson
     , algebraic-graphs >=0.5
     , async
@@ -598,6 +601,7 @@ executable server
     , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
+    , adjunctions
     , aeson
     , algebraic-graphs >=0.5
     , async
@@ -740,6 +744,7 @@ executable ui
     , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
+    , adjunctions
     , aeson
     , algebraic-graphs >=0.5
     , async
@@ -898,6 +903,7 @@ test-suite chopaan-test
     , Shpadoinkle-template
     , Shpadoinkle-widgets
     , ad
+    , adjunctions
     , aeson
     , algebraic-graphs >=0.5
     , async

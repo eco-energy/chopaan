@@ -32,6 +32,7 @@ dependencies:
 - streamly >= 0.7.2
 - network >= 3.1.2.1
 - async
+- adjunctions
 - exceptions
 - deepseq
 - ghc-prim

@@ -4,21 +4,33 @@
 {-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE DuplicateRecordFields     #-}
 {-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies #-}
+{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell #-}
 
 module Chopaan.Ui.ThreeD where
 
-import GHC.Generics
+import GHC.Generics hiding (R)
 import Control.DeepSeq
 import Control.Monad
-import Data.Aeson
+import Control.Monad.IO.Class
+
+import Control.Concurrent
+import Control.Concurrent.STM
 import Data.Functor.Rep
+import System.IO (stderr, hPutStrLn, stdout, hFlush)
 
 import qualified Data.Text as T
+import           Data.FileEmbed              (embedFile)
+import           Data.Text.Encoding          (decodeUtf8)
+
+
+import GHCJS.DOM (currentWindow, currentWindowUnchecked)
+import GHCJS.DOM.Window (getInnerHeight, getInnerWidth, Window, requestAnimationFrame)
+import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback)
+
+import Shpadoinkle (Html, JSM, MonadJSM, TVar, voidC, shpadoinkle)
+import Shpadoinkle.Run (simple, runJSorWarp, live)
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Html.Utils (getBody)
-import Shpadoinkle (Html)
-import Shpadoinkle.Run (simple, runJSorWarp, live)
 import Shpadoinkle.Widgets.Types (Humanize(..))
 import Shpadoinkle.Backend.ParDiff
 import Shpadoinkle.Lens
@@ -30,8 +42,12 @@ import qualified Data.Key as K
 import Linear.Vector
 import Linear.Matrix
 import Linear.V3
+import Linear.V4
 import Linear.Quaternion
+import Linear.Metric
+import Linear.Projection
 
+import qualified Chopaan.Ui.Style as Css
 
 -- $ A Translation of
 -- $ https://github.com/mrdoob/three.js/blob/dev/examples/jsm/renderers/CSS3DRenderer.js
@@ -42,40 +58,117 @@ import Linear.Quaternion
 
 default(T.Text)
 
-type V3R = V3 Double 
+type R = Double
 
-type QuatR = Quaternion Double
+type V3R = V3 R 
 
-type M44R = M44 Double
+type QuatR = Quaternion R
 
+type M44R = M44 R
 
 
 data Obj = Obj
-  { pos :: V3R
-  , rot :: QuatR
-  , scale :: V3R
+  { _pos :: V3R
+  , _rot :: QuatR
+  , _scale :: V3R
+  , _localTransform :: M44R
+  , _worldTransform :: M44R
   } deriving (Eq, Ord, Show, Generic, NFData)
 
-defObj = Obj zero zero zero
+translateObj :: V3R -> Obj -> Obj
+translateObj t o = o
+                   & #_pos .~ newP
+                   & (#_localTransform . translation) .~ newP
+                   & (#_worldTransform . translation) .~ newP
+  where
+    newP = t ^+^ (_pos o)
+
+rotateObj :: QuatR -> Obj -> Obj
+rotateObj q o = o
+                & #_rot .~ newQ
+                & (#_localTransform . _m33) %~ newQT
+                & (#_worldTransform . _m33) %~ newQT
+  where
+    newQ = q * (_rot o)
+    newQT p = (fromQuaternion q !*! p)
+
+scaleObj :: V3R -> Obj -> Obj
+scaleObj s o = o
+               & #_scale .~ s
+               & (#_localTransform . _m33) %~ newS
+               & (#_worldTransform . _m33) %~ newS
+  where
+    newS p = (scaled s !*! p)
+
+
+transformMat :: V3R -> QuatR -> V3R -> M44R
+transformMat p r s = mkTransformationMat ((scaled s) !*! (fromQuaternion r)) p
+
+asT :: Obj -> M44R
+asT Obj{_pos, _rot, _scale} = transformMat _pos _rot _scale
+
+mkObj :: V3R -> QuatR -> V3R -> Obj
+mkObj pos rot scale = Obj pos rot scale locT locT
+  where
+    locT = transformMat pos rot scale
+
+zeroObj :: Obj
+zeroObj = mkObj zero zero zero
+
 
 data Camera = Camera
   { fov :: Double
-  , style :: T.Text }
-  deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
+  , aspect :: Double
+  , near :: Double
+  , far :: Double
+  , matrixWorldInverse :: M44R
+  , projectionTransform :: M44R
+  , cameraObj :: Obj
+  }
+  deriving (Eq, Show, Generic, NFData)
+
+toRad = (* (pi / 180))
+
+mkCam :: Obj -> Double -> Double -> Double -> Double -> Camera
+mkCam obj fov asp near far = Camera fov asp near far worldInv perspectiveProj obj
+  where
+    perspectiveProj = perspective fov asp near far
+    perspectiveProj' :: M44R
+    perspectiveProj' = zero & (column _x) %~ (_x .~ x)
+                           & (column _y) %~ (_y .~ y)
+                           & (column _z) .~ (V4 a b c (-1))
+                           & (column _w) %~ (_z .~ d)
+      where
+        zoom = 1.0
+        top = near * (tan $ (toRad fov) * 0.5 * fov) / zoom
+        height = 2 * top
+        width = asp * height
+        left = 0.5 * width
+        right = left + width
+        bottom = top - height
+        x = 2 * near / (right - left)
+        y = 2 * near / (top - bottom)
+        a = (right + left) / (right - left)
+        b = (top + bottom) / (top - bottom)
+        c = - (far + near) / (far - near)
+        d = (- 2) * (far * near) / (far - near)
+    worldInv = inv44 $ asT obj 
+
+worldDirection :: Camera -> V3 R
+worldDirection = normalize . (view (_xyz . column _z)) . matrixWorldInverse 
 
 data Scene a = Scene [(a, Obj)]
   deriving (Eq, Show, Generic, NFData)
 
-mkScene :: [a] -> Scene a
-mkScene = Scene . (flip zip (repeat defObj))
-
-defCam = Camera 0 ""
+mkScene :: (Int -> Obj) -> [a] -> Scene a
+mkScene objF = Scene . (flip zip (objF <$> [0,1..]))
 
 data ThreeModel a = ThreeModel
   { scene :: Scene a
   , camera :: Camera
-  }
-  deriving (Eq, Show, Generic, NFData)
+  , widthG :: R
+  , heightG :: R
+  } deriving (Eq, Show, Generic, NFData)
 
 epsilon :: (Functor f, RealFrac a, Ord a) => f a -> f a
 epsilon = fmap ep
@@ -83,40 +176,116 @@ epsilon = fmap ep
     ep x = if (abs x) < 1e-10 then 0 else  x
 
 cssMat :: M44R -> T.Text
-cssMat m = (foldl (\x y -> x <> "," <> ((T.pack . show $ y))) "matrix3d("  $ join m) <> ")"
-
-toCSSMatEp :: M44R -> T.Text
-toCSSMatEp = cssMat . (fmap epsilon)
-
-
-cameraCSSMatrix :: Camera -> (T.Text, H.Prop m Camera)
-cameraCSSMatrix c = H.textProperty "style" ("transform: " <> mkCameraStyle c)
+cssMat m = "matrix3d(" <> (foldMat ""  (transpose m)) <> ")"
   where
-    mkCameraStyle c = ""
+    foldMat :: T.Text -> M44R -> T.Text
+    foldMat x y = T.init $ foldl foldVec x y
+    foldVec :: T.Text -> (V4 Double) -> T.Text
+    foldVec i v = foldl (\x y -> x <> ((textS $ y) <> ",")) i v
 
-objectCSSMatrix :: M44R -> T.Text
-objectCSSMatrix = cssMat . negativeY
+cssMatEp :: M44R -> T.Text
+cssMatEp = cssMat . (fmap epsilon)
+
+
+cameraCSSMat :: Camera -> T.Text
+cameraCSSMat c = (tz (fov c) <>) . cssMatEp . negativeRowY . inv44 . matrixWorldInverse $ c 
   where
-    -- Second Row should be negative
-    negativeY = over _y negated
+    -- Second Row Should be Negative
+    tz x = "translateZ(" <> (textS $ x) <> "px)"
+    negativeRowY = over _y negated
     
-defMod xs = ThreeModel (mkScene xs) defCam
+objectCSSMat :: Obj -> T.Text
+objectCSSMat = ("translate(-50%, -50%)" <>) . cssMatEp . negativeColY . _worldTransform
+  where
+    -- Second Column should be negative
+    negativeColY = over (column _y) negated
 
-threeD :: forall m a. (Functor m, Humanize a) => ThreeModel a -> Html m (ThreeModel a)
-threeD (ThreeModel (Scene xs) (Camera fov style)) = onRecord (#scene) $ H.div rootCSS $ [
-  H.div cameraCSS $ (H.div objCSS . pure . H.text . humanize . fst) <$> xs
+
+defCam :: Double -> Double -> Double -> Camera
+defCam z w h = mkCam objZ 40 (w / h) 1 10000
+  where
+    objZ :: Obj
+    objZ = translateObj (zero & _z .~ z) zeroObj
+
+defMod :: MonadJSM m => (Int -> Obj) -> [a] -> m (ThreeModel a)
+defMod objF xs = do
+  w' <- currentWindow
+  case w' of
+    Nothing -> error "NO WINDOW"
+    Just w -> do
+      height <- realToFrac <$> getInnerHeight w
+      width <- realToFrac <$> getInnerWidth w
+      return $ ThreeModel (mkScene objF xs) (defCam 3000 width height) width height
+
+-- 
+-- 
+
+threeD :: forall m a. (MonadJSM m, Humanize a) => ThreeModel a -> Html m (ThreeModel a)
+threeD (ThreeModel (Scene xs) c width height) = voidC $ H.div rootCSS [
+  H.div (cameraCSS) $
+    (\(x, y) -> H.div (objCSS y) . pure . H.text . humanize $ x) <$> xs
   ]
   where
-    rootCSS = [ H.textProperty "style" "overflow:hidden"]
-    objCSS = [ H.textProperty "style" "position:absolute"]
+    rootCSS = [ H.textProperty "id" "renderer"
+              , styleP "overflow:hidden"
+              , styleP ("perspective:" <> (textS . fov $ c) <> "px")
+              , H.class' Css.flex
+              , H.class' Css.w_screen
+              ]
+    objCSS y = [ styleP "position:absolute"
+               , transformP $ objectCSSMat y
+               , H.class' "element"
+               ]
     cameraCSS =
-      [ H.textProperty "style" "transform-style:preserve-3d"
-      , H.textProperty "style" "pointer-events: none"
+      [ H.textProperty "id" "camera"
+      ,  transformP $ (cameraCSSMat c) -- <> (translatePx width height)
+      , styleP "transform-style:preserve-3d"
+      , styleP "pointer-events: none"
       ]
 
 
+grid3D :: Int -> Int -> Int -> (Int -> Obj)
+grid3D row col stack = (gridPos)
+  where
+    gridPos :: Int -> Obj
+    gridPos i = translateObj (V3 (x i) (y i) (z i)) zeroObj
+    x i = c $ (mod i row) * 400 + 800
+    y i = c $ (- (mod (div i col) col)) * 400 + 800
+    z i = c $ ((div i stack)) * 1000 - 2000
+    c = fromIntegral @Int @Double
+
+
+styleP = H.textProperty "style"
+transformP x = styleP $ "transform:" <> x
+translatePx w h = "translate(" <> (toPx w) <> "," <> (toPx h)
+toPx = (<> "px") . textS
+textS = T.pack . show
+
+wait = 3000000
+
+dur :: Double
+dur = 3000
+
+animation :: Window -> TVar (ThreeModel a) -> JSM ()
+animation w t = void $ requestAnimationFrame w =<< go
+  where
+    go = newRequestAnimationFrameCallback $ \(clock') -> do
+      let clock = clock' - (wait / 1000)
+      r <- go
+      when (clock < dur) . void $ requestAnimationFrame w r
 
 main :: IO ()
-main = do
-  let model = defMod ["GodawfulPog" :: T.Text]
-  live 8080 $ simple runParDiff model threeD getBody
+main = runJSorWarp 8080 $ do
+  H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
+  H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
+  let objF = grid3D 5 5 25
+      --model = zip (repeat testText) (objF <$> [1..10])
+  mod <- (defMod objF (take 3 $ repeat testText))
+  model <- liftIO $ newTVarIO mod
+  w <- currentWindowUnchecked
+  _ <- (liftIO . forkIO $ threadDelay wait) >> animation w model
+  shpadoinkle id runParDiff model (threeD) getBody
+
+
+testText :: T.Text
+testText = "Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of 'de Finibus Bonorum et Malorum' (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, 'Lorem ipsum dolor sit amet..', comes from a line in section 1.10.32."
