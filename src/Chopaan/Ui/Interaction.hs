@@ -6,7 +6,9 @@ import qualified Data.Text as T
 import           GHCJS.DOM.Types              hiding (Text, Touch)
 import           Language.Javascript.JSaddle  hiding (JSM, liftJSM, toJSString)
 
-import           Shpadoinkle (listenRaw, Continuation, RawEvent(..))
+import           Shpadoinkle (listenRaw, Continuation, RawEvent(..), Prop)
+
+import Linear.V2
 
 -- mkOnKey ::  Text -> (KeyCode -> Continuation m a) -> (Text, Prop m a)
 -- mkOnKey t f = listenRaw t $ \_ (RawEvent e) ->
@@ -34,11 +36,6 @@ data PointerEv = PointerEv
   , button :: Maybe (Button)
   }
 
-data TrackballActions = Rotate | Zoom | Pan
-  deriving (Eq, Ord, Show, Generic, Enum, Bounded)
-
-
-
 fromPointer :: RawEvent -> JSM (PointerEv)
 fromPointer (RawEvent e') = liftJSM $ do
   e <- valToObject e'
@@ -51,11 +48,14 @@ fromPointer (RawEvent e') = liftJSM $ do
   return $ PointerEv (PointerPos (x, y)) (getPointerType pt) pid b'  
 
 
+onPointerUp :: (PointerEv -> JSM (Continuation m a)) -> (T.Text, Prop m a)
+onPointerUp f = listenRaw "pointerup" (\_ e -> f =<< fromPointer e)
 
-onPointerUp = listenRaw "pointerup"
-onPointerDown = listenRaw "pointerdown"
+onPointerDown :: (PointerEv -> JSM (Continuation m a)) -> (T.Text, Prop m a)
+onPointerDown f = listenRaw "pointerdown" (\_ e -> f =<< fromPointer e)
 
-onPointerMove = listenRaw "pointermove"
+onPointerMove :: (PointerEv -> JSM (Continuation m a)) -> (T.Text, Prop m a)
+onPointerMove f = listenRaw "pointermove" (\_ e -> f =<< fromPointer e)
 
 
 --onPointerUp = listenRaw "pointerup"

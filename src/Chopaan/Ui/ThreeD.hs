@@ -4,7 +4,7 @@
 {-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE DuplicateRecordFields     #-}
 {-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell #-}
+{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell, RecordWildCards #-}
 
 module Chopaan.Ui.ThreeD where
 
@@ -27,7 +27,9 @@ import GHCJS.DOM (currentWindow, currentWindowUnchecked)
 import GHCJS.DOM.Window (getInnerHeight, getInnerWidth, Window, requestAnimationFrame)
 import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback)
 
-import Shpadoinkle (Html, JSM, MonadJSM, TVar, voidC, shpadoinkle)
+import Shpadoinkle (Html, JSM, MonadJSM, TVar
+                   , voidC, shpadoinkle
+                   , Continuation, pur, impur, kleisli)
 import Shpadoinkle.Run (simple, runJSorWarp, live)
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Html.Utils (getBody)
@@ -41,6 +43,7 @@ import qualified Data.Key as K
 
 import Linear.Vector
 import Linear.Matrix
+import Linear.V2
 import Linear.V3
 import Linear.V4
 import Linear.Quaternion
@@ -48,6 +51,7 @@ import Linear.Metric
 import Linear.Projection
 
 import qualified Chopaan.Ui.Style as Css
+import Chopaan.Ui.Interaction
 
 -- $ A Translation of
 -- $ https://github.com/mrdoob/three.js/blob/dev/examples/jsm/renderers/CSS3DRenderer.js
@@ -74,6 +78,14 @@ data Obj = Obj
   , _localTransform :: M44R
   , _worldTransform :: M44R
   } deriving (Eq, Ord, Show, Generic, NFData)
+
+
+transformObj :: M44R -> Obj -> Obj
+transformObj t o = o
+                   & #_pos %~ ((t ^. translation) ^+^) 
+                   & (#_localTransform) %~ (t !*!)
+                   & (#_worldTransform) %~ (t !*!)
+                   
 
 translateObj :: V3R -> Obj -> Obj
 translateObj t o = o
@@ -129,6 +141,8 @@ data Camera = Camera
   }
   deriving (Eq, Show, Generic, NFData)
 
+transformCamera :: M44R -> Camera -> Camera
+transformCamera t = over #cameraObj (transformObj t) 
 
 toRad = (* (pi / 180))
 nanEr v x = if (isNaN x) then error (v <> " is NaN") else x
@@ -161,6 +175,10 @@ mkCam obj fov asp near far = Camera fov asp near far worldInv perspectiveProj ob
         d =  (- 2) * (far * near) / (far - near)
     worldInv = inv44 $ asT obj
 
+changeAspect :: Double -> Camera -> Camera
+changeAspect a (c@Camera{..}) = c & #aspect .~ a
+                     & (#projectionTransform) .~ (perspective fov aspect near far) 
+
 worldDirection :: Camera -> V3 R
 worldDirection = normalize . (view (_xyz . column _z)) . matrixWorldInverse 
 
@@ -176,6 +194,8 @@ data ThreeModel a = ThreeModel
   , widthG :: R
   , heightG :: R
   } deriving (Eq, Show, Generic, NFData)
+
+
 
 epsilon :: (Functor f, RealFrac a, Ord a) => f a -> f a
 epsilon = fmap ep
@@ -208,25 +228,22 @@ objectCSSMat = ("translate(-50%, -50%)" <>) . cssMatEp . negativeColY . _worldTr
     negativeColY = over (column _y) negated
 
 
-defCam :: Double -> Double -> Double -> Camera
-defCam z w h = mkCam objZ 40 (w / h) 1 10000
+defCam :: V3 R -> Double -> Double -> Camera
+defCam p w h = mkCam o 40 (w / h) 1 10000
   where
-    objZ :: Obj
-    objZ = translateObj (zero & _z .~ z) zeroObj
+    o = mkObj p zero (V3 1 1 1) 
+
 
 defMod :: MonadJSM m => (Int -> Obj) -> [a] -> m (ThreeModel a)
 defMod objF xs = do
-  w' <- currentWindow
-  case w' of
-    Nothing -> error "NO WINDOW"
-    Just w -> do
-      (width, height) <- getWH
-      let cam = (defCam 3000 width height)
-      return $ ThreeModel (mkScene (objF' (_rot . cameraObj $ cam)) xs) cam width height
+  (width, height) <- getWH
+  let cam = (defCam camPos width height)
+  return $ ThreeModel (mkScene (objF' cam) xs) cam width height
   where
-    objF' q = (rotateObj q) . objF
+    objF' c = (rotateObj (_rot . cameraObj $ c)) . objF
+    camPos = V3 0 0 3000
 
-
+    
 getWH = do
   w <- currentWindowUnchecked
   height <- realToFrac <$> getInnerHeight w
@@ -245,7 +262,9 @@ threeD (ThreeModel (Scene xs) c widthG heightG) = H.div rootProps [
     rootProps = rootHandler <> rootCSS
     resizeHandler = do
       (w, h) <- getWH
-      return $ \(ThreeModel s c _ _) -> (ThreeModel s c w h) 
+      liftIO . print $ "Resize"
+      liftIO $ hFlush stdout
+      return $ \(ThreeModel s c _ _) -> (ThreeModel s (changeAspect (w/h) c) w h) 
     rootHandler = [H.onResizeM resizeHandler]
     fov' = (c ^. #projectionTransform . _y . _y) * (heightG / 2)
     rootCSS = [ H.textProperty "id" "renderer"
@@ -263,12 +282,12 @@ threeD (ThreeModel (Scene xs) c widthG heightG) = H.div rootProps [
       , H.class' Css.w_screen
       , H.class' Css.h_screen
       ]
-      
     objCSS y = [ styleP "position:absolute"
                , styleP "pointer-events: auto"
                , transformP $ objectCSSMat y
                , H.class' "element"
                , styleP "background-color: white"
+               , styleP "opacity:0.9"
                ]
 
 
@@ -281,14 +300,63 @@ grid3D row col stack = (gridPos)
     xs = [(-2000), (-2000 + elWidth + widthOffset)..2000]
     ys = [(-2000), (-2000 + elHeight + heightOffset)..2000]
     -- Depth is infinite. So the zip must provide a surface for all depths
-    zs = [(-2000), (-2000 + elDepth + depthOffset)..]
-    c = fromIntegral @Int @Double
+    zs = [-800, ((-800) - (elDepth + depthOffset))..]
     elWidth = 400
     widthOffset = 800
-    elDepth = 1000
-    depthOffset = 2000
+    elDepth = 200
+    depthOffset = 200
     elHeight = 400
     heightOffset = 800
+
+
+data TrackballAction = Pan | Zoom | Rotate 
+  deriving (Eq, Ord, Show, Generic, Enum, Bounded)
+
+data ControlDiff = ControlDiff
+  { eye :: V3 R
+  , moveCurr :: V2 R
+  , lastAxis :: V3 R
+  , zoomStart :: V2 R
+  , zoomEnd :: V2 R
+  , panStart :: V2 R
+  , panEnd :: V2 R
+  } deriving (Eq, Ord, Show, Generic)
+
+
+type ZoomState = (V2 R, V2 R)
+type PanState = (V2 R, V2 R)
+type RotState = ()
+
+
+zoomA :: PointerEv -> (M44R -> M44R)
+zoomA = undefined -- \wM -> (inv44 wM) . scaleZ . translateWToP' !*! (wM !*! p)
+  -- where
+  --   p = 
+
+panA :: PointerEv -> (M44R -> M44R)
+panA = undefined
+
+rotateA :: PointerEv -> (M44R -> M44R)
+rotateA = undefined
+
+getAct :: TrackballAction -> (PointerEv -> (M44R -> M44R))
+getAct Pan = panA
+getAct Zoom = zoomA
+getAct Rotate = rotateA
+
+type TrackballState = (Maybe TrackballAction, (M44R -> M44R))
+
+actionControl :: PointerEv -> Continuation m (TrackballState) 
+actionControl = const (pur (const (Just Pan, id)))
+
+controlTransformation :: PointerEv -> Continuation m (TrackballState)
+controlTransformation e = pur t 
+  where
+    t (Nothing, tf) = (Nothing, tf)
+    t (Just act, tf) = (Just act, (\w -> ((getAct act) e $ w) !*! (tf w)))
+
+endTransformation :: PointerEv -> Continuation m (TrackballState)
+endTransformation = const (pur (const (Nothing, id)))
 
 styleP :: T.Text -> (T.Text, H.Prop m a)
 styleP = H.textProperty "style"
@@ -297,7 +365,7 @@ transformP :: T.Text -> (T.Text, H.Prop m a)
 transformP x = styleP $ "transform:" <> x
 
 translatePx :: R -> R -> T.Text
-translatePx w h = "translate(" <> (toPx w) <> "," <> (toPx h)
+translatePx w h = "translate(" <> (toPx w) <> "," <> (toPx h) <> ")"
 
 toPx :: Show a => a -> T.Text
 toPx = (<> "px") . textS
@@ -311,13 +379,13 @@ wait = 3000000
 dur :: Double
 dur = 3000
 
-animation :: Window -> TVar (ThreeModel a) -> JSM ()
-animation w t = void $ requestAnimationFrame w =<< go
-  where
-    go = newRequestAnimationFrameCallback $ \(clock') -> do
-      let clock = clock' - (wait / 1000)
-      r <- go
-      when (clock < dur) . void $ requestAnimationFrame w r
+-- animation :: Window -> TVar (ThreeModel a) -> JSM ()
+-- animation w t = void $ requestAnimationFrame w =<< go
+--   where
+--     go = newRequestAnimationFrameCallback $ \(clock') -> do
+--       let clock = clock' - (wait / 1000)
+--       r <- go
+--       when (clock < dur) . void $ requestAnimationFrame w r
 
 main :: IO ()
 main = runJSorWarp 8080 $ do
@@ -328,7 +396,7 @@ main = runJSorWarp 8080 $ do
   mod <- (defMod objF (take 1000 $ repeat testText))
   model <- liftIO $ newTVarIO mod
   w <- currentWindowUnchecked
-  _ <- (liftIO . forkIO $ threadDelay wait) >> animation w model
+  -- _ <- (liftIO . forkIO $ threadDelay wait) >> animation w model
   shpadoinkle id runParDiff model (threeD) getBody
 
 

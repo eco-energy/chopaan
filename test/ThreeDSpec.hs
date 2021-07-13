@@ -5,6 +5,7 @@ import Test.Hspec
 import Chopaan.Ui.ThreeD
 import qualified Linear.Vector as V
 import Linear.V4
+import Linear.V3
 import Linear.Matrix
 import Control.Lens (over)
 
@@ -17,6 +18,10 @@ spec = describe "3D in Shpadoinkle for CSS transforms" $ do
     let mat12 = over _x (over _y (+1)) $ (pure V.zero)
     cssMat mat12 `shouldBe` "matrix3d(0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)"
   it "No NaNs in inverting objects" $ do
-    let c = (defCam 3000 4878 2555)
+    let
+      o = V3 0 0 3000
+      c = (defCam o 4878 2555)
+    print $ cameraCSSMat c
+    print $ (cameraCSSMat c) <> (translatePx (2500 / 2) (1700 / 2))
     (hasNaN . matrixWorldInverse $ c) `shouldBe` False
     (hasNaN . projectionTransform $ c) `shouldBe` False
