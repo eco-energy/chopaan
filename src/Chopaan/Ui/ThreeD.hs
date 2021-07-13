@@ -276,18 +276,35 @@ grid3D :: Int -> Int -> Int -> (Int -> Obj)
 grid3D row col stack = (gridPos)
   where
     gridPos :: Int -> Obj
-    gridPos i = translateObj (V3 (x i) (y i) (z i)) zeroObj
-    x i = c $ (mod i row) * 400 + 800
-    y i = c $ (- (mod (div i col) col)) * 400 + 800
-    z i = c $ ((div i stack)) * 1000 - 2000
+    gridPos i = translateObj (points !! i) zeroObj
+    points = [V3 x y z | z <- zs, y <- ys, x <- xs]
+    xs = [(-2000), (-2000 + elWidth + widthOffset)..2000]
+    ys = [(-2000), (-2000 + elHeight + heightOffset)..2000]
+    -- Depth is infinite. So the zip must provide a surface for all depths
+    zs = [(-2000), (-2000 + elDepth + depthOffset)..]
     c = fromIntegral @Int @Double
+    elWidth = 400
+    widthOffset = 800
+    elDepth = 1000
+    depthOffset = 2000
+    elHeight = 400
+    heightOffset = 800
 
-
+styleP :: T.Text -> (T.Text, H.Prop m a)
 styleP = H.textProperty "style"
+
+transformP :: T.Text -> (T.Text, H.Prop m a)
 transformP x = styleP $ "transform:" <> x
+
+translatePx :: R -> R -> T.Text
 translatePx w h = "translate(" <> (toPx w) <> "," <> (toPx h)
+
+toPx :: Show a => a -> T.Text
 toPx = (<> "px") . textS
+
+textS :: Show a => a -> T.Text
 textS = T.pack . show
+
 
 wait = 3000000
 
@@ -308,7 +325,7 @@ main = runJSorWarp 8080 $ do
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
   let objF = grid3D 5 5 25
       --model = zip (repeat testText) (objF <$> [1..10])
-  mod <- (defMod objF (take 250 $ repeat testText))
+  mod <- (defMod objF (take 1000 $ repeat testText))
   model <- liftIO $ newTVarIO mod
   w <- currentWindowUnchecked
   _ <- (liftIO . forkIO $ threadDelay wait) >> animation w model

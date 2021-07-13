@@ -1,5 +1,5 @@
 {-# Language OverloadedStrings, DeriveGeneric, DeriveAnyClass #-}
-module Chopaan.Ui.Events where
+module Chopaan.Ui.Interaction where
 
 import GHC.Generics
 import qualified Data.Text as T
@@ -31,7 +31,7 @@ data PointerEv = PointerEv
   { pos :: PointerPos
   , pointerType :: PointerType
   , pointerId :: Int
-  , button :: Button
+  , button :: Maybe (Button)
   }
 
 data TrackballActions = Rotate | Zoom | Pan
@@ -46,8 +46,9 @@ fromPointer (RawEvent e') = liftJSM $ do
   x <- valToNumber =<< unsafeGetProp "pageX" e
   y <- valToNumber =<< unsafeGetProp "pageY" e
   pid <- fmap round $ valToNumber =<< unsafeGetProp "pointerId" e
-  b <- fmap (toEnum . round) $ valToNumber =<< unsafeGetProp "button" e
-  return $ PointerEv (PointerPos (x, y)) (getPointerType pt) pid b  
+  b <- fmap (round) $ valToNumber =<< unsafeGetProp "button" e
+  let b' = if (b > 2 || b < 0) then Nothing else (Just $ toEnum b)
+  return $ PointerEv (PointerPos (x, y)) (getPointerType pt) pid b'  
 
 
 

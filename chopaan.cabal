@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1a4be2a48c225245f9cab8090acf7d86b9bed779dd3c6e2d7f3b193cfcc3e7d2
+-- hash: 9769ee520cd2a811314c445fe8ab0715c9fde48442c7e8e81e6d54c83fc6d23f
 
 name:           chopaan
 version:        0.1.0.0
@@ -191,6 +191,7 @@ library
         Chopaan.Ui.WebGL
         Chopaan.Ui.WebSocket
         Chopaan.Ui.ThreeD
+        Chopaan.Ui.Interaction
         Chopaan.UiTypes
         Chopaan.View
         Chopaan.Kibbutz.KbtzId
@@ -273,6 +274,7 @@ library
         Chopaan.Ui.WebGL
         Chopaan.Ui.WebSocket
         Chopaan.Ui.ThreeD
+        Chopaan.Ui.Interaction
         Chopaan.UiTypes
         Chopaan.View
         Chopaan.Kibbutz.KbtzId

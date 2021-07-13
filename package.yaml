@@ -188,6 +188,7 @@ library:
         - Chopaan.Ui.WebGL
         - Chopaan.Ui.WebSocket
         - Chopaan.Ui.ThreeD
+        - Chopaan.Ui.Interaction
         - Chopaan.UiTypes
         - Chopaan.View
         - Chopaan.Kibbutz.KbtzId
@@ -271,6 +272,7 @@ library:
         - Chopaan.Ui.WebGL
         - Chopaan.Ui.WebSocket
         - Chopaan.Ui.ThreeD
+        - Chopaan.Ui.Interaction
         - Chopaan.UiTypes
         - Chopaan.View
         - Chopaan.Kibbutz.KbtzId
