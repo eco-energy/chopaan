@@ -51,7 +51,7 @@ import           Shpadoinkle.Widgets.Types         (Control (..),
                                                     getValid, humanize,
                                                     validate, Hygiene(..))
 import           Shpadoinkle.Run             (runJSorWarp, simple, Env(Dev))
-import           Shpadoinkle.Backend.ParDiff (runParDiff)
+import           Shpadoinkle.Backend.Snabbdom (runSnabbdom)
 
 
 import Chopaan.Graph.Snapshot
@@ -309,7 +309,7 @@ gView :: forall m. (MonadJSM m, CRUDChopaan m) => GView -> Html m (GView)
 gView g = H.div [H.class' $ Css.relative <> Css.flex_grow <> Css.flex_col]
   [ case _currentG g of
       Nothing -> voidC $ H.text "No Graph Found Yet"
-      Just sg -> voidC $ renderKbtzGraph sg
+      Just sg -> voidC $ render3dGrid sg
   , graphSelectButtons
   --, onRecord whichK $ getGraph
   ]
