@@ -9,12 +9,10 @@ import GHC.Generics
 import Network.AWS.S3 (BucketName, ObjectKey(..))
 import Chopaan.Types hiding (DBOpts)
 
-import Control.Applicative
 import Control.Arrow
 import Control.Monad.IO.Class
 import Control.Monad
 import Control.Monad.Catch
-import Control.Concurrent (forkIO)
 import Control.Monad.STM
 import Control.Concurrent.STM.TVar
 import qualified Data.Map as M
@@ -25,8 +23,6 @@ import Streamly as S
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Prelude as S
 import qualified Streamly.Internal.Data.Fold as FL
-import qualified Streamly.Internal.Data.Fold.Types as FL
-import qualified Streamly.Internal.Data.Pipe as P
 
 import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, EnergyState)
 import System.IO (stdout)
@@ -38,7 +34,7 @@ import Chopaan.Comm.Mqtt.AWS (withMqttAuth)
 import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
 import Chopaan.Kibbutz.Transactor
 import Chopaan.Node.NodeId (NodeMAC)
-import Chopaan.Node.Folds (SensorR, sensorFold, meshFold)
+import Chopaan.Node.Folds (SensorR, sensorFold)
 import Chopaan.Node.Metrics (initSM)
 
 
@@ -48,9 +44,6 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          , mkCallback
                          , PubQueue
                          , unfoldChan
-                         , initQs
-                         , writeChan
-                         , Address
                          )
 import Chopaan.Graph.Kbtz
 import Chopaan.Graph
@@ -84,7 +77,7 @@ twoSrc :: (KbtzConn t m n)
   -> MessageQs n
   -> m (t m (n, EnergyState), t m (n, RuntimeStats), PubQueue)
 twoSrc q q' = do
-  (e, r, p) <- qSrc q
+  (e, r, _) <- qSrc q
   (e', r', p') <- qSrc q'
   return $ (e `parallel` e', r `parallel` r', p')
 
@@ -98,27 +91,15 @@ s3Stream :: (IsStream t, MonadAsync m, MonadCatch m)
          -> S3S t m EnergyState RuntimeStats
 s3Stream ns bucket = let
   s' = S.bracketIO (liftIO $ newLogger Info stdout) (pure) s
-  x :: (a, ((b, c), d)) -> ((b, a, c), (b, d))
-  x (a, ((b, c), d)) = ((b, a, c), (b, d)) 
+  align :: (a, ((b, c), d)) -> ((b, a, c), (b, d))
+  align (a, ((b, c), d)) = ((b, a, c), (b, d)) 
   f :: (n, Either a b) -> Either (n, a) (n, b)
   f (n, c) = case c of
     Left x -> Left (n, x)
     Right y -> Right (n, y)
-  in (fmap (second f) $ fmap x s')
+  in (fmap (second f) $ fmap align s')
   where
     s lg = S.concatMapWith S.parallel (uncurry (nodeS3 lg bucket)) $ S.fromList ns
-      
--- s3Src :: forall m. (MonadAsync m, MonadCatch m)
---   => [(NodeMAC, Maybe ObjectKey)]
---   -> S3Opts
---   -> m (MessageQs NodeMAC)
--- s3Src ns bucket = do
---    qs <- liftIO $ initQs
---    liftIO . forkIO . S.drain . S.aheadly $ S.mapM (\(ok, ((n, t), x)) -> case x of
---               Left e -> liftIO $ writeChan (stateChan qs) n e
---               Right r -> liftIO $ writeChan (statsChan qs) n r
---           ) (s3Stream ns bucket)
---    return qs
 
 
 mqttQs :: (MonadIO m) => MQTTOpts -> KbtzName -> [NodeMAC] -> m (MessageQs NodeMAC)
@@ -145,7 +126,7 @@ runKibbutzM h p = (pure . S.adapt . S.hoist (runGraphM h p)) <=< (runGraphM h p 
 
 
 runKibbutz :: forall t. (IsStream t) => KbtzC NodeMAC -> GraphM (t GraphM Bool)
-runKibbutz KbtzC{name, nodes, channelOpts, s3Opts} = do
+runKibbutz KbtzC{name, nodes, channelOpts} = do
   -- Live Data
   (es, rs, outbox) <- qSrc @t channelOpts
   -- Folds
@@ -185,12 +166,11 @@ runKibbutz KbtzC{name, nodes, channelOpts, s3Opts} = do
                                   (liftIO . print $ s <> ": " <> (show x) <> "is: " <> (show a))
                                   >> (return $ x + (1 :: Int)))
                    (pure 0)
-    --tryToBool = expToBool <=< try
-    dispatchTxSafe o t = tryJust t
+    dispatchTxSafe o t = tryJust' t
       where
-        tryJust (Just x) = expToBool
+        tryJust' (Just x) = expToBool
                          =<< (try $ (dispatchTx o x))
-        tryJust Nothing = pure False
+        tryJust' Nothing = pure False
     horizon = 10 * 60
 
 gridSensorR :: (KbtzConn t m n) => [n] -> t m (n, EnergyState) -> t m (n, M.Map n SensorR)
@@ -219,7 +199,7 @@ hydrateKbtz KbtzC{name, nodes, s3Opts} = case s3Opts of
         x <- liftIO $ newTVarIO (M.fromList [])
         lsyncs <- mapM (\n -> do
                            ls <- withKbtzPool (flip getNodeLastSync n) 
-                           return $ (\x -> (n, ObjectKey <$> x)) (listToMaybe ls)
+                           return $ (\a -> (n, ObjectKey <$> a)) (listToMaybe ls)
                        ) nodes
         flowFoldS3 <- withSpider $ addFlowNode name
         meshFoldS3 <- withSpider addMeshNode
@@ -236,7 +216,7 @@ hydrateKbtz KbtzC{name, nodes, s3Opts} = case s3Opts of
         let finalize = do
               m <- liftIO . atomically $ readTVar x
               mapM_ (\(n, ((ObjectKey k), _)) ->
-                                       withKbtzPool (\s -> addLastSyncToHH s n k)) $ M.toList m
+                                       withKbtzPool (\p -> addLastSyncToHH p n k)) $ M.toList m
         return
           $ S.finallyIO finalize
           $ S.postscan flowFoldS3
