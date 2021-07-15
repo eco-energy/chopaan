@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9769ee520cd2a811314c445fe8ab0715c9fde48442c7e8e81e6d54c83fc6d23f
+-- hash: d5f18c188ab374c0622d1c3c74ff9e9843ffdaa28892ba29b5bd952402e54fab
 
 name:           chopaan
 version:        0.1.0.0
@@ -46,7 +46,8 @@ library
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
-    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
@@ -312,7 +313,8 @@ executable dev
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
-    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
@@ -455,7 +457,8 @@ executable kbtzim
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
-    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
@@ -597,7 +600,8 @@ executable server
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
-    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
@@ -740,7 +744,8 @@ executable ui
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
-    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
@@ -899,7 +904,8 @@ test-suite chopaan-test
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
-    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
     , Shpadoinkle-html
     , Shpadoinkle-lens
     , Shpadoinkle-router
