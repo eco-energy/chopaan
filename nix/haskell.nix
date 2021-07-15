@@ -153,8 +153,9 @@ let
         #    examples = false;
         #    examples-sdl = false;
         #  };
-        packages.concat-inline.package.doHaddock = false;
-        packages.concat-plugin.package.doHaddock = false;
+        packages.concat-inline.doHaddock = false;
+        packages.concat-plugin.doHaddock = false;
+        packages.concat-examples.doHaddock = false;
         packages.newtype-generics.package.doHaddock = false;
         packages.numtype-dk.package.doHaddock = false;
         packages.MemoTrie.package.doHaddock = false;

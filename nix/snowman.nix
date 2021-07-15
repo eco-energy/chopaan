@@ -99,8 +99,8 @@ let
         "concat-satisfy" = concatPkg "satisfy";
         "concat-classes" = concatPkg "classes";
         "concat-plugin" = pkgs.haskell.lib.dontHaddock (concatPkg "plugin");
-        "concat-examples" = concatPkg "examples";
-        "concat-graphics" = concatPkg "graphics";
+        "concat-examples" = pkgs.haskell.lib.dontHaddock (pkgs.haskell.lib.dontCheck (concatPkg "examples"));
+        "concat-graphics" = pkgs.haskell.lib.dontHaddock (pkgs.haskell.lib.dontCheck (concatPkg "graphics"));
         "streamly" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
           pkg = "streamly";
           ver = "0.7.3";
