@@ -87,7 +87,8 @@ dependencies:
 - interpolatedstring-perl6
 - retry
 - Shpadoinkle >= 0.3.0.0
-- Shpadoinkle-backend-pardiff
+- Shpadoinkle-backend-snabbdom
+- Shpadoinkle-console
 - Shpadoinkle-html
 - Shpadoinkle-widgets
 - Shpadoinkle-router
