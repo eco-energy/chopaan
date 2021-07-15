@@ -21,7 +21,7 @@ import Data.Bifunctor
 import Data.Aeson
 import GHC.Generics (Generic, Generic1)
 
-import Shpadoinkle.Backend.ParDiff (runParDiff)
+import Shpadoinkle.Backend.Snabbdom (runSnabbdom)
 
 import Shpadoinkle (Html(..), liftC, text)
 import Shpadoinkle.Run (runJSorWarp, simple)
@@ -243,7 +243,7 @@ sortCol m = sortColGr (const Title) (graph m)
 
 main :: IO ()
 main = runJSorWarp 8080 $
-  simple runParDiff (Model (mergeGr $ (fmap snd) (iterate opS (0, emptyGr)))) view getBody
+  simple runSnabbdom (Model (mergeGr $ (fmap snd) (iterate opS (0, emptyGr)))) view getBody
 
 
 

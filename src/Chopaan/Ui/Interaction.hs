@@ -14,8 +14,8 @@ import Linear.V2
 -- mkOnKey t f = listenRaw t $ \_ (RawEvent e) ->
 --   f <$> liftJSM (fmap round $ valToNumber =<< unsafeGetProp "keyCode" =<< valToObject e)
 
-newtype PointerPos = PointerPos (Double, Double)
-  deriving (Eq, Ord, Show, Generic, ToJSVal, FromJSVal)
+type PointerPos = (Double, Double)
+
 
 data PointerType = Touch | Mouse
   deriving (Eq, Ord, Show, Generic, Enum, Bounded, ToJSVal, FromJSVal)
@@ -26,7 +26,7 @@ getPointerType "mouse" = Mouse
 getPointerType _ = error "Wrong pointer type"  
 
 
-data Button = Left | Middle | Right
+data Button = LeftButton | MiddleScroll | RightButton
   deriving (Eq, Ord, Show, Generic, Enum, Bounded)
 
 data PointerEv = PointerEv
@@ -45,7 +45,7 @@ fromPointer (RawEvent e') = liftJSM $ do
   pid <- fmap round $ valToNumber =<< unsafeGetProp "pointerId" e
   b <- fmap (round) $ valToNumber =<< unsafeGetProp "button" e
   let b' = if (b > 2 || b < 0) then Nothing else (Just $ toEnum b)
-  return $ PointerEv (PointerPos (x, y)) (getPointerType pt) pid b'  
+  return $ PointerEv (x, y) (getPointerType pt) pid b'  
 
 
 onPointerUp :: (PointerEv -> JSM (Continuation m a)) -> (T.Text, Prop m a)

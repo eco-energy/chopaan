@@ -4,12 +4,12 @@
 {-# LANGUAGE OverloadedStrings, PackageImports, ExtendedDefaultRules #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable, DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase, TypeOperators, TypeApplications, LiberalTypeSynonyms, CPP  #-}
-{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE IncoherentInstances, TupleSections #-}
 module Chopaan.Ui.GraphView where
 
 import Data.Aeson as A
 import Data.Maybe
-import Data.Text hiding (empty, zip)
+import Data.Text hiding (empty, zip, filter)
 import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding as T
 
@@ -30,7 +30,7 @@ import           Shpadoinkle
 
 import Shpadoinkle (Html(..), liftC, text, JSM, MonadJSM, Continuation, Html,
                      RawNode (..),
-                     atomically, baked,
+                     atomically, retrySTM, baked,
                      constUpdate, done,
                      kleisli, mapC, pur,
                      readTVarIO, text,
@@ -45,9 +45,26 @@ import Shpadoinkle.Lens
 import Chopaan.Graph.G as G
 import qualified Chopaan.Ui.Style as Css
 import Chopaan.Graph.Snapshot
+import Chopaan.Ui.ThreeD (threeDM, grid3D)
 import Data.FileEmbed
 
 default (Text)
+
+render3dGrid :: forall m n. (Applicative m, Eq n, Humanize n) => SG n -> Html m ()
+render3dGrid sg = case sg of
+  (G.Mesh (SG ms)) -> renderBaked ms 
+  (G.Transactor (SG ms)) -> renderBaked ms 
+  (G.Status (SG ms)) -> renderBaked ms
+  (G.Flow (SG ms)) -> renderBaked ms
+  where
+    renderBaked :: forall v l.
+                 (Eq l, Eq v, NFData l, NFData v, Humanize l, Humanize v)
+               =>  SnapshotGraph n v l -> Html m ()
+    renderBaked (ns, ls) = H.baked $ do
+      (, retrySTM) <$> (threeDM objF  elements)
+        where
+          elements = fmap (fromJust) $ filter (isJust) $ _nodeAttributes <$> ns
+          objF = grid3D 5 5 25
 
 
 renderKbtzGraph :: forall m n. (Applicative m, Ord n, Humanize n) => SG n -> Html m () -- SG
@@ -66,6 +83,7 @@ renderKbtzGraph sg = case sg of
           [ edgeHtml (_linkAttributes l) (_sourceNode l) (_destinationNode l) | l <- ls ]
       ]
       where
+        elements = (fmap (fromJust) $ filter (isJust) $ _nodeAttributes <$> ns)
         nodeHtml :: SnapshotNode n v -> Html m ()
         nodeHtml n = H.div textBoxCSS
           $ (pure . H.text . humanize . _nodeId $ n)

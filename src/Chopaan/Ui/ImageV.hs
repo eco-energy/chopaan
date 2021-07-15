@@ -39,7 +39,7 @@ import GHCJS.DOM.Window (Window, requestAnimationFrame)
 import Shpadoinkle
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Run (runJSorWarp)
-import Shpadoinkle.Backend.ParDiff (runParDiff, stage)
+import Shpadoinkle.Backend.Snabbdom (runSnabbdom)
 
 import qualified Chopaan.Ui.Style as Css
 import Chopaan.Ui.WebGL
