@@ -64,7 +64,8 @@ extra-deps:
      - lens
      - disembodied
      - template
-
+     - backends/snabbdom
+     - console
  # - git: https://github.com/composewell/streamly.git
  #   commit: 4e48b52e8709390a47e99c107ebed2d1c9420076
    # nix-sha256: 1824vqnx9ncs8f1vzgl08r5bd274vhabsdkirqqa88fxl0f2jyw5
