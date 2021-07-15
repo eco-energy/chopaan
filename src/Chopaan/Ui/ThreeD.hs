@@ -4,11 +4,12 @@
 {-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE DuplicateRecordFields     #-}
 {-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell, RecordWildCards #-}
+{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell, RecordWildCards, PackageImports #-}
 
 module Chopaan.Ui.ThreeD where
 
 import GHC.Generics hiding (R)
+import Control.Arrow
 import Control.DeepSeq
 import Control.Monad
 import Control.Monad.IO.Class
@@ -22,20 +23,25 @@ import qualified Data.Text as T
 import           Data.FileEmbed              (embedFile)
 import           Data.Text.Encoding          (decodeUtf8)
 
+import Language.Javascript.JSaddle (ToJSVal(..), FromJSVal(..))
+import GHCJS.DOM (currentWindow, currentWindowUnchecked, currentDocumentUnchecked)
+import "ghcjs-dom" GHCJS.DOM.Document (createElement, getDocumentElementUnchecked)
+import GHCJS.DOM.Element (setId, getBoundingClientRect, getClientTop, getClientLeft, toElement, Element)
+import GHCJS.DOM.NonElementParentNode (getElementById)
+import GHCJS.DOM.Window (getInnerHeight, getInnerWidth, Window, requestAnimationFrame, getPageXOffset, getPageYOffset)
+import GHCJS.DOM.DOMRectReadOnly (getTop, getWidth, getHeight, getLeft)
+import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback, RequestAnimationFrameCallback)
 
-import GHCJS.DOM (currentWindow, currentWindowUnchecked)
-import GHCJS.DOM.Window (getInnerHeight, getInnerWidth, Window, requestAnimationFrame)
-import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback)
-
-import Shpadoinkle (Html, JSM, MonadJSM, TVar
-                   , voidC, shpadoinkle
-                   , Continuation, pur, impur, kleisli, RawNode, RawEvent)
+import Shpadoinkle (Html, JSM, MonadJSM, TVar, shpadoinkle
+                   , voidC, liftC', leftC', rightC', maybeC', liftCMay', eitherC'
+                   , Continuation, pur, impur, kleisli, RawNode(..), RawEvent)
 import Shpadoinkle.Run (simple, runJSorWarp, live)
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Html.Utils (getBody)
 import Shpadoinkle.Widgets.Types (Humanize(..))
-import Shpadoinkle.Backend.ParDiff
+import Shpadoinkle.Backend.Snabbdom
 import Shpadoinkle.Lens
+import Shpadoinkle.Console
 import Control.Lens hiding (simple)
 import Data.Generics.Product
 import Data.Generics.Labels
@@ -141,9 +147,6 @@ data Camera = Camera
   }
   deriving (Eq, Show, Generic, NFData)
 
-transformCamera :: M44R -> Camera -> Camera
-transformCamera t = over #cameraObj (transformObj t) 
-
 toRad = (* (pi / 180))
 nanEr v x = if (isNaN x) then error (v <> " is NaN") else x
 matNaN v = (fmap (fmap (nanEr v)))
@@ -179,6 +182,12 @@ changeAspect :: Double -> Camera -> Camera
 changeAspect a (c@Camera{..}) = c & #aspect .~ a
                      & (#projectionTransform) .~ (perspective fov aspect near far) 
 
+transformCamera :: M44R -> Camera -> Camera
+transformCamera t c = c & #cameraObj .~ (newO) 
+                        & (#matrixWorldInverse) .~ (inv44 $ asT newO)
+  where
+    newO = transformObj t $ c ^. #cameraObj 
+                      
 worldDirection :: Camera -> V3 R
 worldDirection = normalize . (view (_xyz . column _z)) . matrixWorldInverse 
 
@@ -195,7 +204,7 @@ data Screen = Screen
   , top :: Double
   } deriving (Eq, Ord, Show, Generic, NFData)
 
-zeroScreen = Screen 0 0 0 0 
+zeroScreen = Screen 0 0 0 0
 
 data ThreeModel a = ThreeModel
   { scene :: Scene a
@@ -259,26 +268,40 @@ getWH = do
 -- 
 --
 
+type ControlModel a = (ThreeModel a, Maybe TrackballState)
 
+screenAspect s = (widthG s / heightG s) 
 
-threeD :: forall m a. (MonadJSM m, Humanize a) => ThreeModel a -> Html m (ThreeModel a)
-threeD (ThreeModel (Scene xs) c screen) = H.div rootProps [
+getScreen :: Element -> JSM Screen
+getScreen e = do
+  win <- currentWindowUnchecked
+  docE <- getDocumentElementUnchecked =<< currentDocumentUnchecked
+  r <- getBoundingClientRect e
+  w <- getWidth r
+  h <- getHeight r
+  t <- (\a b c -> a + b - c) <$> getTop r <*> getPageYOffset win <*> (getClientTop docE)
+  l <- (\a b c -> a + b - c) <$> getLeft r <*> getPageXOffset win <*> (getClientLeft docE)
+  return $ Screen w h l t
+
+threeD :: forall m a. (MonadJSM m, Humanize a) => ControlModel a -> Html m (ControlModel a)
+threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
   H.div (cameraCSS) $
     (\(x, y) -> H.div (objCSS y) . pure . H.text . humanize $ x) <$> xs
   ]
   where
     rootProps = rootHandler <> rootCSS
     --loadHandler = do
-    rootHandler = [H.listenRaw "resize" screenHandler, H.listenRaw "load" screenHandler]
-    screenHandler :: RawNode -> RawEvent -> JSM (Continuation m (ThreeModel a))
-    screenHandler rn re = do
-      (w, h) <- getWH
-      liftIO . print $ "Resize"
-      liftIO $ hFlush stdout
-      let cont (ThreeModel s c screen) =
-                 (ThreeModel s (changeAspect (w/h) c) (screen { widthG=w, heightG = h }))
-      return $ pur cont
-    
+    rootHandler = [ H.listenRaw "resize" screenHandler
+                  , H.listenRaw "load" screenHandler
+                  , onPointerDown (pure . rightC' . startAction)
+                  , onPointerMove (pure . rightC' . maybeC' . controlTf)
+                  , onPointerUp (pure . rightC' . endAction)
+                  ]
+    screenHandler :: RawNode -> RawEvent -> JSM (Continuation m (ThreeModel a, x))
+    screenHandler (RawNode n) re = do
+      newS <- getScreen =<< fromJSValUnchecked @Element n
+      let cont (ThreeModel s c _) = (ThreeModel s (changeAspect (screenAspect newS) c) newS)
+      return $ leftC' (pur cont)
     fov' = (c ^. #projectionTransform . _y . _y) * (heightG screen / 2)
     rootCSS = [ H.textProperty "id" "renderer"
               , styleP "overflow:hidden"
@@ -286,6 +309,7 @@ threeD (ThreeModel (Scene xs) c screen) = H.div rootProps [
               , H.class' Css.w_screen
               , H.class' Css.h_screen
               , styleP "background-color: black"
+              , styleP "touch-action: none"
               ]
     cameraCSS =
       [ H.textProperty "id" "camera"
@@ -323,62 +347,78 @@ grid3D row col stack = (gridPos)
 
 
 data TrackballAction = Pan | Zoom | Rotate 
-  deriving (Eq, Ord, Show, Generic, Enum, Bounded)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
-data ControlDiff = ControlDiff
-  { eye :: V3 R
-  , moveCurr :: V2 R
-  , lastAxis :: V3 R
-  , zoomStart :: V2 R
-  , zoomEnd :: V2 R
-  , panStart :: V2 R
-  , panEnd :: V2 R
-  } deriving (Eq, Ord, Show, Generic)
-
-
-type ZoomState = (V2 R, V2 R)
+type ActionStates = Either ZoomState (Either PanState RotState)
+type ZoomState = V2 R
 type PanState = (V2 R, V2 R)
 type RotState = (V2 R, V2 R)
 
 
-liftZ :: ZoomState -> (M44R -> M44R)
-liftZ = undefined
-
-liftP :: PanState -> (M44R -> M44R)
+liftZ :: (Functor m) => Continuation m ZoomState -> Continuation m (ZoomState, M44R)
+liftZ = liftC' (\z (z', t) -> (z, over translation (^+^ (baseScale ^* (zoomFactor . zdiff $ (z, z')))) t)) (\(z, t) -> z)
+  where
+    baseScale = (V3 1 1 1)
+    zoomFactor x = 1.0 + x * 1.2
+    zdiff (start, end) = end ^. _y - start ^. _y 
+    
+liftP :: Continuation m PanState -> Continuation m (PanState, M44R)
 liftP = undefined
 
-liftR :: RotState -> (M44R -> M44R)
+liftR :: Continuation m RotState -> Continuation m (RotState, M44R)
 liftR = undefined
 
-zoomA :: PointerEv -> ZoomState
-zoomA = undefined -- \wM -> (inv44 wM) . scaleZ . translateWToP' !*! (wM !*! p)
-  -- where
-  --   p = 
 
-panA :: PointerEv -> PanState
+zoomA :: PointerEv -> Continuation m ZoomState
+zoomA PointerEv{pos} = pur $ \endP -> V2 (fst pos) (snd pos) ^-^ endP
+
+panA :: PointerEv -> Continuation m PanState
 panA = undefined
 
-rotateA :: PointerEv -> RotState
+rotateA :: PointerEv -> Continuation m RotState
 rotateA = undefined
 
-getAct :: TrackballAction -> (PointerEv -> (M44R -> M44R))
-getAct Pan = liftP . panA
-getAct Zoom = liftZ . zoomA
-getAct Rotate = liftR . rotateA
 
-type TrackballState = (Maybe TrackballAction, (M44R -> M44R))
 
-actionControl :: PointerEv -> Continuation m (TrackballState) 
-actionControl = const (pur (const (Just Pan, id)))
 
-controlTransformation :: PointerEv -> Continuation m (TrackballState)
-controlTransformation e = pur t 
+getAct :: (Applicative m) => TrackballAction -> (PointerEv -> Continuation m (ActionStates, M44R))
+getAct Pan = liftCMay' toAct mayPan . (liftP . panA)
   where
-    t (Nothing, tf) = (Nothing, tf)
-    t (Just act, tf) = (Just act, (\w -> ((getAct act) e $ w) !*! (tf w)))
+    toAct :: (PanState, M44R) -> (ActionStates, M44R) -> (ActionStates, M44R)
+    toAct a b = (Right . Left . fst $ a, snd a !*! snd b)
+    mayPan (Right (Left k), a) = Just (k, a)
+    mayPan _ = Nothing
+getAct Zoom = liftCMay' toAct mayZoom . liftZ . zoomA
+  where
+    toAct :: (ZoomState, M44R) -> (ActionStates, M44R) -> (ActionStates, M44R)
+    toAct a b = (Left . fst $ a, snd a !*! snd b)
+    mayZoom (Left k, a) = Just (k, a)
+    mayZoom _ = Nothing
+getAct Rotate = liftCMay' toAct mayRot . liftR . rotateA
+  where
+    toAct :: (RotState, M44R) -> (ActionStates, M44R) -> (ActionStates, M44R)
+    toAct a b = (Right . Right . fst $ a, snd b !*! snd a)
+    mayRot (Right (Right k), a) = Just (k, a)
+    mayRot _ = Nothing
 
-endTransformation :: PointerEv -> Continuation m (TrackballState)
-endTransformation = const (pur (const (Nothing, id)))
+type TrackballState = (Maybe TrackballAction, (ActionStates, M44R))
+
+defActState = (Just Zoom, (Left zero, identity))
+
+getActionType :: Button -> TrackballAction
+getActionType = const Zoom
+
+startAction :: PointerEv -> Continuation m (Maybe TrackballState) 
+startAction PointerEv{button, pos} = pur $ (\_ -> Just (getActionType <$> button, (Left $ V2 (fst pos) (snd pos), identity)))
+
+endAction :: PointerEv -> Continuation m (Maybe TrackballState)
+endAction _ = pur (const Nothing)
+                      
+controlTf :: Applicative m => PointerEv -> Continuation m (TrackballState)
+controlTf = rightC' . (getAct Zoom)
+
+deltaModel :: TrackballState -> ThreeModel a -> ThreeModel a
+deltaModel (_, (_, diff)) m = over #camera (transformCamera diff) m
 
 styleP :: T.Text -> (T.Text, H.Prop m a)
 styleP = H.textProperty "style"
@@ -401,26 +441,53 @@ wait = 3000000
 dur :: Double
 dur = 3000
 
--- animation :: Window -> TVar (ThreeModel a) -> JSM ()
--- animation w t = void $ requestAnimationFrame w =<< go
---   where
---     go = newRequestAnimationFrameCallback $ \(clock') -> do
---       let clock = clock' - (wait / 1000)
---       r <- go
---       when (clock < dur) . void $ requestAnimationFrame w r
+animation :: Window -> TVar (ControlModel a) -> JSM (RequestAnimationFrameCallback)
+animation w tv = go
+  where
+    go = newRequestAnimationFrameCallback $ \(clock') -> () <$ do
+      let clock = clock' - (wait / 1000)
+      liftIO . atomically $ do
+        (threeM, t) <- readTVar tv
+        case t of
+          Nothing -> return ()
+          Just ts -> 
+            writeTVar tv (deltaModel ts threeM, Just ts)
+      (requestAnimationFrame w) =<< (animation w tv)
+
+threeDM :: (Eq a, NFData a, Humanize a) => (Int -> Obj) -> [a] -> JSM RawNode
+threeDM objF elements = do
+  let vId = "threeDView"
+  doc <- currentDocumentUnchecked
+  isSubsequent <- traverse toJSVal =<< getElementById doc vId
+  case isSubsequent of
+    Just raw -> return $ RawNode raw
+    Nothing -> do
+      H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
+      H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
+      win <-currentWindowUnchecked
+      elm <- createElement doc "div"
+      setId elm vId
+      (w, h) <- getWH
+      let mod = mkModel (Screen w h 0 h) objF elements 
+      model <- liftIO $ newTVarIO (mod, Nothing)
+      _ <- requestAnimationFrame win =<< animation win model
+      raw <- RawNode <$> toJSVal elm
+      _ <- (liftIO . forkIO $ threadDelay 1)
+        >> shpadoinkle id runSnabbdom model (threeD) (pure raw)
+      return raw
+
 
 main :: IO ()
 main = runJSorWarp 8080 $ do
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
+  win <- currentWindowUnchecked
   (w, h) <- getWH
   let objF = grid3D 5 5 25
-      --model = zip (repeat testText) (objF <$> [1..10])
   let mod = mkModel (Screen w h 0 h) objF (take 1000 $ repeat testText) 
-  model <- liftIO $ newTVarIO mod
-  w <- currentWindowUnchecked
-  -- _ <- (liftIO . forkIO $ threadDelay wait) >> animation w model
-  shpadoinkle id runParDiff model (threeD) getBody
+  model <- liftIO $ newTVarIO (mod, Nothing)
+  _ <- requestAnimationFrame win =<< animation win model
+  shpadoinkle id runSnabbdom model (threeD) (getBody)
 
 
 testText :: T.Text
