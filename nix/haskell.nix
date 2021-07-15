@@ -119,6 +119,11 @@ let
 
         # split data output for ekg to reduce closure size
         packages.ekg.components.library.enableSeparateDataOutput = true;
+
+        # dont haddock concatisms
+        packages.concat-inline.doHaddock = false;
+        packages.concat-plugin.doHaddock = false;
+        packages.concat-examples.doHaddock = false;
         
         # some packages are missing identifier.name:
         packages.cryptonite-openssl.package.identifier.name = "cryptonite-openssl";
@@ -153,9 +158,6 @@ let
         #    examples = false;
         #    examples-sdl = false;
         #  };
-        packages.concat-inline.doHaddock = false;
-        packages.concat-plugin.doHaddock = false;
-        packages.concat-examples.doHaddock = false;
         packages.newtype-generics.package.doHaddock = false;
         packages.numtype-dk.package.doHaddock = false;
         packages.MemoTrie.package.doHaddock = false;
