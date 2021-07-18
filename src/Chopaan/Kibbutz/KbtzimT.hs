@@ -37,5 +37,3 @@ deriving instance FromJSON (KbtzimT Identity)
 deriving instance Humanize (KbtzimT Identity)
 
 type Kbtzim = KbtzimT Identity
-
-makeFieldsNoPrefix ''KbtzimT

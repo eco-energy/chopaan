@@ -36,7 +36,6 @@ import Chopaan.Comm.Address
 
 import qualified Data.ByteString.Lazy as BL
 import Data.ProtoLens.TextFormat
-import Data.ProtoLens.Labels()
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent.STM

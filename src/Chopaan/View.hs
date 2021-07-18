@@ -16,6 +16,7 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE DerivingStrategies, DeriveGeneric, DeriveAnyClass #-}
 {-# LANGUAGE TemplateHaskell, FunctionalDependencies #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
@@ -23,13 +24,16 @@
 
 module Chopaan.View where
 
-import qualified Data.Text                         as T
-import Data.Maybe (isNothing)
-import Data.Proxy (Proxy(..))
-
 import Control.Lens hiding (view, simple)
 import Control.Lens.Unsound (lensProduct)
 import Control.Monad.IO.Class
+
+import qualified Data.Text                         as T
+import Data.Maybe (isNothing)
+import Data.Proxy (Proxy(..))
+import Data.Generics.Product
+import Data.Generics.Sum
+import Data.Generics.Labels
 
 
 
@@ -49,7 +53,7 @@ import           Shpadoinkle.Widgets.Types         (Control (..),
                                                     Pick (..), Status (..),
                                                     fuzzySearch,
                                                     getValid, humanize,
-                                                    validate, Hygiene(..))
+                                                    validate, Hygiene(..), Search)
 import           Shpadoinkle.Run             (runJSorWarp, simple, Env(Dev))
 import           Shpadoinkle.Backend.Snabbdom (runSnabbdom)
 
@@ -153,26 +157,29 @@ homePage = H.div
 
 view :: forall m. (MonadJSM m, CRUDChopaan m) => Frontend -> Html m Frontend
 view fe = case fe of
-  MHomePage -> onSum _MHomePage $ homePage
-  MKibbutzim kbtzRoster -> onSum _MKibbutzim $ H.div "container-fluid"
+  MHomePage -> onSum #_MHomePage $ homePage
+  MKibbutzim kbtzRoster -> onSum #_MKibbutzim $ H.div "container-fluid"
     [ H.div "row justify-content-between align-items-center"
      [ H.h2_ [ "Kibbutzim" ]
      , H.div [ H.class' "input-group"
              , H.textProperty "style" ("width:300px" :: T.Text)
              ]
-       [ kbtzRoster <% searchK $ Input.search [ H.class' "form-control", H.placeholder "Search" ]
+       [ kbtzRoster <% #_searchK $ Input.search [ H.class' "form-control", H.placeholder "Search" ]
        , H.div "input-group-append mr-3"
          [ H.button [ H.onClickM_ $ navigate @(SPA m) RHomePage, H.class' "btn btn-primary" ] [ "Register" ]
          ]
        ]
      ]
-   , onRecord (lensProduct tableK sortK) $ Table.viewWith tableCfg
-       (kbtzRoster ^. tableK . to (KbtzList . (fuzzySearch fuzzyK $ kbtzRoster ^. searchK . value) . unKbtzList))
-       (kbtzRoster ^. sortK)
+   , onRecord (lensProduct #_tableK #_sortK) $ Table.viewWith tableCfg
+       (kbtzRoster ^. #_tableK
+         . to (KbtzList .
+               (fuzzySearch searchKbtzName (kbtzRoster ^. (#_searchK . (value @(F.Input)))))
+               . unKbtzList))
+       (_sortK kbtzRoster)
     ]
-  MKibbutz nodeRoster -> onSum _MKibbutz $ H.div "container-fluid"
+  MKibbutz nodeRoster -> onSum #_MKibbutz $ H.div "container-fluid"
     []
-  MAddNode k n form -> onSum (_MAddNode . _3) $ H.div "row"
+  MAddNode k n form -> onSum (#_MAddNode . _3) $ H.div "row"
     [ H.div "col-sm-8 offset-sm-2"
       [ H.h1_ [ text $ maybe "Add New Node" (const "Edit Node") n
               ]
@@ -191,7 +198,7 @@ view fe = case fe of
     ]
     where
       sectionTitle cr ed = H.h3_ [ text $ maybe cr (const ed) n ]
-  MGraph gv -> onSum (_MGraph) $ gView gv
+  MGraph gv -> onSum (#_MGraph) $ gView gv
                 
 addBattery :: (MonadJSM m) => StorageUpdate 'Edit -> Html m (StorageUpdate 'Edit)
 addBattery bc = H.div [ H.onClick (\a-> undefined) ]
@@ -296,12 +303,8 @@ tableCfg = mempty
 
 
   
-fuzzyK :: [Kbtzim -> T.Text]
-fuzzyK = flip (^.) <$>
-  [ kbtzId   . to (T.pack . show)
-  , kbtzName . to (T.pack . show)
-  , kbtzDesc . to (T.pack . show)
-  ]
+searchKbtzName :: [Kbtzim -> T.Text]
+searchKbtzName = [ T.pack . show . _kbtzName ]
 
 
 
