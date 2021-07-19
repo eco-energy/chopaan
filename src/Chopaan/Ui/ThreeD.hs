@@ -14,16 +14,18 @@ import Control.DeepSeq
 import Control.Monad
 import Control.Monad.IO.Class
 
-import Control.Concurrent
+
 import Control.Concurrent.STM
 import Data.Functor.Rep
+import Data.Aeson
 import System.IO (stderr, hPutStrLn, stdout, hFlush)
 
 import qualified Data.Text as T
 import           Data.FileEmbed              (embedFile)
 import           Data.Text.Encoding          (decodeUtf8)
 
-import Language.Javascript.JSaddle (ToJSVal(..), FromJSVal(..))
+import UnliftIO.Concurrent (forkIO, threadDelay)
+import Language.Javascript.JSaddle (ToJSVal(..), FromJSVal(..), valToObject)
 import GHCJS.DOM (currentWindow, currentWindowUnchecked, currentDocumentUnchecked)
 import "ghcjs-dom" GHCJS.DOM.Document (createElement, getDocumentElementUnchecked)
 import GHCJS.DOM.Element (setId, getBoundingClientRect, getClientTop, getClientLeft, toElement, Element)
@@ -32,20 +34,19 @@ import GHCJS.DOM.Window (getInnerHeight, getInnerWidth, Window, requestAnimation
 import GHCJS.DOM.DOMRectReadOnly (getTop, getWidth, getHeight, getLeft)
 import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback, RequestAnimationFrameCallback)
 
-import Shpadoinkle (Html, JSM, MonadJSM, TVar, shpadoinkle
+import Shpadoinkle (Html, JSM, MonadJSM, liftJSM, TVar, shpadoinkle
                    , voidC, liftC', leftC', rightC', maybeC', liftCMay', eitherC'
                    , Continuation, pur, impur, kleisli, RawNode(..), RawEvent)
-import Shpadoinkle.Run (simple, runJSorWarp, live)
+import Shpadoinkle.Run (runJSorWarp)
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Html.Utils (getBody)
 import Shpadoinkle.Widgets.Types (Humanize(..))
 import Shpadoinkle.Backend.Snabbdom
 import Shpadoinkle.Lens
 import Shpadoinkle.Console
-import Control.Lens hiding (simple)
+import Control.Lens hiding (simple, elements)
 import Data.Generics.Product
 import Data.Generics.Labels
-import qualified Data.Key as K
 
 import Linear.Vector
 import Linear.Matrix
@@ -202,7 +203,7 @@ data Screen = Screen
   , heightG :: Double
   , left :: Double
   , top :: Double
-  } deriving (Eq, Ord, Show, Generic, NFData)
+  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 zeroScreen = Screen 0 0 0 0
 
@@ -258,7 +259,8 @@ mkModel s objF xs = ThreeModel (mkScene (objF' cam) xs) cam s
     objF' c = (rotateObj (_rot . cameraObj $ c)) . objF
     camPos = V3 0 0 3000
 
-    
+
+getWH :: MonadJSM m => m (Double, Double)
 getWH = do
   w <- currentWindowUnchecked
   height <- realToFrac <$> getInnerHeight w
@@ -270,6 +272,7 @@ getWH = do
 
 type ControlModel a = (ThreeModel a, Maybe TrackballState)
 
+screenAspect :: Screen -> Double
 screenAspect s = (widthG s / heightG s) 
 
 getScreen :: Element -> JSM Screen
@@ -277,10 +280,12 @@ getScreen e = do
   win <- currentWindowUnchecked
   docE <- getDocumentElementUnchecked =<< currentDocumentUnchecked
   r <- getBoundingClientRect e
-  w <- getWidth r
-  h <- getHeight r
-  t <- (\a b c -> a + b - c) <$> getTop r <*> getPageYOffset win <*> (getClientTop docE)
-  l <- (\a b c -> a + b - c) <$> getLeft r <*> getPageXOffset win <*> (getClientLeft docE)
+  debug @ToJSVal r
+  (w, h) <- getWH
+  --w <- getWidth r
+  --h <- getHeight r
+  t <- (\a b c -> a - c) <$> getTop r <*> getPageYOffset win <*> (getClientTop docE)
+  l <- (\a b c -> a - c) <$> getLeft r <*> getPageXOffset win <*> (getClientLeft docE)
   return $ Screen w h l t
 
 threeD :: forall m a. (MonadJSM m, Humanize a) => ControlModel a -> Html m (ControlModel a)
@@ -290,18 +295,24 @@ threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
   ]
   where
     rootProps = rootHandler <> rootCSS
-    --loadHandler = do
     rootHandler = [ H.listenRaw "resize" screenHandler
-                  , H.listenRaw "load" screenHandler
+                  --, H.listenRaw "load" screenHandler
+                  , H.onResizeC 
+                    (impur $ do
+                                 debug @ToJSON "On Resize Called"               
+                                 return id)
                   , onPointerDown (pure . rightC' . startAction)
                   , onPointerMove (pure . rightC' . maybeC' . controlTf)
                   , onPointerUp (pure . rightC' . endAction)
                   ]
     screenHandler :: RawNode -> RawEvent -> JSM (Continuation m (ThreeModel a, x))
     screenHandler (RawNode n) re = do
-      newS <- getScreen =<< fromJSValUnchecked @Element n
-      let cont (ThreeModel s c _) = (ThreeModel s (changeAspect (screenAspect newS) c) newS)
-      return $ leftC' (pur cont)
+      let cont = do
+            e <- valToObject n
+            debug @ToJSVal e
+            newS <- getScreen =<< (fromJSValUnchecked @Element n) 
+            return $ \(ThreeModel s c _) -> (ThreeModel s (changeAspect (screenAspect newS) c) newS)
+      return $ leftC' (impur (liftJSM cont))
     fov' = (c ^. #projectionTransform . _y . _y) * (heightG screen / 2)
     rootCSS = [ H.textProperty "id" "renderer"
               , styleP "overflow:hidden"
@@ -445,35 +456,30 @@ animation :: Window -> TVar (ControlModel a) -> JSM (RequestAnimationFrameCallba
 animation w tv = go
   where
     go = newRequestAnimationFrameCallback $ \(clock') -> () <$ do
-      let clock = clock' - (wait / 1000)
       liftIO . atomically $ do
         (threeM, t) <- readTVar tv
         case t of
           Nothing -> return ()
-          Just ts -> 
-            writeTVar tv (deltaModel ts threeM, Just ts)
+          Just ts -> writeTVar tv (deltaModel ts threeM, Just ts)
       (requestAnimationFrame w) =<< (animation w tv)
 
 threeDM :: (Eq a, NFData a, Humanize a) => (Int -> Obj) -> [a] -> JSM RawNode
-threeDM objF elements = do
+threeDM objF xs = do
   let vId = "threeDView"
   doc <- currentDocumentUnchecked
   isSubsequent <- traverse toJSVal =<< getElementById doc vId
   case isSubsequent of
     Just raw -> return $ RawNode raw
     Nothing -> do
-      H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
-      H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
-      win <-currentWindowUnchecked
+      win <- currentWindowUnchecked
       elm <- createElement doc "div"
       setId elm vId
       (w, h) <- getWH
-      let mod = mkModel (Screen w h 0 h) objF elements 
+      let mod = mkModel (Screen w h 0 h) objF xs 
       model <- liftIO $ newTVarIO (mod, Nothing)
       _ <- requestAnimationFrame win =<< animation win model
       raw <- RawNode <$> toJSVal elm
-      _ <- (liftIO . forkIO $ threadDelay 1)
-        >> shpadoinkle id runSnabbdom model (threeD) (pure raw)
+      _ <- forkIO $ shpadoinkle id runSnabbdom model threeD (pure raw)
       return raw
 
 
@@ -482,9 +488,12 @@ main = runJSorWarp 8080 $ do
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
   win <- currentWindowUnchecked
-  (w, h) <- getWH
+  scr <- (\x -> (debug @ToJSVal x >> getScreen x))
+         -- =<< (\x -> (debug @ToJSVal x >> (fromJSValUnchecked @Element) x))
+         =<< (getDocumentElementUnchecked =<< currentDocumentUnchecked)
+  debug @ToJSON scr
   let objF = grid3D 5 5 25
-  let mod = mkModel (Screen w h 0 h) objF (take 1000 $ repeat testText) 
+  let mod = mkModel scr objF (take 1000 $ repeat testText) 
   model <- liftIO $ newTVarIO (mod, Nothing)
   _ <- requestAnimationFrame win =<< animation win model
   shpadoinkle id runSnabbdom model (threeD) (getBody)

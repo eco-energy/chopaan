@@ -61,7 +61,7 @@ render3dGrid sg = case sg of
                  (Eq l, Eq v, NFData l, NFData v, Humanize l, Humanize v)
                =>  SnapshotGraph n v l -> Html m ()
     renderBaked (ns, ls) = H.baked $ do
-      (, retrySTM) <$> (threeDM objF  elements)
+      (, retrySTM) <$> (threeDM objF elements)
         where
           elements = fmap (fromJust) $ filter (isJust) $ _nodeAttributes <$> ns
           objF = grid3D 5 5 25
