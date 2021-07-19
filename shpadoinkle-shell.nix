@@ -1,1 +1,1 @@
-(import ./nix/snowman.nix).shell { isJS = false; }
+(import ./nix/snowman.nix).shell { isJS = true; }
