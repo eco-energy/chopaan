@@ -49,8 +49,10 @@ js:
 	nix-build -A projectCross.ghcjs --option binary-caches "s3://ee-nixcache?region=ap-southeast-1 https://shpadoinkle.cachix.org" --option require-sigs false
 
 devjs:
-	nix-shell shpadoinkle-shell.nix --command "cabal --enable-nix --ghcjs --project-file=cabal-ghcjs.project --builddir=dist-ghcjs new-build all"
+	nix-shell shpadoinkle-shell.nix --command "cabal --enable-nix --ghcjs --project-file=cabal-ghcjs.project --builddir=dist-ghcjs new-build all" && ./linkDevAssets.sh
 
+dj:
+	cabal --enable-nix --ghcjs --project-file=cabal-ghcjs.project --builddir=dist-ghcjs new-build all && ./linkDevAssets.sh
 
 db_image:
 	docker build -f Dockerfile.db -t chopaan/timescale .
