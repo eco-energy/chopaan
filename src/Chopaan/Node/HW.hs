@@ -2,13 +2,16 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveFoldable, DeriveTraversable
 , DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, DerivingVia #-}
 {-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies, ScopedTypeVariables #-}
-{-# LANGUAGE CPP, TemplateHaskell #-}
+{-# LANGUAGE CPP, TypeApplications, OverloadedLabels #-}
 module Chopaan.Node.HW where
 
 #include "UpdateInst.inc"
 
 import Control.Lens
 import GHC.Generics
+import Data.Generics.Product
+import Data.Generics.Labels ()
+
 
 import Control.Monad.Except (MonadError (throwError))
 import Control.DeepSeq (NFData)
@@ -29,7 +32,11 @@ import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), VFoundNode, EFin
 import Data.Monoid (Sum(..))
 
 import Chopaan.Node.Components
+import Chopaan.Ui.FormCommon
 import Chopaan.Graph.Greskell
+
+import Shpadoinkle (MonadJSM, Html)
+import qualified Shpadoinkle.Html as H
 
 import Shpadoinkle.Widgets.Types (Field, Humanize (..)
                                  , Hygiene (Clean)
@@ -136,10 +143,10 @@ newtype Hours = Hours Double
   deriving (Semigroup, Monoid) via (Sum Double)
 
 data StorageUpdate (s :: Status) = StorageUpdate
-  { _capacity :: Field s Text Input WattHours
-  , _minVoltage :: Field s Text Input Volts
-  , _maxVoltage :: Field s Text Input Volts
-  , _batteryType :: Field s Text (Dropdown 'One) BatteryType
+  { capacity :: Field s Text Input WattHours
+  , minVoltage :: Field s Text Input Volts
+  , maxVoltage :: Field s Text Input Volts
+  , batteryType :: Field s Text (Dropdown 'One) BatteryType
   } deriving (Generic)
 
 UpdateInstances(StorageUpdate)
@@ -152,27 +159,36 @@ instance ( NFData (Field s Text Input (WattHours))
 
 instance Validate StorageUpdate where
   rules = StorageUpdate
-    { _capacity = positive
-    , _minVoltage = positive
-    , _maxVoltage = positive
-    , _batteryType = maybe (throwError "Cannot be empty") pure
+    { capacity = positive
+    , minVoltage = positive
+    , maxVoltage = positive
+    , batteryType = maybe (throwError "Cannot be empty") pure
     }
 
 storageForm :: StorageUpdate 'Edit
 storageForm = StorageUpdate
-    { _capacity = Input Clean 0
-    , _minVoltage = Input Clean 0
-    , _maxVoltage = Input Clean 0
-    , _batteryType = fullOptions
+    { capacity = Input Clean 0
+    , minVoltage = Input Clean 0
+    , maxVoltage = Input Clean 0
+    , batteryType = fullOptions
     }
 
-makeFieldsNoPrefix ''StorageUpdate
+addBattery :: (MonadJSM m) => StorageUpdate 'Edit -> Html m (StorageUpdate 'Edit)
+addBattery bc = H.div [ ]
+      [ realControl @WattHours #capacity "Battery Capacity" errs bc
+      , realControl @Volts #minVoltage "Minimum Battery Voltage" errs bc
+      , realControl @Volts #maxVoltage "Maximum Battery Voltage" errs bc
+      , selectControl @'One @BatteryType #batteryType "Battery Type" errs bc
+      ]
+  where
+    errs = validate bc
+
 
 data GenerationUpdate (s :: Status) = GenerationUpdate
-  { _genPower :: Field s Text Input Watts
-  , _openCircuitVoltage :: Field s Text Input Volts
-  , _voltageAtMPP :: Field s Text Input Volts
-  , _currentAtMPP :: Field s Text Input Amperes 
+  { genPower :: Field s Text Input Watts
+  , openCircuitVoltage :: Field s Text Input Volts
+  , voltageAtMPP :: Field s Text Input Volts
+  , currentAtMPP :: Field s Text Input Amperes 
   } deriving (Generic)
 
 instance ( NFData (Field s Text Input (Amperes))
@@ -184,28 +200,37 @@ UpdateInstances(GenerationUpdate)
 
 instance Validate GenerationUpdate where
   rules = GenerationUpdate
-    { _genPower = positive
-    , _openCircuitVoltage = positive
-    , _voltageAtMPP = positive
-    , _currentAtMPP = positive
+    { genPower = positive
+    , openCircuitVoltage = positive
+    , voltageAtMPP = positive
+    , currentAtMPP = positive
     }
 
 generationForm :: GenerationUpdate 'Edit
 generationForm = GenerationUpdate
-  { _genPower = Input Clean 0
-  , _openCircuitVoltage = Input Clean 0
-  , _voltageAtMPP = Input Clean 0
-  , _currentAtMPP = Input Clean 0 
+  { genPower = Input Clean 0
+  , openCircuitVoltage = Input Clean 0
+  , voltageAtMPP = Input Clean 0
+  , currentAtMPP = Input Clean 0 
   }
 
-makeFieldsNoPrefix ''GenerationUpdate
+
+addGeneration :: (MonadJSM m) => GenerationUpdate 'Edit -> Html m (GenerationUpdate 'Edit)
+addGeneration ef = H.div genProps [
+  realControl @Watts #genPower "Panel Power" errs ef
+  , realControl @Volts #openCircuitVoltage "Open Circuit Voltage" errs ef
+  , realControl @Volts #voltageAtMPP "Voltage @ Max Power Point" errs ef
+  , realControl @Amperes #currentAtMPP "Current @ Max Power Point" errs ef
+  ]
+  where
+    genProps = []
+    errs = validate ef
 
 data LoadUpdate (s :: Status) = LoadUpdate
-  { _loadPowerU :: Field s Text Input Watts
-  , _loadDuration :: Field s Text Input Hours
+  { loadPowerU :: Field s Text Input Watts
+  , loadDuration :: Field s Text Input Hours
   } deriving (Generic)
 
-makeFieldsNoPrefix ''LoadUpdate
 
 instance ( NFData (Field s Text Input (Watts))
          , NFData (Field s Text Input (Hours))
@@ -214,23 +239,32 @@ instance ( NFData (Field s Text Input (Watts))
 UpdateInstances(LoadUpdate)
 
 instance Validate LoadUpdate where
-  rules = LoadUpdate { _loadPowerU = positive
-                     , _loadDuration = positive
+  rules = LoadUpdate { loadPowerU = positive
+                     , loadDuration = positive
                      }
 
 loadForm :: LoadUpdate 'Edit
 loadForm = LoadUpdate
-  { _loadPowerU = Input Clean 0
-  , _loadDuration = Input Clean 0
+  { loadPowerU = Input Clean 0
+  , loadDuration = Input Clean 0
   }
 
+addLoad :: (MonadJSM m) => LoadUpdate 'Edit -> Html m (LoadUpdate 'Edit) 
+addLoad ef = H.div loadProps 
+  [ realControl @Watts (#loadPowerU) "Load Power" errs ef
+  , realControl @Hours (#loadDuration) "Load Duration" errs ef
+  ]
+  where
+    loadProps = []
+    errs = validate ef
+
+
 data HWUpdate (s :: Status) = HWUpdate
-  { _storageU :: StorageUpdate s
-  , _generationU :: GenerationUpdate s
-  , _loadU :: LoadUpdate s
+  { storageU :: StorageUpdate s
+  , generationU :: GenerationUpdate s
+  , loadU :: LoadUpdate s
   } deriving (Generic)
 
-makeFieldsNoPrefix ''HWUpdate
 
 
 
@@ -247,26 +281,26 @@ instance ( NFDataHW s
 UpdateInstances(HWUpdate)
 
 instance Validate HWUpdate where
-  rules = HWUpdate { _storageU = rules, _generationU = rules, _loadU = rules }
-  validate (HWUpdate{_storageU, _generationU, _loadU}) = HWUpdate
-    { _storageU = validate _storageU
-    , _generationU = validate _generationU
-    , _loadU = validate _loadU
+  rules = HWUpdate { storageU = rules, generationU = rules, loadU = rules }
+  validate (HWUpdate{storageU, generationU, loadU}) = HWUpdate
+    { storageU = validate storageU
+    , generationU = validate generationU
+    , loadU = validate loadU
     }
-  getValid (HWUpdate{_storageU,_generationU, _loadU}) = case getValid _storageU of
+  getValid (HWUpdate{storageU,generationU, loadU}) = case getValid storageU of
     Nothing -> Nothing
-    Just x -> case getValid _generationU of
+    Just x -> case getValid generationU of
       Nothing -> Nothing
-      Just y -> case getValid _loadU of
+      Just y -> case getValid loadU of
         Nothing -> Nothing
-        Just z -> Just (HWUpdate { _storageU = x
-                                 , _generationU = y
-                                 , _loadU = z})
+        Just z -> Just (HWUpdate { storageU = x
+                                 , generationU = y
+                                 , loadU = z})
 
 emptyHWForm :: HWUpdate 'Edit
 emptyHWForm = HWUpdate
-  { _storageU = storageForm
-  , _generationU = generationForm
-  , _loadU = loadForm
+  { storageU = storageForm
+  , generationU = generationForm
+  , loadU = loadForm
   }
 

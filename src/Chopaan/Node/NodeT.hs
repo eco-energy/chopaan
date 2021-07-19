@@ -9,7 +9,6 @@ module Chopaan.Node.NodeT where
 import GHC.Generics
 import Control.Monad.Identity (Identity)
 import Control.Monad.Except
-import Control.Lens (makeFieldsNoPrefix)
 import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Text (Text)
@@ -30,7 +29,6 @@ import Shpadoinkle.Widgets.Validation ( between
                                       , nonZero
                                       , positive)
 #include "UpdateInst.inc"
-
 import Chopaan.Node.NodeId
 import Chopaan.Node.HW
 
@@ -55,8 +53,8 @@ type Nodezim = NodeT Identity
 
 
 data NodeUpdate s = NodeUpdate
-  { _nodeMACU :: Field s Text Input (NodeMAC)
-  , _hardwareConfigU :: HWUpdate s
+  { nodeMACU :: Field s Text Input (NodeMAC)
+  , hardwareConfigU :: HWUpdate s
   } deriving (Generic)
 
 instance ( NFDataHW s
@@ -65,12 +63,11 @@ instance ( NFDataHW s
 
 UpdateInstances(NodeUpdate)
 
-makeFieldsNoPrefix ''NodeUpdate
 
 emptyNodeForm :: NodeUpdate 'Edit
 emptyNodeForm = NodeUpdate
-  { _nodeMACU = Input Clean (NodeId "")
-  , _hardwareConfigU = emptyHWForm
+  { nodeMACU = Input Clean (NodeId "")
+  , hardwareConfigU = emptyHWForm
   }
 
 
@@ -85,15 +82,15 @@ isValidMAC (NodeId mac) = if parsesTrue mac
 
 instance Validate NodeUpdate where
   rules = NodeUpdate
-    { _nodeMACU = isValidMAC
-    , _hardwareConfigU = rules
+    { nodeMACU = isValidMAC
+    , hardwareConfigU = rules
     }
-  validate (NodeUpdate{_nodeMACU, _hardwareConfigU}) = NodeUpdate
-    { _nodeMACU = (isValidMAC . getValue $ _nodeMACU) 
-    , _hardwareConfigU = validate _hardwareConfigU
+  validate (NodeUpdate{nodeMACU, hardwareConfigU}) = NodeUpdate
+    { nodeMACU = (isValidMAC . getValue $ nodeMACU) 
+    , hardwareConfigU = validate hardwareConfigU
     }
-  getValid (NodeUpdate{_nodeMACU, _hardwareConfigU}) = case getValid _hardwareConfigU of
+  getValid (NodeUpdate{nodeMACU, hardwareConfigU}) = case getValid hardwareConfigU of
     Nothing -> Nothing
-    Just x -> case _nodeMACU of
-      Validated a -> Just (NodeUpdate {_nodeMACU = a, _hardwareConfigU = x})
+    Just x -> case nodeMACU of
+      Validated a -> Just (NodeUpdate {nodeMACU = a, hardwareConfigU = x})
       _ -> Nothing

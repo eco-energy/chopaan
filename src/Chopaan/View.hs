@@ -183,13 +183,13 @@ view fe = case fe of
     [ H.div "col-sm-8 offset-sm-2"
       [ H.h1_ [ text $ maybe "Add New Node" (const "Edit Node") n
               ]
-      , textControl @NodeMAC nodeMACU "MAC Address" (validate form) form
+      , textControl @NodeMAC #nodeMACU "MAC Address" (validate form) form
       , sectionTitle "Battery Details" "Edit Battery"
-      , onRecord (hardwareConfigU . storageU) $ addBattery (form ^. hardwareConfigU ^. storageU)
+      , onRecord (#hardwareConfigU . #storageU) $ addBattery (form ^. #hardwareConfigU ^. #storageU)
       , sectionTitle "Solar Panel Details" "Edit Solar Panel"
-      , onRecord (hardwareConfigU . generationU) $ addGeneration (form ^. hardwareConfigU . generationU)
+      , onRecord (#hardwareConfigU . #generationU) $ addGeneration (form ^. #hardwareConfigU . #generationU)
       , sectionTitle "Load Details" "Edit Load"
-      , onRecord (hardwareConfigU . loadU) $ addLoad (form ^. hardwareConfigU . loadU)
+      , onRecord (#hardwareConfigU . #loadU) $ addLoad (form ^. #hardwareConfigU . #loadU)
       , H.div "d-flex flex-row justify-content-end"
         [ cancelButton
         , saveButton n (getValid . validate $ form) undefined undefined
@@ -200,35 +200,6 @@ view fe = case fe of
       sectionTitle cr ed = H.h3_ [ text $ maybe cr (const ed) n ]
   MGraph gv -> onSum (#_MGraph) $ gView gv
                 
-addBattery :: (MonadJSM m) => StorageUpdate 'Edit -> Html m (StorageUpdate 'Edit)
-addBattery bc = H.div [ H.onClick (\a-> undefined) ]
-      [ realControl @WattHours capacity "Battery Capacity" errs bc
-      , realControl @Volts minVoltage "Minimum Battery Voltage" errs bc
-      , realControl @Volts maxVoltage "Maximum Battery Voltage" errs bc
-      , selectControl @'One @BatteryType batteryType "Battery Type" errs bc
-      ]
-  where
-    errs = validate bc
-
-addGeneration :: (MonadJSM m) => GenerationUpdate 'Edit -> Html m (GenerationUpdate 'Edit)
-addGeneration ef = H.div genProps [
-  realControl @Watts genPower "Panel Power" errs ef
-  , realControl @Volts openCircuitVoltage "Open Circuit Voltage" errs ef
-  , realControl @Volts voltageAtMPP "Voltage @ Max Power Point" errs ef
-  , realControl @Amperes currentAtMPP "Current @ Max Power Point" errs ef
-  ]
-  where
-    genProps = []
-    errs = validate ef
-
-addLoad :: (MonadJSM m) => LoadUpdate 'Edit -> Html m (LoadUpdate 'Edit) 
-addLoad ef = H.div loadProps 
-  [ realControl @Watts (loadPowerU) "Load Power" errs ef
-  , realControl @Hours (loadDuration) "Load Duration" errs ef
-  ]
-  where
-    loadProps = []
-    errs = validate ef
 
 
 cancelButton :: forall m a. MonadJSM m => Html m (NodeUpdate 'Edit)
