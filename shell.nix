@@ -15,7 +15,7 @@ chopaanHaskellPackages.shellFor {
 
     # Builds a Hoogle documentation index of all dependencies,
     # and provides a "hoogle" command to search the index.
-    withHoogle = true;
+    withHoogle = false;
 
     # You might want some extra tools in the shell (optional).
 
