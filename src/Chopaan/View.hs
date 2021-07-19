@@ -226,16 +226,10 @@ saveButton idT isValid createT updateT  = H.button
 staticTemplate :: (Monad m) => Html m () -> Html m b
 staticTemplate s = voidC $ H.html_
   [ H.head_
-    [ H.link'
-        [ H.rel "stylesheet"
-        , H.href "https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
-        ]
-    -- , H.link'
-    --     [ H.rel "stylesheet"
-    --     , H.href "https://unpkg.com/tailwindcss@2.1.2/dist/tailwind.min.css"
-    --     ]
-    , H.meta [ H.charset "ISO-8859-1" ] []
+    [ H.meta [ H.charset "ISO-8859-1" ] []
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
+    , stylesheetAsset "tailwind.min.css"
+    , stylesheet bootstrap
     --, H.script [ H.src $ entrypoint ev ] []
     ]
   , H.body_
@@ -244,19 +238,22 @@ staticTemplate s = voidC $ H.html_
   ]
 
 
+stylesheetAsset = stylesheet . ("./assets/" <>)
+
+stylesheet f = H.link'
+        [ H.rel "stylesheet"
+        , H.href f
+        ]
+
+bootstrap = "https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
+
 template :: Env -> Frontend -> Html m a -> Html m a
 template ev fe stage = H.html_
   [ H.head_
-    [ H.link'
-        [ H.rel "stylesheet"
-        , H.href "https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
-        ]
-    , H.link'
-        [ H.rel "stylesheet"
-        , H.href "./assets/tailwind.min.css"
-        ]
-    , H.meta [ H.charset "ISO-8859-1" ] []
+    [ H.meta [ H.charset "ISO-8859-1" ] []
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
+    , stylesheetAsset "tailwind.min.css"
+    , stylesheetAsset "style.css"
     , toHydration fe
     , H.script [ H.src $ entrypoint ev ] []
     ]
