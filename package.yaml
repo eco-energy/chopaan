@@ -178,6 +178,7 @@ library:
         - Chopaan.Graph.G
         - Chopaan.Graph.Snapshot
         - Chopaan.CRUD
+        - Chopaan.Ui.Base
         - Chopaan.Ui.AddKbtz
         - Chopaan.Ui.Foreign.Utils
         - Chopaan.Ui.Foreign.WebSocket
@@ -263,6 +264,7 @@ library:
         - Chopaan.Graph
         - Chopaan.Graph.Snapshot
         - Chopaan.CRUD
+        - Chopaan.Ui.Base
         - Chopaan.Ui.AddKbtz
         - Chopaan.Ui.Foreign.Utils
         - Chopaan.Ui.Foreign.WebSocket

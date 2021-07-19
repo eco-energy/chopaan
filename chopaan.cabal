@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d5f18c188ab374c0622d1c3c74ff9e9843ffdaa28892ba29b5bd952402e54fab
+-- hash: d0b78fdd4d62e274c60ecb9f77c4c464b157bb38774a07b066c46833779bef1b
 
 name:           chopaan
 version:        0.1.0.0
@@ -181,6 +181,7 @@ library
         Chopaan.Graph.G
         Chopaan.Graph.Snapshot
         Chopaan.CRUD
+        Chopaan.Ui.Base
         Chopaan.Ui.AddKbtz
         Chopaan.Ui.Foreign.Utils
         Chopaan.Ui.Foreign.WebSocket
@@ -265,6 +266,7 @@ library
         Chopaan.Graph
         Chopaan.Graph.Snapshot
         Chopaan.CRUD
+        Chopaan.Ui.Base
         Chopaan.Ui.AddKbtz
         Chopaan.Ui.Foreign.Utils
         Chopaan.Ui.Foreign.WebSocket
