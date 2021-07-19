@@ -4,7 +4,7 @@
 }:
 
 let
-  artifact = (import ./snowman.nix).build { isJS = true; };
+  artifact = (import ./snowman.nix).build { isJS = true; inherit optimize; };
   pkgs = (import (builtins.fetchTarball {
         url = "https://github.com/NixOS/nixpkgs/archive/${chan}.tar.gz";
   }) { inherit system; });
