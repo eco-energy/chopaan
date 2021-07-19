@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, TypeApplications, ScopedTypeVariables, OverloadedLabels #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
-{-# LANGUAGE AllowAmbiguousTypes       #-}
-{-# LANGUAGE DataKinds                 #-}
+{-# LANGUAGE AllowAmbiguousTypes, ImpredicativeTypes, QuantifiedConstraints       #-}
+{-# LANGUAGE DataKinds, GADTs                 #-}
 {-# LANGUAGE DuplicateRecordFields     #-}
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell, RecordWildCards, PackageImports #-}
@@ -13,7 +13,7 @@ import Control.Arrow
 import Control.DeepSeq
 import Control.Monad
 import Control.Monad.IO.Class
-
+import Control.Monad.Trans.State
 
 import Control.Concurrent.STM
 import Data.Functor.Rep
@@ -58,6 +58,7 @@ import Linear.Metric
 import Linear.Projection
 
 import qualified Chopaan.Ui.Style as Css
+import Chopaan.Ui.Base
 import Chopaan.Ui.Interaction
 
 -- $ A Translation of
@@ -65,77 +66,7 @@ import Chopaan.Ui.Interaction
 -- $ https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
 -- $ https://github.com/mrdoob/three.js/blob/dev/examples/jsm/controls/TrackballControls.js
 -- $ https://github.com/mrdoob/three.js/blob/dev/examples/css3d_periodictable.html
-
-
 default(T.Text)
-
-type R = Double
-
-type V3R = V3 R 
-
-type QuatR = Quaternion R
-
-type M44R = M44 R
-
-
-data Obj = Obj
-  { _pos :: V3R
-  , _rot :: QuatR
-  , _scale :: V3R
-  , _localTransform :: M44R
-  , _worldTransform :: M44R
-  } deriving (Eq, Ord, Show, Generic, NFData)
-
-
-transformObj :: M44R -> Obj -> Obj
-transformObj t o = o
-                   & #_pos %~ ((t ^. translation) ^+^) 
-                   & (#_localTransform) %~ (t !*!)
-                   & (#_worldTransform) %~ (t !*!)
-                   
-
-translateObj :: V3R -> Obj -> Obj
-translateObj t o = o
-                   & #_pos .~ newP
-                   & (#_localTransform . translation) .~ newP
-                   & (#_worldTransform . translation) .~ newP
-  where
-    newP = t ^+^ (_pos o)
-
-rotateObj :: QuatR -> Obj -> Obj
-rotateObj q o = o
-                & #_rot .~ newQ
-                & (#_localTransform . _m33) %~ newQT
-                & (#_worldTransform . _m33) %~ newQT
-  where
-    newQ = q * (_rot o)
-    newQT p = (fromQuaternion q !*! p)
-
-scaleObj :: V3R -> Obj -> Obj
-scaleObj s o = o
-               & #_scale .~ s
-               & (#_localTransform . _m33) %~ newS
-               & (#_worldTransform . _m33) %~ newS
-  where
-    newS p = (scaled s !*! p)
-
-
-transformMat :: V3R -> QuatR -> V3R -> M44R
-transformMat p r s = mkTransformationMat ((scaled s) !*! (fromQuaternion r)) p
-
-asT :: Obj -> M44R
-asT Obj{_pos, _rot, _scale} = transformMat _pos _rot _scale
-
-mkObj :: V3R -> QuatR -> V3R -> Obj
-mkObj pos rot scale = Obj pos rot scale locT locT
-  where
-    locT = transformMat pos rot scale
-
-defQuat = axisAngle (V3 1 1 1) 
-
-zeroObj :: Obj
-zeroObj = mkObj zero zero (V3 1 1 1)
-
 
 data Camera = Camera
   { fov :: Double
@@ -146,7 +77,7 @@ data Camera = Camera
   , projectionTransform :: M44R
   , cameraObj :: Obj
   }
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
 toRad = (* (pi / 180))
 nanEr v x = if (isNaN x) then error (v <> " is NaN") else x
@@ -188,15 +119,19 @@ transformCamera t c = c & #cameraObj .~ (newO)
                         & (#matrixWorldInverse) .~ (inv44 $ asT newO)
   where
     newO = transformObj t $ c ^. #cameraObj 
-                      
+
+           
 worldDirection :: Camera -> V3 R
 worldDirection = normalize . (view (_xyz . column _z)) . matrixWorldInverse 
 
-data Scene a = Scene [(a, Obj)]
-  deriving (Eq, Show, Generic, NFData)
+newtype Scene a = Scene { runScene :: [(a, Obj)] }
+  deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
 mkScene :: (Int -> Obj) -> [a] -> Scene a
 mkScene objF = Scene . (flip zip (objF <$> [0,1..]))
+
+transformScene :: M44R -> Scene a -> Scene a
+transformScene p = Scene . fmap (second (transformObj p)) . runScene
 
 data Screen = Screen
   { widthG :: Double
@@ -211,8 +146,13 @@ data ThreeModel a = ThreeModel
   { scene :: Scene a
   , camera :: Camera
   , screen :: Screen
-  } deriving (Eq, Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
+transformModel :: M44R -> ThreeModel a -> ThreeModel a
+transformModel p (ThreeModel s c x) = ThreeModel s c' x
+  where
+    c' = transformCamera p c
+    s' = (transformScene (c' ^. #cameraObj . #_localTransform) s)
 
 
 epsilon :: (Functor f, RealFrac a, Ord a) => f a -> f a
@@ -270,7 +210,9 @@ getWH = do
 -- 
 --
 
-type ControlModel a = (ThreeModel a, Maybe TrackballState)
+type ControlModel a = (ThreeModel a, Maybe (forall b. TrackballS b))
+
+type Throttler m a = (H.Throttle m (PointerEv -> JSM (Continuation m (ControlModel a))) (ControlModel a))
 
 screenAspect :: Screen -> Double
 screenAspect s = (widthG s / heightG s) 
@@ -288,8 +230,13 @@ getScreen e = do
   l <- (\a b c -> a - c) <$> getLeft r <*> getPageXOffset win <*> (getClientLeft docE)
   return $ Screen w h l t
 
-threeD :: forall m a. (MonadJSM m, Humanize a) => ControlModel a -> Html m (ControlModel a)
-threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
+
+
+threeD :: forall m a. (MonadJSM m, Humanize a)
+       => Throttler m a
+       -> ControlModel a
+       -> Html m (ControlModel a)
+threeD throt ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
   H.div (cameraCSS) $
     (\(x, y) -> H.div (objCSS y) . pure . H.text . humanize $ x) <$> xs
   ]
@@ -297,12 +244,8 @@ threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
     rootProps = rootHandler <> rootCSS
     rootHandler = [ H.listenRaw "resize" screenHandler
                   --, H.listenRaw "load" screenHandler
-                  , H.onResizeC 
-                    (impur $ do
-                                 debug @ToJSON "On Resize Called"               
-                                 return id)
                   , onPointerDown (pure . rightC' . startAction)
-                  , onPointerMove (pure . rightC' . maybeC' . controlTf)
+                  , onMove throt (pure . rightC' . maybeC' . controlTf)
                   , onPointerUp (pure . rightC' . endAction)
                   ]
     screenHandler :: RawNode -> RawEvent -> JSM (Continuation m (ThreeModel a, x))
@@ -357,79 +300,12 @@ grid3D row col stack = (gridPos)
     heightOffset = 800
 
 
-data TrackballAction = Pan | Zoom | Rotate 
-  deriving (Eq, Ord, Show, Generic, NFData)
-
-type ActionStates = Either ZoomState (Either PanState RotState)
-type ZoomState = V2 R
-type PanState = (V2 R, V2 R)
-type RotState = (V2 R, V2 R)
+-- data TrackballAction = Pan | Zoom | Rotate 
 
 
-liftZ :: (Functor m) => Continuation m ZoomState -> Continuation m (ZoomState, M44R)
-liftZ = liftC' (\z (z', t) -> (z, over translation (^+^ (baseScale ^* (zoomFactor . zdiff $ (z, z')))) t)) (\(z, t) -> z)
-  where
-    baseScale = (V3 1 1 1)
-    zoomFactor x = 1.0 + x * 1.2
-    zdiff (start, end) = end ^. _y - start ^. _y 
-    
-liftP :: Continuation m PanState -> Continuation m (PanState, M44R)
-liftP = undefined
-
-liftR :: Continuation m RotState -> Continuation m (RotState, M44R)
-liftR = undefined
-
-
-zoomA :: PointerEv -> Continuation m ZoomState
-zoomA PointerEv{pos} = pur $ \endP -> V2 (fst pos) (snd pos) ^-^ endP
-
-panA :: PointerEv -> Continuation m PanState
-panA = undefined
-
-rotateA :: PointerEv -> Continuation m RotState
-rotateA = undefined
-
-
-
-
-getAct :: (Applicative m) => TrackballAction -> (PointerEv -> Continuation m (ActionStates, M44R))
-getAct Pan = liftCMay' toAct mayPan . (liftP . panA)
-  where
-    toAct :: (PanState, M44R) -> (ActionStates, M44R) -> (ActionStates, M44R)
-    toAct a b = (Right . Left . fst $ a, snd a !*! snd b)
-    mayPan (Right (Left k), a) = Just (k, a)
-    mayPan _ = Nothing
-getAct Zoom = liftCMay' toAct mayZoom . liftZ . zoomA
-  where
-    toAct :: (ZoomState, M44R) -> (ActionStates, M44R) -> (ActionStates, M44R)
-    toAct a b = (Left . fst $ a, snd a !*! snd b)
-    mayZoom (Left k, a) = Just (k, a)
-    mayZoom _ = Nothing
-getAct Rotate = liftCMay' toAct mayRot . liftR . rotateA
-  where
-    toAct :: (RotState, M44R) -> (ActionStates, M44R) -> (ActionStates, M44R)
-    toAct a b = (Right . Right . fst $ a, snd b !*! snd a)
-    mayRot (Right (Right k), a) = Just (k, a)
-    mayRot _ = Nothing
-
-type TrackballState = (Maybe TrackballAction, (ActionStates, M44R))
-
-defActState = (Just Zoom, (Left zero, identity))
-
-getActionType :: Button -> TrackballAction
-getActionType = const Zoom
-
-startAction :: PointerEv -> Continuation m (Maybe TrackballState) 
-startAction PointerEv{button, pos} = pur $ (\_ -> Just (getActionType <$> button, (Left $ V2 (fst pos) (snd pos), identity)))
-
-endAction :: PointerEv -> Continuation m (Maybe TrackballState)
-endAction _ = pur (const Nothing)
-                      
-controlTf :: Applicative m => PointerEv -> Continuation m (TrackballState)
-controlTf = rightC' . (getAct Zoom)
-
-deltaModel :: TrackballState -> ThreeModel a -> ThreeModel a
-deltaModel (_, (_, diff)) m = over #camera (transformCamera diff) m
+deltaModel :: Maybe TrackballS b -> ThreeModel a -> ThreeModel a
+deltaModel Nothing _ = id
+deltaModel (Just del) = transformModel del
 
 styleP :: T.Text -> (T.Text, H.Prop m a)
 styleP = H.textProperty "style"
@@ -456,14 +332,16 @@ animation :: Window -> TVar (ControlModel a) -> JSM (RequestAnimationFrameCallba
 animation w tv = go
   where
     go = newRequestAnimationFrameCallback $ \(clock') -> () <$ do
-      liftIO . atomically $ do
-        (threeM, t) <- readTVar tv
-        case t of
-          Nothing -> return ()
-          Just ts -> writeTVar tv (deltaModel ts threeM, Just ts)
-      (requestAnimationFrame w) =<< (animation w tv)
+      --do
+    (threeM, t) <- liftIO . atomically $ readTVar tv
+    case t of
+      Nothing -> return ()
+      Just ts -> liftIO . atomically $ writeTVar tv (deltaModel ts threeM, Just ts)
+    debug @ToJSON t
+    (requestAnimationFrame w) =<< (animation w tv)
 
-threeDM :: (Eq a, NFData a, Humanize a) => (Int -> Obj) -> [a] -> JSM RawNode
+
+threeDM :: (Eq a, NFData a, ToJSON a, Humanize a) => (Int -> Obj) -> [a] -> JSM RawNode
 threeDM objF xs = do
   let vId = "threeDView"
   doc <- currentDocumentUnchecked
@@ -471,15 +349,19 @@ threeDM objF xs = do
   case isSubsequent of
     Just raw -> return $ RawNode raw
     Nothing -> do
+      throt <- liftIO $ H.throttle 1
       win <- currentWindowUnchecked
       elm <- createElement doc "div"
       setId elm vId
+      debug @ToJSVal elm
       (w, h) <- getWH
       let mod = mkModel (Screen w h 0 h) objF xs 
       model <- liftIO $ newTVarIO (mod, Nothing)
       _ <- requestAnimationFrame win =<< animation win model
       raw <- RawNode <$> toJSVal elm
-      _ <- forkIO $ shpadoinkle id runSnabbdom model threeD (pure raw)
+      ctx <- askJSM
+      _ <- forkIO $ threadDelay 10
+           >> shpadoinkle id runSnabbdom model ((threeD throt) . trapper @ToJSON ctx) (pure raw)
       return raw
 
 
@@ -488,16 +370,18 @@ main = runJSorWarp 8080 $ do
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
   win <- currentWindowUnchecked
-  scr <- (\x -> (debug @ToJSVal x >> getScreen x))
+  throt <- liftIO $ H.throttle 1
+  scr <- (\x -> (getScreen x))
          -- =<< (\x -> (debug @ToJSVal x >> (fromJSValUnchecked @Element) x))
          =<< (getDocumentElementUnchecked =<< currentDocumentUnchecked)
   debug @ToJSON scr
   let objF = grid3D 5 5 25
-  let mod = mkModel scr objF (take 1000 $ repeat testText) 
+  let mod = mkModel scr objF (take 1 $ repeat testText) 
   model <- liftIO $ newTVarIO (mod, Nothing)
   _ <- requestAnimationFrame win =<< animation win model
-  shpadoinkle id runSnabbdom model (threeD) (getBody)
-
+  ctx <- askJSM
+  shpadoinkle id runSnabbdom model ((threeD throt)) (getBody)
+--  . trapper @ToJSON ctx
 
 testText :: T.Text
 testText = "Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of 'de Finibus Bonorum et Malorum' (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, 'Lorem ipsum dolor sit amet..', comes from a line in section 1.10.32."
