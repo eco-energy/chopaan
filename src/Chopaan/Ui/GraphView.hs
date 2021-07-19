@@ -58,7 +58,7 @@ render3dGrid sg = case sg of
   (G.Flow (SG ms)) -> renderBaked ms
   where
     renderBaked :: forall v l.
-                 (Eq l, Eq v, NFData l, NFData v, Humanize l, Humanize v)
+                 (Eq l, Eq v, NFData l, NFData v, Humanize l, Humanize v, ToJSON v)
                =>  SnapshotGraph n v l -> Html m ()
     renderBaked (ns, ls) = H.baked $ do
       (, retrySTM) <$> (threeDM objF elements)
