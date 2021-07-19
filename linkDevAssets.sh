@@ -26,6 +26,10 @@ do
     ln -s $asset $OUT/assets/$(basename $asset)
 done
 
+if [ ! -d $ARTIFACT ]; then
+    echo "JS Executable Not Found! Please run: `make devjs` "
+    exit
+fi    
 ln -s ${ARTIFACT}/all.js $OUT/all.min.js
 ln -s ${ARTIFACT}/index.html $OUT/index.html
 echo $(git log --pretty=format:'%h' -n 1) > $OUT/version
