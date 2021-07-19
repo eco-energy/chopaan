@@ -44,12 +44,13 @@ let
       inherit (import (shpadoinkle + "/nix/util.nix") { inherit compiler isJS pkgs; }) compilerjs gitignore doCannibalize;
 
 
+      chill = p: pkgs.haskell.lib.dontHaddock p;
       # Build faster by doing less
-      chill = p: (pkgs.haskell.lib.overrideCabal p {
-        inherit enableLibraryProfiling enableExecutableProfiling;
-      }).overrideAttrs (_: {
-        inherit doHoogle doHaddock strictDeps;
-      });
+      # chill = p: (pkgs.haskell.lib.overrideCabal p {
+      #   inherit enableLibraryProfiling enableExecutableProfiling;
+      # }).overrideAttrs (_: {
+      #   inherit doHoogle doHaddock strictDeps;
+      # });
 
 
       # Overlay containing Shpadoinkle packages, and needed alterations for those packages
