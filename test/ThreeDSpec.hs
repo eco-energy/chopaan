@@ -2,6 +2,7 @@
 module ThreeDSpec where
 
 import Test.Hspec
+import Chopaan.Ui.Base
 import Chopaan.Ui.ThreeD
 import Chopaan.Ui.Interaction
 import qualified Linear.Vector as V
@@ -10,7 +11,7 @@ import Linear.V3
 import Linear.V2
 import Linear.Metric
 import Linear.Matrix
-import Control.Lens (over)
+import Control.Lens
 
 import Test.QuickCheck
 
@@ -30,8 +31,8 @@ spec = describe "3D in Shpadoinkle for CSS transforms" $ do
     (hasNaN . matrixWorldInverse $ c) `shouldBe` False
     (hasNaN . projectionTransform $ c) `shouldBe` False
   it "Zoom in on ascending pointer pos, Zoom out on descending" $ do
-    let pvs = (\i -> (i, i) :: PointerPos) <$> [1..(10 :: Double)]
+    let pvs = (\i -> posVec (i, i)) <$> [1..(10 :: Double)]
     let x = foldl (flip zoomA) (V.zero, V.zero) pvs
-    (ydiff x) `shouldBe` 1.0
+    (x ^. _2 . _y) `shouldBe` 1.0
     
     
