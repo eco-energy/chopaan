@@ -68,21 +68,22 @@ deltaDiskPlot :: forall f.
   -> f R
   -> f R
   -> ImageC
-deltaDiskPlot toC xs ys = (toC . fst) `C.over` im
+deltaDiskPlot toC = (toC . fst) `C.over` im
   where
     im = toImageC $ deltaPlot disk xs ys
+    {-# INLINE im #-}
 {-# INLINE deltaDiskPlot #-}
 
 
 deltaPlot :: forall f.
   (Foldable f, Functor f, Zip f)
-  => (R -> Region)
+  => (R -> R -> R -> Region)
   -> f R
   -> f R
   -> Region
 deltaPlot toR xs ys = foldl xorR noThing $
                       (\(x, d) -> translate (x, 0) d)
-                      <$> Data.Key.zip xs deltas 
+                      <$> Data.Key.zip xs (toR <$> ys) 
   where
     noThing :: Region
     noThing = nothing
@@ -95,15 +96,16 @@ installEffect = undefined
 
 
 imListener :: forall m. (MonadJSM m)
-  => (ShaderEff -> m (Continuation m ShaderEff))
+  => m ShaderEff
+  -> Control
   -> RawNode
   -> Html m ShaderEff
 imListener ma = baked . args
   where
-    args :: RawNode -> JSM (RawNode, STM (Continuation m ShaderEff))
+    args :: RawNode -> JSM (RawNode, STM (Continuation m Control))
     args x = pure (x, f)
-    f :: STM (Continuation m ShaderEff)
-    f = pure $ Continuation  (id, ma)
+    f :: STM (Continuation m Control)
+    f = pure $ kleisli ma
         ---sss = runShader' unitW (\() -> deltaDiskPlot (\(x, y) -> C.black) undefined)
 
 
