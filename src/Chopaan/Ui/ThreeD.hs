@@ -35,7 +35,7 @@ import GHCJS.DOM.DOMRectReadOnly (getTop, getWidth, getHeight, getLeft)
 import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback, RequestAnimationFrameCallback)
 
 import Shpadoinkle (Html, JSM, MonadJSM, liftJSM, TVar, shpadoinkle
-                   , voidC, liftC', leftC', rightC', maybeC', liftCMay', eitherC'
+                   , voidC, liftC', leftC', rightC', rightC, maybeC', liftCMay', eitherC'
                    , Continuation, pur, impur, kleisli, RawNode(..), RawEvent)
 import Shpadoinkle.Run (runJSorWarp)
 import qualified Shpadoinkle.Html as H
@@ -210,7 +210,7 @@ getWH = do
 -- 
 --
 
-type ControlModel a = (ThreeModel a, Maybe (forall b. TrackballS b))
+type ControlModel a = (ThreeModel a, Maybe Interact)
 
 type Throttler m a = (H.Throttle m (PointerEv -> JSM (Continuation m (ControlModel a))) (ControlModel a))
 
@@ -244,9 +244,9 @@ threeD throt ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
     rootProps = rootHandler <> rootCSS
     rootHandler = [ H.listenRaw "resize" screenHandler
                   --, H.listenRaw "load" screenHandler
-                  , onPointerDown (pure . rightC' . startAction)
-                  , onMove throt (pure . rightC' . maybeC' . controlTf)
-                  , onPointerUp (pure . rightC' . endAction)
+                  , rightC <$> onStart
+                  , rightC <$> onEnd
+                  , rightC <$> move
                   ]
     screenHandler :: RawNode -> RawEvent -> JSM (Continuation m (ThreeModel a, x))
     screenHandler (RawNode n) re = do
@@ -300,12 +300,9 @@ grid3D row col stack = (gridPos)
     heightOffset = 800
 
 
--- data TrackballAction = Pan | Zoom | Rotate 
 
-
-deltaModel :: Maybe TrackballS b -> ThreeModel a -> ThreeModel a
-deltaModel Nothing _ = id
-deltaModel (Just del) = transformModel del
+deltaModel :: Interact -> ThreeModel a -> ThreeModel a
+deltaModel del = transformModel $ evalI del
 
 styleP :: T.Text -> (T.Text, H.Prop m a)
 styleP = H.textProperty "style"
@@ -332,13 +329,12 @@ animation :: Window -> TVar (ControlModel a) -> JSM (RequestAnimationFrameCallba
 animation w tv = go
   where
     go = newRequestAnimationFrameCallback $ \(clock') -> () <$ do
-      --do
-    (threeM, t) <- liftIO . atomically $ readTVar tv
-    case t of
-      Nothing -> return ()
-      Just ts -> liftIO . atomically $ writeTVar tv (deltaModel ts threeM, Just ts)
-    debug @ToJSON t
-    (requestAnimationFrame w) =<< (animation w tv)
+      (threeM, t) <- liftIO . atomically $ readTVar tv
+      case t of
+        Nothing -> return ()
+        Just ts -> liftIO . atomically $ writeTVar tv (deltaModel ts threeM, Just ts)
+      debug @ToJSON t
+      (requestAnimationFrame w) =<< (animation w tv)
 
 
 threeDM :: (Eq a, NFData a, ToJSON a, Humanize a) => (Int -> Obj) -> [a] -> JSM RawNode
