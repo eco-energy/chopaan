@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, DuplicateRecordFields, OverloadedLabels, NamedFieldPuns #-}
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, StandaloneDeriving, FlexibleInstances #-}
 module Chopaan.Ui.Base where
 
 import GHC.Generics hiding (R)
@@ -13,6 +13,7 @@ import Data.Generics.Labels
 
 import Linear.Vector
 import Linear.Matrix
+import Linear.Affine
 import Linear.V2
 import Linear.V3
 import Linear.V4
@@ -28,6 +29,9 @@ type V3R = V3 R
 type QuatR = Quaternion R
 
 type M44R = M44 R
+
+deriving instance (ToJSON a) => ToJSON (Point V2 a)
+deriving instance (FromJSON a) => FromJSON (Point V2 a)
 
 deriving instance (ToJSON a) => ToJSON (V2 a)
 deriving instance (FromJSON a) => FromJSON (V2 a)
