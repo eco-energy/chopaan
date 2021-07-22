@@ -2,6 +2,8 @@
 module ThreeDSpec where
 
 import Test.Hspec
+import Data.Semigroup
+import Shpadoinkle (runContinuation)
 import Chopaan.Ui.Base
 import Chopaan.Ui.ThreeD
 import Chopaan.Ui.Interaction
@@ -12,6 +14,9 @@ import Linear.V2
 import Linear.Metric
 import Linear.Matrix
 import Control.Lens
+
+import qualified Streamly.Prelude as S
+import Streamly
 
 import Test.QuickCheck
 
@@ -31,8 +36,22 @@ spec = describe "3D in Shpadoinkle for CSS transforms" $ do
     (hasNaN . matrixWorldInverse $ c) `shouldBe` False
     (hasNaN . projectionTransform $ c) `shouldBe` False
   it "Zoom in on ascending pointer pos, Zoom out on descending" $ do
-    let pvs = (\i -> posVec (i, i)) <$> [1..(10 :: Double)]
-    let x = foldl (flip zoomA) (V.zero, V.zero) pvs
-    (x ^. _2 . _y) `shouldBe` 1.0
-    
+    let
+      pvs = (\i -> posVec (i, i)) <$> [1..(10000 :: Double)]
+      scanner = foldl (flip zoomA) (V.zero, V.zero) pvs
+    (scanner ^. _2 . _y) `shouldBe` 1.0
+  it "Continuations are Isomorphic to scans" $ do
+    let
+      pvs = (\i -> posVec (i, i)) <$> [1..(10000 :: Double)]
+      scanner = foldl (flip zoomA) (V.zero, V.zero)
+      zoomNext :: Monad m => PPos -> m (ZoomS -> ZoomS) 
+      zoomNext p = runContinuation (zoomC p) (posVec (0, 0), posVec (0, 0))
+      contZ :: Monad m => [PPos] -> m ZoomS
+      contZ ps = S.foldlM' (\prev c -> do
+                           n <- zoomNext c
+                           return (n prev)) ((V.zero, V.zero)) $ S.fromList ps
+    x <- contZ pvs
+    print x
+    x `shouldBe` (scanner pvs)
+      
     
