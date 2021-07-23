@@ -20,7 +20,11 @@ import Linear.V4
 import Linear.Quaternion
 import Linear.Metric
 import Linear.Projection
+import Data.Monoid
 
+type Unop a = a -> a 
+
+type T = Endo M44R
 
 type R = Double
 
@@ -45,6 +49,7 @@ deriving instance (FromJSON a) => FromJSON (V4 a)
 deriving instance (ToJSON a) => ToJSON (Quaternion a)
 deriving instance (FromJSON a) => FromJSON (Quaternion a)
 
+deriving instance (NFData a) => NFData (Endo a) 
 
 data Obj = Obj
   { _pos :: V3R
@@ -55,11 +60,13 @@ data Obj = Obj
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 
-transformObj :: M44R -> Obj -> Obj
+transformObj :: T -> Obj -> Obj
 transformObj t o = o
-                   & #_pos %~ ((t ^. translation) ^+^) 
-                   & (#_localTransform) %~ (t !*!)
-                   & (#_worldTransform) %~ (t !*!)
+                   & #_pos %~ ((t' ^. translation) ^+^) 
+                   & (#_localTransform) .~ t' 
+                   & (#_worldTransform) %~ (appEndo t)
+  where
+    t' = (appEndo t) (_localTransform o)
                    
 
 translateObj :: V3R -> Obj -> Obj
