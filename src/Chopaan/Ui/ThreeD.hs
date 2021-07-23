@@ -114,7 +114,7 @@ changeAspect :: Double -> Camera -> Camera
 changeAspect a (c@Camera{..}) = c & #aspect .~ a
                      & (#projectionTransform) .~ (perspective fov aspect near far) 
 
-transformCamera :: M44R -> Camera -> Camera
+transformCamera :: T -> Camera -> Camera
 transformCamera t c = c & #cameraObj .~ (newO) 
                         & (#matrixWorldInverse) .~ (inv44 $ asT newO)
   where
@@ -130,7 +130,7 @@ newtype Scene a = Scene { runScene :: [(a, Obj)] }
 mkScene :: (Int -> Obj) -> [a] -> Scene a
 mkScene objF = Scene . (flip zip (objF <$> [0,1..]))
 
-transformScene :: M44R -> Scene a -> Scene a
+transformScene :: T -> Scene a -> Scene a
 transformScene p = Scene . fmap (second (transformObj p)) . runScene
 
 data Screen = Screen
@@ -148,11 +148,10 @@ data ThreeModel a = ThreeModel
   , screen :: Screen
   } deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
-transformModel :: M44R -> ThreeModel a -> ThreeModel a
+transformModel :: T -> ThreeModel a -> ThreeModel a
 transformModel p (ThreeModel s c x) = ThreeModel s c' x
   where
     c' = transformCamera p c
-    s' = (transformScene (c' ^. #cameraObj . #_localTransform) s)
 
 
 epsilon :: (Functor f, RealFrac a, Ord a) => f a -> f a
@@ -212,7 +211,7 @@ getWH = do
 
 type ControlModel a = (ThreeModel a, Maybe Interact)
 
-type Throttler m a = (H.Throttle m (PointerEv -> JSM (Continuation m (ControlModel a))) (ControlModel a))
+type Throttler m ev a = (H.Throttle m (ev -> JSM (Continuation m (ControlModel a))) (ControlModel a))
 
 screenAspect :: Screen -> Double
 screenAspect s = (widthG s / heightG s) 
@@ -233,7 +232,7 @@ getScreen e = do
 
 
 threeD :: forall m a. (MonadJSM m, Humanize a)
-       => Throttler m a
+       => Throttler m Pointer a
        -> ControlModel a
        -> Html m (ControlModel a)
 threeD throt ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
@@ -299,8 +298,6 @@ grid3D row col stack = (gridPos)
     elHeight = 400
     heightOffset = 800
 
-
-
 deltaModel :: Interact -> ThreeModel a -> ThreeModel a
 deltaModel del = transformModel $ evalI del
 
@@ -333,7 +330,7 @@ animation w tv = go
       case t of
         Nothing -> return ()
         Just ts -> liftIO . atomically $ writeTVar tv (deltaModel ts threeM, Just ts)
-      debug @ToJSON t
+      --debug @ToJSON t
       (requestAnimationFrame w) =<< (animation w tv)
 
 
@@ -372,7 +369,7 @@ main = runJSorWarp 8080 $ do
          =<< (getDocumentElementUnchecked =<< currentDocumentUnchecked)
   debug @ToJSON scr
   let objF = grid3D 5 5 25
-  let mod = mkModel scr objF (take 1 $ repeat testText) 
+  let mod = mkModel scr objF (take 100 $ repeat testText) 
   model <- liftIO $ newTVarIO (mod, Nothing)
   _ <- requestAnimationFrame win =<< animation win model
   ctx <- askJSM
