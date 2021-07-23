@@ -4,8 +4,7 @@
 {-# LANGUAGE AllowAmbiguousTypes, ImpredicativeTypes, QuantifiedConstraints       #-}
 {-# LANGUAGE DataKinds, GADTs                 #-}
 {-# LANGUAGE DuplicateRecordFields, OverloadedLabels, NamedFieldPuns     #-}
-{-# LANGUAGE FlexibleContexts          #-}
-
+{-# LANGUAGE FlexibleContexts, ExtendedDefaultRules          #-}
 
 module Chopaan.Ui.Interaction where
 
@@ -49,10 +48,9 @@ import Linear.Metric
 import Linear.Projection
 
 import Chopaan.Ui.Base
--- mkOnKey ::  Text -> (KeyCode -> Continuation m a) -> (Text, Prop m a)
--- mkOnKey t f = listenRaw t $ \_ (RawEvent e) ->
---   f <$> liftJSM (fmap round $ valToNumber =<< unsafeGetProp "keyCode" =<< valToObject e)
- -- (Double, Double)
+
+
+default(T.Text)
 
 newtype Ctrl = Ctrl { unCtrl :: (TVar [Interact]) }
   deriving (Generic)
@@ -64,14 +62,19 @@ type PosDiff = Diff (Point V2) R
 
 type PosState = (LastPos, PosDiff)
 
+initPosState :: CurPos -> PosState
+initPosState p = (p, zero)
+
 diffPos :: CurPos -> Unop PosState
 diffPos p = \(e, _) -> (p, (p .-. e))
 
-
-
 runCtrl :: (MonadUnliftIO m, Applicative m) => Ctrl -> Continuation m (Maybe Interact) -> m ()
 runCtrl (Ctrl t) c = writeUpdate t (listC c)
-
+  where
+    listC :: (Applicative m) => Continuation m (Maybe a) -> Continuation m [a]
+    listC = liftCMay' (\x a -> a
+                        <> (fromMaybe mempty (fmap pure x)))
+            (\(a:_) -> pure $ pure a)
 
 onStart :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
 onStart = onPointerDown (pure . startControl)
@@ -79,20 +82,40 @@ onStart = onPointerDown (pure . startControl)
 onEnd :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
 onEnd = onPointerUp (pure . endControl)
 
+--onEnter
+
+onExit :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
+onExit = onPointer "exit" (pure . endControl)
+
 move :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
-move = onPointerMove (pure . controlC . pos)
+move = onPointerMove (pure . controlC)
 
-startControl :: (Applicative m) => a -> Continuation m (Maybe Interact)
-startControl = const . pur . const . Just . Tr $ identity
+startControl :: (Applicative m) => Pointer -> Continuation m (Maybe Interact)
+startControl p = pur getInitState
+  where
+    getInitState :: Maybe Interact -> Maybe (Interact)
+    getInitState prev = case button p of
+      NoneB -> case prev of
+        Nothing -> Nothing
+        (Just (ZoomI z)) -> Just . zoomI $ zoomA (pos p) z
+        (Just (PanI z)) -> Just . panI $ panA (pos p) z
+        (Just (RotateI z)) -> Just . rotateI $ rotateA (pos p) z
+        (Just (Tr z)) -> error "How should we treat Tr?" --Just . zoomI $ zoomA (pos p) z
+      ZoomB -> Just . zoomI $ initZoomState (pos p)
+      PanB -> Just . panI $ initPanState (pos p)
+      RotateB -> Just . rotateI $ initRotateState (pos p)
+      TouchRotateB -> error "touch rotate not handled"
+      TouchZoomB -> error "touch zoom not handled"
+      
 
-controlC :: (Applicative m) => PosState -> Continuation m (Maybe Interact)
+controlC :: (Applicative m) => Pointer -> Continuation m (Maybe Interact)
 controlC = maybeC' . control'
 
 endControl :: (Applicative m) => a -> Continuation m (Maybe Interact)
 endControl = const . pur . const $ Nothing
 
 
-control' :: (Applicative m) => PosState -> Continuation m Interact
+control' :: (Applicative m) => Pointer -> Continuation m Interact
 control' p = (boop' panI (preview #_PanI) $ panC p)
             <> (boop' zoomI (preview #_ZoomI) $ zoomC p)
             <> (boop' rotateI (preview #_RotateI) $ rotateC p)
@@ -101,7 +124,7 @@ control' p = (boop' panI (preview #_PanI) $ panC p)
 
 
 data PointerType = Touch | Mouse
-  deriving (Eq, Ord, Show, Generic, Enum, Bounded, ToJSVal, FromJSVal, NFData)
+  deriving (Eq, Ord, Show, Generic, Enum, Bounded, ToJSON, NFData)
 
 getPointerType :: JSString -> Maybe PointerType
 getPointerType "touch" = Just Touch
@@ -114,9 +137,12 @@ data Pointer = Pointer
   { pos :: CurPos
   , pointerType :: Maybe PointerType
   , pointerId :: Int
-  , button :: Maybe (Button)
-  }
+  , button :: Button
+  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON)
 
+
+toPos :: (R, R) -> Point V2 R
+toPos = (zero .+^) . (uncurry V2)
 
 fromPointer :: RawEvent -> JSM (Maybe Pointer)
 fromPointer (RawEvent e') = liftJSM $ do
@@ -126,9 +152,8 @@ fromPointer (RawEvent e') = liftJSM $ do
   y <- valToNumber =<< getProp "pageY" e
   pid <- fmap round $ valToNumber =<< getProp "pointerId" e
   b <- fmap (round) $ valToNumber =<< getProp "button" e
-  let b' = Just $ toEnum (b + 1)
-  debug @ToJSON (b, b')
-  return $ Just $ Pointer (zero .+^ posVec (x, y)) (getPointerType pt) pid b'
+  let b' = toEnum (b + 1)
+  return $ Just $ Pointer (toPos (x, y)) (getPointerType pt) pid b'
 
 
 onEv :: forall m i o. T.Text -> (RawEvent -> (JSM (Maybe i))) -> (i -> JSM (Continuation m o)) -> (T.Text, Prop m o)
@@ -138,7 +163,7 @@ onEv ev parse f = listenRaw ev (\_ e ->  (step =<< parse e))
     step Nothing = pure . pur $ id
 
 onPointer :: T.Text -> (Pointer -> JSM (Continuation m a)) -> (T.Text, Prop m a)
-onPointer act = onEv ("pointer" <> act) fromPointer     
+onPointer act = onEv ("pointer" <> act) ((\x -> (debug @ToJSON x) >> pure x) <=< fromPointer)     
 
 onPointerUp ::  (Pointer -> JSM (Continuation m a)) -> (T.Text, Prop m a)
 onPointerUp = onPointer "up"
@@ -158,12 +183,14 @@ onMove t = runThrottle t onPointerMove
 unitV :: V3R
 unitV = V3 1 1 1
 
-type ZoomS = PosState
 
 type Eye = V3 R
 type UpDir = V3 R
 type PanSpeed = R
 type PanS = (R, Eye, PosState, UpDir, V3 R) -- (translate in the x and y planes)
+
+initPanState :: CurPos -> PanS
+initPanState p = (1.0, zero, initPosState p, V3 0 1 0, zero)
 
 setLength s = (^* s) . normalize
 
@@ -175,32 +202,99 @@ data CState = CState
   , pointers :: [PointerType]
   } deriving (Eq, Ord, Show, Generic, NFData)
 
-type T = Endo M44R
 
-panT :: Button -> PanS -> T
-panT (panSpeed, eye, (lastP, pd), upDir, pan) = f 
+panT :: PanS -> T
+panT (panSpeed, eye, (lastP, pd), upDir, panDiff) = f 
   where
     f =  if ((norm pd) > 0)
-               then (over translation (.+^ (pan .+^ panDiff)))
-               else id
-    panDiff = let
-      scaledChange = pd ^* ((norm eye) * panSpeed)
-      p' = setLength (pd ^. _x) (cross eye upDir)
-      in p'
+               then Endo $ (over translation (.+^ panDiff))
+               else Endo id
 
-zoomT :: Button -> ZoomS -> T
-zoomT z = over translation (^+^ (unitV ^* (zoomFactor . ydiff $ z)))
+panI :: PanS -> Interact
+panI = PanI
+
+panA :: CurPos -> Unop PanS
+panA p (panSpeed, eye, (lastP, pd), upDir, _) = (panSpeed, eye, (p, pd'), upDir, newP) 
+  where
+    pd' = p .-. lastP
+    scaledChange = pd' ^* ((norm eye) * panSpeed)
+    newP = (setLength (scaledChange ^. _x) (cross eye upDir)) .+^ (setLength (scaledChange ^. _y) upDir)
+
+panC :: Pointer -> Continuation m (PanS)
+panC Pointer{pos, button} = case button of
+  PanB -> pur (panA pos)
+  _ -> pur id
+
+type ZoomS = PosState
+
+initZoomState :: CurPos -> ZoomS
+initZoomState = initPosState
+
+zoomT :: ZoomS -> T
+zoomT z = Endo $ over translation (^+^ (unitV ^* (zoomFactor . ydiff $ z)))
   where
     zoomFactor x = 1.0 + (x * 0.1)
     ydiff (_, diff) = diff ^. _y
 
-rotateT :: Button -> RotateS -> T
-rotateT r = \m ->  (mkTransformation r zero) !*! m
+zoomA :: CurPos -> Unop ZoomS
+zoomA p (lastP, _) = (p, p .-. lastP)
 
-type RotateS = QuatR
+zoomI :: ZoomS -> Interact
+zoomI = ZoomI
+
+zoomC :: Pointer -> Continuation m (ZoomS)
+zoomC Pointer{pos, button} = case button of
+  ZoomB -> pur (zoomA pos)
+  _ -> pur id
+
+
+data RotateS = RotateS
+  { rotationS :: QuatR
+  , rotPosDiff :: (LastPos, PosDiff)
+  , eyeDirection :: V3R
+  , upDir :: V3R
+  , sideDir :: V3R
+  , moveDir :: V3R
+  , rotAxis :: V3R
+  , rotSpeed :: R
+  }
+  deriving (Eq, Ord, Show, Generic, NFData, ToJSON)
+
+initRotateState :: CurPos -> RotateS
+initRotateState p = RotateS defQuat (initPosState p) zero zero zero zero zero 0.1
+
+rotateT :: RotateS -> T
+rotateT r = Endo $ \m -> (mkTransformation (rotationS r) zero) !*! m
+
+rotateI :: RotateS -> Interact
+rotateI = RotateI
+
+rotateA :: CurPos -> Unop RotateS
+rotateA p RotateS{rotationS, rotPosDiff, eyeDirection, upDir, sideDir, moveDir, rotAxis, rotSpeed} = r'
+  where
+    r' = RotateS q' pd' ed' ud' sd' md' ax' rotSpeed
+    q' = axisAngle ax' ang
+      where
+        ang =  norm md'
+    pd' = (p, p .-. lastPos)
+      where
+        (lastPos, posDiff) = rotPosDiff
+    ed' = normalize ed
+      where ed = eyeDirection -- (scope.object.position - scope.target)
+    ud' = setLength (pd' ^. _2 . _y) $ normalize ud
+      where ud = upDir -- scope.object.up
+    sd' = setLength (pd' ^. _2 . _y) $ cross ud' ed'
+    md' = (V3 (pd' ^. _2 . _x) (pd' ^. _2 . _y) 0)
+    ax' = cross md' eyeDirection
+
+  
+rotateC :: Pointer -> Continuation m (RotateS)
+rotateC Pointer{pos, button} = case button of
+  RotateB -> pur (rotateA pos)
+  _ -> pur id
+
 
 type InteractM m a = (StateT (Interact) m)
-
 
 data Interact = ZoomI ZoomS
               | PanI PanS
@@ -211,46 +305,14 @@ data Interact = ZoomI ZoomS
 boop :: Unop a -> Continuation m a
 boop = pur
 
-zoomA :: Pointer -> Unop ZoomS
-zoomA p (lastP, _) = (pos p, pos p .-. lastP)
-
-zoomI :: ZoomS -> Interact
-zoomI = ZoomI
-
-panI :: PanS -> Interact
-panI = PanI
-
-rotateI :: RotateS -> Interact
-rotateI = RotateI
-
-panA :: Pointer -> Unop PanS
-panA = undefined
-
-panC :: Pointer -> Continuation m (PanS)
-panC x = pur (panA x)
-
-zoomC :: Pointer -> Continuation m (ZoomS)
-zoomC p = pur (zoomA p) 
-
-rotateA :: Pointer -> Unop RotateS
-rotateA = undefined
-
-rotateC :: Pointer -> Continuation m (RotateS)
-rotateC = pur . rotateT
-
-listC :: (Applicative m) => Continuation m (Maybe a) -> Continuation m [a]
-listC = liftCMay' (\x a -> a <> (if isJust x then [fromJust x] else [])) (\(a:_) -> pure $ pure a)
-
 evalI :: Interact -> T
 evalI (ZoomI z) = zoomT z
 evalI (PanI p) = panT p
 evalI (RotateI r) = rotateT r
-evalI (Tr i) = i
+evalI (Tr i) = Endo (i !*!)
 
-data Button = None | RotateB | ZoomB | PanB | TouchRotateB | TouchZoomB
+data Button = NoneB | RotateB | ZoomB | PanB | TouchRotateB | TouchZoomB
   deriving (Eq, Ord, Show, Generic, Bounded, Enum, ToJSON, NFData)
-
-
 
 boop' :: Applicative m => (a -> Interact) -> (Interact -> Maybe a) -> Continuation m a -> Continuation m Interact
 boop' f g = liftCMay' (mergeI . f) g
@@ -262,39 +324,7 @@ boopP :: Applicative m => Continuation m PanS -> Continuation m Interact
 boopP = boop' panI (preview #_PanI)
 
 mergeI :: Interact -> Interact -> Interact
-mergeI a b = Tr $ (evalI a) !*! (evalI b)
+mergeI a b = Tr $ (appEndo $ (evalI a) <> (evalI b)) identity
 
-type TrackballS a = (Interact -> M44R)
-
-trackball :: forall f. (Applicative f, Foldable f, Functor f) => f Interact -> M44R
-trackball = undefined
-
-
-type Unop a = a -> a 
-
-
-liftI :: Continuation m (Interact) -> Continuation m M44R
-liftI = undefined
-
-act :: Obj -> M44R -> Obj
+act :: Obj -> T -> Obj
 act = flip transformObj 
-
-
-
-posVec :: (R, R) -> V2 R
-posVec = uncurry V2
-
-
-type PointEre = (Button, V2 R)
-
-path' :: Pointer -> Unop PointEre
-path' = undefined
-
--- path :: Pointer -> Continuation (InteractM m a) PointEre
--- path p = impur $ do
---   s <- get
---   let i' = interact p
---   case i' of
---     Nothing -> return ()
---     Just i -> put (s:i)
---   return $ (\(t, pos) -> undefined)
