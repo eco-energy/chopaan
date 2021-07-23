@@ -28,6 +28,7 @@ import Chopaan.Kibbutz
 import Chopaan.Graph.Spider
 import Chopaan.Graph.Snapshot
 
+import Chopaan.Ui.Interaction
 
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
@@ -100,4 +101,13 @@ instance (Arbitrary n, Arbitrary v, Arbitrary e) => Arbitrary (SG' n v e) where
   arbitrary = genericArbitrary
 
 instance (forall a b. (Arbitrary a, Arbitrary b) => Arbitrary (k n a b)) => Arbitrary (G k n) where
+  arbitrary = genericArbitrary
+
+instance Arbitrary Button where
+  arbitrary = genericArbitrary
+
+instance Arbitrary PointerType where
+  arbitrary = genericArbitrary
+
+instance Arbitrary Pointer where
   arbitrary = genericArbitrary

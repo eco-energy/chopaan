@@ -1,9 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, ExplicitForAll, TypeApplications, FlexibleContexts #-}
 module ThreeDSpec where
 
 import Test.Hspec
 import Data.Semigroup
-import Shpadoinkle (runContinuation)
+import Shpadoinkle (runContinuation, Continuation)
 import Chopaan.Ui.Base
 import Chopaan.Ui.ThreeD
 import Chopaan.Ui.Interaction
@@ -36,22 +36,68 @@ spec = describe "3D in Shpadoinkle for CSS transforms" $ do
     (hasNaN . matrixWorldInverse $ c) `shouldBe` False
     (hasNaN . projectionTransform $ c) `shouldBe` False
   it "Zoom in on ascending pointer pos, Zoom out on descending" $ do
-    let
-      pvs = (\i -> posVec (i, i)) <$> [1..(10000 :: Double)]
-      scanner = foldl (flip zoomA) (V.zero, V.zero) pvs
-    (scanner ^. _2 . _y) `shouldBe` 1.0
-  it "Continuations are Isomorphic to scans" $ do
-    let
-      pvs = (\i -> posVec (i, i)) <$> [1..(10000 :: Double)]
-      scanner = foldl (flip zoomA) (V.zero, V.zero)
-      zoomNext :: Monad m => PPos -> m (ZoomS -> ZoomS) 
-      zoomNext p = runContinuation (zoomC p) (posVec (0, 0), posVec (0, 0))
-      contZ :: Monad m => [PPos] -> m ZoomS
-      contZ ps = S.foldlM' (\prev c -> do
-                           n <- zoomNext c
-                           return (n prev)) ((V.zero, V.zero)) $ S.fromList ps
-    x <- contZ pvs
-    print x
-    x `shouldBe` (scanner pvs)
-      
+    ((scanZ pvs) ^. _2 . _y) `shouldBe` 1.0
+  it "Continuations are Isomorphic to monadic folds" $ do
+    c <- contZ getButtonZ pvs
+    c `shouldBe` (scanZ pvs)
+    p <- contP getButtonP pvs
+    print p
+    p `shouldBe` (scanP pvs)
+  it "Continuations only work for their own buttons" $ do
+    zoomable <- contZ getButtonZ pvs
+    panable <- contP getButtonP pvs
+    noContZ <- contZ getButtonN pvs
+    noContP <- contP getButtonN pvs
+    noContZ `shouldBe` (initPosState V.zero)
+    noContP `shouldBe` (initPanState V.zero)
+    zoomable `shouldNotBe` noContZ
+    panable `shouldNotBe` noContP
+  --it "Continuations should stop when "
     
+pvs :: [CurPos]
+pvs = (\i -> toPos (i, i)) <$> [1..(10000 :: Double)]
+
+scanZ :: (Foldable f) => f CurPos -> ZoomS
+scanZ = foldl (flip zoomA) (initPosState V.zero)
+
+scanP :: (Foldable f) => f CurPos -> PanS
+scanP = foldl (flip panA) (initPanState V.zero)
+
+scanR :: (Foldable f) => f CurPos -> RotateS
+scanR = foldl (flip rotateA) (initRotateState V.zero)
+
+getButtonZ p = Pointer p (Just Mouse) 1 (ZoomB)
+getButtonN p = Pointer p (Just Mouse) 1 (NoneB)
+getButtonR p = Pointer p (Just Mouse) 1 (RotateB)
+getButtonP p = Pointer p (Just Mouse) 1 (PanB)
+
+contNext :: forall m a. Monad m
+      => (CurPos -> Pointer)
+      -> (Pointer -> Continuation m a)
+      -> a
+      -> CurPos
+      -> m (a -> a)
+contNext f c init p = runContinuation (c (f p)) init
+
+zoomNext :: Monad m => (CurPos -> Pointer) -> CurPos -> m (ZoomS -> ZoomS)
+zoomNext f = contNext f zoomC (initZoomState V.zero)
+
+panNext :: Monad m => (CurPos -> Pointer) -> CurPos -> m (PanS -> PanS)
+panNext f = contNext f panC (initPanState V.zero)
+
+rotateNext :: Monad m => (CurPos -> Pointer) -> CurPos -> m (RotateS -> RotateS)
+rotateNext f = contNext f rotateC (initRotateState V.zero)
+
+contF :: forall m a. MonadAsync m
+      => (CurPos -> Pointer)
+      -> ((CurPos -> Pointer) -> CurPos -> m (a -> a))
+      -> a
+      -> [CurPos]
+      -> m a
+contF f cont init ps = S.foldlM' (\prev cp -> do
+                                    n <- cont f cp
+                                    return (n prev)) init $ S.fromList ps
+
+contZ f = contF f zoomNext (initZoomState V.zero)
+contP f = contF f panNext (initPanState V.zero)
+contR f = contF f rotateNext (initRotateState V.zero)
