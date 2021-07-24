@@ -246,6 +246,7 @@ threeD throt ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
                   , rightC <$> onStart
                   , rightC <$> onEnd
                   , rightC <$> move
+                  , rightC <$> onWheel
                   ]
     screenHandler :: RawNode -> RawEvent -> JSM (Continuation m (ThreeModel a, x))
     screenHandler (RawNode n) re = do
@@ -253,7 +254,8 @@ threeD throt ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
             e <- valToObject n
             debug @ToJSVal e
             newS <- getScreen =<< (fromJSValUnchecked @Element n) 
-            return $ \(ThreeModel s c _) -> (ThreeModel s (changeAspect (screenAspect newS) c) newS)
+            return $ \(ThreeModel s c _) ->
+                       (ThreeModel s (changeAspect (screenAspect newS) c) newS)
       return $ leftC' (impur (liftJSM cont))
     fov' = (c ^. #projectionTransform . _y . _y) * (heightG screen / 2)
     rootCSS = [ H.textProperty "id" "renderer"
