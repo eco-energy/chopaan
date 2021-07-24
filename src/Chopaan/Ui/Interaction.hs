@@ -25,15 +25,19 @@ import Data.Maybe
 import           GHCJS.DOM.Types              hiding (Text, Touch)
 import           Language.Javascript.JSaddle  hiding (JSM, liftJSM, toJSString)
 
-import           Shpadoinkle ( listenRaw, Continuation, RawEvent(..), Prop
+import           Shpadoinkle ( listenRaw, Continuation(..), RawEvent(..), Prop
                              , MonadUnliftIO, JSM, MonadJSM, liftJSM
                              )
-import Shpadoinkle (TVar, shpadoinkle
+import Shpadoinkle ( TVar, shpadoinkle
                    , voidC, liftC', leftC', rightC', maybeC', comaybeC', liftCMay', eitherC'
                    , Continuation, pur, impur, kleisli, merge
-                   , writeUpdate, shouldUpdate, constUpdate)
+                   , writeUpdate, shouldUpdate, constUpdate
+                   )
 import           Shpadoinkle.Console
-import           Shpadoinkle.Html (debounce, Debounce(..), throttle, Throttle (..))
+import           Shpadoinkle.Html ( debounce, Debounce(..)
+                                  , throttle, Throttle (..)
+                                  , preventDefault
+                                  )
 
 import Data.Monoid
 
@@ -52,7 +56,7 @@ import Chopaan.Ui.Base
 
 default(T.Text)
 
-newtype Ctrl = Ctrl { unCtrl :: (TVar [Interact]) }
+newtype Ctrl a = Ctrl { unCtrl :: (TVar [Interact a]) }
   deriving (Generic)
 
 type CurPos = Point V2 R
@@ -82,6 +86,13 @@ onStart = onPointerDown (pure . startControl)
 onEnd :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
 onEnd = onPointerUp (pure . endControl)
 
+boopZ :: (Applicative m) => Wheel -> Continuation m (Maybe Interact)
+boopZ = maybeC' . (boop' zoomI (preview #_ZoomI) . zoomC)
+
+
+onWheel :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
+onWheel = onEv "wheel" toWheel (pure <$> boopZ)
+
 --onEnter
 
 onExit :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
@@ -97,10 +108,10 @@ startControl p = pur getInitState
     getInitState prev = case button p of
       NoneB -> case prev of
         Nothing -> Nothing
-        (Just (ZoomI z)) -> Just . zoomI $ zoomA (pos p) z
+        (Just (ZoomI z)) -> Just . zoomI $ zoomA' (pos p) z
         (Just (PanI z)) -> Just . panI $ panA (pos p) z
         (Just (RotateI z)) -> Just . rotateI $ rotateA (pos p) z
-        (Just (Tr z)) -> error "How should we treat Tr?" --Just . zoomI $ zoomA (pos p) z
+        (Just (ProdI z)) -> error "How should we treat Tr?" --Just . zoomI $ zoomA (pos p) z
       ZoomB -> Just . zoomI $ initZoomState (pos p)
       PanB -> Just . panI $ initPanState (pos p)
       RotateB -> Just . rotateI $ initRotateState (pos p)
@@ -117,10 +128,7 @@ endControl = const . pur . const $ Nothing
 
 control' :: (Applicative m) => Pointer -> Continuation m Interact
 control' p = (boop' panI (preview #_PanI) $ panC p)
-            <> (boop' zoomI (preview #_ZoomI) $ zoomC p)
             <> (boop' rotateI (preview #_RotateI) $ rotateC p)
-
-
 
 
 data PointerType = Touch | Mouse
@@ -129,7 +137,7 @@ data PointerType = Touch | Mouse
 getPointerType :: JSString -> Maybe PointerType
 getPointerType "touch" = Just Touch
 getPointerType "mouse" = Just Mouse
-getPointerType _ = Nothing  
+getPointerType _ = Nothing
 
 
 
@@ -144,8 +152,10 @@ data Pointer = Pointer
 toPos :: (R, R) -> Point V2 R
 toPos = (zero .+^) . (uncurry V2)
 
-fromPointer :: RawEvent -> JSM (Maybe Pointer)
-fromPointer (RawEvent e') = liftJSM $ do
+
+toPointer :: RawEvent -> JSM (Maybe Pointer)
+toPointer (RawEvent e') = liftJSM $ do
+  preventDefault (RawEvent e')
   e <- valToObject e'
   pt <- valToStr =<< getProp "pointerType" e
   x <- valToNumber =<< getProp "pageX" e
@@ -163,7 +173,7 @@ onEv ev parse f = listenRaw ev (\_ e ->  (step =<< parse e))
     step Nothing = pure . pur $ id
 
 onPointer :: T.Text -> (Pointer -> JSM (Continuation m a)) -> (T.Text, Prop m a)
-onPointer act = onEv ("pointer" <> act) ((\x -> (debug @ToJSON x) >> pure x) <=< fromPointer)     
+onPointer act = onEv ("pointer" <> act) toPointer     
 
 onPointerUp ::  (Pointer -> JSM (Continuation m a)) -> (T.Text, Prop m a)
 onPointerUp = onPointer "up"
@@ -230,22 +240,42 @@ type ZoomS = PosState
 initZoomState :: CurPos -> ZoomS
 initZoomState = initPosState
 
+data DeltaUnit = PixelDelta | LineDelta | PageDelta
+  deriving (Eq, Ord, Show, Generic, Enum, Bounded, NFData, ToJSON)
+
+data Wheel = Wheel
+  { deltaUnit :: DeltaUnit
+  , wheelDelta :: V2 R
+  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON)
+
+toWheel :: RawEvent -> JSM (Maybe Wheel)
+toWheel (RawEvent e') = liftJSM $ do
+  preventDefault (RawEvent e')
+  e <- valToObject e'
+  debug @ToJSVal e
+  del <- (V2 <$> (numVal "deltaX" e) <*> (numVal "deltaY" e)) -- <*> (numVal "deltaZ" e))
+  b <- fmap (toEnum . round) $ valToNumber =<< getProp "deltaMode" e
+  return $ Just $ Wheel b del
+  where
+    numVal p = valToNumber <=< (getProp p)
+
 zoomT :: ZoomS -> T
 zoomT z = Endo $ over translation (^+^ (unitV ^* (zoomFactor . ydiff $ z)))
   where
     zoomFactor x = 1.0 + (x * 0.1)
     ydiff (_, diff) = diff ^. _y
 
-zoomA :: CurPos -> Unop ZoomS
-zoomA p (lastP, _) = (p, p .-. lastP)
+zoomA :: DeltaUnit -> V2 R -> Unop ZoomS
+zoomA d p (lastP, pDiff) = (lastP .+^ p, p)
+
+zoomA' :: CurPos -> Unop ZoomS
+zoomA' p (lastP, pDiff) = (p, pDiff .+^ (p .-. lastP))
 
 zoomI :: ZoomS -> Interact
 zoomI = ZoomI
 
-zoomC :: Pointer -> Continuation m (ZoomS)
-zoomC Pointer{pos, button} = case button of
-  ZoomB -> pur (zoomA pos)
-  _ -> pur id
+zoomC :: Wheel -> Continuation m (ZoomS)
+zoomC Wheel{deltaUnit, wheelDelta} = pur (zoomA deltaUnit wheelDelta)
 
 
 data RotateS = RotateS
@@ -316,12 +346,6 @@ data Button = NoneB | RotateB | ZoomB | PanB | TouchRotateB | TouchZoomB
 
 boop' :: Applicative m => (a -> Interact) -> (Interact -> Maybe a) -> Continuation m a -> Continuation m Interact
 boop' f g = liftCMay' (mergeI . f) g
-
-boopZ :: Applicative m => Continuation m ZoomS -> Continuation m Interact
-boopZ = boop' zoomI (preview #_ZoomI)
-    
-boopP :: Applicative m => Continuation m PanS -> Continuation m Interact
-boopP = boop' panI (preview #_PanI)
 
 mergeI :: Interact -> Interact -> Interact
 mergeI a b = Tr $ (appEndo $ (evalI a) <> (evalI b)) identity
