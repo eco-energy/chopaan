@@ -95,18 +95,18 @@ installEffect :: (MonadJSM m) => RawNode -> ShaderEff -> m ()
 installEffect = undefined
 
 
-imListener :: forall m. (MonadJSM m)
-  => m ShaderEff
-  -> Control
-  -> RawNode
-  -> Html m ShaderEff
-imListener ma = baked . args
-  where
-    args :: RawNode -> JSM (RawNode, STM (Continuation m Control))
-    args x = pure (x, f)
-    f :: STM (Continuation m Control)
-    f = pure $ kleisli ma
-        ---sss = runShader' unitW (\() -> deltaDiskPlot (\(x, y) -> C.black) undefined)
+-- imListener :: forall m. (MonadJSM m)
+--   => m ShaderEff
+--   -> Control
+--   -> RawNode
+--   -> Html m ShaderEff
+-- imListener ma = baked . args
+--   where
+--     args :: RawNode -> JSM (RawNode, STM (Continuation m Control))
+--     args x = pure (x, f)
+--     f :: STM (Continuation m Control)
+--     f = pure $ kleisli ma
+--         ---sss = runShader' unitW (\() -> deltaDiskPlot (\(x, y) -> C.black) undefined)
 
 
 

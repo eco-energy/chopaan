@@ -15,6 +15,13 @@ import Data.ProtoLens.Arbitrary
 import qualified Data.Text as T
 import qualified Data.Time as Ti
 import Numeric.Compensated
+import Linear.V2
+import Linear.V3
+import Linear.V4
+import Linear.Affine
+import Linear.Matrix
+import Linear.Quaternion
+
 
 import Chopaan.Graph
 import Chopaan.Node.NodeId
@@ -110,4 +117,25 @@ instance Arbitrary PointerType where
   arbitrary = genericArbitrary
 
 instance Arbitrary Pointer where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (V2 a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (V3 a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (V4 a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (Quaternion a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (Point V2 a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (Point V3 a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (M44 a) where
   arbitrary = genericArbitrary

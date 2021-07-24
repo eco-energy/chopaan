@@ -38,17 +38,21 @@ spec = do
       (hasNaN . projectionTransform $ c) `shouldBe` False
 
   describe "Various Interactions And Their Invariants" $ do
+    it "zoomA and zoomA' should produce identical results" $ do
+      1 `shouldBe` 1
     it "Zoom in on ascending pointer pos, Zoom out on descending" $ do
-      ((scanZ pvs) ^. _2 . _y) `shouldBe` (realToFrac $ length pvs)
+      ((scanZ pvs) ^. _2 . _y) `shouldBe` (realToFrac $ (length pvs) - 1)
     it "Continuations are Isomorphic to monadic folds" $ do
       c <- contZ (uncurry getWheelZ) pvs
+      print c
+      print (scanZ pvs)
       c `shouldBe` (scanZ pvs)
       p <- contP getButtonP pvs
       p `shouldBe` (scanP pvs)
     it "Continuations only work for their own buttons" $ do
       --zoomable <- contZ getWheelZ pvs
       panable <- contP getButtonP pvs
-      --noContZ <- contZ getButtonN pvs
+      --noContZ <- contZ getWheelZ pvs
       noContP <- contP getButtonN pvs
       --noContZ `shouldBe` zeroZoom
       noContP `shouldBe` zeroPan
@@ -62,8 +66,11 @@ spec = do
 pvs :: [CurPos]
 pvs = (\i -> toPos (i, i)) <$> [1..(10000 :: Double)]
 
-scanZ :: (Foldable f) => f CurPos -> ZoomS
-scanZ = foldl (flip zoomA') zeroZoom
+scanZ :: [CurPos] -> ZoomS
+scanZ xs = last $ scanl (flip zoomW) zeroZoom $ mkWheels xs
+
+mkWheels :: [CurPos] -> [Wheel]
+mkWheels xs = ((uncurry getWheelZ) <$> (zip xs (tail xs)))
 
 scanP :: (Foldable f) => f CurPos -> PanS
 scanP = foldl (flip panA) zeroPan
@@ -111,10 +118,8 @@ contF f cont init ps = S.foldlM' (\prev cp -> do
                                     return (n prev)) init $ S.fromList ps
 
 contZ :: (MonadAsync m) => ((CurPos, CurPos) -> Wheel) -> [CurPos] -> m (ZoomS)
-contZ f xs = contF f zoomNext zeroZoom (z xs)
-  where
-    z [] = []
-    z (x:y:zs) = [(x, y)] <> (z zs)
+contZ f xs = contF f zoomNext zeroZoom (zip xs (tail xs))
+
     
 contP f = contF f panNext zeroPan
 contR f = contF f rotateNext zeroRotate

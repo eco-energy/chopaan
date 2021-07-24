@@ -56,7 +56,7 @@ import Chopaan.Ui.Base
 
 default(T.Text)
 
-newtype Ctrl a = Ctrl { unCtrl :: (TVar [Interact a]) }
+newtype Ctrl = Ctrl { unCtrl :: (TVar [Interact]) }
   deriving (Generic)
 
 type CurPos = Point V2 R
@@ -111,7 +111,7 @@ startControl p = pur getInitState
         (Just (ZoomI z)) -> Just . zoomI $ zoomA' (pos p) z
         (Just (PanI z)) -> Just . panI $ panA (pos p) z
         (Just (RotateI z)) -> Just . rotateI $ rotateA (pos p) z
-        (Just (ProdI z)) -> error "How should we treat Tr?" --Just . zoomI $ zoomA (pos p) z
+        (Just (Tr z)) -> error "How should we treat Tr?" --Just . zoomI $ zoomA (pos p) z
       ZoomB -> Just . zoomI $ initZoomState (pos p)
       PanB -> Just . panI $ initPanState (pos p)
       RotateB -> Just . rotateI $ initRotateState (pos p)
@@ -266,7 +266,11 @@ zoomT z = Endo $ over translation (^+^ (unitV ^* (zoomFactor . ydiff $ z)))
     ydiff (_, diff) = diff ^. _y
 
 zoomA :: DeltaUnit -> V2 R -> Unop ZoomS
-zoomA d p (lastP, pDiff) = (lastP .+^ p, p)
+zoomA d p (lastP, pDiff) = (lastP .+^ p, p .+^ pDiff)
+
+zoomW :: Wheel -> Unop ZoomS
+zoomW Wheel{deltaUnit, wheelDelta} = zoomA deltaUnit wheelDelta
+
 
 zoomA' :: CurPos -> Unop ZoomS
 zoomA' p (lastP, pDiff) = (p, pDiff .+^ (p .-. lastP))
@@ -275,7 +279,7 @@ zoomI :: ZoomS -> Interact
 zoomI = ZoomI
 
 zoomC :: Wheel -> Continuation m (ZoomS)
-zoomC Wheel{deltaUnit, wheelDelta} = pur (zoomA deltaUnit wheelDelta)
+zoomC = pur . zoomW
 
 
 data RotateS = RotateS
