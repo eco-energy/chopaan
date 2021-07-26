@@ -4,7 +4,7 @@
 {-# LANGUAGE DataKinds, GADTs                 #-}
 {-# LANGUAGE DuplicateRecordFields     #-}
 {-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell, RecordWildCards, PackageImports #-}
+{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell, RecordWildCards, PackageImports, CPP #-}
 
 module Chopaan.Ui.ThreeD where
 
@@ -369,7 +369,7 @@ threeDM objF xs = do
            >> shpadoinkle id runSnabbdom model (threeD . trapper @ToJSON ctx) (pure raw)
       return raw
 
-
+#ifndef __GHCJS__
 main :: IO ()
 main = runJSorWarp 8080 $ do
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
@@ -388,5 +388,7 @@ main = runJSorWarp 8080 $ do
   shpadoinkle id runSnabbdom model (threeD . trapper @ToJSON ctx) (getBody)
 --  . trapper @ToJSON ctx
 
+
 testText :: T.Text
 testText = "Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of 'de Finibus Bonorum et Malorum' (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, 'Lorem ipsum dolor sit amet..', comes from a line in section 1.10.32."
+#endif
