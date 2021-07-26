@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f31f9fa124485d05ddc479616a3fc50a7b3bf7553c29b5fea469bdff8e074cdd
+-- hash: e0a9377d738bdbd7c63d789a8a84376cdd871e6e3731a9bf8890db609be2f1f1
 
 name:           chopaan
 version:        0.1.0.0
@@ -68,7 +68,6 @@ library
     , colour
     , comonad
     , compensated
-    , concat-classes
     , constraints-extras
     , containers
     , convertible
@@ -139,6 +138,7 @@ library
       , beam-migrate
       , beam-postgres
       , blaze-markup
+      , concat-classes
       , concat-examples
       , concat-graphics
       , concat-plugin
@@ -339,7 +339,6 @@ executable dev
     , colour
     , comonad
     , compensated
-    , concat-classes
     , constraints-extras
     , containers
     , convertible
@@ -410,6 +409,7 @@ executable dev
       , beam-migrate
       , beam-postgres
       , blaze-markup
+      , concat-classes
       , concat-examples
       , concat-graphics
       , concat-plugin
@@ -483,7 +483,6 @@ executable kbtzim
     , colour
     , comonad
     , compensated
-    , concat-classes
     , constraints-extras
     , containers
     , convertible
@@ -554,6 +553,7 @@ executable kbtzim
       , beam-migrate
       , beam-postgres
       , blaze-markup
+      , concat-classes
       , concat-examples
       , concat-graphics
       , concat-plugin
@@ -626,7 +626,6 @@ executable server
     , colour
     , comonad
     , compensated
-    , concat-classes
     , constraints-extras
     , containers
     , convertible
@@ -697,6 +696,7 @@ executable server
       , beam-migrate
       , beam-postgres
       , blaze-markup
+      , concat-classes
       , concat-examples
       , concat-graphics
       , concat-plugin
@@ -770,7 +770,6 @@ executable ui
     , colour
     , comonad
     , compensated
-    , concat-classes
     , constraints-extras
     , containers
     , convertible
@@ -841,6 +840,7 @@ executable ui
       , beam-migrate
       , beam-postgres
       , blaze-markup
+      , concat-classes
       , concat-examples
       , concat-graphics
       , concat-plugin
@@ -930,7 +930,6 @@ test-suite chopaan-test
     , colour
     , comonad
     , compensated
-    , concat-classes
     , constraints-extras
     , containers
     , convertible
@@ -1001,6 +1000,7 @@ test-suite chopaan-test
       , beam-migrate
       , beam-postgres
       , blaze-markup
+      , concat-classes
       , concat-examples
       , concat-graphics
       , concat-plugin
