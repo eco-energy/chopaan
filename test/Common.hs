@@ -137,5 +137,3 @@ instance (Arbitrary a) => Arbitrary (Point V2 a) where
 instance (Arbitrary a) => Arbitrary (Point V3 a) where
   arbitrary = genericArbitrary
 
-instance (Arbitrary a) => Arbitrary (M44 a) where
-  arbitrary = genericArbitrary

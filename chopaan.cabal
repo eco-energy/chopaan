@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d0b78fdd4d62e274c60ecb9f77c4c464b157bb38774a07b066c46833779bef1b
+-- hash: f31f9fa124485d05ddc479616a3fc50a7b3bf7553c29b5fea469bdff8e074cdd
 
 name:           chopaan
 version:        0.1.0.0

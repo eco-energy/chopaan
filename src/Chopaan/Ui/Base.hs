@@ -34,6 +34,14 @@ type QuatR = Quaternion R
 
 type M44R = M44 R
 
+type CurPos = Point V2 R
+
+type LastPos = Point V2 R
+
+toPos :: (R, R) -> Point V2 R
+toPos = (zero .+^) . (uncurry V2)
+
+
 deriving instance (ToJSON a) => ToJSON (Point V2 a)
 deriving instance (FromJSON a) => FromJSON (Point V2 a)
 
@@ -107,7 +115,8 @@ mkObj pos rot scale = Obj pos rot scale locT locT
     locT = transformMat pos rot scale
 
 defQuat :: QuatR
-defQuat = axisAngle (V3 0 1 0) 90 
+defQuat = normalize (axisAngle (V3 0 1 0) 90) 
 
 zeroObj :: Obj
 zeroObj = mkObj zero zero (V3 1 1 1)
+

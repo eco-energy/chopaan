@@ -59,6 +59,7 @@ import Linear.Projection
 
 import qualified Chopaan.Ui.Style as Css
 import Chopaan.Ui.Base
+import Chopaan.Ui.Events
 import Chopaan.Ui.Interaction
 
 -- $ A Translation of
@@ -232,10 +233,10 @@ getScreen e = do
 
 
 threeD :: forall m a. (MonadJSM m, Humanize a)
-       => Throttler m Pointer a
-       -> ControlModel a
+       -- => Throttler m Pointer a
+       => ControlModel a
        -> Html m (ControlModel a)
-threeD throt ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
+threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
   H.div (cameraCSS) $
     (\(x, y) -> H.div (objCSS y) . pure . H.text . humanize $ x) <$> xs
   ]
@@ -245,8 +246,9 @@ threeD throt ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
                   --, H.listenRaw "load" screenHandler
                   , rightC <$> onStart
                   , rightC <$> onEnd
-                  , rightC <$> move
+                  , rightC <$> onMove
                   , rightC <$> onWheel
+                  , voidC <$> noRightClick
                   ]
     screenHandler :: RawNode -> RawEvent -> JSM (Continuation m (ThreeModel a, x))
     screenHandler (RawNode n) re = do
@@ -331,8 +333,16 @@ animation w tv = go
       (threeM, t) <- liftIO . atomically $ readTVar tv
       case t of
         Nothing -> return ()
-        Just ts -> liftIO . atomically $ writeTVar tv (deltaModel ts threeM, Just ts)
-      --debug @ToJSON t
+        Just ts -> do
+          debug @ToJSON ts
+          liftIO . atomically $ do
+            let
+              m' = deltaModel ts threeM
+              b' = (buttonMap $ getButton ts)
+              t' = case b' of
+                Nothing -> Nothing
+                (Just f) -> Just (f $ getState ts)
+            writeTVar tv (m', t')
       (requestAnimationFrame w) =<< (animation w tv)
 
 
@@ -344,7 +354,7 @@ threeDM objF xs = do
   case isSubsequent of
     Just raw -> return $ RawNode raw
     Nothing -> do
-      throt <- liftIO $ H.throttle 1
+      --throt <- liftIO $ H.throttle 1
       win <- currentWindowUnchecked
       elm <- createElement doc "div"
       setId elm vId
@@ -356,7 +366,7 @@ threeDM objF xs = do
       raw <- RawNode <$> toJSVal elm
       ctx <- askJSM
       _ <- forkIO $ threadDelay 10
-           >> shpadoinkle id runSnabbdom model ((threeD throt) . trapper @ToJSON ctx) (pure raw)
+           >> shpadoinkle id runSnabbdom model (threeD . trapper @ToJSON ctx) (pure raw)
       return raw
 
 
@@ -365,7 +375,7 @@ main = runJSorWarp 8080 $ do
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
   win <- currentWindowUnchecked
-  throt <- liftIO $ H.throttle 1
+  --throt <- liftIO $ H.throttle 1
   scr <- (\x -> (getScreen x))
          -- =<< (\x -> (debug @ToJSVal x >> (fromJSValUnchecked @Element) x))
          =<< (getDocumentElementUnchecked =<< currentDocumentUnchecked)
@@ -375,7 +385,7 @@ main = runJSorWarp 8080 $ do
   model <- liftIO $ newTVarIO (mod, Nothing)
   _ <- requestAnimationFrame win =<< animation win model
   ctx <- askJSM
-  shpadoinkle id runSnabbdom model ((threeD throt)) (getBody)
+  shpadoinkle id runSnabbdom model (threeD . trapper @ToJSON ctx) (getBody)
 --  . trapper @ToJSON ctx
 
 testText :: T.Text

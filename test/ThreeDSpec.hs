@@ -3,8 +3,9 @@ module ThreeDSpec where
 
 import Test.Hspec
 import Data.Semigroup
-import Shpadoinkle (runContinuation, Continuation)
+import Shpadoinkle (runContinuation, Continuation, maybeC')
 import Chopaan.Ui.Base
+import Chopaan.Ui.Events
 import Chopaan.Ui.ThreeD
 import Chopaan.Ui.Interaction
 
@@ -23,7 +24,7 @@ import Streamly
 import Test.QuickCheck
 
 spec = do
-  describe "3D Geometery for Shpadoinkle CSS transforms" $ do
+  describe "3D Geometery for Shpadoinkle CSS transforms: " $ do
     it "cssMat right identity matrix" $ do
       let mat = (identity :: M44R)
       cssMat mat `shouldBe` "matrix3d(1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0)"
@@ -37,95 +38,58 @@ spec = do
       (hasNaN . matrixWorldInverse $ c) `shouldBe` False
       (hasNaN . projectionTransform $ c) `shouldBe` False
 
-  describe "Various Interactions And Their Invariants" $ do
-    it "zoomA and zoomA' should produce identical results" $ do
-      1 `shouldBe` 1
-    it "Zoom in on ascending pointer pos, Zoom out on descending" $ do
-      ((scanZ pvs) ^. _2 . _y) `shouldBe` (realToFrac $ (length pvs) - 1)
-    it "Continuations are Isomorphic to monadic folds" $ do
-      c <- contZ (uncurry getWheelZ) pvs
-      print c
-      print (scanZ pvs)
-      c `shouldBe` (scanZ pvs)
-      p <- contP getButtonP pvs
-      p `shouldBe` (scanP pvs)
-    it "Continuations only work for their own buttons" $ do
-      --zoomable <- contZ getWheelZ pvs
-      panable <- contP getButtonP pvs
-      --noContZ <- contZ getWheelZ pvs
-      noContP <- contP getButtonN pvs
-      --noContZ `shouldBe` zeroZoom
-      noContP `shouldBe` zeroPan
-      --zoomable `shouldNotBe` noContZ
-      panable `shouldNotBe` noContP
-    it "control' demuxes via event type equivalently to each constituent cont" $ do
-      p <- contP getButtonP pvs
-      p' <- contPR getButtonP (panI zeroPan) pvs
-      (appEndo (evalI . panI $ p) identity) `shouldBe` (appEndo (evalI p') identity)
-    
-pvs :: [CurPos]
-pvs = (\i -> toPos (i, i)) <$> [1..(10000 :: Double)]
+  describe "Various Interactions And Their Invariants: " $ do
+    it "control is nice and works as the composition over Interact's Constructors" $ do
+      let
+        ps = mkPointers (PanB : repeat NoneB) pvs
+        rs = mkPointers (RotateB : repeat NoneB) pvs
+      c <- contScan pointerControl (panI $ initPosState (pure 0)) (ps <> rs)
+      p' <- contScan pointerControl (panI $ initPosState (pure 0)) ps
+      r' <- contScan pointerControl (rotateI $ initPosState (pure 0)) rs
+      print p'
+      (take (length pvs) c) `shouldBe` p'
+      (drop (length pvs) $ c) `shouldBe` r'
+    it "wheelControl should handle (Maybe Interaction) by initializing its own state" $ do
+      let
+        zs = mkWheels pvs
+      c <- contScan wheelControl (zoomI $ initPosState (pure 0)) zs
+      c' <- contScan (wheelControl') Nothing zs
+      print c'
+      c' `shouldBe` (fmap Just c)
+    it "pointerC deals with NoneB events by propagating the active interaction" $ do
+      let
+        ps = mkPointers (repeat PanB) pvs
+        ps' = mkPointers (PanB : (repeat NoneB)) pvs
+      c <- contScan pointerControl (panI $ initPosState (pure 0)) ps
+      c' <- contScan pointerControl (panI $ initPosState (pure 0)) ps'
+      c' `shouldBe` c
 
-scanZ :: [CurPos] -> ZoomS
-scanZ xs = last $ scanl (flip zoomW) zeroZoom $ mkWheels xs
+      
+pvs :: [CurPos]
+pvs = (\i -> toPos (i, i)) <$> [1..(10 :: Double)]
+
+mkPointers :: [Button] -> [CurPos] -> [Pointer]
+mkPointers bs ps = (\(b, p) -> Pointer p (Just Mouse) 1 b) <$> (zip bs ps)
 
 mkWheels :: [CurPos] -> [Wheel]
-mkWheels xs = ((uncurry getWheelZ) <$> (zip xs (tail xs)))
-
-scanP :: (Foldable f) => f CurPos -> PanS
-scanP = foldl (flip panA) zeroPan
-
-scanR :: (Foldable f) => f CurPos -> RotateS
-scanR = foldl (flip rotateA) zeroRotate
-
-getButtonZ p = Pointer p (Just Mouse) 1 (ZoomB)
+mkWheels xs = (uncurry getWheelZ) <$> (pairs xs)
 
 getWheelZ :: CurPos -> CurPos -> Wheel
 getWheelZ p' p = Wheel PixelDelta (p .-. p')
 
-getButtonN p = Pointer p (Just Mouse) 1 (NoneB)
-getButtonR p = Pointer p (Just Mouse) 1 (RotateB)
-getButtonP p = Pointer p (Just Mouse) 1 (PanB)
+pairs :: [a] -> [(a, a)]
+pairs xs = (zip' xs (tail xs))
+  where
+    zip' [] (b:[]) = [(b, b)]
+    zip' _as [] = []
+    zip' (a:as) (b:bs) = (a, b) : zip as bs
 
-contNext :: forall m a b z. Monad m
-      => (z -> b)
-      -> (b -> Continuation m a)
-      -> a
-      -> z
-      -> m (a -> a)
-contNext f c init p = runContinuation (c (f p)) init
 
-zoomNext :: Monad m => ((CurPos, CurPos) -> Wheel) -> (CurPos, CurPos) -> m (ZoomS -> ZoomS)
-zoomNext f = contNext f zoomC (zeroZoom)
-
-panNext :: Monad m => (CurPos -> Pointer) -> CurPos -> m (PanS -> PanS)
-panNext f = contNext f panC (zeroPan)
-
-rotateNext :: Monad m => (CurPos -> Pointer) -> CurPos -> m (RotateS -> RotateS)
-rotateNext f = contNext f rotateC (zeroRotate)
-
-intrNext :: Monad m => Interact -> (CurPos -> Pointer) -> CurPos -> m (Interact -> Interact)
-intrNext i f = contNext f control' i
-
-contF :: forall m a b z. MonadAsync m
-      => (z -> b)
-      -> ((z -> b) -> z -> m (a -> a))
+contScan :: forall m a b z. MonadAsync m
+      => (z -> Continuation m a)
       -> a
       -> [z]
-      -> m a
-contF f cont init ps = S.foldlM' (\prev cp -> do
-                                    n <- cont f cp
-                                    return (n prev)) init $ S.fromList ps
-
-contZ :: (MonadAsync m) => ((CurPos, CurPos) -> Wheel) -> [CurPos] -> m (ZoomS)
-contZ f xs = contF f zoomNext zeroZoom (zip xs (tail xs))
-
-    
-contP f = contF f panNext zeroPan
-contR f = contF f rotateNext zeroRotate
-contPR f i = contF f (intrNext i) i
-
-
-zeroZoom = (initZoomState $ pure 0)
-zeroPan = (initPanState $ V.zero)
-zeroRotate = (initRotateState $ V.zero)
+      -> m [a]
+contScan cont init ps = S.toList $ S.postscanlM' (\prev cp -> do
+                                                n <- runContinuation (cont cp) prev
+                                                return (n prev)) init $ S.fromList ps
