@@ -26,6 +26,9 @@ type Unop a = a -> a
 
 type T = Endo M44R
 
+applyT :: T -> M44R -> M44R
+applyT t m = (appEndo $ (Endo normalize) <> t) m
+
 type R = Double
 
 type V3R = V3 R 
@@ -71,10 +74,11 @@ data Obj = Obj
 transformObj :: T -> Obj -> Obj
 transformObj t o = o
                    & #_pos %~ ((t' ^. translation) ^+^) 
-                   & (#_localTransform) .~ t' 
-                   & (#_worldTransform) %~ (appEndo t)
+                   & (#_worldTransform) .~ t' 
+                   & (#_localTransform) .~ t''
   where
-    t' = (appEndo t) (_localTransform o)
+    t' = (appEndo t) (_worldTransform o)
+    t'' = (appEndo t) (_localTransform o) 
                    
 
 translateObj :: V3R -> Obj -> Obj

@@ -36,7 +36,7 @@ import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback
 
 import Shpadoinkle (Html, JSM, MonadJSM, liftJSM, TVar, shpadoinkle
                    , voidC, liftC', leftC', rightC', rightC, maybeC', liftCMay', eitherC'
-                   , Continuation, pur, impur, kleisli, RawNode(..), RawEvent)
+                   , Continuation, pur, impur, kleisli, RawNode(..), RawEvent, shouldUpdate)
 import Shpadoinkle.Run (runJSorWarp)
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Html.Utils (getBody)
@@ -116,12 +116,12 @@ changeAspect a (c@Camera{..}) = c & #aspect .~ a
                      & (#projectionTransform) .~ (perspective fov aspect near far) 
 
 transformCamera :: T -> Camera -> Camera
-transformCamera t c = c & #cameraObj .~ (newO) 
+transformCamera t c = c & #cameraObj .~ (newO)
                         & (#matrixWorldInverse) .~ (inv44 $ asT newO)
   where
     newO = transformObj t $ c ^. #cameraObj 
 
-           
+    
 worldDirection :: Camera -> V3 R
 worldDirection = normalize . (view (_xyz . column _z)) . matrixWorldInverse 
 
@@ -134,14 +134,6 @@ mkScene objF = Scene . (flip zip (objF <$> [0,1..]))
 transformScene :: T -> Scene a -> Scene a
 transformScene p = Scene . fmap (second (transformObj p)) . runScene
 
-data Screen = Screen
-  { widthG :: Double
-  , heightG :: Double
-  , left :: Double
-  , top :: Double
-  } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
-
-zeroScreen = Screen 0 0 0 0
 
 data ThreeModel a = ThreeModel
   { scene :: Scene a
@@ -200,36 +192,9 @@ mkModel s objF xs = ThreeModel (mkScene (objF' cam) xs) cam s
     camPos = V3 0 0 3000
 
 
-getWH :: MonadJSM m => m (Double, Double)
-getWH = do
-  w <- currentWindowUnchecked
-  height <- realToFrac <$> getInnerHeight w
-  width <- realToFrac <$> getInnerWidth w
-  return (width, height)
-
--- 
---
-
 type ControlModel a = (ThreeModel a, Maybe Interact)
 
 type Throttler m ev a = (H.Throttle m (ev -> JSM (Continuation m (ControlModel a))) (ControlModel a))
-
-screenAspect :: Screen -> Double
-screenAspect s = (widthG s / heightG s) 
-
-getScreen :: Element -> JSM Screen
-getScreen e = do
-  win <- currentWindowUnchecked
-  docE <- getDocumentElementUnchecked =<< currentDocumentUnchecked
-  r <- getBoundingClientRect e
-  debug @ToJSVal r
-  (w, h) <- getWH
-  --w <- getWidth r
-  --h <- getHeight r
-  t <- (\a b c -> a - c) <$> getTop r <*> getPageYOffset win <*> (getClientTop docE)
-  l <- (\a b c -> a - c) <$> getLeft r <*> getPageXOffset win <*> (getClientLeft docE)
-  return $ Screen w h l t
-
 
 
 threeD :: forall m a. (MonadJSM m, Humanize a)
@@ -244,9 +209,9 @@ threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
     rootProps = rootHandler <> rootCSS
     rootHandler = [ H.listenRaw "resize" screenHandler
                   --, H.listenRaw "load" screenHandler
-                  , rightC <$> onStart
-                  , rightC <$> onEnd
-                  , rightC <$> onMove
+                  , rightC <$> (onStart screen)
+                  , rightC <$> (onEnd screen)
+                  , rightC <$> (onMove screen)
                   , rightC <$> onWheel
                   , voidC <$> noRightClick
                   ]
@@ -334,15 +299,23 @@ animation w tv = go
       case t of
         Nothing -> return ()
         Just ts -> do
-          debug @ToJSON ts
-          liftIO . atomically $ do
-            let
-              m' = deltaModel ts threeM
-              b' = (buttonMap $ getButton ts)
-              t' = case b' of
-                Nothing -> Nothing
-                (Just f) -> Just (f $ getState ts)
-            writeTVar tv (m', t')
+          if ((abs . quadrance . snd . getState $ ts) < (1e-4))
+            then return ()
+            else do
+            debug @ToJSON (getT ts)
+            liftIO . atomically $ do
+              let
+                m' = deltaModel ts threeM
+                b' = (buttonMap $ getButton ts)
+                t' = case b' of
+                  Nothing -> Nothing 
+                  (Just f) -> do
+                    let (pos, diff) = getState ts
+                    let ns = f (pos, pure 0)
+                    case ns of
+                      (ZoomI _) -> Nothing
+                      _ -> return $ ns
+              writeTVar tv (m', t')
       (requestAnimationFrame w) =<< (animation w tv)
 
 
@@ -383,6 +356,16 @@ main = runJSorWarp 8080 $ do
   let objF = grid3D 5 5 25
   let mod = mkModel scr objF (take 100 $ repeat testText) 
   model <- liftIO $ newTVarIO (mod, Nothing)
+  _ <- forkIO $ shouldUpdate (\c (m, d) -> do
+                                 --liftIO $ hPutStrLn stdout $ show (m ^. #camera . #cameraObj)
+                                 --liftIO $ hPutStrLn stdout $ show (m ^. #camera . #matrixWorldInverse)
+                                 case d of
+                                   Nothing -> return c
+                                   Just d' -> do
+                                     let c' = c ^+^ (snd . getState $ d')
+                                     liftIO $ hPutStrLn stdout $ show c' 
+                                     liftIO $ hFlush stdout
+                                     return c') (pure 0) model
   _ <- requestAnimationFrame win =<< animation win model
   ctx <- askJSM
   shpadoinkle id runSnabbdom model (threeD . trapper @ToJSON ctx) (getBody)

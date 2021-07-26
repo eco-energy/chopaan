@@ -17,6 +17,7 @@ import Control.Monad.Trans.State
 import Control.Lens
 
 import qualified Data.Text as T
+import Data.Aeson
 import Data.Generics.Labels ()
 import Data.Generics.Sum ()
 import Data.Maybe
@@ -74,22 +75,27 @@ diffPos :: CurPos -> Unop PosState
 diffPos p (lastP, pDiff) = (p, pDiff .+^ (p .-. lastP))
 
 diffWheel :: DeltaUnit -> V2 R -> Unop PosState
-diffWheel d p (lastP, pDiff) = (lastP .+^ p, p .+^ pDiff)
+diffWheel d p (lastP, pDiff) = (lastP .-^ p', pDiff ^-^ p') -- sub because d is in -ve y-axis
+  where
+    p' = case d of
+      PixelDelta -> p ^* 0.00025
+      LineDelta -> p ^* 0.01
+      PageDelta -> p ^* 0.025
 
-onStart :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
-onStart = onPointerDown (pure . startP)
+onStart :: (Applicative m) => Screen -> (T.Text, Prop m (Maybe Interact))
+onStart s = onPointerDown s (pure . startP)
 
-onEnd :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
-onEnd = onPointerUp (pure . endP)
+onEnd :: (Applicative m) => Screen -> (T.Text, Prop m (Maybe Interact))
+onEnd s = onPointerUp s (pure . endP)
 
 onWheel :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
 onWheel = onEv "wheel" toWheel (pure . wheelControl')
 
-onExit :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
-onExit = onPointer "exit" (pure . endP)
+onExit :: (Applicative m) => Screen -> (T.Text, Prop m (Maybe Interact))
+onExit s = onPointer s "exit" (pure . endP)
 
-onMove :: (Applicative m) => (T.Text, Prop m (Maybe Interact))
-onMove = onPointerMove (pure . maybeC' . pointerControl)
+onMove :: (Applicative m) => Screen -> (T.Text, Prop m (Maybe Interact))
+onMove s = onPointerMove s (pure . maybeC' . pointerControl)
 
 startP :: (Applicative m) => Pointer -> Continuation m (Maybe Interact)
 startP p = pur getInitState
@@ -146,25 +152,28 @@ wheelC w = ((generalize _1 (pur $ const (Just ZoomB))) <> (generalize _2 $ pos w
     pos :: Wheel -> Continuation m PosState
     pos Wheel{deltaUnit, wheelDelta} = pur (diffWheel deltaUnit wheelDelta)
 
+
 wheelControl :: (Applicative m) => Wheel -> Continuation m (Interact)
 wheelControl = boop . wheelC
+
 
 wheelControl' :: (Applicative m) => Wheel -> Continuation m (Maybe Interact)
 wheelControl' = withInitC z0 . wheelControl
   where
     z0 = zoomI . initPosState $ pure 0
+    -- maybeC' has wrong semantics here.
+    -- We need withInitC to always start this continuation with our initial zoom value. So we use before to conditionally initialize the state
     withInitC a = (before (pur onMay)) . maybeC'
       where
         onMay (Just (ZoomI s)) = (Just $ ZoomI s)
         onMay _ = Just a
     
--- $ maybeC' has wrong semantics here.
--- $ We need withInitC to always start this continuation with our initial zoom value 
 
-onTMove :: Throttle m (Pointer -> JSM (Continuation m a)) a
-       -> (Pointer -> JSM (Continuation m a))
-       -> (T.Text, Prop m a)
-onTMove t = runThrottle t onPointerMove
+
+-- onTMove :: Throttle m (Pointer -> JSM (Continuation m a)) a
+--        -> (Pointer -> JSM (Continuation m a))
+--        -> (T.Text, Prop m a)
+-- onTMove t = runThrottle t onPointerMove
 
 --onPointerUp = listenRaw "pointerup"
 
@@ -181,7 +190,7 @@ scaleNorm s = (^* s) . normalize
 panT :: PosState -> T
 panT (_, pd) = f
   where
-    f =  Endo $ (over translation (.+^ panDiff))
+    f =  Endo $ \m -> m !*! (over translation (.+^ panDiff) identity)
     panSpeed = 0.1
     upDir = cross eye (pure 0)
     eye = (pure 1)
@@ -190,15 +199,15 @@ panT (_, pd) = f
 
 
 zoomT :: PosState -> T
-zoomT z = Endo $ over translation (^-^ (unitV ^* (zoomFactor . ydiff $ z)))
+zoomT z = Endo $ \m -> m !*! (over translation (^+^ (unitV ^* (zoomFactor . ydiff $ z))) identity)
   where
-    zoomFactor x = 1.0 + (x * 0.1)
+    zoomFactor x = 1.0 + (x * 1.2)
     ydiff (_, diff) = diff ^. _y
 
 
 
 rotateT :: PosState -> T
-rotateT (_, delta) = Endo $ \m -> (mkTransformation q' zero) !*! m
+rotateT (_, delta) = Endo $ \m -> m !*! (mkTransformation q' zero)
   where
     q' = (axisAngle ax' ang)
       where
@@ -219,7 +228,7 @@ data Interact = ZoomI PosState
               | PanI PosState
               | RotateI PosState
               | Tr Interact Interact
-              deriving (Eq, Ord, Show, Generic, NFData, ToJSON)
+              deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 zoomI :: PosState -> Interact
 zoomI = ZoomI
