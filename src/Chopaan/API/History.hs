@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables, GADTs, FlexibleContexts, NamedFieldPuns #-}
+{-# LANGUAGE MultiParamTypeClasses, RankNTypes, QuantifiedConstraints, DataKinds, TypeOperators, TypeApplications, TypeSynonymInstances, FlexibleInstances, ConstraintKinds, ScopedTypeVariables, GADTs, FlexibleContexts, NamedFieldPuns, KindSignatures, PolyKinds #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, StandaloneDeriving, DerivingStrategies, DerivingVia, UndecidableInstances, OverloadedStrings, CPP #-}
 
 module Chopaan.API.History where
@@ -25,6 +25,10 @@ import Servant.API.Modifiers
 import Servant.API.QueryParam
 import Chopaan.CRUD
 import Chopaan.Graph
+import Servant.Streamly
+import Streamly (IsStream, MonadAsync, AsyncT)
+import qualified Streamly.Prelude as S
+import Servant.API.Stream
 
 #ifndef ghcjs_HOST_OS
 import Servant (Server, Get, Capture, QueryParam, Proxy(..), (:>)
@@ -49,12 +53,12 @@ import Servant.API
 #endif
 
 
-type HistoryAPI = "history"
+type HistoryAPI t m = "history"
   :> (QueryParamR "kbtzId" KbtzName)
   :> (QueryParamR "graphType" GraphType)
   :> (QueryParamR "startTime" UTCTime)
   :> (QueryParamR "endTime" UTCTime)
-  :> Get '[JSON] (G.SG NodeMAC)
+  :> StreamGet NewlineFraming JSON (t m (G.SG NodeMAC))
 
 type QueryParamR = QueryParam' '[Required, Strict]
 
@@ -118,11 +122,12 @@ instance CRUDChopaan (GraphM) where
     return . NodeList $ (undefined) <$> (zip [1..] ns)
   getGraph = getHistoryForGraph
 
-getHistoryForGraph :: KbtzName
+getHistoryForGraph :: (IsStream t)
+  => KbtzName
   -> GraphType
   -> UTCTime
   -> UTCTime
-  -> GraphM (G.SG NodeMAC)
+  -> t GraphM (G.SG NodeMAC)
 getHistoryForGraph kn g t0 t1 = do
   DBPools{gremlinPool, spools} <- ask  
   ns <- withResource gremlinPool ((flip getKbtzNodes) kn)
@@ -132,11 +137,16 @@ getHistoryForGraph kn g t0 t1 = do
     StatusG -> (G.Status . G.SG)  <$> (withSpider $ statusNodesSnapshot ns t0 t1)
     FlowG -> (G.Flow . G.SG) <$> (withSpider $ flowNodesSnapshot ns t0 t1)
 
-serveHistoryAPI :: String -> Int -> Server (HistoryAPI)
-serveHistoryAPI h p = hoistServer (Proxy @ HistoryAPI) (runGraphM h p) getHistoryForGraph 
+serveHistoryAPI :: forall t m. (IsStream t, MonadAsync m)
+  => String
+  -> Int
+  -> Server (HistoryAPI t m)
+serveHistoryAPI h p = hoistServer (Proxy @ (HistoryAPI t m)) (runGraphM h p) getHistoryForGraph 
 
-historyApp :: String -> Int -> Application
-historyApp h p = serve (Proxy :: Proxy HistoryAPI) $ serveHistoryAPI h p
+historyApp :: String
+           -> Int
+           -> Application
+historyApp h p = serve (Proxy :: Proxy (HistoryAPI AsyncT IO)) $ serveHistoryAPI h p
 #endif
 
 
