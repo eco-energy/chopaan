@@ -28,6 +28,7 @@ description:         Please see the README on Github at <https://github.com/faez
 
 dependencies:
 - base >= 4.11 && < 10
+- concat-classes
 - rio >= 0.1.8.0
 - streamly >= 0.7.2
 - network >= 3.1.2.1
@@ -117,15 +118,14 @@ when:
   condition: "!impl(ghcjs)"
   then:
     dependencies:
+      - concat-examples
+      - concat-plugin
+      - concat-graphics
       - optparse-applicative
       - net-spider
       - beam-postgres
       - beam-migrate
       - postgresql-simple
-      - concat-classes
-      - concat-examples
-      - concat-plugin
-      - concat-graphics
       - network-uri
       - websockets
       - servant-server
@@ -179,6 +179,7 @@ library:
         - Chopaan.Graph.Snapshot
         - Chopaan.CRUD
         - Chopaan.Ui.Base
+        - Chopaan.Ui.Events
         - Chopaan.Ui.AddKbtz
         - Chopaan.Ui.Foreign.Utils
         - Chopaan.Ui.Foreign.WebSocket
@@ -265,6 +266,7 @@ library:
         - Chopaan.Graph.Snapshot
         - Chopaan.CRUD
         - Chopaan.Ui.Base
+        - Chopaan.Ui.Events
         - Chopaan.Ui.AddKbtz
         - Chopaan.Ui.Foreign.Utils
         - Chopaan.Ui.Foreign.WebSocket
