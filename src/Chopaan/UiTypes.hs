@@ -62,7 +62,7 @@ type SPA m = "app" :> View m Frontend
         :<|> "app" :> "kibbutz" :> Capture "id" KbtzName :> View m Frontend
         :<|> "app" :> "kibbutz" :> Capture "id" KbtzName :> "addNode" :> View m Frontend
         :<|> "app" :> "graph" :> Capture "id" KbtzName :> View m Frontend
-        :<|> Raw
+
 
 
 data Route
@@ -80,7 +80,6 @@ routes =
   :<|> RKibbutz
   :<|> RAddNode
   :<|> RGraph
-  :<|> RHomePage
 
 instance Routed (SPA m) Route where
   redirect = \case

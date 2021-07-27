@@ -242,8 +242,8 @@ staticTemplate s = voidC $ H.html_
   [ H.head_
     [ H.meta [ H.charset "ISO-8859-1" ] []
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
-    , stylesheetAsset "tailwind.min.css"
-    , stylesheet bootstrap
+    --, stylesheetAsset "tailwind.min.css"
+    --, stylesheet bootstrap
     --, H.script [ H.src $ entrypoint ev ] []
     ]
   , H.body_
@@ -252,7 +252,7 @@ staticTemplate s = voidC $ H.html_
   ]
 
 
-stylesheetAsset = stylesheet . ("./assets/" <>)
+stylesheetAsset = stylesheet . ("./webdev/assets/" <>)
 
 stylesheet f = H.link'
         [ H.rel "stylesheet"
@@ -266,8 +266,8 @@ template ev fe stage = H.html_
   [ H.head_
     [ H.meta [ H.charset "ISO-8859-1" ] []
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
-    , stylesheetAsset "tailwind.min.css"
-    , stylesheetAsset "style.css"
+    --, stylesheetAsset "tailwind.min.css"
+    --, stylesheetAsset "style.css"
     , toHydration fe
     , H.script [ H.src $ entrypoint ev ] []
     ]
@@ -294,7 +294,7 @@ gView :: forall m. (MonadJSM m, CRUDChopaan m) => GView -> Html m (GView)
 gView g = H.div [H.class' $ Css.relative <> Css.flex_grow <> Css.flex_col]
   [ case _currentG g of
       Nothing -> voidC $ H.text "No Graph Found Yet"
-      Just sg -> voidC $ render3dGrid sg
+      Just sg -> render3dGrid sg
   , graphSelectButtons
   --, onRecord whichK $ getGraph
   ]

@@ -50,16 +50,16 @@ import Data.FileEmbed
 
 default (Text)
 
-render3dGrid :: forall m n. (Applicative m, Eq n, Humanize n) => SG n -> Html m ()
+render3dGrid :: forall m n a. (Applicative m, Eq n, Humanize n) => SG n -> Html m a
 render3dGrid sg = case sg of
   (G.Mesh (SG ms)) -> renderBaked ms 
   (G.Transactor (SG ms)) -> renderBaked ms 
   (G.Status (SG ms)) -> renderBaked ms
   (G.Flow (SG ms)) -> renderBaked ms
   where
-    renderBaked :: forall v l.
+    renderBaked :: forall a v l.
                  (Eq l, Eq v, NFData l, NFData v, Humanize l, Humanize v, ToJSON v)
-               =>  SnapshotGraph n v l -> Html m ()
+               =>  SnapshotGraph n v l -> Html m a
     renderBaked (ns, _) = H.baked $ do
       (, retrySTM) <$> (threeDM objF elements)
         where

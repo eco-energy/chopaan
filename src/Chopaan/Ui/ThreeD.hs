@@ -198,7 +198,6 @@ type Throttler m ev a = (H.Throttle m (ev -> JSM (Continuation m (ControlModel a
 
 
 threeD :: forall m a. (MonadJSM m, Humanize a)
-       -- => Throttler m Pointer a
        => ControlModel a
        -> Html m (ControlModel a)
 threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
@@ -327,11 +326,11 @@ threeDM objF xs = do
   case isSubsequent of
     Just raw -> return $ RawNode raw
     Nothing -> do
-      --throt <- liftIO $ H.throttle 1
       win <- currentWindowUnchecked
       elm <- createElement doc "div"
       setId elm vId
       debug @ToJSVal elm
+      debug @ToJSVal "testView!!"
       (w, h) <- getWH
       let mod = mkModel (Screen w h 0 h) objF xs 
       model <- liftIO $ newTVarIO (mod, Nothing)
@@ -339,8 +338,10 @@ threeDM objF xs = do
       raw <- RawNode <$> toJSVal elm
       ctx <- askJSM
       _ <- forkIO $ threadDelay 1
-           >> shpadoinkle id runSnabbdom model (threeD . trapper @ToJSON ctx) (pure raw)
+           >> shpadoinkle id runSnabbdom model testView (pure raw)
       return raw
+      -- (threeD . trapper @ToJSON ctx)
+testView _ = H.div [H.id' "threeDView"] ["Where is this waldo?!!"]
 
 #ifndef __GHCJS__
 main :: IO ()
@@ -348,17 +349,13 @@ main = runJSorWarp 8080 $ do
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
   win <- currentWindowUnchecked
-  --throt <- liftIO $ H.throttle 1
   scr <- (\x -> (getScreen x))
-         -- =<< (\x -> (debug @ToJSVal x >> (fromJSValUnchecked @Element) x))
          =<< (getDocumentElementUnchecked =<< currentDocumentUnchecked)
   debug @ToJSON scr
   let objF = grid3D 5 5 25
   let mod = mkModel scr objF (take 100 $ repeat testText) 
   model <- liftIO $ newTVarIO (mod, Nothing)
   _ <- forkIO $ shouldUpdate (\c (m, d) -> do
-                                 --liftIO $ hPutStrLn stdout $ show (m ^. #camera . #cameraObj)
-                                 --liftIO $ hPutStrLn stdout $ show (m ^. #camera . #matrixWorldInverse)
                                  case d of
                                    Nothing -> return c
                                    Just d' -> do
@@ -372,6 +369,11 @@ main = runJSorWarp 8080 $ do
 --  . trapper @ToJSON ctx
 
 
+
 testText :: T.Text
 testText = "Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of 'de Finibus Bonorum et Malorum' (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, 'Lorem ipsum dolor sit amet..', comes from a line in section 1.10.32."
 #endif
+
+
+                                 --liftIO $ hPutStrLn stdout $ show (m ^. #camera . #cameraObj)
+                                 --liftIO $ hPutStrLn stdout $ show (m ^. #camera . #matrixWorldInverse)
