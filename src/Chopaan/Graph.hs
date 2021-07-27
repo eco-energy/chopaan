@@ -15,13 +15,11 @@ module Chopaan.Graph ( module Chopaan.Graph
                      ) where
 
 import Prelude hiding ((.), id)
-import Control.Category
 import Control.Monad
 
 import GHC.Generics (Generic, Generic1)
 import Control.DeepSeq
 import Data.Aeson (ToJSON, FromJSON)
-import Data.Greskell (FromGraphSON)
 
 #ifndef ghcjs_HOST_OS
 import Control.Monad.IO.Class
@@ -39,8 +37,6 @@ import Data.Pool
 import Shpadoinkle.Widgets.Types (Humanize)
 
 import Chopaan.Graph.G
-import Chopaan.Graph.Snapshot
-
 
 
 #ifndef ghcjs_HOST_OS
@@ -70,8 +66,3 @@ withKbtzPool f = do
 withSpider :: SpiderM ~> GraphM
 withSpider f = (\s -> runSpider s f) =<< (fmap spools ask)
 #endif
-
-
-
-data GraphType = MeshG | PlanG | StatusG | FlowG
-  deriving (Eq, Ord, Show, Read, Bounded, Enum, Generic, ToJSON, FromJSON, NFData, Humanize)

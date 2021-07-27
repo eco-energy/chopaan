@@ -8,8 +8,14 @@
 module Chopaan.Client where
 
 import           Control.Monad.Catch         (MonadThrow)
-import           Control.Monad.Reader        (MonadIO)
+import           Control.Monad.Reader        (MonadIO, liftIO)
 import           Data.Proxy                  (Proxy (..))
+
+import           Streamly
+import qualified Streamly.Prelude as S
+import qualified Streamly.Internal.Prelude as S
+import           Servant.Streamly
+
 #ifndef ghcjs_HOST_OS
 import           Shpadoinkle                 (JSM, MonadJSM, MonadUnliftIO (..),
                                               UnliftIO (..), askJSM, runJSM)
@@ -51,11 +57,11 @@ instance MonadUnliftIO AppC where
 instance CRUDChopaan AppC where
   listKibbutzim = AppC $ runXHR listKibbutzimM
   listNodezim = AppC . runXHR . listNodezimM
-  getGraph k g t0 t1 = AppC $ do
-    let
+  getGraph k g t0 t1 = adapt $ S.hoist AppC $ S.concatM $ (S.hoist liftIO . adapt) <$> (runXHR' r env)
+    where
       r = historyAPI k g t0 t1
       env = (ClientEnv $ BaseUrl Http devHost 8080 "")
-    runXHR' r env
+    
 
 prodHost = "dosti.ecoenergy.global"
 devHost = "localhost"
@@ -66,7 +72,7 @@ prodEnv = ClientEnv $ BaseUrl Https prodHost 443 ""
   = client (Proxy @ API)
 
 (historyAPI)
-  = client (Proxy @ (HistoryAPI))
+  = client (Proxy @ (HistoryAPI AheadT))
 
   
 app :: JSM ()

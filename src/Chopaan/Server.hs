@@ -8,21 +8,31 @@
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE QuantifiedConstraints, UndecidableInstances #-}
 --{-# OPTIONS_GHC -fno-warn-missing-methods #-}
 
 module Chopaan.Server (application, main, TinkerConf(..)) where
 
 import GHC.Generics hiding (R)
 
+import           Control.Monad.Trans (lift)
 import           Control.Monad.Trans.Reader hiding (ask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader.Class
+import           Control.Monad.Catch
+import           Control.Monad.Base
+import           Control.Monad.Trans.Control
+
 
 import           Data.Proxy
 
 import           Network.Wai               (Application)
 import           Network.Wai.Handler.Warp  (run)
 import           Network.Wai.Middleware.Cors
+
+import           Streamly                  (IsStream, AheadT, adapt)
+import           Streamly.Internal.Prelude (hoist)
+import qualified Streamly as S
 
 import           Servant.API.WebSocket (WebSocket)
 import           Servant.Links
@@ -52,7 +62,8 @@ import Chopaan.View (view, template, onRouteChange)
 
 
 newtype App a = App { runApp :: ReaderT TinkerConf IO a }
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader TinkerConf)
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader TinkerConf,
+                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
 
 
 appToHandler :: MonadIO m => TinkerConf -> App ~> m
@@ -63,16 +74,21 @@ newtype Noop a = Noop (JSM a)
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadJSM)
   deriving anyclass CRUDChopaan
 
+-- (forall t. IsStream t => (Monad (t App))) =>
 instance CRUDChopaan App where
   listNodezim k = (\(TinkerConf h p) -> (runGraphM h p) $ listNodezim k)
                   =<< ask 
   listKibbutzim = (\(TinkerConf h p) -> (runGraphM h p) listKibbutzim) =<< ask
-  getGraph  g k t t' = ask
-                       >>= (\(TinkerConf h p) -> runGraphM h p $ getGraph g k t t')
+  getGraph g k t t' = S.aheadly $ do
+    (TinkerConf h p) <- ask
+    g <- runGraphM h p $ do
+      return $ getGraph g k t t'
+    hoistS h p $ g
+
 
 app :: Env -> FilePath -> TinkerConf -> Application
 app ev root (TinkerConf h p) =
-  serve (Proxy @ (HistoryAPI :<|> SPA App)) ((serveHistoryAPI h p) :<|> serveSPA) 
+  serve (Proxy @ ((HistoryAPI AheadT) :<|> SPA App)) ((serveHistoryAPI h p) :<|> serveSPA) 
   where
     serveSPA :: Server (SPA App)
     serveSPA = serveUI @ (SPA App) root

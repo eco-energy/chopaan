@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving
 , DerivingStrategies, DeriveAnyClass, StandaloneDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuantifiedConstraints, InstanceSigs #-}
 module Chopaan.CRUD where
 
 import GHC.Generics
@@ -15,6 +16,8 @@ import Shpadoinkle (Html, MonadJSM)
 import Shpadoinkle.Widgets.Table (Tabular(..), Column, Row, SortCol(..), Sort(..))
 import Shpadoinkle.Widgets.Types (Humanize (..), Present(present))
 
+import Streamly (IsStream, adapt)
+import Streamly.Internal.Prelude (hoist)
 
 import Control.Monad.Trans.Class
 import Chopaan.Node.NodeId
@@ -28,13 +31,14 @@ import Data.Time
 class CRUDChopaan m where
   listKibbutzim :: m (KbtzList)
   listNodezim :: KbtzName -> m (NodeList)
-  getGraph :: KbtzName -> GraphType -> UTCTime -> UTCTime -> m (SG NodeMAC)
+  getGraph :: forall t. IsStream t => KbtzName -> GraphType -> UTCTime -> UTCTime -> t m (SG NodeMAC)
   --sensorMonitor :: (IsStream t) => NodeMAC -> t m SensorR
 
-instance (MonadTrans t, Monad m, CRUDChopaan m) => CRUDChopaan (t m) where
+instance (MonadTrans t, Monad m, CRUDChopaan m, Monad (t m)) => CRUDChopaan (t m) where
   listKibbutzim = lift listKibbutzim
   listNodezim = lift . listNodezim
-  getGraph k g t0 t1 = lift (getGraph k g t0 t1)
+  getGraph :: forall t'. (IsStream t') => KbtzName -> GraphType -> UTCTime -> UTCTime -> t' (t m) (SG NodeMAC)
+  getGraph k g t0 t1 = adapt . hoist lift $ getGraph k g t0 t1
   --nodeDetails = lift . nodeDetails
   --sensorMonitor :: (IsStream t') => NodeMAC -> t' (t m) SensorR
   --sensorMonitor = lift . sensorMonitor

@@ -34,7 +34,7 @@ import Data.Proxy (Proxy(..))
 import Data.Generics.Product
 import Data.Generics.Sum
 import Data.Generics.Labels
-
+import Data.Maybe
 
 
 import           Shpadoinkle                       (Html, MonadJSM, text, voidC)
@@ -57,6 +57,9 @@ import           Shpadoinkle.Widgets.Types         (Control (..),
 import           Shpadoinkle.Run             (runJSorWarp, simple, Env(Dev))
 import           Shpadoinkle.Backend.Snabbdom (runSnabbdom)
 
+import Streamly
+import qualified Streamly.Prelude as S
+import qualified Streamly.Data.Fold as FL
 
 import Chopaan.Graph.Snapshot
 import Servant.API                 ((:<|>) (..))
@@ -64,7 +67,7 @@ import Chopaan.Kibbutz.KbtzId
 import Chopaan.API.History
 import Chopaan.UiTypes
 import Chopaan.Graph
-import Chopaan.Graph.G as G (SG, G(..), SG'(..))
+import Chopaan.Graph
 import Chopaan.CRUD
 import Chopaan.Node.NodeT
 import Chopaan.Node.NodeId
@@ -88,9 +91,21 @@ defGView = GView (KbtzId "test") StatusG t0 t1 Nothing
     t0 = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
     t1 = Ti.UTCTime (Ti.fromGregorian 2021 4 7) (Ti.secondsToDiffTime 0)
 
-requestGView :: (CRUDChopaan m) => GView -> m (SG NodeMAC) 
-requestGView (GView k g t0 t1 _) = getGraph k g t0 t1 
-
+requestGView :: forall m. (CRUDChopaan m, Monad m) => GView -> m (SG NodeMAC) 
+requestGView (GView k g t0 t1 _) = case g of
+  MeshG -> getL Mesh getMesh
+  PlanG -> getL Transactor getTransactor
+  StatusG -> getL Status getStatus
+  FlowG -> getL Flow getFlow
+  where
+    getL :: forall a b. (SG' NodeMAC a b -> SG NodeMAC)
+         -> (SG NodeMAC -> Maybe (SG' NodeMAC a b))
+         -> m (SG NodeMAC)
+    getL c p = c <$> (S.fold FL.mconcat
+                             $ S.map (fromJust)
+                                   $ S.filter (isJust)
+                                   $ S.map p
+                                   $ getGraph k g t0 t1)
 
 mkGView :: KbtzName -> GraphType -> Ti.UTCTime -> Ti.UTCTime -> GView 
 mkGView k g t0 t1 = GView k g t0 t1 Nothing
@@ -199,7 +214,6 @@ view fe = case fe of
     where
       sectionTitle cr ed = H.h3_ [ text $ maybe cr (const ed) n ]
   MGraph gv -> onSum (#_MGraph) $ gView gv
-                
 
 
 cancelButton :: forall m a. MonadJSM m => Html m (NodeUpdate 'Edit)
@@ -298,5 +312,5 @@ gView g = H.div [H.class' $ Css.relative <> Css.flex_grow <> Css.flex_col]
                  <> Css.justify_center
                  <> Css.w_full
                ] [ text . humanize $ gt ]
-      | gt <- [(minBound @GraphType)..maxBound] ]
+      | gt <- [(minBound @GraphType)..maxBound]]
 
