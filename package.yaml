@@ -300,6 +300,7 @@ library:
         - Chopaan.Utils.Retry
         - Chopaan.Utils.Streamly
         - Chopaan.Utils.Time
+        - Servant.Streamly
         - Proto.NodeMessageSchema.NodeMessages
         - Proto.NodeMessageSchema.NodeMessages_Fields
       other-modules: []

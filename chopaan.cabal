@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e0a9377d738bdbd7c63d789a8a84376cdd871e6e3731a9bf8890db609be2f1f1
+-- hash: 0f1f04d6536cc15278631007a0ccb73e0085f5a93d25cfabda4b66ae3442ead9
 
 name:           chopaan
 version:        0.1.0.0
@@ -302,6 +302,7 @@ library
         Chopaan.Utils.Retry
         Chopaan.Utils.Streamly
         Chopaan.Utils.Time
+        Servant.Streamly
         Proto.NodeMessageSchema.NodeMessages
         Proto.NodeMessageSchema.NodeMessages_Fields
     hs-source-dirs:

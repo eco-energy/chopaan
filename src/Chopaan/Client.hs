@@ -28,8 +28,8 @@ import           Data.FileEmbed              (embedFile)
 import           Data.Text.Encoding          (decodeUtf8)
 
 import           Servant.API                 ((:<|>) (..))
-import           Shpadoinkle.Backend.Snabbdom (runSnabbdom)
-import           Shpadoinkle.Html.Utils      (getBody, addInlineStyle)
+import           Shpadoinkle.Backend.Snabbdom (runSnabbdom, stage)
+import           Shpadoinkle.Html.Utils      (addInlineStyle)
 import           Shpadoinkle.Router          (fullPageSPA, withHydration)
 import           Shpadoinkle.Router.Client   (client, runXHR', runXHR)
 import           Servant.Client.JS
@@ -74,11 +74,11 @@ prodEnv = ClientEnv $ BaseUrl Https prodHost 443 ""
 (historyAPI)
   = client (Proxy @ (HistoryAPI AheadT))
 
-  
+
 app :: JSM ()
 app = do
   addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
-  fullPageSPA @(SPA JSM) runAppC runSnabbdom (withHydration ainit) view getBody onRouteChange routes
+  fullPageSPA @(SPA JSM) runAppC runSnabbdom (withHydration ainit) view stage onRouteChange routes
 
 
 main :: IO ()
