@@ -21,7 +21,7 @@ import Shpadoinkle.Console (debug)
 
 import Linear.V2
 
-import           Language.Javascript.JSaddle  hiding (JSM, liftJSM, toJSString)
+import           Language.Javascript.JSaddle  hiding (JSM, MonadJSM, liftJSM, toJSString)
 
 import Chopaan.Ui.Base
 
@@ -138,6 +138,7 @@ data Screen = Screen
   , top :: Double
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
+zeroScreen :: Screen
 zeroScreen = Screen 0 0 0 0
 
 screenAspect :: Screen -> Double
