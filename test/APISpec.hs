@@ -11,8 +11,10 @@ import           Test.Hspec.Wai.Matcher
 import qualified Network.Wai.Handler.Warp         as Warp
 
 import           Servant
-import           Servant.Client
-
+import           Servant.Client.Streaming
+import Streamly
+import qualified Streamly.Prelude as S
+import Servant.Streamly
 
 import Chopaan.Graph
 import Chopaan.API.History
@@ -39,21 +41,21 @@ tn = Ti.addUTCTime (60 * 60) t0
 
 serverSpec :: Spec
 serverSpec = do
-  let nNodes = 10
-      nMessages = 10
-      kbtzId = (KbtzId "test")
-  -- beforeAll_ (do
-  --               ns <- liftIO $ arbs @NodeMAC nNodes
-  --               void $ hydrateKbtz ns nNodes nMessages) $ do
+  let kbtzId = (KbtzId "test")
+
   around withUserApp $ do
-      let getHistory = client (Proxy :: Proxy HistoryAPI)
+      let getHistory = client (Proxy :: Proxy (HistoryAPI AheadT))
       baseUrl <- runIO $ parseBaseUrl "http://localhost"
       manager <- runIO $ newManager defaultManagerSettings
       let clientEnv port = mkClientEnv manager (baseUrl { baseUrlPort = port })
       describe "GET Graph" $ do
         it "responds with 200" $ \p -> do
-          result <- runClientM (getHistory kbtzId MeshG t0 tn) (clientEnv p)
-          print (result)
+          withClientM (getHistory kbtzId MeshG t0 tn) (clientEnv p) $
+            \res -> case res of
+              Left e -> do
+                print e
+              Right r -> do
+                S.mapM_ print $ adapt r
           1 `shouldBe` 1 --(Right (x)) 
 
   
