@@ -54,6 +54,12 @@ devjs:
 dj:
 	cabal --enable-nix --ghcjs --project-file=cabal-ghcjs.project --builddir=dist-ghcjs new-build all && ./linkDevAssets.sh
 
+load_dev:
+	nix-shell shpadoinkle-shell.nix \
+	--command "cabal --enable-nix --ghcjs --project-file=cabal-ghcjs.project --builddir=dist-ghcjs new-build all" && \
+	./linkDevAssets.sh && \
+	stack run -- server --assets ./webdev --tinkerHost "localhost" --tinkerPort 8182 
+
 db_image:
 	docker build -f Dockerfile.db -t chopaan/timescale .
 
