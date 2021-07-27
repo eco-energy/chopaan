@@ -77,7 +77,7 @@ prodEnv = ClientEnv $ BaseUrl Https prodHost 443 ""
 
 app :: JSM ()
 app = do
-  addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
+  --addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
   fullPageSPA @(SPA JSM) runAppC runSnabbdom (withHydration ainit) view stage onRouteChange routes
 
 

@@ -338,7 +338,7 @@ threeDM objF xs = do
       _ <- requestAnimationFrame win =<< animation win model
       raw <- RawNode <$> toJSVal elm
       ctx <- askJSM
-      _ <- forkIO $ threadDelay 10
+      _ <- forkIO $ threadDelay 1
            >> shpadoinkle id runSnabbdom model (threeD . trapper @ToJSON ctx) (pure raw)
       return raw
 

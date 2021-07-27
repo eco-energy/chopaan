@@ -39,7 +39,7 @@ import           Servant.Links
 
 import           Servant.API
 import           Servant.Server            (Server, hoistServer, serve)
-
+import           Servant.Server.StaticFiles (serveDirectoryWebApp)
 
 import           Shpadoinkle               (JSM)
 import           Shpadoinkle.Router        (MonadJSM)
@@ -88,7 +88,8 @@ instance CRUDChopaan App where
 
 app :: Env -> FilePath -> TinkerConf -> Application
 app ev root (TinkerConf h p) =
-  serve (Proxy @ ((HistoryAPI AheadT) :<|> SPA App)) ((serveHistoryAPI h p) :<|> serveSPA) 
+  serve (Proxy @ ((HistoryAPI AheadT) :<|> SPA App :<|> Raw))
+  ((serveHistoryAPI h p) :<|> serveSPA :<|> (serveDirectoryWebApp root))
   where
     serveSPA :: Server (SPA App)
     serveSPA = serveUI @ (SPA App) root
