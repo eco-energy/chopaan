@@ -41,7 +41,8 @@ import Shpadoinkle.Run (runJSorWarp)
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Html.Utils (getBody)
 import Shpadoinkle.Widgets.Types (Humanize(..))
-import Shpadoinkle.Backend.Snabbdom
+--import Shpadoinkle.Backend.Snabbdom
+import Shpadoinkle.Backend.ParDiff
 import Shpadoinkle.Lens
 import Shpadoinkle.Console
 import Control.Lens hiding (simple, elements)
@@ -227,8 +228,8 @@ threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
     rootCSS = [ H.textProperty "id" "renderer"
               , styleP "overflow:hidden"
               , styleP ("perspective:" <> (textS fov') <> "px")
-              , H.class' Css.w_screen
-              , H.class' Css.h_screen
+              , H.class' Css.w_full
+              , H.class' Css.h_full
               , styleP "background-color: black"
               , styleP "touch-action: none"
               ]
@@ -317,10 +318,10 @@ animation w tv = go
               writeTVar tv (m', t')
       (requestAnimationFrame w) =<< (animation w tv)
 
+vId = "threeDView"
 
-threeDM :: (Eq a, NFData a, ToJSON a, Humanize a) => (Int -> Obj) -> [a] -> JSM RawNode
+threeDM :: (Eq a, NFData a, ToJSON a, Humanize a, Show a) => (Int -> Obj) -> [a] -> JSM RawNode
 threeDM objF xs = do
-  let vId = "threeDView"
   doc <- currentDocumentUnchecked
   isSubsequent <- traverse toJSVal =<< getElementById doc vId
   case isSubsequent of
@@ -329,8 +330,6 @@ threeDM objF xs = do
       win <- currentWindowUnchecked
       elm <- createElement doc "div"
       setId elm vId
-      debug @ToJSVal elm
-      debug @ToJSVal "testView!!"
       (w, h) <- getWH
       let mod = mkModel (Screen w h 0 h) objF xs 
       model <- liftIO $ newTVarIO (mod, Nothing)
@@ -338,10 +337,8 @@ threeDM objF xs = do
       raw <- RawNode <$> toJSVal elm
       ctx <- askJSM
       _ <- forkIO $ threadDelay 1
-           >> shpadoinkle id runSnabbdom model testView (pure raw)
+           >> shpadoinkle id runParDiff model (threeD . trapper @ToJSON ctx) (pure raw)
       return raw
-      -- (threeD . trapper @ToJSON ctx)
-testView _ = H.div [H.id' "threeDView"] ["Where is this waldo?!!"]
 
 #ifndef __GHCJS__
 main :: IO ()
@@ -365,7 +362,7 @@ main = runJSorWarp 8080 $ do
                                      return c') (pure 0) model
   _ <- requestAnimationFrame win =<< animation win model
   ctx <- askJSM
-  shpadoinkle id runSnabbdom model (threeD . trapper @ToJSON ctx) (getBody)
+  shpadoinkle id runParDiff model (threeD . trapper @ToJSON ctx) (stage)
 --  . trapper @ToJSON ctx
 
 

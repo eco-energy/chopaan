@@ -12,7 +12,7 @@ import ConCat.Misc (inNew2)
 import qualified Control.Category as C
 #endif
 
-import Control.PseudoInverseCategory (pimap, EndoIso(..), PseudoInverseCategory(..))
+--import Control.PseudoInverseCategory (pimap, EndoIso(..), PseudoInverseCategory(..))
 import qualified Control.Newtype.Generics as N
 import Control.DeepSeq (NFData)
 import Data.Monoid (Sum(..))
@@ -108,18 +108,18 @@ instance (GrConn flow state) => T.Tabular (Gr flow state) where
     let --c = context ((==) col) gr
         es = edgeList g
         grHtml :: Monad m => [Html m (Gr flow state)]
-        grHtml = xs <$> es
+        grHtml = undefined <$> es
           where
-            xs :: Monad m => (flow, state, state) -> Html m (Gr flow state)
-            xs e = pimap iso (text $ grRow e)
-            iso :: EndoIso [(flow, state, state)] (Gr flow state)
-            iso = EndoIso id isoL isoR
-              where
-                isoL :: [(flow, state, state)] -> Gr flow state
-                isoL xs' = foldl ov emptyGr (fmap e' xs')
-                isoR :: Gr flow state -> [(flow, state, state)]
-                isoR = edgeList . unGr
-                e' (x, y, z) = Gr $ edge x y z
+            -- xs :: Monad m => (flow, state, state) -> Html m (Gr flow state)
+            -- xs e = pimap iso (text $ grRow e)
+            -- iso :: EndoIso [(flow, state, state)] (Gr flow state)
+            -- iso = EndoIso id isoL isoR
+            --   where
+            --     isoL :: [(flow, state, state)] -> Gr flow state
+            --     isoL xs' = foldl ov emptyGr (fmap e' xs')
+            --     isoR :: Gr flow state -> [(flow, state, state)]
+            --     isoR = edgeList . unGr
+            --     e' (x, y, z) = Gr $ edge x y z
                 
     in grHtml  
   sortTable ::
@@ -206,30 +206,30 @@ data Model l n = Model
 deriving instance (Generic s, Generic o, NFData s, NFData o) => NFData (Model s o)
 
 
-asTitle :: forall f s. (GrConn f s) => EndoIso (Gr f s) (Gr f s, T.SortCol (Gr f s))
-asTitle = EndoIso id (\a -> (a, sortColGr (const Title) a)) fst
+-- asTitle :: forall f s. (GrConn f s) => EndoIso (Gr f s) (Gr f s, T.SortCol (Gr f s))
+-- asTitle = EndoIso id (\a -> (a, sortColGr (const Title) a)) fst
 
-asTitle' :: forall f s. (GrConn f s) => EndoIso (Gr f s, T.SortCol (Gr f s)) (Gr f s) 
-asTitle' = piinverse asTitle
+-- asTitle' :: forall f s. (GrConn f s) => EndoIso (Gr f s, T.SortCol (Gr f s)) (Gr f s) 
+-- asTitle' = piinverse asTitle
 
-asVx :: forall f s. (GrConn f s) => EndoIso (Gr f s) (Gr f s, T.SortCol (Gr f s))
-asVx = EndoIso id (\a -> (a, sortColGr (const Vx) a)) fst
+-- asVx :: forall f s. (GrConn f s) => EndoIso (Gr f s) (Gr f s, T.SortCol (Gr f s))
+-- asVx = EndoIso id (\a -> (a, sortColGr (const Vx) a)) fst
 
-asVx' :: forall f s. (GrConn f s) => EndoIso (Gr f s, T.SortCol (Gr f s)) (Gr f s) 
-asVx' = piinverse asVx
+-- asVx' :: forall f s. (GrConn f s) => EndoIso (Gr f s, T.SortCol (Gr f s)) (Gr f s) 
+-- asVx' = piinverse asVx
 
-asLx :: forall f s. (GrConn f s) => EndoIso (Gr f s) (Gr f s, T.SortCol (Gr f s))
-asLx = EndoIso id (\a -> (a, sortColGr (const Lx) a)) fst
+-- asLx :: forall f s. (GrConn f s) => EndoIso (Gr f s) (Gr f s, T.SortCol (Gr f s))
+-- asLx = EndoIso id (\a -> (a, sortColGr (const Lx) a)) fst
 
-asLx' :: forall f s. (GrConn f s) => EndoIso (Gr f s, T.SortCol (Gr f s)) (Gr f s) 
-asLx' = piinverse asLx
+-- asLx' :: forall f s. (GrConn f s) => EndoIso (Gr f s, T.SortCol (Gr f s)) (Gr f s) 
+-- asLx' = piinverse asLx
 
 
--- $ The view takes continuations as arguments
+-- -- $ The view takes continuations as arguments
 
-view :: (Monad m) => Model S Op -> Html m (Model S Op)
-view model = div_
-  [ liftC (\g' m -> m {graph = g'}) graph $ pimap asTitle' (grView (graph model) (sortCol model)) ]
+-- view :: (Monad m) => Model S Op -> Html m (Model S Op)
+-- view model = div_
+--   [ liftC (\g' m -> m {graph = g'}) graph $ pimap asTitle' (grView (graph model) (sortCol model)) ]
 
 
 -- $ TODO: head here after vertex list doesn't make any sense.
@@ -243,7 +243,7 @@ sortCol m = sortColGr (const Title) (graph m)
 
 main :: IO ()
 main = runJSorWarp 8080 $
-  simple runSnabbdom (Model (mergeGr $ (fmap snd) (iterate opS (0, emptyGr)))) view getBody
+  simple runSnabbdom (Model (mergeGr $ (fmap snd) (iterate opS (0, emptyGr)))) undefined getBody
 
 
 

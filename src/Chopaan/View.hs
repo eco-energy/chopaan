@@ -55,7 +55,6 @@ import           Shpadoinkle.Widgets.Types         (Control (..),
                                                     getValid, humanize,
                                                     validate, Hygiene(..), Search)
 import           Shpadoinkle.Run             (runJSorWarp, simple, Env(Dev))
-import           Shpadoinkle.Backend.Snabbdom (runSnabbdom)
 
 import Streamly
 import qualified Streamly.Prelude as S
@@ -242,8 +241,8 @@ staticTemplate s = voidC $ H.html_
   [ H.head_
     [ H.meta [ H.charset "ISO-8859-1" ] []
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
-    --, stylesheetAsset "tailwind.min.css"
-    --, stylesheet bootstrap
+    , stylesheetAsset "tailwind.min.css"
+    , stylesheet bootstrap
     --, H.script [ H.src $ entrypoint ev ] []
     ]
   , H.body_
@@ -252,7 +251,7 @@ staticTemplate s = voidC $ H.html_
   ]
 
 
-stylesheetAsset = stylesheet . ("./webdev/assets/" <>)
+stylesheetAsset = stylesheet . ("./assets/" <>)
 
 stylesheet f = H.link'
         [ H.rel "stylesheet"
@@ -266,8 +265,8 @@ template ev fe stage = H.html_
   [ H.head_
     [ H.meta [ H.charset "ISO-8859-1" ] []
     , H.meta [ H.name' "viewport", H.content "width=device-width, initial-scale=1.0"] []
-    --, stylesheetAsset "tailwind.min.css"
-    --, stylesheetAsset "style.css"
+    , stylesheetAsset "tailwind.min.css"
+    , stylesheetAsset "style.css"
     , toHydration fe
     , H.script [ H.src $ entrypoint ev ] []
     ]
