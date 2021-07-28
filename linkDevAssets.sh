@@ -17,13 +17,13 @@ mkdir -p $OUT/js
 echo "Linking JS sources"
 for src in ${jslib}/*
 do
-    ln -s $src $OUT/js/$(basename $src)
+    cp $src $OUT/js/$(basename $src)
 done
 
 echo "Linking Artifacts"
 for asset in ${assets}/*
 do
-    ln -s $asset $OUT/assets/$(basename $asset)
+    cp $asset $OUT/assets/$(basename $asset)
 done
 
 if [ ! -d $ARTIFACT ]; then
