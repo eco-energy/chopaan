@@ -30,7 +30,7 @@ source-repository-package
 source-repository-package
     type: git
     location: https://github.com/Fresheyeball/Shpadoinkle.git
-    tag: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+    tag: 34cfee8702c8c104a211686e9c6c078315b65c0a
     subdir: core
     subdir: backends/snabbdom
     subdir: backends/static
@@ -41,7 +41,7 @@ source-repository-package
     subdir: disembodied
     subdir: template
     subdir: console
-    --sha256: 0vvykghlf3d289ni3817zl4h3d49xxwrc6xxcjdygawbsng0v4yf
+    --sha256: 14aajxpr14506qj2hxnjy6iz4c2w8ch5dchqhy81a5i1s0nylid6
 
 -- source-repository-package
 --     type: git

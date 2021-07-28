@@ -23,8 +23,8 @@ let
       shpadoinkle = fetchFromGitHub {
         owner = "Fresheyeball";
         repo = "shpadoinkle";
-        rev    = "8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4";
-        sha256 = "0vvykghlf3d289ni3817zl4h3d49xxwrc6xxcjdygawbsng0v4yf";
+        rev    = "34cfee8702c8c104a211686e9c6c078315b65c0a";
+        sha256 = "14aajxpr14506qj2hxnjy6iz4c2w8ch5dchqhy81a5i1s0nylid6";
       };
 
       chan = import (shpadoinkle + "/nix/chan.nix");

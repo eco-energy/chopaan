@@ -88,6 +88,7 @@ dependencies:
 - retry
 - Shpadoinkle >= 0.3.0.0
 - Shpadoinkle-backend-snabbdom
+- Shpadoinkle-backend-pardiff
 - Shpadoinkle-console
 - Shpadoinkle-html
 - Shpadoinkle-widgets

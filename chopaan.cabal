@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0f1f04d6536cc15278631007a0ccb73e0085f5a93d25cfabda4b66ae3442ead9
+-- hash: 588c783c2c1e797c65b9dd4c90c9230a39359fca28df3b79e8eea11be57c196b
 
 name:           chopaan
 version:        0.1.0.0
@@ -46,6 +46,7 @@ library
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
     , Shpadoinkle-html
@@ -318,6 +319,7 @@ executable dev
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
     , Shpadoinkle-html
@@ -462,6 +464,7 @@ executable kbtzim
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
     , Shpadoinkle-html
@@ -605,6 +608,7 @@ executable server
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
     , Shpadoinkle-html
@@ -749,6 +753,7 @@ executable ui
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
     , Shpadoinkle-html
@@ -909,6 +914,7 @@ test-suite chopaan-test
   build-depends:
       SVGFonts
     , Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
     , Shpadoinkle-html

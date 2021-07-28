@@ -53,7 +53,7 @@ extra-deps:
      - net-spider
    # nix-sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
  - git: https://github.com/Fresheyeball/Shpadoinkle.git
-   commit: 8ac480f78e0fa8d75d9335dc1e1eed2aa4f9efd4
+   commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
    subdirs:
      - core
      - backends/pardiff
