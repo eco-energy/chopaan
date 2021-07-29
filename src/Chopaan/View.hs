@@ -262,7 +262,7 @@ staticTemplate s = voidC $ H.html_
   ]
 
 
-stylesheetAsset = stylesheet . ("./assets/" <>)
+stylesheetAsset = stylesheet . ("./static/assets/" <>)
 
 stylesheet f = H.link'
         [ H.rel "stylesheet"

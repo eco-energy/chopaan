@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE QuantifiedConstraints, UndecidableInstances #-}
+{-# LANGUAGE QuantifiedConstraints, DataKinds, UndecidableInstances #-}
 --{-# OPTIONS_GHC -fno-warn-missing-methods #-}
 
 module Chopaan.Server (application, main, TinkerConf(..)) where
@@ -86,9 +86,11 @@ instance CRUDChopaan App where
     hoistS h p $ g
 
 
+type Static = "static" :> Raw
+
 app :: Env -> FilePath -> TinkerConf -> Application
 app ev root (TinkerConf h p) =
-  serve (Proxy @ ((HistoryAPI AheadT) :<|> SPA App :<|> Raw))
+  serve (Proxy @ ((HistoryAPI AheadT) :<|> SPA App :<|> Static))
   ((serveHistoryAPI h p) :<|> serveSPA :<|> (serveDirectoryWebApp root))
   where
     serveSPA :: Server (SPA App)
