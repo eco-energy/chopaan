@@ -238,8 +238,8 @@ threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
       , transformP $ (cameraCSSMat c) <> (translatePx (widthG screen / 2) (heightG screen / 2))
       , styleP "transform-style: preserve-3d"
       , styleP "pointer-events: none"
-      , H.class' Css.w_screen
-      , H.class' Css.h_screen
+      , H.class' Css.w_full
+      , H.class' Css.h_full
       ]
     objCSS y = [ styleP "position:absolute"
                , styleP "pointer-events: auto"
@@ -318,7 +318,6 @@ animation w tv = go
               writeTVar tv (m', t')
       (requestAnimationFrame w) =<< (animation w tv)
 
-vId = "threeDView"
 
 threeDM :: (Eq a, NFData a, ToJSON a, Humanize a, Show a) => (Int -> Obj) -> [a] -> JSM RawNode
 threeDM objF xs = do
@@ -339,6 +338,8 @@ threeDM objF xs = do
       _ <- forkIO $ threadDelay 1
            >> shpadoinkle id runParDiff model (threeD . trapper @ToJSON ctx) (pure raw)
       return raw
+  where
+    vId = "three-view"
 
 #ifndef __GHCJS__
 main :: IO ()

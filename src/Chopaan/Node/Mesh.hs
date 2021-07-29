@@ -30,22 +30,13 @@ import qualified Proto.NodeMessageSchema.NodeMessages as N
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N
 import GHC.Generics
 
-import Data.Monoid (Sum(..), Last(..))
-import Data.Maybe
-import Data.Either
+import Data.Monoid (Last(..))
 import Data.Int
-import Data.ProtoLens
-import Data.Time (DiffTime, UTCTime(..), Day(..))
 import Data.Text as T
 import Data.Binary
 import Data.Aeson (FromJSON(..), ToJSON)
-import Chopaan.Node.NodeId
-import Chopaan.Utils.Time (utcTimeNow)
-import qualified Streamly.Prelude as S
-import Streamly (IsStream, MonadAsync, adapt)
 import qualified Streamly.Internal.Data.Fold as FL
 
-import Data.Greskell.GraphSON.GValue (unwrapOne)
 import Data.Greskell (newBind, gProperty, lookupAs, lookupAs', Key, pMapToFail, FromGraphSON(..))
 import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
 import Shpadoinkle.Widgets.Types (Humanize(..))
@@ -53,11 +44,13 @@ import Shpadoinkle.Widgets.Types (Humanize(..))
 #ifndef ghcjs_HOST_OS
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
 import NetSpider.Spider
-  (Spider, addFoundNode, withSpider)
-
+  (Spider, addFoundNode)
 import NetSpider.Graph (LinkAttributes(..), EFinds, NodeAttributes(..), VFoundNode)
 import NetSpider.Timestamp (fromUTCTime)
 #endif
+
+import Chopaan.Node.NodeId
+import Chopaan.Utils.Time (utcTimeNow)
 
 newtype RxSignal = RxSignal (Maybe Double)
   deriving stock (Generic)

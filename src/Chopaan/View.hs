@@ -82,7 +82,7 @@ default (T.Text, [])
 
 
 ainit :: (Monad m, CRUDChopaan m) => Route -> m Frontend
-ainit _ = return MHomePage
+ainit _ = MHomePage . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
 
 defGView :: GView
 defGView = GView (KbtzId "test") StatusG t0 t1 Nothing
@@ -127,14 +127,14 @@ loadG g = (pure . MGraph) =<< loadGraph g
 
 onRouteChange :: (Monad m, CRUDChopaan m) => Route -> m Frontend
 onRouteChange = \case
-  RHomePage -> return $ MHomePage
+  RHomePage -> MHomePage . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
   RKibbutzim -> MKibbutzim . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
   RKibbutz k -> MKibbutz . RosterNodezim (SortCol NId ASC) mempty <$> (listNodezim k)
   RAddNode k -> return $ MAddNode k Nothing emptyNodeForm
   RGraph k -> loadG (defGView {_whichK = k})
 
-homePage :: forall m a. MonadJSM m => Html m a
-homePage = H.div
+homePage :: forall m a. MonadJSM m => RosterKbtzim -> Html m RosterKbtzim
+homePage k = H.div
     [ H.class' $ Css.flex <> Css.flex_col <> Css.flex_grow <> Css.h_screen ]
     [ H.div headingBox [ H.h1 headingText [ "Welcome To Chopaan" ] ]
     , H.div menuBox
@@ -143,6 +143,17 @@ homePage = H.div
           ]
       , H.div (headingBox <> boxingCss) [
           H.a ([ H.onClickM_ . navigate @(SPA m) $ RGraph (KbtzId "test") ]) ["View Kibbutzim"]
+          ]
+      , H.div (headingBox <> boxingCss) [
+          H.div [ H.class' "input-group"
+                , H.textProperty "style" ("width:300px" :: T.Text)
+                ] [ k <% #_searchK $ Input.search [ H.class' "form-control", H.placeholder "Search" ] ]
+          , onRecord (lensProduct #_tableK #_sortK) $ Table.viewWith tableCfg
+            (k ^. #_tableK
+             . to (KbtzList .
+               (fuzzySearch searchKbtzName (k ^. (#_searchK . (value @(F.Input)))))
+                    . unKbtzList))
+            (_sortK k)
           ]
       ]
     ]
@@ -155,6 +166,8 @@ homePage = H.div
                   <> Css.grid_cols_2
                   <> Css.place_items_stretch
                   <> Css.h_full
+                  <> Css.bg_black
+                  <> Css.text_white
                 ]
       headingBox = [ H.class' $ Css.h_full <> Css.grid <> Css.place_items_center ]
       headingText = [ H.class' $ Css.text_3xl <> Css.flex_grow]
@@ -171,7 +184,7 @@ homePage = H.div
 
 view :: forall m. (MonadJSM m, CRUDChopaan m) => Frontend -> Html m Frontend
 view fe = case fe of
-  MHomePage -> onSum #_MHomePage $ homePage
+  MHomePage ks -> onSum #_MHomePage $ homePage ks
   MKibbutzim kbtzRoster -> onSum #_MKibbutzim $ H.div "container-fluid"
     [ H.div "row justify-content-between align-items-center"
      [ H.h2_ [ "Kibbutzim" ]
@@ -179,16 +192,14 @@ view fe = case fe of
              , H.textProperty "style" ("width:300px" :: T.Text)
              ]
        [ kbtzRoster <% #_searchK $ Input.search [ H.class' "form-control", H.placeholder "Search" ]
-       , H.div "input-group-append mr-3"
-         [ H.button [ H.onClickM_ $ navigate @(SPA m) RHomePage, H.class' "btn btn-primary" ] [ "Register" ]
-         ]
+       -- , H.div "input-group-append mr-3"
+       --   [ H.button [ H.onClickM_ $ navigate @(SPA m) RHomePage, H.class' "btn btn-primary" ] [ "Register" ]
+       --   ]
        ]
      ]
    , onRecord (lensProduct #_tableK #_sortK) $ Table.viewWith tableCfg
        (kbtzRoster ^. #_tableK
-         . to (KbtzList .
-               (fuzzySearch searchKbtzName (kbtzRoster ^. (#_searchK . (value @(F.Input)))))
-               . unKbtzList))
+         . to (KbtzList . (fuzzySearch searchKbtzName (kbtzRoster ^. #_searchK . (value @(F.Input)))) . unKbtzList))
        (_sortK kbtzRoster)
     ]
   MKibbutz nodeRoster -> onSum #_MKibbutz $ H.div "container-fluid"
@@ -275,17 +286,17 @@ template ev fe stage = H.html_
     ]
   ]
 
-tableCfg :: Table.Theme m KbtzList
+tableCfg :: forall m . (MonadJSM m) => Table.Theme m KbtzList
 tableCfg = mempty
   { tableProps = const . const . pure $ H.class' "table table-striped table-bordered"
-  , tdProps    = const . const . const $ \case
-      _      -> "align-middle"
+  , tdProps    = const . const $ \(KbtzimRow k) -> \case
+      _      -> [H.class' "align-middle", H.class' "text-white"] <> [H.onClickM_ . navigate @(SPA m) . RGraph $ k]
   }
 
 
   
-searchKbtzName :: [Kbtzim -> T.Text]
-searchKbtzName = [ T.pack . show . _kbtzName ]
+searchKbtzName :: [KbtzName -> T.Text]
+searchKbtzName = [ unKbtzId ]
 
 
 

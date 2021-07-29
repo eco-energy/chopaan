@@ -43,22 +43,22 @@ instance (MonadTrans t, Monad m, CRUDChopaan m, Monad (t m)) => CRUDChopaan (t m
   --sensorMonitor :: (IsStream t') => NodeMAC -> t' (t m) SensorR
   --sensorMonitor = lift . sensorMonitor
 
-newtype NodeList = NodeList { unNodeList :: [Nodezim] }
+newtype NodeList = NodeList { unNodeList :: Nodezim }
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (NFData, ToJSON, FromJSON)
 
-data instance Column NodeList = NId | NMac | NHW
+data instance Column NodeList = NId --  | NMac | NHW
   deriving (Eq, Ord, Show, Bounded, Enum, Generic, NFData, ToJSON, FromJSON)
 
-newtype instance Row NodeList = NodezimRow { unNodezimRow :: Nodezim }
+newtype instance Row NodeList = NodezimRow { unNodezimRow :: NodeMAC }
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (NFData)
 
 instance Humanize (Column NodeList) where
   humanize = \case
-    NId -> "Node Id"
-    NMac -> "MAC Address"
-    NHW -> "Hardware Configuration"
+    NId -> "MAC Address"
+    --NMac -> "MAC Address"
+    --NHW -> "Hardware Configuration"
 
 
 instance Tabular NodeList where
@@ -69,37 +69,37 @@ instance Tabular NodeList where
     -> Row NodeList
     -> Column NodeList
     -> [Html m NodeList]
-  toCell _ (NodezimRow Node{..}) = \case
-    NId -> present (show <$> _nodeId)
-    NMac -> present _nodeMAC
-    NHW -> present _hardwareConfig
+  toCell _ (NodezimRow n) = \case
+    NId -> present (unNodeId n)
+    --NMac -> present _nodeMAC
+    --NHW -> present _hardwareConfig
   sortTable (SortCol c d) = f $ case c of
-    NId -> g _nodeId
-    NMac -> g _nodeMAC
-    NHW -> g _hardwareConfig
+    NId -> g id
+    --NMac -> g _nodeMAC
+    --NHW -> g _hardwareConfig
     where
       f = case d of
-        ASC -> id
+        ASC -> flip
         DESC -> flip
       g l = compare `on` l . unNodezimRow
 
 
-newtype KbtzList = KbtzList { unKbtzList :: [Kbtzim] }
+newtype KbtzList = KbtzList { unKbtzList :: Kbtzim }
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (NFData, ToJSON, FromJSON)
 
-data instance Column KbtzList = KId | KName | KDesc
+data instance Column KbtzList = KId -- | KName | KDesc
   deriving (Eq, Ord, Show, Generic, Bounded, Enum, NFData, ToJSON, FromJSON)
 
-newtype instance Row KbtzList = KbtzimRow { unKbtzimRow :: Kbtzim }
+newtype instance Row KbtzList = KbtzimRow { unKbtzimRow :: KbtzName }
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (NFData)
 
 instance Humanize (Column KbtzList) where
   humanize = \case
     KId -> "Kibbutz Id"
-    KName -> "Name"
-    KDesc -> "Description"
+    --KName -> "Name"
+    --KDesc -> "Description"
 
 
 instance Tabular KbtzList where
@@ -110,14 +110,14 @@ instance Tabular KbtzList where
     -> Row KbtzList
     -> Column KbtzList
     -> [Html m KbtzList]
-  toCell _ (KbtzimRow Kbtzim {..}) = \case
-    KId -> present (show <$> _kbtzId)
-    KName -> present _kbtzName
-    KDesc -> present . fromMaybe "No Description Available" $ _kbtzDesc
+  toCell _ (KbtzimRow k) = \case
+    KId -> present (unKbtzId k)
+    -- KName -> present _kbtzName
+    -- KDesc -> present . fromMaybe "No Description Available" $ _kbtzDesc
   sortTable (SortCol c d) = f $ case c of
-    KId -> g _kbtzId
+    KId -> g id
     where
       f = case d of
-        ASC -> id
+        ASC -> flip
         DESC -> flip
       g l = compare `on` l . unKbtzimRow

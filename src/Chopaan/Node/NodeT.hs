@@ -33,23 +33,9 @@ import Chopaan.Node.NodeId
 import Chopaan.Node.HW
 
 
-data NodeT f = Node
-  { _nodeId :: Columnar f (NodeId Int)
-  , _nodeMAC :: Columnar f (NodeMAC)
-  , _hardwareConfig :: Columnar f (HW Double)
-  } deriving (Generic, Beamable)
-
-deriving instance Eq (NodeT Identity)
-deriving instance Ord (NodeT Identity)
-deriving instance Show (NodeT Identity)
-instance NFData (NodeT Identity)
-deriving instance ToJSON (NodeT Identity)
-deriving instance FromJSON (NodeT Identity)
-
-deriving instance Humanize (NodeT Identity)
 
 
-type Nodezim = NodeT Identity
+type Nodezim = [NodeMAC]
 
 
 data NodeUpdate s = NodeUpdate

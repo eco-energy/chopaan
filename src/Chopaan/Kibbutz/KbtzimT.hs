@@ -22,18 +22,18 @@ import Shpadoinkle.Widgets.Types (Humanize (..))
 import Chopaan.Kibbutz.KbtzId
 
 
-data KbtzimT f = Kbtzim
-  { _kbtzId   :: Columnar f (KbtzId Int)
-  , _kbtzName :: Columnar f (KbtzName)
-  , _kbtzDesc :: Columnar (Nullable f) Text
-  } deriving (Generic, Beamable)
+-- data KbtzimT f = Kbtzim
+--   { _kbtzId   :: Columnar f (KbtzId Int)
+--   , _kbtzName :: Columnar f (KbtzName)
+--   , _kbtzDesc :: Columnar (Nullable f) Text
+--   } deriving (Generic, Beamable)
 
-instance NFData (KbtzimT Identity)
-deriving instance Eq (KbtzimT Identity)
-deriving instance Ord (KbtzimT Identity)
-deriving instance Show (KbtzimT Identity)
-deriving instance ToJSON (KbtzimT Identity)
-deriving instance FromJSON (KbtzimT Identity)
-deriving instance Humanize (KbtzimT Identity)
+-- instance NFData (KbtzimT Identity)
+-- deriving instance Eq (KbtzimT Identity)
+-- deriving instance Ord (KbtzimT Identity)
+-- deriving instance Show (KbtzimT Identity)
+-- deriving instance ToJSON (KbtzimT Identity)
+-- deriving instance FromJSON (KbtzimT Identity)
+-- deriving instance Humanize (KbtzimT Identity)
 
-type Kbtzim = KbtzimT Identity
+type Kbtzim = [KbtzName]

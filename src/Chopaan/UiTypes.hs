@@ -49,15 +49,15 @@ data GView = GView
   , _currentG :: Maybe (SG NodeMAC)
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
-data Frontend = MHomePage
-              | MKibbutzim (RosterKbtzim)
-              | MKibbutz (RosterNodezim)
+data Frontend = MHomePage RosterKbtzim
+              | MKibbutzim RosterKbtzim
+              | MKibbutz RosterNodezim
               | MGraph GView
               | MAddNode (KbtzName) (Maybe NodeMAC) (NodeUpdate 'Edit)
               deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 
-type SPA m = "app" :> View m Frontend
+type SPA m = "" :> View m Frontend
         :<|> "app" :> "kibbutzim" :> View m Frontend
         :<|> "app" :> "kibbutz" :> Capture "id" KbtzName :> View m Frontend
         :<|> "app" :> "kibbutz" :> Capture "id" KbtzName :> "addNode" :> View m Frontend
@@ -83,7 +83,7 @@ routes =
 
 instance Routed (SPA m) Route where
   redirect = \case
-    RHomePage -> Redirect (Proxy @("app" :> View m Frontend)) id
+    RHomePage -> Redirect (Proxy @("" :> View m Frontend)) id
     RKibbutzim -> Redirect (Proxy @("app" :> "kibbutzim" :> View m Frontend)) id
     RKibbutz k -> Redirect (Proxy @("app" :> "kibbutz" :> Capture "id" KbtzName :> View m Frontend)) ($ k)
     RAddNode k -> Redirect (Proxy @("app" :> "kibbutz" :> Capture "id" KbtzName :> "addNode" :> View m Frontend)) ($ k)

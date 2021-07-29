@@ -111,17 +111,14 @@ type HistoryConn n a e =
   , ToJSON a, FromJSON a
   , FromGraphSON n, IsoGConn n a e)
 
-    
-defKbtz :: Int -> KbtzName -> Kbtzim
-defKbtz i k = Kbtzim (KbtzId i) k Nothing
--- (forall t. IsStream t => (Monad (t GraphM))) => 
+
 instance CRUDChopaan (GraphM) where
   listKibbutzim = do
     ks <- withKbtzPool getKbtzim
-    return . KbtzList $ (uncurry defKbtz) <$> (zip [1..] ks)  
+    return $ KbtzList ks  
   listNodezim k = do
     ns <- withKbtzPool ((flip getKbtzNodes) k)
-    return . NodeList $ (undefined) <$> (zip [1..] ns)
+    return . NodeList $ ns
   getGraph :: (IsStream t) => KbtzName -> GraphType -> UTCTime -> UTCTime -> t GraphM (SG NodeMAC)
   getGraph k g t t' = S.concatM (getHistoryForGraph k g t t')
 
