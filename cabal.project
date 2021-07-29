@@ -33,6 +33,7 @@ source-repository-package
     tag: 34cfee8702c8c104a211686e9c6c078315b65c0a
     subdir: core
     subdir: backends/snabbdom
+    subdir: backends/pardiff
     subdir: backends/static
     subdir: html
     subdir: widgets
