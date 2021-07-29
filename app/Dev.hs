@@ -6,7 +6,7 @@ import           Shpadoinkle.Run (liveWithBackend, Env(Dev))
 
 
 main :: IO ()
-main = liveAndWait 8080 C.app $ S.application Dev "./ui" (S.TinkerConf "localhost" 8182)
+main = liveAndWait 8080 (C.app "localhost" 8080) $ S.application Dev "./webdev" (S.TinkerConf "localhost" 8182)
 
 
 

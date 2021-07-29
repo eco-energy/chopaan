@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, ExplicitForAll, TypeApplications, TypeOperators, PackageImports #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, ExplicitForAll, TypeApplications, TypeOperators, PackageImports, DeriveGeneric, DeriveAnyClass #-}
 
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
@@ -23,89 +23,19 @@ module Main where
 
 import qualified Chopaan.Client as C
 import           Shpadoinkle.Run (runJSorWarp, live)
+import System.Environment
+import System.Envy
+import GHC.Generics
 
+data ClientArgs = ClientArgs
+  { serverHost :: String
+  , serverPort :: Int
+  } deriving (Show, Generic, FromEnv)
+
+
+defCA = ClientArgs "localhost" 8080
 
 main :: IO ()
-main = runJSorWarp 8080 C.app
-
-dev = live 8080 C.app
-
--- import GHC.Generics
-
--- import Prelude hiding (id, const, (.), id)
--- import ConCat.Circuit
--- import ConCat.Graphics.Image
--- import qualified ConCat.Graphics.Color as C
--- import ConCat.Graphics.GLSL
--- import ConCat.Shaped
--- import ConCat.Nat
--- import ConCat.Misc
-
--- import ConCat.AltCat
--- import ConCat.Rebox ()
-
--- import GHCJS.DOM (currentWindowUnchecked)
--- import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback)
--- import GHCJS.DOM.Window (Window, requestAnimationFrame)
-
--- import Shpadoinkle
--- import qualified Shpadoinkle.Html as H
--- import Shpadoinkle.Backend.ParDiff (runParDiff, stage)
--- import Shpadoinkle.Run (runJSorWarp, live)
-
--- import UnliftIO.Concurrent (forkIO, threadDelay)
--- import Chopaan.Ui.ImageV
--- import qualified Chopaan.Ui.Grable as Ui
--- import qualified Data.Vector.Sized as V
-
--- main :: IO ()
--- main = appx
-
-
--- {--
--- We want a canvas element that can be passed to install_effect from
--- and we need a go function which installs that effect.
--- We also need debounced event handlers for dragging and scrolling.
-
--- --}
-
--- app :: IO ()
--- app = live 8080 $ do
---   --let canvas = H.canvas [("delta-thingo", ""), ("w", deltaWidget )] []
---   return ()
-
-
--- unitS :: ShaderEff
--- unitS = runShader' "unitS" unitW (const $ deltaDiskPlot (const C.black) x y)
---   where
---     x :: [Double]
---     x = pure 5
---     y :: [Double]
---     y = pure 5
--- {-# INLINE unitS #-}
-
--- appx :: IO ()
--- appx = do
---   t <- newTVarIO unitS
---   runJSorWarp 8080 $ do
---     w <- currentWindowUnchecked
---     _ <- forkIO $ threadDelay wait >> animation w t f
---     shpadoinkle id runParDiff t view stage
---   where
---     f :: Double -> ShaderEff
---     f = const unitS
-
-
--- runS :: (GenBuses a) => Widgets a -> (a :> ImageC) -> ShaderEff
--- runS w c = shaderH w c
-
-
--- runShader' :: (GenBuses a, C.ToColor c)
---         => String
---         -> Widgets a
---         -> (a -> Image c)
---         -> ShaderEff
--- runShader' _  _ _ = error "runShader' called directly"
--- {-# NOINLINE runShader' #-}
--- {-# RULES "runShader'"
---   forall n w f. runShader' n w f = runS w $ toCcc $ toPImageC f #-}
+main = do
+  c <- decodeWithDefaults defCA
+  runJSorWarp 8080 (C.app (serverHost c) (serverPort c))
