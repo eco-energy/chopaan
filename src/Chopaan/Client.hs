@@ -3,12 +3,12 @@
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE FlexibleInstances, TypeOperators, TemplateHaskell  #-}
+{-# LANGUAGE FlexibleInstances, TypeOperators, TemplateHaskell, LambdaCase  #-}
 
 module Chopaan.Client where
 
 import           Control.Monad.Catch         (MonadThrow)
-import           Control.Monad.Reader        (MonadIO, liftIO)
+import           Control.Monad.Reader        (MonadIO, liftIO, ReaderT(..), ask, MonadReader)
 import           Data.Proxy                  (Proxy (..))
 
 import           Streamly
@@ -18,10 +18,10 @@ import           Servant.Streamly
 
 #ifndef ghcjs_HOST_OS
 import           Shpadoinkle                 (JSM, MonadJSM, MonadUnliftIO (..),
-                                              UnliftIO (..), askJSM, runJSM)
+                                              UnliftIO (..), askJSM, runJSM, liftJSM)
 #else
 import           Shpadoinkle                 (JSM, MonadUnliftIO (..),
-                                              UnliftIO (..), askJSM, runJSM)
+                                              UnliftIO (..), askJSM, runJSM, liftJSM)
 #endif
 
 import           Data.FileEmbed              (embedFile)
@@ -41,33 +41,43 @@ import           Chopaan.UiTypes              (API, SPA,
 import           Chopaan.API.History
 import           Chopaan.View                   (ainit, ginitM, onRouteChange, view, template)
 
-import           Shpadoinkle.Run             (runJSorWarp, Env(Dev))
+import           Shpadoinkle.Run             (runJSorWarp, Env(Dev, Prod))
 
-newtype AppC a = AppC { runAppC :: JSM a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow)
+newtype AppC a = AppC { runAppC :: ReaderT ClientEnv JSM a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadReader ClientEnv)
 #ifndef ghcjs_HOST_OS
   deriving (MonadJSM)
 #endif
+
+runApp :: ClientEnv -> AppC a -> JSM a
+runApp c = (flip runReaderT c) . runAppC
 
 instance MonadUnliftIO AppC where
   {-# INLINE askUnliftIO #-}
   askUnliftIO = do
     ctx <- askJSM
-    return $ UnliftIO $ \(AppC m) -> runJSM m ctx
+    env <- ask
+    return $ UnliftIO $ \(AppC m) -> runJSM (runReaderT m env) ctx
 
 instance CRUDChopaan AppC where
-  listKibbutzim = AppC $ runXHR listKibbutzimM
-  listNodezim = AppC . runXHR . listNodezimM
-  getGraph k g t0 t1 = adapt $ S.hoist AppC $ S.concatM $ (S.hoist liftIO . adapt) <$> (runXHR' r env)
+  listKibbutzim = do
+    env <- ask
+    liftJSM $ runXHR' listKibbutzimM env
+  listNodezim k = do
+    env <- ask
+    liftJSM $ runXHR' (listNodezimM k) env
+  getGraph k g t0 t1 = adapt . S.concatM $ do
+    env <- ask
+    (S.hoist (AppC . liftIO) . adapt) <$> (liftJSM $ runXHR' r env)
     where
       r = historyAPI k g t0 t1
-      env = (ClientEnv $ BaseUrl Http devHost 8080 "")
     
 
-prodHost = "dosti.ecoenergy.global"
-devHost = "localhost"
-devEnv = ClientEnv $ BaseUrl Http devHost 8080 ""
-prodEnv = ClientEnv $ BaseUrl Https prodHost 443 ""
+getClientEnv :: String -> Int -> ClientEnv
+getClientEnv host port = ClientEnv $ BaseUrl (scheme host) host port "" 
+  where 
+    scheme "localhost" = Http
+    scheme _ = Https
 
 (listKibbutzimM :<|> listNodezimM)
   = client (Proxy @ API)
@@ -76,11 +86,11 @@ prodEnv = ClientEnv $ BaseUrl Https prodHost 443 ""
   = client (Proxy @ (HistoryAPI AheadT))
 
 
-app :: JSM ()
-app = do
-  --addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
-  fullPageSPA @(SPA JSM) runAppC runParDiff (withHydration ainit) view getBody onRouteChange routes
+app :: String -> Int -> JSM ()
+app h p = do
+  let e = getClientEnv h p
+  fullPageSPA @(SPA JSM) (runApp e) runParDiff (withHydration ainit) view getBody onRouteChange routes
 
 
 main :: IO ()
-main = runJSorWarp 8080 app
+main = runJSorWarp 8080 (app "localhost" 8080)
