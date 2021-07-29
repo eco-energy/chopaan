@@ -35,6 +35,7 @@
         depends = [
           (hsPkgs."SVGFonts" or (errorHandler.buildDepError "SVGFonts"))
           (hsPkgs."Shpadoinkle" or (errorHandler.buildDepError "Shpadoinkle"))
+          (hsPkgs."Shpadoinkle-backend-pardiff" or (errorHandler.buildDepError "Shpadoinkle-backend-pardiff"))
           (hsPkgs."Shpadoinkle-backend-snabbdom" or (errorHandler.buildDepError "Shpadoinkle-backend-snabbdom"))
           (hsPkgs."Shpadoinkle-console" or (errorHandler.buildDepError "Shpadoinkle-console"))
           (hsPkgs."Shpadoinkle-html" or (errorHandler.buildDepError "Shpadoinkle-html"))
@@ -171,6 +172,8 @@
             "Chopaan/Graph/G"
             "Chopaan/Graph/Snapshot"
             "Chopaan/CRUD"
+            "Chopaan/Ui/Base"
+            "Chopaan/Ui/Events"
             "Chopaan/Ui/AddKbtz"
             "Chopaan/Ui/Foreign/Utils"
             "Chopaan/Ui/Foreign/WebSocket"
@@ -253,6 +256,8 @@
             "Chopaan/Graph"
             "Chopaan/Graph/Snapshot"
             "Chopaan/CRUD"
+            "Chopaan/Ui/Base"
+            "Chopaan/Ui/Events"
             "Chopaan/Ui/AddKbtz"
             "Chopaan/Ui/Foreign/Utils"
             "Chopaan/Ui/Foreign/WebSocket"
@@ -286,6 +291,7 @@
             "Chopaan/Utils/Retry"
             "Chopaan/Utils/Streamly"
             "Chopaan/Utils/Time"
+            "Servant/Streamly"
             "Proto/NodeMessageSchema/NodeMessages"
             "Proto/NodeMessageSchema/NodeMessages_Fields"
             ]);
@@ -298,6 +304,7 @@
           depends = ([
             (hsPkgs."SVGFonts" or (errorHandler.buildDepError "SVGFonts"))
             (hsPkgs."Shpadoinkle" or (errorHandler.buildDepError "Shpadoinkle"))
+            (hsPkgs."Shpadoinkle-backend-pardiff" or (errorHandler.buildDepError "Shpadoinkle-backend-pardiff"))
             (hsPkgs."Shpadoinkle-backend-snabbdom" or (errorHandler.buildDepError "Shpadoinkle-backend-snabbdom"))
             (hsPkgs."Shpadoinkle-console" or (errorHandler.buildDepError "Shpadoinkle-console"))
             (hsPkgs."Shpadoinkle-html" or (errorHandler.buildDepError "Shpadoinkle-html"))
@@ -435,6 +442,7 @@
           depends = ([
             (hsPkgs."SVGFonts" or (errorHandler.buildDepError "SVGFonts"))
             (hsPkgs."Shpadoinkle" or (errorHandler.buildDepError "Shpadoinkle"))
+            (hsPkgs."Shpadoinkle-backend-pardiff" or (errorHandler.buildDepError "Shpadoinkle-backend-pardiff"))
             (hsPkgs."Shpadoinkle-backend-snabbdom" or (errorHandler.buildDepError "Shpadoinkle-backend-snabbdom"))
             (hsPkgs."Shpadoinkle-console" or (errorHandler.buildDepError "Shpadoinkle-console"))
             (hsPkgs."Shpadoinkle-html" or (errorHandler.buildDepError "Shpadoinkle-html"))
@@ -573,6 +581,7 @@
           depends = ([
             (hsPkgs."SVGFonts" or (errorHandler.buildDepError "SVGFonts"))
             (hsPkgs."Shpadoinkle" or (errorHandler.buildDepError "Shpadoinkle"))
+            (hsPkgs."Shpadoinkle-backend-pardiff" or (errorHandler.buildDepError "Shpadoinkle-backend-pardiff"))
             (hsPkgs."Shpadoinkle-backend-snabbdom" or (errorHandler.buildDepError "Shpadoinkle-backend-snabbdom"))
             (hsPkgs."Shpadoinkle-console" or (errorHandler.buildDepError "Shpadoinkle-console"))
             (hsPkgs."Shpadoinkle-html" or (errorHandler.buildDepError "Shpadoinkle-html"))
@@ -711,6 +720,7 @@
           depends = ([
             (hsPkgs."SVGFonts" or (errorHandler.buildDepError "SVGFonts"))
             (hsPkgs."Shpadoinkle" or (errorHandler.buildDepError "Shpadoinkle"))
+            (hsPkgs."Shpadoinkle-backend-pardiff" or (errorHandler.buildDepError "Shpadoinkle-backend-pardiff"))
             (hsPkgs."Shpadoinkle-backend-snabbdom" or (errorHandler.buildDepError "Shpadoinkle-backend-snabbdom"))
             (hsPkgs."Shpadoinkle-console" or (errorHandler.buildDepError "Shpadoinkle-console"))
             (hsPkgs."Shpadoinkle-html" or (errorHandler.buildDepError "Shpadoinkle-html"))
@@ -850,6 +860,7 @@
           depends = ([
             (hsPkgs."SVGFonts" or (errorHandler.buildDepError "SVGFonts"))
             (hsPkgs."Shpadoinkle" or (errorHandler.buildDepError "Shpadoinkle"))
+            (hsPkgs."Shpadoinkle-backend-pardiff" or (errorHandler.buildDepError "Shpadoinkle-backend-pardiff"))
             (hsPkgs."Shpadoinkle-backend-snabbdom" or (errorHandler.buildDepError "Shpadoinkle-backend-snabbdom"))
             (hsPkgs."Shpadoinkle-console" or (errorHandler.buildDepError "Shpadoinkle-console"))
             (hsPkgs."Shpadoinkle-html" or (errorHandler.buildDepError "Shpadoinkle-html"))

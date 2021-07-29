@@ -13,7 +13,7 @@
       specVersion = "2.2";
       identifier = {
         name = "Shpadoinkle-backend-snabbdom";
-        version = "0.3.0.1";
+        version = "0.3.0.2";
         };
       license = "BSD-3-Clause";
       copyright = "";
@@ -51,7 +51,7 @@
           ];
         buildable = true;
         modules = [ "Shpadoinkle/Backend/Snabbdom" ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       };
     } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/9; }

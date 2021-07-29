@@ -11,7 +11,7 @@
     flags = { testing = false; };
     package = {
       specVersion = "2.2";
-      identifier = { name = "Shpadoinkle-widgets"; version = "0.2.0.0"; };
+      identifier = { name = "Shpadoinkle-widgets"; version = "0.2.0.1"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "isaac.shapira@platonic.systems";
@@ -35,17 +35,22 @@
         depends = [
           (hsPkgs."Shpadoinkle" or (errorHandler.buildDepError "Shpadoinkle"))
           (hsPkgs."Shpadoinkle-html" or (errorHandler.buildDepError "Shpadoinkle-html"))
+          (hsPkgs."attoparsec" or (errorHandler.buildDepError "attoparsec"))
           (hsPkgs."aeson" or (errorHandler.buildDepError "aeson"))
           (hsPkgs."base" or (errorHandler.buildDepError "base"))
+          (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
           (hsPkgs."compactable" or (errorHandler.buildDepError "compactable"))
           (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
           (hsPkgs."edit-distance" or (errorHandler.buildDepError "edit-distance"))
+          (hsPkgs."either" or (errorHandler.buildDepError "either"))
           (hsPkgs."email-validate" or (errorHandler.buildDepError "email-validate"))
           (hsPkgs."jsaddle" or (errorHandler.buildDepError "jsaddle"))
           (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
+          (hsPkgs."servant" or (errorHandler.buildDepError "servant"))
           (hsPkgs."stm" or (errorHandler.buildDepError "stm"))
           (hsPkgs."template-haskell" or (errorHandler.buildDepError "template-haskell"))
           (hsPkgs."text" or (errorHandler.buildDepError "text"))
+          (hsPkgs."transformers" or (errorHandler.buildDepError "transformers"))
           (hsPkgs."unliftio" or (errorHandler.buildDepError "unliftio"))
           ] ++ (pkgs.lib).optionals (flags.testing) [
           (hsPkgs."QuickCheck" or (errorHandler.buildDepError "QuickCheck"))
@@ -65,6 +70,7 @@
           "Shpadoinkle/Widgets/Types/ConsideredChoice"
           "Shpadoinkle/Widgets/Types/Core"
           "Shpadoinkle/Widgets/Types/Form"
+          "Shpadoinkle/Widgets/Types/Pagination"
           "Shpadoinkle/Widgets/Types/Physical"
           "Shpadoinkle/Widgets/Types/Remote"
           "Shpadoinkle/Widgets/Types/Search"
@@ -73,7 +79,7 @@
           "Test/QuickCheck/Classes/Hspec"
           "Test/QuickCheck/Classes/FoldableOrd"
           ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       tests = {
         "unit" = {
@@ -92,4 +98,4 @@
           };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/12; }
+    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/13; }

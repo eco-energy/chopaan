@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "2.2";
-      identifier = { name = "Shpadoinkle-lens"; version = "0.0.0.3"; };
+      identifier = { name = "Shpadoinkle-lens"; version = "0.0.0.4"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "isaac.shapira@platonic.systems";
@@ -40,7 +40,7 @@
           ];
         buildable = true;
         modules = [ "Shpadoinkle/Lens" ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/14; }
+    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/15; }

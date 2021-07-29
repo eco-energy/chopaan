@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "2.2";
-      identifier = { name = "Shpadoinkle"; version = "0.3.0.0"; };
+      identifier = { name = "Shpadoinkle"; version = "0.3.2.0"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "isaac.shapira@platonic.systems";
@@ -34,7 +34,6 @@
       "library" = {
         depends = [
           (hsPkgs."base" or (errorHandler.buildDepError "base"))
-          (hsPkgs."category" or (errorHandler.buildDepError "category"))
           (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
           (hsPkgs."deepseq" or (errorHandler.buildDepError "deepseq"))
           (hsPkgs."ghcjs-dom" or (errorHandler.buildDepError "ghcjs-dom"))
@@ -51,13 +50,12 @@
           ];
         buildable = true;
         modules = [
-          "Control/PseudoInverseCategory"
           "Shpadoinkle"
           "Shpadoinkle/Continuation"
           "Shpadoinkle/Core"
           "Shpadoinkle/Run"
           ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       };
     } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/8; }

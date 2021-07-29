@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "2.2";
-      identifier = { name = "Shpadoinkle-html"; version = "0.3.0.0"; };
+      identifier = { name = "Shpadoinkle-html"; version = "0.3.0.2"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "isaac.shapira@platonic.systems";
@@ -26,7 +26,7 @@
       licenseFiles = [ "LICENSE" ];
       dataDir = ".";
       dataFiles = [];
-      extraSrcFiles = [ "README.md" ];
+      extraSrcFiles = [ "README.md" "sample.css" ];
       extraTmpFiles = [];
       extraDocFiles = [];
       };
@@ -38,9 +38,11 @@
           (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
           (hsPkgs."compactable" or (errorHandler.buildDepError "compactable"))
           (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
+          (hsPkgs."directory" or (errorHandler.buildDepError "directory"))
           (hsPkgs."ghcjs-dom" or (errorHandler.buildDepError "ghcjs-dom"))
           (hsPkgs."jsaddle" or (errorHandler.buildDepError "jsaddle"))
           (hsPkgs."lens" or (errorHandler.buildDepError "lens"))
+          (hsPkgs."process" or (errorHandler.buildDepError "process"))
           (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))
           (hsPkgs."stm" or (errorHandler.buildDepError "stm"))
           (hsPkgs."template-haskell" or (errorHandler.buildDepError "template-haskell"))
@@ -65,16 +67,16 @@
           "Shpadoinkle/Html/Element"
           "Shpadoinkle/Html/Event"
           "Shpadoinkle/Html/Property"
-          "Shpadoinkle/Html/Memo"
           "Shpadoinkle/Html/MicroData"
           "Shpadoinkle/Html/Utils"
           "Shpadoinkle/Html/LocalStorage"
           "Shpadoinkle/Html/TH"
+          "Shpadoinkle/Html/TH/AssetLink"
           "Shpadoinkle/Html/TH/CSS"
           "Shpadoinkle/WebWorker"
           "Shpadoinkle/Keyboard"
           ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/11; }
+    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/12; }

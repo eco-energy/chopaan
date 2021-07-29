@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "2.2";
-      identifier = { name = "Shpadoinkle-disembodied"; version = "0.0.0.1"; };
+      identifier = { name = "Shpadoinkle-disembodied"; version = "0.0.0.2"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "isaac.shapira@platonic.systems";
@@ -49,7 +49,7 @@
           "Shpadoinkle/Disembodied/Sample"
           "Shpadoinkle/Disembodied"
           ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/15; }
+    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/16; }

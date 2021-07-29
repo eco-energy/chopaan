@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "2.2";
-      identifier = { name = "Shpadoinkle-console"; version = "0.0.1.3"; };
+      identifier = { name = "Shpadoinkle-console"; version = "0.0.1.4"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "isaac.shapira@platonic.systems";
@@ -42,7 +42,7 @@
           ];
         buildable = true;
         modules = [ "Shpadoinkle/Console" ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/17; }
+    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/18; }

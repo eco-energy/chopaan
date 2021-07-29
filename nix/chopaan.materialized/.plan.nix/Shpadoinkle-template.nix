@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "2.2";
-      identifier = { name = "Shpadoinkle-template"; version = "0.0.0.1"; };
+      identifier = { name = "Shpadoinkle-template"; version = "0.0.0.2"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "isaac.shapira@platonic.systems";
@@ -36,13 +36,16 @@
           (hsPkgs."Shpadoinkle" or (errorHandler.buildDepError "Shpadoinkle"))
           (hsPkgs."Shpadoinkle-backend-static" or (errorHandler.buildDepError "Shpadoinkle-backend-static"))
           (hsPkgs."base" or (errorHandler.buildDepError "base"))
+          (hsPkgs."directory" or (errorHandler.buildDepError "directory"))
+          (hsPkgs."process" or (errorHandler.buildDepError "process"))
           (hsPkgs."html-parse" or (errorHandler.buildDepError "html-parse"))
           (hsPkgs."template-haskell" or (errorHandler.buildDepError "template-haskell"))
           (hsPkgs."text" or (errorHandler.buildDepError "text"))
+          (hsPkgs."html-entities" or (errorHandler.buildDepError "html-entities"))
           ];
         buildable = true;
         modules = [ "Shpadoinkle/Template/TH" "Shpadoinkle/Template" ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       tests = {
         "sample" = {
@@ -51,16 +54,19 @@
             (hsPkgs."Shpadoinkle-backend-static" or (errorHandler.buildDepError "Shpadoinkle-backend-static"))
             (hsPkgs."Shpadoinkle-template" or (errorHandler.buildDepError "Shpadoinkle-template"))
             (hsPkgs."base" or (errorHandler.buildDepError "base"))
+            (hsPkgs."directory" or (errorHandler.buildDepError "directory"))
+            (hsPkgs."process" or (errorHandler.buildDepError "process"))
             (hsPkgs."file-embed" or (errorHandler.buildDepError "file-embed"))
             (hsPkgs."html-parse" or (errorHandler.buildDepError "html-parse"))
             (hsPkgs."template-haskell" or (errorHandler.buildDepError "template-haskell"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
+            (hsPkgs."html-entities" or (errorHandler.buildDepError "html-entities"))
             ];
           buildable = true;
           modules = [ "Shpadoinkle/Template" "Shpadoinkle/Template/TH" ];
-          hsSourceDirs = [ "./." ];
+          hsSourceDirs = [ "." ];
           mainPath = [ "Test.hs" ];
           };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/16; }
+    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/17; }

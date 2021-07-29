@@ -13,7 +13,7 @@
       specVersion = "2.2";
       identifier = {
         name = "Shpadoinkle-backend-static";
-        version = "0.2.0.0";
+        version = "0.2.0.1";
         };
       license = "BSD-3-Clause";
       copyright = "";
@@ -43,7 +43,7 @@
           ];
         buildable = true;
         modules = [ "Shpadoinkle/Backend/Static" ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/10; }
+    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/11; }

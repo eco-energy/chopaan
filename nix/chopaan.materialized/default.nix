@@ -86,7 +86,6 @@
         "MonadRandom".revision = (((hackage."MonadRandom")."0.5.2").revisions).default;
         "dense-linear-algebra".revision = (((hackage."dense-linear-algebra")."0.1.0.0").revisions).default;
         "edit-distance".revision = (((hackage."edit-distance")."0.2.2.1").revisions).default;
-        "alg".revision = (((hackage."alg")."0.2.13.1").revisions).default;
         "split".revision = (((hackage."split")."0.2.3.4").revisions).default;
         "checkers".revision = (((hackage."checkers")."0.5.6").revisions).default;
         "data-fix".revision = (((hackage."data-fix")."0.3.0").revisions).default;
@@ -208,7 +207,6 @@
         "megaparsec".revision = (((hackage."megaparsec")."9.0.1").revisions).default;
         "megaparsec".flags.dev = false;
         "syb".revision = (((hackage."syb")."0.7.2.1").revisions).default;
-        "category".revision = (((hackage."category")."0.2.5.0").revisions).default;
         "distributive".revision = (((hackage."distributive")."0.6.2.1").revisions).default;
         "distributive".flags.semigroups = true;
         "distributive".flags.tagged = true;
@@ -360,8 +358,6 @@
         "Boolean".revision = (((hackage."Boolean")."0.2.4").revisions).default;
         "base-compat".revision = (((hackage."base-compat")."0.11.2").revisions).default;
         "active".revision = (((hackage."active")."0.2.0.14").revisions).default;
-        "util".revision = (((hackage."util")."0.1.17.1").revisions).default;
-        "dual".revision = (((hackage."dual")."0.1.1.1").revisions).default;
         "math-functions".revision = (((hackage."math-functions")."0.3.4.1").revisions).default;
         "math-functions".flags.system-expm1 = true;
         "math-functions".flags.system-erf = true;
@@ -413,6 +409,7 @@
         "integer-logarithms".revision = (((hackage."integer-logarithms")."1.0.3.1").revisions).default;
         "integer-logarithms".flags.check-bounds = false;
         "integer-logarithms".flags.integer-gmp = true;
+        "base-prelude".revision = (((hackage."base-prelude")."1.4").revisions).default;
         "reflection".revision = (((hackage."reflection")."2.1.6").revisions).default;
         "reflection".flags.slow = false;
         "reflection".flags.template-haskell = true;
@@ -535,6 +532,7 @@
         "comonad".flags.containers = true;
         "hspec".revision = (((hackage."hspec")."2.7.8").revisions).default;
         "time".revision = (((hackage."time")."1.8.0.2").revisions).default;
+        "html-entities".revision = (((hackage."html-entities")."1.1.4.3").revisions).default;
         "th-compat".revision = (((hackage."th-compat")."0.1").revisions).default;
         "data-default-class".revision = (((hackage."data-default-class")."0.1.2.0").revisions).default;
         "haxl".revision = (((hackage."haxl")."2.3.0.0").revisions).default;
@@ -739,6 +737,7 @@
         Shpadoinkle-router = ./.plan.nix/Shpadoinkle-router.nix;
         concat-satisfy = ./.plan.nix/concat-satisfy.nix;
         concat-inline = ./.plan.nix/concat-inline.nix;
+        Shpadoinkle-backend-pardiff = ./.plan.nix/Shpadoinkle-backend-pardiff.nix;
         ghcjs-three = ./.plan.nix/ghcjs-three.nix;
         Shpadoinkle-console = ./.plan.nix/Shpadoinkle-console.nix;
         concat-classes = ./.plan.nix/concat-classes.nix;
@@ -768,6 +767,7 @@
           "Shpadoinkle-router" = { flags = {}; };
           "concat-satisfy" = { flags = {}; };
           "concat-inline" = { flags = {}; };
+          "Shpadoinkle-backend-pardiff" = { flags = {}; };
           "ghcjs-three" = { flags = {}; };
           "Shpadoinkle-console" = { flags = {}; };
           "concat-classes" = { flags = {}; };

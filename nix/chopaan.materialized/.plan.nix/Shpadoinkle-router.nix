@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "2.2";
-      identifier = { name = "Shpadoinkle-router"; version = "0.3.0.0"; };
+      identifier = { name = "Shpadoinkle-router"; version = "0.3.0.1"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "isaac.shapira@platonic.systems";
@@ -71,7 +71,7 @@
           "Shpadoinkle/Router/Client"
           "Shpadoinkle/Router/Server"
           ];
-        hsSourceDirs = [ "./." ];
+        hsSourceDirs = [ "." ];
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/13; }
+    } // rec { src = (pkgs.lib).mkDefault .././.source-repository-packages/14; }
