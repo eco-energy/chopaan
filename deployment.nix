@@ -1,6 +1,6 @@
 let
   region = "ap-southeast-1";
-  app = (import ./.) {};
+  app = (import ./. {}).chopaan;
   accessKeyId = "default";
   ui = (import ./nix/snowman.nix).build { isJS = true; };
   staticUi = (import ./nix/website.nix) {};
@@ -11,7 +11,7 @@ in
   
   chopaan = { config, pkgs, resources, lib, ... }:
     let
-      uijs = "${ui}/bin/ui.jsexe";
+      uijs = "${staticUi}/bin/ui.jsexe";
       janusPort = 8182;
       serverPort = 8080;
       mqttPort = 8883;
@@ -69,7 +69,7 @@ in
 
         script =
           let
-            chopaan = app.chopaan.kbtzim;
+            chopaan = app.kbtzim;
           in
             ''
             ${chopaan}/bin/kbtzim --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
@@ -84,10 +84,10 @@ in
 
         script =
           let
-            server = app.chopaan.server;
+            server = app.server;
           in
             ''
-            ${server}/bin/server --assets ${uijs} --port ${toString serverPort} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
+            ${server}/bin/server --assets ${staticUi} --port ${toString serverPort} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
             '';
       };
 
@@ -119,7 +119,7 @@ in
           enableACME = true;
           locations."/" = {
             proxyPass = "http://127.0.0.1:${toString serverPort}";
-            root = uijs;
+            root = staticUi;
           };
           #extraConfig = ""
           locations."~* .(jpe?g|svg|png|gif|ico|css|js|webmanifest|json|fbx)$" = {
