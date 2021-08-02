@@ -73,12 +73,13 @@ data Obj = Obj
 
 transformObj :: T -> Obj -> Obj
 transformObj t o = o
-                   & #_pos %~ ((t' ^. translation) ^+^) 
+                   & #_pos %~ ((\x -> x ^. _xyz) . (*! p') . point)
                    & (#_worldTransform) .~ t' 
                    & (#_localTransform) .~ t''
   where
+    p' = appEndo t identity
     t' = (appEndo t) (_worldTransform o)
-    t'' = (appEndo t) (_localTransform o) 
+    t'' = (appEndo t) (_localTransform o)
                    
 
 translateObj :: V3R -> Obj -> Obj
