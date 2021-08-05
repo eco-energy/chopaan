@@ -20,6 +20,7 @@ import Control.Monad
 import GHC.Generics (Generic, Generic1)
 import Control.DeepSeq
 import Data.Aeson (ToJSON, FromJSON)
+import Data.Text (pack, Text)
 
 #ifndef ghcjs_HOST_OS
 import Control.Monad.IO.Class
@@ -33,6 +34,7 @@ import Chopaan.Graph.Spider
 import Chopaan.Graph.Kbtz
 import Network.Greskell.WebSocket (Client)
 import Data.Pool
+import Network.AWS.S3 (BucketName(..))
 #endif
 import Shpadoinkle.Widgets.Types (Humanize)
 
@@ -51,16 +53,19 @@ mkDBPools :: MonadIO m => String -> Int -> m (DBPools)
 mkDBPools h p = do
   kp <- liftIO $ kbtzPool h p
   spools <- liftIO $ mkSpool $ mkConfG (h, p)
-  return $ DBPools spools kp
+  return $ DBPools spools kp (BucketName b)
+    where
+      b = "dosti-datastream"
 
 data DBPools = DBPools
   { spools :: Spools
   , gremlinPool :: KbtzPool
+  , s3Bucket :: BucketName
   }
 
 withKbtzPool :: (Client -> GraphM a) -> GraphM a
 withKbtzPool f = do
-    (DBPools _ kp) <- ask
+    (DBPools _ kp _) <- ask
     withResource kp f
 
 withSpider :: SpiderM ~> GraphM
