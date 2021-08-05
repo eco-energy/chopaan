@@ -28,7 +28,7 @@ runKbtzim mq = do
   let confss = fmap sConf $ zip (zip ks nss) qss
       past = S.concatMapWith S.parallel (S.concatM . hydrateKbtz @t) $ S.fromList confss
       present = S.concatMapWith S.parallel (S.concatM . runKibbutz @t) $ S.fromList confss
-  return $ past `parallel` present
+  return $ (S.map (const True) $ past) `parallel` (S.map (const True) $ present)
   where
     sConf ((k, ns), qs) = KbtzC { Chopaan.Kibbutz.name = k
                                 , nodes = ns
