@@ -34,11 +34,8 @@ import           Streamly                  (IsStream, AheadT, adapt)
 import           Streamly.Internal.Prelude (hoist)
 import qualified Streamly as S
 
-import           Servant.API.WebSocket (WebSocket)
-import           Servant.Links
-
 import           Servant.API
-import           Servant.Server            (Server, hoistServer, serve)
+import           Servant.Server            (Server, serve)
 import           Servant.Server.StaticFiles (serveDirectoryWebApp)
 
 import           Shpadoinkle               (JSM)
@@ -86,7 +83,7 @@ instance CRUDChopaan App where
     hoistS h p $ g
 
 
-type Static = "static" :> Raw
+type Static = Raw
 
 app :: Env -> FilePath -> TinkerConf -> Application
 app ev root (TinkerConf h p) =
