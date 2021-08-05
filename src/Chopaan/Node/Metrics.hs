@@ -383,13 +383,6 @@ instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (SensorMetrics e p)
     ]
 #endif
 
-instance FromGraphSON UTCTime where
-  parseGraphSON = parseJSON . unwrapOne
-
-instance FromGraphSON DiffTime where
-  parseGraphSON = parseJSON . unwrapOne
-
-
 
 showDec :: Double -> String
 showDec = (printf ("%.2g"))
