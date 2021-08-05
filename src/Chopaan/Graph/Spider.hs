@@ -34,7 +34,7 @@ import Control.Monad.Catch
 import Chopaan.Node.NodeId
 import Chopaan.Node.Metrics hiding (Timestamp)
 import Chopaan.Node.Folds
-import Chopaan.Node.Mesh (MeshNode, RxSignal, rsToFN, initMeshNode)
+import Chopaan.Node.Mesh (MeshNode, RxSignal, sigToFN, initMeshNode)
 import qualified Proto.NodeMessageSchema.NodeMessages as N
 
 import Chopaan.Utils.Retry
@@ -309,39 +309,11 @@ subscribeSnapshot k c = getSnapshotStream c (\s ->
                                                =<< (getSnapshotSimple s (getRoot . mkKbtzRoot $ k)))
 
 
-
-initGridRoot :: KbtzName -> [NodeMAC] -> SpiderM (Bool)
-initGridRoot name ns = do
-  spool <- ask
-  --t <- fromUTCTime <$> getCurrentTime
-  let t = fromUTCTime $ UTCTime (fromGregorian 2021 4 6) (secondsToDiffTime 0)
-  let root = getGridRoot name
-  --a <- withResource (unSpool . txG $ spool) (\s -> addFN s $ toFN t root mempty [])
-  --b <- withResource (unSpool . statusG $ spool) (\s -> addFN s $ toFN t root initSM [])
-  --c <- withResource (unSpool . meshG $ spool) (\s -> addFN s $ toFN t root initMeshNode [])
-  -- print =<< (gridSnapshotSimple name meshConfig)
-  -- print =<< (gridSnapshotSimple name stakeConfig)
-  -- print =<< (gridSnapshotSimple name statusConfig)
-  return $ True -- a && b && c
-  -- (foldl (&&) True a) && (foldl (&&) True b) && (foldl (&&) True c)
-  where
-    initialEdges :: forall e. (Monoid e, LinkAttributes e, HasDir e) => [FoundLink NodeMAC e]
-    initialEdges = ((flip toLink $ mempty) <$> ns)
-    reverseFN :: forall v e. (Show v, Show e, NodeAttributes v, LinkAttributes e, Monoid e)
-              => v -> NodeMAC -> Timestamp -> NodeMAC -> FoundNode NodeMAC v e 
-    reverseFN v root t n = toFN t n v [toLink' root mempty LinkBidirectional]
-    reverseFNs :: forall v e. (Show v, Show e, NodeAttributes v, LinkAttributes e, Monoid e)
-              => v -> NodeMAC -> Timestamp -> [FoundNode NodeMAC v e]
-    reverseFNs v root t = (reverseFN v root t) <$> ns
-    meshEdges :: [FoundLink NodeMAC RxSignal]
-    meshEdges = ((\n -> toLink' n mempty LinkBidirectional) <$> ns)
-  
-
-
-addMeshNode :: (MonadAsync m, MonadCatch m) => SpiderM (FL.Fold m (NodeMAC, N.RuntimeStats) Bool)
+addMeshNode :: (MonadAsync m, MonadCatch m)
+  => SpiderM (FL.Fold m (NodeMAC, (MeshNode, RxSignal)) Bool)
 addMeshNode = do
   spool <- ask
-  return $ spiderFold (unSpool . meshG $ spool) (pure . Just . rsToFN)
+  return $ spiderFold (unSpool . meshG $ spool) (pure . Just . sigToFN)
 
 addTxNode :: forall m. (MonadAsync m, MonadCatch m)
   => KbtzName -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus)) Bool)
