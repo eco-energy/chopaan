@@ -42,6 +42,7 @@ import Linear.Vector
 import Linear.Matrix
 import Linear.V2
 import Linear.V3
+import Linear.V4 (vector, point)
 import Linear.Quaternion
 import Linear.Metric
 import Linear.Projection
@@ -74,8 +75,8 @@ initPosState p = (p, zero)
 diffPos :: CurPos -> Unop PosState
 diffPos p (lastP, pDiff) = (p, pDiff .+^ (p .-. lastP))
 
-diffWheel :: DeltaUnit -> V2 R -> Unop PosState
-diffWheel d p (lastP, pDiff) = (lastP .-^ p', pDiff ^-^ p') -- sub because d is in -ve y-axis
+diffWheel :: DeltaUnit -> V2 R -> Unop PosDiff
+diffWheel d p pDiff = pDiff ^+^ p' -- sub because d is in -ve y-axis
   where
     p' = case d of
       PixelDelta -> p ^* 0.00025
@@ -126,6 +127,17 @@ fromInteract (Tr _ j) = fromInteract j
 boop :: (Applicative m) => Continuation m (Maybe Button, PosState) -> Continuation m Interact
 boop = liftC' toInteract fromInteract
 
+
+-- $ This is a continuation that looks at the pointer event and decides what the next
+-- $ state should be.
+-- $ The structure of events is such that the initial event is tagged with the correct
+-- $ button but all its subsequent movement has a button type of NoneB.
+-- $ No button at all means the last state was the initial state, or that the button
+-- $ parse failed in the event decoding.
+-- $ We want events that are tagged with NoneB to be re-tagged if they're preceeded
+-- $ by another valid button, in a way that identifies the entire continuation
+-- $ as a Pan or a Rotation.
+-- $ The state should be re-initalized if the event type changes.
 pointerC :: (Applicative m) => Pointer -> Continuation m (Maybe Button, PosState)
 pointerC Pointer{pos, button} = case button of
   RotateB -> interactionC
@@ -134,8 +146,12 @@ pointerC Pointer{pos, button} = case button of
   NoneB -> pur (rememberLast)
   _ -> pur id
   where
-    interactionC = (generalize _1 $ pur (const (Just button)))
-      <> (generalize _2 $ pur (diffPos pos))
+    interactionC = pur onChangeReInit
+      where
+        onChangeReInit (Nothing, s) = (Just button, diffPos pos s)
+        onChangeReInit (Just b, s) = case (b == button) of
+          True -> (Just button, diffPos pos s)
+          False -> (Just button, diffPos pos (initPosState pos))
     rememberLast (Nothing, s) = (Nothing, s)
     rememberLast (Just NoneB, s) = (Nothing, s)
     rememberLast (Just ZoomB, s) = (Just ZoomB, diffPos pos s)
@@ -146,11 +162,11 @@ pointerC Pointer{pos, button} = case button of
 pointerControl :: (Applicative m) => Pointer -> Continuation m Interact
 pointerControl p = boop (pointerC p)
 
-wheelC :: (Applicative m) => Wheel -> Continuation m (Maybe Button, PosState)
+wheelC :: forall m. (Applicative m) => Wheel -> Continuation m (Maybe Button, PosState)
 wheelC w = ((generalize _1 (pur $ const (Just ZoomB))) <> (generalize _2 $ pos w))
   where
     pos :: Wheel -> Continuation m PosState
-    pos Wheel{deltaUnit, wheelDelta} = pur (diffWheel deltaUnit wheelDelta)
+    pos Wheel{deltaUnit, wheelDelta} = rightC' $ pur (diffWheel deltaUnit wheelDelta)
 
 
 wheelControl :: (Applicative m) => Wheel -> Continuation m (Interact)
@@ -185,40 +201,48 @@ type Eye = V3 R
 type UpDir = V3 R
 
 
-scaleNorm s = (^* s) . normalize
+scaleNorm s = (^* s) -- . normalize
 
 panT :: PosState -> T
-panT (_, pd) = f
+panT (_, delta) = Endo $ \m -> (diffMat m)
   where
-    f =  Endo $ \m -> m !*! (over translation (.+^ panDiff) identity)
-    panSpeed = 0.1
-    upDir = cross eye (pure 0)
-    eye = (pure 1)
-    scaledChange = pd ^* ((norm eye) * panSpeed)
-    panDiff = (scaleNorm (scaledChange ^. _x) (cross eye upDir)) .+^ (scaleNorm (scaledChange ^. _y) upDir)
+    diffMat m = (over translation (^+^ (panDiff pos up delta)) m)
+      where
+        pos = negated $ m ^. _m33 . _z
+        up = m ^. _m33 . _y
+
+panDiff :: V3 R -> V3 R -> V2 R -> V3 R
+panDiff pos up delta = (scaleNorm (scaledChange ^. _x) (cross pos up))--
+                ^+^ (scaleNorm (scaledChange ^. _y) up)
+  where
+    panSpeed = 1.0
+    scaledChange = delta ^* ((norm pos) * panSpeed)
 
 
 zoomT :: PosState -> T
-zoomT z = Endo $ \m -> m !*! (over translation (^+^ (unitV ^* (zoomFactor . ydiff $ z))) identity)
+zoomT z = Endo $ \m -> scaled (point $ unitV ^* (zoomFactor (z ^. _2 . _y))) !*! m
   where
-    zoomFactor x = 1.0 + (x * 1.2)
-    ydiff (_, diff) = diff ^. _y
+    zoomFactor x = exp (x * zoomSpeed)
+    zoomSpeed = 1.2
 
 
 
 rotateT :: PosState -> T
-rotateT (_, delta) = Endo $ \m -> m !*! (mkTransformation q' zero)
+rotateT (_, delta) = Endo $ \m -> (q' m) !*! m
   where
-    q' = (axisAngle ax' ang)
+    q' m = mkTransformationMat (fromQuaternion (rot ed ud delta)) (zero)
       where
-        ang =  norm md'
-    ud = cross ed' (pure 0) --scope.object.up
-    ed' = (pure 1) -- (scope.object.position - scope.target)
-    ud' = scaleNorm (delta ^. _y) $ ud -- upDir 
-    sd' = scaleNorm (delta ^. _y) $ cross ud' ed'
-    md' = (V3 (delta ^. _x) (delta ^. _y) 0)
-    ax' = cross md' sd'
+        ud = m ^. _m33 . _y
+        ed = negate $ m ^. _m33 . _z
 
+rot :: V3 R -> V3 R -> V2 R -> QuatR
+rot pos up delta = axisAngle ax ang
+  where
+    ang =  norm (V3 (delta ^. _x) (delta ^. _y) 0)
+    ud' = scaleNorm (delta ^. _y) up -- upDir 
+    sd' = scaleNorm (delta ^. _x) $ cross ud' pos
+    md' = (ud' ^+^ sd')--
+    ax = cross md' sd'
 
 
 

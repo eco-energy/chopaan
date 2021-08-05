@@ -50,9 +50,9 @@ spec = do
     it "control is nice and works as the composition over Interact's Constructors" $ property $
       prop_cont_over_sum
     it "wheelControl should handle (Maybe Interaction) by initializing its own state" $ property $
-      forAll path $ \pvs ->
+      forAll genWheelD $ \wd ->
       let
-        zs = mkWheels pvs
+        zs = mkWheels wd
         c = contScanPure wheelControl (zoomI $ initPosState (pure 0)) zs
         c' = contScanPure wheelControl' Nothing zs
       in c' == (fmap Just c)
@@ -66,53 +66,168 @@ spec = do
         in c' == c
     it "Zoom Should Transform an object and its reverse should get it back to where it was" $ property $
       prop_zoom_in_out
-
+    it "Zoom Should Transform a Camera and its reverse should get it back to where it was" $ property $
+      prop_zoom_in_out_camera
+    -- it "Rotations work" $ do
+    --   xs <- arbs @CurPos 100
+    -- it "Rotations on a point are invertible" $ property $
+    --   prop_rotate_invertible
+    it "Panning on a point is invertible" $ property $
+      prop_pan_invertible
+      
 applyIs :: [Interact] -> T
 applyIs = foldMap (evalI)
 
 arbMat :: Gen M44R
 arbMat = arbitrary
 
-pathMatPoint = (,,) <$> path <*> arbMat <*> (arbitrary @(V4 Double))
+wheelPoint = (,) <$> genWheelD <*> (arbitrary @(V3 Double))
+
+pathPoint = (,)
+            <$> path --
+            <*> (arbitrary @(V3 Double)) -- 
+
+prop_pan_invertible :: Property
+prop_pan_invertible = forAll pathPoint $ \(pvs, p) ->
+  nearZero $ pointIsoStateful p $ isoPan pvs
+
+-- prop_rotate_invertible' :: Property
+-- prop_rotate_invertible' = forAll pathPoint $ \(pvs, p) ->
+--   nearZero $ camIso (defCam p 4878 2555) $ isoRotate pvs
+
+prop_rotate_invertible :: Property
+prop_rotate_invertible = forAll pathPoint $ \(pvs, p) ->
+  nearZero $ pointIsoStateful p $ isoRotate pvs
+
+fseq = flip seq
+
+isoRotate :: [CurPos] -> (T, T)
+isoRotate [] = (Endo id, Endo id)
+isoRotate (x:[]) = (Endo id, Endo id)
+isoRotate ds = let
+  fw = mkPointers (RotateB : repeat NoneB) ds
+  rv = mkPointers (RotateB : repeat NoneB) $ reverse ds
+  rstart = initPosState (pure 0)
+  c = contScanPure pointerControl (zoomI rstart) fw
+  c' = contScanPure pointerControl (zoomI rstart) rv
+  ft = applyIs c
+  rt = applyIs c'
+  deb = unsafePerformIO (do
+                            print (fmap (getState) c)
+                            print (fmap (getState) c')
+                            --print $ (appEndo rt) (appEndo ft identity)
+                            --print $ 
+                            )
+  in (ft, rt) --`fseq` deb
+
+
+isoPan :: [CurPos] -> (T, T)
+isoPan [] = (Endo id, Endo id)
+isoPan (_:[]) = (Endo id, Endo id)
+isoPan ds = let
+  fw = mkPointers (PanB : repeat NoneB) ds
+  rv = mkPointers (PanB : repeat NoneB) $ reverse ds
+  c = contScanPure pointerControl (panI $ initPosState (head ds)) fw
+  c' = contScanPure pointerControl (panI $ initPosState (head $ reverse ds)) rv
+  ft = applyIs c
+  rt = applyIs c'
+  deb = unsafePerformIO (do
+                            print $ fmap (fst . getState) c
+                            print $ reverse $ fmap (fst . getState) c'
+                            print $ fmap (snd . getState) c
+                            print $ fmap (snd . getState) c'
+                            --print $ zipWith (V.^-^) (fmap (snd . getState) c) (reverse $ fmap (snd . getState) c')
+                           )
+  in (ft, rt) `fseq` deb
+
+
+pointIsoStateful :: V3 R -> (T, T) -> V3 R
+pointIsoStateful p (ft, rt) = let
+  fw = (appEndo ft identity)
+  bw = (appEndo rt identity)
+  p' = fw !* (Linear.V4.point p)
+  p'' = (bw !* p') ^. _xyz
+  res = (p V.^-^ p'')
+  deb = unsafePerformIO (do
+                            case (nearZero res) of
+                              True -> return ()
+                              False -> do
+                            --print $ p
+                            --print $ p'
+                            --print $ p''
+                                print fw
+                                print bw
+                            --print $ res
+                                --print $ (appEndo rt $ appEndo ft identity)
+                            )
+  in res `fseq` deb
+
+pointIso :: V3 R -> (T, T) -> V3 R
+pointIso p (ft, rt) = let
+  p' = (appEndo ft identity) !* (point p)
+  p'' = ((appEndo rt identity) !* p') ^. _xyz
+  res = (p V.^-^ p'')
+  deb = unsafePerformIO (do
+                            case (nearZero res) of
+                              True -> return ()
+                              False -> do
+                                print $ res
+                                print $ appEndo rt $ appEndo ft identity
+                            )
+  in res --`fseq` deb
+
+camIso :: Camera -> (T, T) -> M44R
+camIso cam (ft, rt) = let
+  cam' = transformCamera ft cam
+  cam'' = transformCamera rt cam'
+  res = ((matrixWorldInverse $ cam) V.^-^ (matrixWorldInverse $ cam''))
+  in res
 
 prop_zoom_in_out :: Property
-prop_zoom_in_out = verbose $ forAll (path) $ \(pvs) ->
-  nearZero $ (isoZoom pvs)
+prop_zoom_in_out = forAll wheelPoint $ \(wd, p) ->
+  nearZero $ pointIso p $ isoZoom wd
 
-isoZoom [] = (pure 1) V.^-^ (pure 1) 
-isoZoom pvs = let
-  s = identity
-  p = pure 1
-  fw = mkWheels pvs
-  rv = mkWheels (reverse pvs)
-  rstart [] = zoomI $ initPosState (pure 1)
-  rstart (a:_) = zoomI $ initPosState a
-  c = contScanPure wheelControl (zoomI $ initPosState (pure 0)) fw
-  c' = contScanPure wheelControl (rstart (reverse pvs)) rv
-  ft = appEndo (applyIs c) s
-  rt = appEndo (applyIs c') s
-  pr = unsafePerformIO (do
-                      --print fw
-                      --print rv
-                           case (nearZero res) of
-                             True -> return ()
-                             False -> do
-                               print res
-                       )
-  p' = ft !* p
-  p'' = rt !* p'
-  fseq = flip seq
-  res = (p V.^-^ p'')
-  in res `fseq` pr   
+      
+prop_zoom_in_out_camera :: Property
+prop_zoom_in_out_camera = forAll wheelPoint $ \(wd, p) ->
+  nearZero $ camIso (defCam p 4878 2555) $ isoZoom wd
+      
+isoZoom :: [V2 R] -> (T, T)
+isoZoom [] = (Endo id, Endo id) 
+isoZoom ds = let
+  fw = mkWheels ds
+  rv = mkWheels (fmap (V.^* (-1)) ds)
+  rstart = initPosState (pure 0)
+  c = contScanPure wheelControl (zoomI rstart) fw
+  c' = contScanPure wheelControl (zoomI rstart) rv
+  ft = applyIs c
+  rt = applyIs c'
+  in (ft, rt)
+  -- `fseq` pr
+  -- where
+  -- pr = unsafePerformIO (do
+  --                          case (nearZero res) of
+  --                            True -> return ()
+  --                            False -> do
+  --                              print $ zipWith (V.^+^) (fmap wheelDelta fw) (fmap wheelDelta rv)
+  --                              print $ zipWith (V.^+^) (fmap (snd . getState) c) (fmap (snd . getState) c')
+
+  --                              print $ p'
+  --                              print $ p''
+  --                              print res
+  --                              --print $ zd c c'
+
 
 prop_cont_over_sum :: Property
 prop_cont_over_sum = forAll path $ \pvs ->
       let
         ps = mkPointers (PanB : repeat NoneB) pvs
         rs = mkPointers (RotateB : repeat NoneB) pvs
-        c = contScanPure pointerControl (panI $ initPosState (pure 0)) (ps <> rs)
-        p' = contScanPure pointerControl (panI $ initPosState (pure 0)) ps
-        r' = contScanPure pointerControl (rotateI $ initPosState (pure 0)) rs
+        c = contScanPure pointerControl (panI $ initPosState (head pvs)) (ps <> rs)
+        p' = contScanPure pointerControl (panI $ initPosState (head pvs)) ps
+        r' = contScanPure pointerControl (rotateI $ initPosState (head pvs)) rs
+      --in ((take (length pvs) c) `shouldBe` p') <>
+       --  ((drop (length pvs) $ c) `shouldBe` r')
       in ((take (length pvs) c) `leqEpI` p') && ((drop (length pvs) $ c) `leqEpI` r')
 
 nearEq :: forall f a. (V.Additive f, Metric f, Epsilon a) => f a -> f a -> Bool 
@@ -140,22 +255,25 @@ leq f xs ys = foldl (&&) True $ fmap (uncurry f) (zip xs ys)
 path :: Gen [CurPos]
 path = arbitrary
 
+genWheelD :: Gen [V2 R]
+genWheelD = arbitrary
+
 mkPointers :: [Button] -> [CurPos] -> [Pointer]
 mkPointers bs ps = (\(b, p) -> Pointer p (Just Mouse) 1 b) <$> (zip bs ps)
 
-mkWheels :: [CurPos] -> [Wheel]
-mkWheels xs = (uncurry getWheelZ) <$> (pairs xs)
+mkWheels :: [V2 R] -> [Wheel]
+mkWheels = (fmap getWheelZ)
 
-getWheelZ :: CurPos -> CurPos -> Wheel
-getWheelZ p' p = Wheel PixelDelta (p .-. p')
+getWheelZ :: V2 R -> Wheel
+getWheelZ d = Wheel PixelDelta d
 
 pairs :: [a] -> [(a, a)]
 pairs [] = []
-pairs xs = (zip' xs (tail xs))
+pairs xs = (zip xs (tail xs))
   where
     zip' [] (b:[]) = [(b, b)]
-    zip' _as [] = []
-    zip' (a:as) (b:bs) = (a, b) : zip as bs
+    zip' (a:[]) [] = [(a, a)]
+    zip' (a:as) (b:bs) = (a, b) : zip' as bs
 
 
 contScan :: forall m a b z. Monad m

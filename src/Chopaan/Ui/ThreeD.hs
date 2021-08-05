@@ -17,6 +17,7 @@ import Control.Monad.Trans.State
 
 import Control.Concurrent.STM
 import Data.Functor.Rep
+import Data.Monoid (Endo(..))
 import Data.Aeson
 import System.IO (stderr, hPutStrLn, stdout, hFlush)
 
@@ -110,7 +111,7 @@ mkCam obj fov asp near far = Camera fov asp near far worldInv perspectiveProj ob
         b =  (top + bottom) / height
         c =  (- (far + near) / (far - near))
         d =  (- 2) * (far * near) / (far - near)
-    worldInv = inv44 $ asT obj
+    worldInv = inv44 $ obj ^. #_worldTransform
 
 changeAspect :: Double -> Camera -> Camera
 changeAspect a (c@Camera{..}) = c & #aspect .~ a
@@ -118,7 +119,7 @@ changeAspect a (c@Camera{..}) = c & #aspect .~ a
 
 transformCamera :: T -> Camera -> Camera
 transformCamera t c = c & #cameraObj .~ (newO)
-                        & (#matrixWorldInverse) .~ (inv44 $ asT newO)
+                        & (#matrixWorldInverse) .~ (inv44 $ newO ^. #_worldTransform)
   where
     newO = transformObj t $ c ^. #cameraObj 
 
@@ -238,8 +239,8 @@ threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
       , transformP $ (cameraCSSMat c) <> (translatePx (widthG screen / 2) (heightG screen / 2))
       , styleP "transform-style: preserve-3d"
       , styleP "pointer-events: none"
-      , H.class' Css.w_full
-      , H.class' Css.h_full
+      , H.class' Css.w_screen
+      , H.class' Css.h_screen
       ]
     objCSS y = [ styleP "position:absolute"
                , styleP "pointer-events: auto"
@@ -363,7 +364,7 @@ main = runJSorWarp 8080 $ do
                                      return c') (pure 0) model
   _ <- requestAnimationFrame win =<< animation win model
   ctx <- askJSM
-  shpadoinkle id runParDiff model (threeD . trapper @ToJSON ctx) (stage)
+  shpadoinkle id runParDiff model (threeD . trapper @ToJSON ctx) (getBody)
 --  . trapper @ToJSON ctx
 
 
