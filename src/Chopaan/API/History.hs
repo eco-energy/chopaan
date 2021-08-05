@@ -5,6 +5,7 @@ module Chopaan.API.History where
 
 import GHC.Generics
 
+import Control.Arrow
 import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Data.Aeson (ToJSON, FromJSON)
@@ -12,20 +13,18 @@ import Data.Greskell (FromGraphSON)
 
 
 import qualified Data.Text as Text
-import Data.Time (UTCTime, diffUTCTime, addUTCTime
-                 , nominalDay)
+import Data.Time (UTCTime(..), diffUTCTime, addUTCTime)
 
 
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
-
 import qualified Chopaan.Graph.G as G
-
+import Chopaan.CRUD
+import Chopaan.Graph
 
 import Servant.API.Modifiers
 import Servant.API.QueryParam
-import Chopaan.CRUD
-import Chopaan.Graph
+
 import Servant.Streamly
 import Streamly (IsStream, MonadAsync, AsyncT, adapt)
 import qualified Streamly.Prelude as S
@@ -36,18 +35,26 @@ import Servant.API.Stream
 import Servant (Server, Get, Capture, QueryParam, Proxy(..), (:>)
                , JSON, FromHttpApiData(..), ToHttpApiData(..), hoistServer, serve)
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..))
-import Chopaan.Graph.Kbtz (getKbtzim, addHHToKbtz, getKbtzNodes, kbtzPool, KbtzPool)
+import Chopaan.Graph.Kbtz (getKbtzim
+                          , getKbtzNodes
+                          , kbtzPool
+                          , addKbtz
+                          , addNodeToKbtz
+                          , KbtzPool)
 import Chopaan.Graph.Spider ( meshNodesSnapshot
                             , txNodesSnapshot
                             , statusNodesSnapshot
                             , flowNodesSnapshot
                             )
+import Chopaan.Comm.Comm (initMessageQs)
 import Chopaan.Comm.Address
 import Data.Pool
 
 import Network.Wai (Application)
 
+import Chopaan.Kibbutz (hydrateKbtz, KbtzC(..), Hydration)
 import Chopaan.Kibbutz.KbtzimT
+import Chopaan.Utils.Time (dayRange)
 import qualified System.Envy as E
 import Options.Applicative
 #else
@@ -121,7 +128,11 @@ instance CRUDChopaan (GraphM) where
     return . NodeList $ ns
   getGraph :: (IsStream t) => KbtzName -> GraphType -> UTCTime -> UTCTime -> t GraphM (SG NodeMAC)
   getGraph k g t t' = S.concatM (getHistoryForGraph k g t t')
+  createKbtz k ns t t' = S.concatM (createKbtzWithHydration k ns t t')
 
+daytimeRange s e = zip r (tail r)
+  where
+    r = dayRange s e
 
 getHistoryForGraph :: forall t. (IsStream t)
   => KbtzName
@@ -130,9 +141,9 @@ getHistoryForGraph :: forall t. (IsStream t)
   -> UTCTime
   -> GraphM (t GraphM (G.SG NodeMAC))
 getHistoryForGraph kn g t0 t1 = do
-  ns <- (\p -> withResource (gremlinPool p) ((flip getKbtzNodes) kn)) =<< ask
+  ns <- withKbtzPool ((flip getKbtzNodes) kn)
   let
-    ts = S.fromList $ dayRange t0 t1
+    ts = S.fromList $ daytimeRange t0 t1
   case g of
     MeshG ->
       return $ streamQ G.Mesh meshNodesSnapshot ns ts
@@ -145,17 +156,21 @@ getHistoryForGraph kn g t0 t1 = do
   where
     streamQ wr q ns ts = S.mapM (\(t, t') -> (wr . G.SG) <$> (withSpider $ q ns t t')) $ ts
 
-dayRange :: UTCTime -> UTCTime -> [(UTCTime, UTCTime)]
-dayRange start end = case (diff < nominalDay) of
-  True -> [(start, end)]
-  False ->
-    scanl (\(_, e) s ->
-             (e, addUTCTime s e))
-                      (start, addUTCTime nominalDay start) (take days $ repeat nominalDay)
-    where
-      days = ceiling (diff / nominalDay)
-  where
-    diff = (diffUTCTime end start)
+
+createKbtzWithHydration :: forall t. (IsStream t)
+  => KbtzName
+  -> [NodeMAC]
+  -> UTCTime
+  -> UTCTime
+  -> GraphM (t GraphM Hydration)
+createKbtzWithHydration k ns t t' = do
+  withKbtzPool (\c -> do
+                     addKbtz c k
+                     mapM_ (addNodeToKbtz c k) ns
+                 )
+  qs <- liftIO $ initMessageQs
+  b <- s3Bucket <$> ask
+  hydrateKbtz $ KbtzC k ns qs (Just b)
 
 hoistS :: forall t m. (IsStream t, MonadAsync m) => String -> Int -> (t GraphM) ~> (t m) 
 hoistS h p = adapt . S.hoist (runGraphM h p) . adapt

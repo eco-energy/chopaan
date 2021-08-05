@@ -9,7 +9,6 @@ import GHC.Generics
 
 import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON, FromJSON)
-import Data.Maybe (fromMaybe)
 import Data.Function (on)
 
 import Shpadoinkle (Html, MonadJSM)
@@ -22,6 +21,7 @@ import Streamly.Internal.Prelude (hoist)
 import Control.Monad.Trans.Class
 import Chopaan.Node.NodeId
 import Chopaan.Node.NodeT
+import Chopaan.Kibbutz (Hydration)
 import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Graph
@@ -32,6 +32,7 @@ class CRUDChopaan m where
   listKibbutzim :: m (KbtzList)
   listNodezim :: KbtzName -> m (NodeList)
   getGraph :: forall t. IsStream t => KbtzName -> GraphType -> UTCTime -> UTCTime -> t m (SG NodeMAC)
+  createKbtz :: forall t. IsStream t => KbtzName -> [NodeMAC] -> UTCTime -> UTCTime -> t m (Hydration)
   --sensorMonitor :: (IsStream t) => NodeMAC -> t m SensorR
 
 instance (MonadTrans t, Monad m, CRUDChopaan m, Monad (t m)) => CRUDChopaan (t m) where
@@ -39,9 +40,9 @@ instance (MonadTrans t, Monad m, CRUDChopaan m, Monad (t m)) => CRUDChopaan (t m
   listNodezim = lift . listNodezim
   getGraph :: forall t'. (IsStream t') => KbtzName -> GraphType -> UTCTime -> UTCTime -> t' (t m) (SG NodeMAC)
   getGraph k g t0 t1 = adapt . hoist lift $ getGraph k g t0 t1
-  --nodeDetails = lift . nodeDetails
-  --sensorMonitor :: (IsStream t') => NodeMAC -> t' (t m) SensorR
-  --sensorMonitor = lift . sensorMonitor
+  createKbtz :: forall t'. IsStream t' => KbtzName -> [NodeMAC] -> UTCTime -> UTCTime -> t' (t m) (Hydration)
+  createKbtz k ns t0 t1 = adapt . hoist lift $ createKbtz k ns t0 t1
+
 
 newtype NodeList = NodeList { unNodeList :: Nodezim }
   deriving (Eq, Ord, Show, Generic)
