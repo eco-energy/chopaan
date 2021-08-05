@@ -1,10 +1,12 @@
 module Chopaan.Utils.Time where
 
+import Control.Arrow
 import Data.Fixed (Fixed(MkFixed), Pico)
 import Data.Time.Compat
 import Data.Time.LocalTime.Compat
 import Data.Time.Clock.POSIX.Compat
 import Data.Word
+import Data.Ix
 import qualified Data.Text as T
 import GHC.Read
 import Text.ParserCombinators.ReadP
@@ -33,6 +35,11 @@ parseUTCTime = utcTimeNow . read . T.unpack
 
 diffUTC :: UTCTime -> UTCTime -> DiffTime
 diffUTC a b = realToFrac $ diffUTCTime a b
+
+dayRange :: UTCTime -> UTCTime -> [UTCTime]
+dayRange start end = r
+  where
+    r = (flip UTCTime $ 0) <$> range (utctDay start, succ $ utctDay end)
 
 
 instance Read DiffTime where
