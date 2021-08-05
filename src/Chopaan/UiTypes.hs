@@ -46,6 +46,7 @@ data GView = GView
   , _whichG :: GraphType
   , _startTime :: Ti.UTCTime
   , _endTime :: Ti.UTCTime
+  , _availableHistory :: (Ti.UTCTime, Ti.UTCTime)
   , _currentG :: Maybe (SG NodeMAC)
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 

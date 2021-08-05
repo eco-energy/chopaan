@@ -75,6 +75,7 @@ import Chopaan.Node.Components
 import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Ui.FormCommon
 import Chopaan.Ui.GraphView
+import Chopaan.Ui.Timeline
 import qualified Chopaan.Ui.Style as Css
 import qualified Data.Time as Ti
 
@@ -85,13 +86,13 @@ ainit :: (Monad m, CRUDChopaan m) => Route -> m Frontend
 ainit _ = MHomePage . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
 
 defGView :: GView
-defGView = GView (KbtzId "test") StatusG t0 t1 Nothing
+defGView = GView (KbtzId "test") StatusG t0 t1 (t0, t1) Nothing
   where
     t0 = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
     t1 = Ti.UTCTime (Ti.fromGregorian 2021 4 7) (Ti.secondsToDiffTime 0)
 
 requestGView :: forall m. (CRUDChopaan m, Monad m) => GView -> m (SG NodeMAC) 
-requestGView (GView k g t0 t1 _) = case g of
+requestGView (GView k g t0 t1 _ _) = case g of
   MeshG -> getL Mesh getMesh
   PlanG -> getL Transactor getTransactor
   StatusG -> getL Status getStatus
@@ -107,7 +108,7 @@ requestGView (GView k g t0 t1 _) = case g of
                                    $ getGraph k g t0 t1)
 
 mkGView :: KbtzName -> GraphType -> Ti.UTCTime -> Ti.UTCTime -> GView 
-mkGView k g t0 t1 = GView k g t0 t1 Nothing
+mkGView k g t0 t1 = GView k g t0 t1 (t0, t1) Nothing
 
 ginitM :: (MonadIO m, CRUDChopaan m) => Route -> m Frontend
 ginitM _ = do
@@ -122,7 +123,6 @@ loadGraph gv = do
   return $ (gv { _currentG = (Just g) })
 
 loadG g = (pure . MGraph) =<< loadGraph g
-
 
 
 onRouteChange :: (Monad m, CRUDChopaan m) => Route -> m Frontend
@@ -307,9 +307,16 @@ gView g = H.div [H.class' $ Css.relative <> Css.flex_grow <> Css.flex_col]
       Nothing -> voidC $ H.text "No Graph Found Yet"
       Just sg -> render3dGrid sg
   , graphSelectButtons
+  , timeRange
   --, onRecord whichK $ getGraph
   ]
   where
+    timeRange :: Html m (GView)
+    timeRange = H.div []
+      [ onRecord (lensProduct #_startTime #_endTime) $ t
+      ]
+      where
+        t = timeline (g ^. #_startTime, g ^. #_endTime)
     graphSelectButtons :: Html m (GView)
     graphSelectButtons = H.div [H.class' $ Css.flex
                                  <> Css.flex_row
@@ -324,4 +331,3 @@ gView g = H.div [H.class' $ Css.relative <> Css.flex_grow <> Css.flex_col]
                  <> Css.w_full
                ] [ text . humanize $ gt ]
       | gt <- [(minBound @GraphType)..maxBound]]
-
