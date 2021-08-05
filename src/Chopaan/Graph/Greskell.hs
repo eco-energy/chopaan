@@ -5,6 +5,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Lazy as B
 import qualified "base64" Data.ByteString.Base64 as B
+import Data.Time (UTCTime(..), DiffTime(..))
 --import qualified "base64" Data.Text.Encoding.Base64 as BT
 import Data.Aeson (ToJSON(..), FromJSON(..), parseJSON)
 import qualified Data.Aeson as Aeson
@@ -86,3 +87,9 @@ decB = (either
          (pure . B.fromStrict))
        . B.decodeBase64 . T.encodeUtf8
 --toBinaryTextHW = binaryJSON
+
+instance FromGraphSON UTCTime where
+  parseGraphSON = parseJSON . unwrapOne
+
+instance FromGraphSON DiffTime where
+  parseGraphSON = parseJSON . unwrapOne
