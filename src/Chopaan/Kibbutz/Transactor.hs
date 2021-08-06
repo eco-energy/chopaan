@@ -46,6 +46,9 @@ import Chopaan.Node.Metrics (toWattSeconds, toWatts
 
 import GHC.Generics (Generic)
 
+import qualified Algebra.Graph.Labelled as G
+import Algebra.Graph.Labelled (Graph(..))
+
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word

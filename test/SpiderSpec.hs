@@ -150,7 +150,23 @@ spec = do
       (gotNs, gotLs) <- snapDebug flowNodesSnapshot sp ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
+      
 
+hydrationSpec :: Spec
+hydrationSpec = describe "hydration tests" $ do
+  it "Hydration Works" $ do
+    let labNodes = [ "7c:9e:bd:f5:ec:74", "c4:4f:33:67:ea:69"
+                     , "ac:67:b2:11:e5:c4", "7c:9e:bd:f6:43:88" ]
+        s3op = "dosti-datastream"
+    qs <- initQs
+    h <- hydrateKbtzM "localhost" 8182 KbtzC { name = KbtzId "labKbtz"
+                                             , nodes = labNodes
+                                             , channelOpts = qs
+                                             , s3Opts = Just s3op
+                                             }
+          --h = s3Stream (zip labNodes (repeat Nothing)) s3op
+    S.mapM_ (print) h
+    1 `shouldBe` 1
 
 oneNodePerMACPlusRoot sn nNodes = ((length $ sn)
                                     `shouldBe` (nNodes + 1))

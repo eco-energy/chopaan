@@ -8,6 +8,7 @@ import           Shpadoinkle.Lens
 
 import Control.Lens hiding (simple)
 
+import Streamly.Array.Foreign
 import Data.Maybe
 import qualified Data.Vector as V
 import qualified Data.Text as T
@@ -18,6 +19,7 @@ import qualified Chopaan.Ui.Style as Css
 
 import Shpadoinkle.Run (simple, runJSorWarp)
 import Shpadoinkle.Backend.Snabbdom (runSnabbdom, stage)
+
 
 default(T.Text)
 
