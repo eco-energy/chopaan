@@ -345,6 +345,11 @@ addFlow k (n, v) = do
   fn <- flowFN k n v
   addFNMaybe (unSpool . flowG $ spool) (Just fn)
 
+addMeshN :: (NodeMAC, (MeshNode, RxSignal)) -> SpiderM (Bool)
+addMeshN v = do
+  spool <- ask
+  addFNMaybe (unSpool . meshG $ spool) (Just $ sigToFN v)
+
 addFlowNode :: forall m. (MonadAsync m, MonadCatch m)
   => KbtzName -> SpiderM (FL.Fold m (NodeMAC, SensorR) Bool)
 addFlowNode k = do
