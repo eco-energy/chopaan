@@ -283,7 +283,7 @@ contScan :: forall m a b z. Monad m
       -> m [a]
 contScan cont init ps = S.toList $ S.postscanlM' (\prev cp -> do
                                                 n <- runContinuation (cont cp) prev
-                                                return (n prev)) init $ S.fromList ps
+                                                return (n prev)) (pure init) $ S.fromList ps
 
 contScanI = (contScan @Identity)
 

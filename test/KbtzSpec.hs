@@ -6,7 +6,7 @@ import Chopaan.Kibbutz.KbtzId
 import Streamly
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Unfold as UF
-import qualified Streamly.Internal.Data.Unfold.Types as UF
+import qualified Streamly.Internal.Data.Unfold.Type as UF
 import qualified Streamly.Internal.Data.Fold as FL
 import Streamly.Internal.Data.Stream.StreamD.Type (Step(..))
 import Test.Hspec
@@ -45,31 +45,7 @@ spec = do
       --(length s) `shouldBe` (length s')
       s' `shouldBe` s 
       --trivial
-      
 
-{-# INLINE unFoldrM #-}
-unFoldrM :: Applicative m => (a -> m (Maybe (b, a))) -> UF.Unfold m a b
-unFoldrM next = UF.Unfold step pure
-  where
-    {-# INLINE_LATE step #-}
-    step st =
-        (\case
-            Just (x, s) -> Yield x s
-            Nothing     -> Stop) <$> next st
 
--- | Like 'unfoldrM' but uses a pure step function.
---
--- >>> :{
---  f [] = Nothing
---  f (x:xs) = Just (x, xs)
--- :}
---
--- >>> Unfold.fold Fold.toList (Unfold.unfoldr f) [1,2,3]
--- [1,2,3]
---
--- /Since: 0.8.0/
---
-{-# INLINE unFoldr #-}
-unFoldr :: Applicative m => (a -> Maybe (b, a)) -> UF.Unfold m a b
-unFoldr step = unFoldrM (pure . step)
+
 
