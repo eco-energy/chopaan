@@ -171,11 +171,19 @@ metadataKey = "chopaanMetadata"
 bucketN :: S3.BucketName
 bucketN = S3.BucketName "dosti-datastream"
 
--- What would the structure of the metadata be?
--- Is there a greskell expression to fetch all nodes and edges in a graph?
-fetchMetadata = undefined
 
-writeMetadata = undefined
+-- createBucketIndex :: IO ()
+-- createBucketIndex = do
+--   l <- liftIO $ newLogger Info stdout
+--   let xs = (\x -> (toNodeMAC x, x))
+--         <$> (s3Paths @S.ParallelT l bucketN (Just "/kibbutz/") Nothing)
+--   S.fold 
+--   return ()
+-- -- What would the structure of the metadata be?
+-- -- Is there a greskell expression to fetch all nodes and edges in a graph?
+-- fetchMetadata = undefined
+
+-- writeMetadata = undefined
 
 -- sensorS3 :: (IsStream t, MonadAsync m) =>  Logger -> S3.BucketName -> NodeMAC -> t m (EnergyState)
 -- sensorS3 l bucket n = S.map ((fromLeft undefined) . snd)
