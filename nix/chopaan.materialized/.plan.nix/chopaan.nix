@@ -95,6 +95,7 @@
           (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
           (hsPkgs."network" or (errorHandler.buildDepError "network"))
           (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
+          (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
           (hsPkgs."pointed" or (errorHandler.buildDepError "pointed"))
           (hsPkgs."proto-lens" or (errorHandler.buildDepError "proto-lens"))
           (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
@@ -141,7 +142,6 @@
             (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
             (hsPkgs."net-spider" or (errorHandler.buildDepError "net-spider"))
             (hsPkgs."network-uri" or (errorHandler.buildDepError "network-uri"))
-            (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
             (hsPkgs."postgresql-simple" or (errorHandler.buildDepError "postgresql-simple"))
             (hsPkgs."sbv" or (errorHandler.buildDepError "sbv"))
             (hsPkgs."servant-blaze" or (errorHandler.buildDepError "servant-blaze"))
@@ -186,6 +186,8 @@
             "Chopaan/Ui/WebSocket"
             "Chopaan/Ui/ThreeD"
             "Chopaan/Ui/Interaction"
+            "Chopaan/Ui/Timeline"
+            "Chopaan/Ui/Tables"
             "Chopaan/UiTypes"
             "Chopaan/View"
             "Chopaan/Kibbutz/KbtzId"
@@ -230,7 +232,6 @@
             "Chopaan/Kibbutz/LinOpt"
             "Chopaan/Kibbutz/Registry"
             "Chopaan/Kibbutz/Serve"
-            "Chopaan/Kibbutz/Ui"
             "Chopaan/Run"
             "Chopaan/Server"
             "Chopaan/Testing"
@@ -269,6 +270,7 @@
             "Chopaan/Ui/WebSocket"
             "Chopaan/Ui/ThreeD"
             "Chopaan/Ui/Interaction"
+            "Chopaan/Ui/Timeline"
             "Chopaan/UiTypes"
             "Chopaan/View"
             "Chopaan/Kibbutz/KbtzId"
@@ -364,6 +366,7 @@
             (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
             (hsPkgs."network" or (errorHandler.buildDepError "network"))
             (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
+            (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
             (hsPkgs."pointed" or (errorHandler.buildDepError "pointed"))
             (hsPkgs."proto-lens" or (errorHandler.buildDepError "proto-lens"))
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
@@ -410,7 +413,6 @@
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
               (hsPkgs."net-spider" or (errorHandler.buildDepError "net-spider"))
               (hsPkgs."network-uri" or (errorHandler.buildDepError "network-uri"))
-              (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
               (hsPkgs."postgresql-simple" or (errorHandler.buildDepError "postgresql-simple"))
               (hsPkgs."sbv" or (errorHandler.buildDepError "sbv"))
               (hsPkgs."servant-blaze" or (errorHandler.buildDepError "servant-blaze"))
@@ -502,6 +504,7 @@
             (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
             (hsPkgs."network" or (errorHandler.buildDepError "network"))
             (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
+            (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
             (hsPkgs."pointed" or (errorHandler.buildDepError "pointed"))
             (hsPkgs."proto-lens" or (errorHandler.buildDepError "proto-lens"))
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
@@ -548,7 +551,6 @@
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
               (hsPkgs."net-spider" or (errorHandler.buildDepError "net-spider"))
               (hsPkgs."network-uri" or (errorHandler.buildDepError "network-uri"))
-              (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
               (hsPkgs."postgresql-simple" or (errorHandler.buildDepError "postgresql-simple"))
               (hsPkgs."sbv" or (errorHandler.buildDepError "sbv"))
               (hsPkgs."servant-blaze" or (errorHandler.buildDepError "servant-blaze"))
@@ -641,6 +643,7 @@
             (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
             (hsPkgs."network" or (errorHandler.buildDepError "network"))
             (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
+            (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
             (hsPkgs."pointed" or (errorHandler.buildDepError "pointed"))
             (hsPkgs."proto-lens" or (errorHandler.buildDepError "proto-lens"))
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
@@ -687,7 +690,6 @@
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
               (hsPkgs."net-spider" or (errorHandler.buildDepError "net-spider"))
               (hsPkgs."network-uri" or (errorHandler.buildDepError "network-uri"))
-              (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
               (hsPkgs."postgresql-simple" or (errorHandler.buildDepError "postgresql-simple"))
               (hsPkgs."sbv" or (errorHandler.buildDepError "sbv"))
               (hsPkgs."servant-blaze" or (errorHandler.buildDepError "servant-blaze"))
@@ -780,6 +782,7 @@
             (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
             (hsPkgs."network" or (errorHandler.buildDepError "network"))
             (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
+            (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
             (hsPkgs."pointed" or (errorHandler.buildDepError "pointed"))
             (hsPkgs."proto-lens" or (errorHandler.buildDepError "proto-lens"))
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
@@ -826,7 +829,6 @@
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
               (hsPkgs."net-spider" or (errorHandler.buildDepError "net-spider"))
               (hsPkgs."network-uri" or (errorHandler.buildDepError "network-uri"))
-              (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
               (hsPkgs."postgresql-simple" or (errorHandler.buildDepError "postgresql-simple"))
               (hsPkgs."sbv" or (errorHandler.buildDepError "sbv"))
               (hsPkgs."servant-blaze" or (errorHandler.buildDepError "servant-blaze"))
@@ -920,6 +922,7 @@
             (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
             (hsPkgs."network" or (errorHandler.buildDepError "network"))
             (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
+            (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
             (hsPkgs."pointed" or (errorHandler.buildDepError "pointed"))
             (hsPkgs."proto-lens" or (errorHandler.buildDepError "proto-lens"))
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
@@ -966,7 +969,6 @@
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
               (hsPkgs."net-spider" or (errorHandler.buildDepError "net-spider"))
               (hsPkgs."network-uri" or (errorHandler.buildDepError "network-uri"))
-              (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
               (hsPkgs."postgresql-simple" or (errorHandler.buildDepError "postgresql-simple"))
               (hsPkgs."sbv" or (errorHandler.buildDepError "sbv"))
               (hsPkgs."servant-blaze" or (errorHandler.buildDepError "servant-blaze"))

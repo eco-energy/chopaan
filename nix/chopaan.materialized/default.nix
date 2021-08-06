@@ -338,20 +338,10 @@
         "vector".flags.wall = false;
         "vector".flags.boundschecks = true;
         "call-stack".revision = (((hackage."call-stack")."0.2.0").revisions).default;
-        "streamly".revision = (((hackage."streamly")."0.7.2").revisions).default;
-        "streamly".flags.no-fusion = false;
-        "streamly".flags.fusion-plugin = false;
-        "streamly".flags.streamk = false;
-        "streamly".flags.examples-sdl = false;
-        "streamly".flags.inspection = false;
-        "streamly".flags.debug = false;
-        "streamly".flags.has-llvm = false;
-        "streamly".flags.dev = false;
-        "streamly".flags.examples = false;
         "jsaddle".revision = (((hackage."jsaddle")."0.9.7.1").revisions).default;
         "jsaddle".flags.check-unchecked = false;
         "jsaddle".flags.call-stacks = false;
-        "primitive".revision = (((hackage."primitive")."0.7.0.1").revisions).default;
+        "primitive".revision = (((hackage."primitive")."0.7.1.0").revisions).default;
         "profunctors".revision = (((hackage."profunctors")."5.5.2").revisions).default;
         "safe".revision = (((hackage."safe")."0.3.19").revisions).default;
         "blaze-builder".revision = (((hackage."blaze-builder")."0.4.2.1").revisions).default;
@@ -740,6 +730,7 @@
         Shpadoinkle-backend-pardiff = ./.plan.nix/Shpadoinkle-backend-pardiff.nix;
         ghcjs-three = ./.plan.nix/ghcjs-three.nix;
         Shpadoinkle-console = ./.plan.nix/Shpadoinkle-console.nix;
+        streamly = ./.plan.nix/streamly.nix;
         concat-classes = ./.plan.nix/concat-classes.nix;
         };
       };
@@ -770,6 +761,19 @@
           "Shpadoinkle-backend-pardiff" = { flags = {}; };
           "ghcjs-three" = { flags = {}; };
           "Shpadoinkle-console" = { flags = {}; };
+          "streamly" = {
+            flags = {
+              "no-fusion" = lib.mkOverride 900 false;
+              "fusion-plugin" = lib.mkOverride 900 false;
+              "streamk" = lib.mkOverride 900 false;
+              "opt" = lib.mkOverride 900 true;
+              "inspection" = lib.mkOverride 900 false;
+              "debug" = lib.mkOverride 900 false;
+              "has-llvm" = lib.mkOverride 900 false;
+              "dev" = lib.mkOverride 900 false;
+              "use-c-malloc" = lib.mkOverride 900 false;
+              };
+            };
           "concat-classes" = { flags = {}; };
           };
         })

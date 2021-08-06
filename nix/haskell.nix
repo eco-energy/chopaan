@@ -30,7 +30,7 @@ let
     src = haskell-nix.haskellLib.cleanGit { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
     index-state = "2021-02-01T00:00:00Z";
-    plan-sha256 = "0ssr5x9124wwgkac7pzppps9rszpxb5a4a9s4b7864rjqw3sxaax";
+    plan-sha256 = "1v5ic879mqmkp16bgi09gxzzp7pp97s2x56zcayhkkhnffz9k942";
     materialized = ./chopaan.materialized;
     # these extras will provide additional packages
     # ontop of the package set derived from cabal resolution.
