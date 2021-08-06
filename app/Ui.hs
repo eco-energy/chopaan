@@ -23,19 +23,29 @@ module Main where
 
 import qualified Chopaan.Client as C
 import           Shpadoinkle.Run (runJSorWarp, live)
-import System.Environment
-import System.Envy
 import GHC.Generics
+import Options.Applicative
 
 data ClientArgs = ClientArgs
   { serverHost :: String
   , serverPort :: Int
-  } deriving (Show, Generic, FromEnv)
+  } deriving (Show, Generic)
 
+
+parser :: Parser ClientArgs
+parser = ClientArgs
+  <$> strOption   (long "host" <> short 'h' <> metavar "HOST"  <> showDefault <> value "localhost")
+  <*> option auto (long "port"   <> short 'p' <> metavar "PORT" <> showDefault <> value 8080)
+
+
+options :: ParserInfo ClientArgs
+options = info (parser <**> helper) $
+  fullDesc <> progDesc "How the client knows where the server is"
+           <> header "Chopaan Frontend"
 
 defCA = ClientArgs "localhost" 8080
 
 main :: IO ()
 main = do
-  c <- decodeWithDefaults defCA
+  c <- execParser options
   runJSorWarp 8080 (C.app (serverHost c) (serverPort c))
