@@ -73,15 +73,15 @@ let
         sha256 = "0cbsj3dyycykh0lcnsglrzzh898n2iydyw8f2nwyfvfnyx6ac2im";
       };
 
-      # streamlySrc = fetchFromGitHub {
-      #   owner = "composewell";
-      #   repo = "streamly";
-      #   rev = "4e48b52e8709390a47e99c107ebed2d1c9420076";
-      #   sha256 = "1824vqnx9ncs8f1vzgl08r5bd274vhabsdkirqqa88fxl0f2jyw5";
-      # };
+      streamlySrc = fetchFromGitHub {
+        owner = "composewell";
+        repo = "streamly";
+        rev = "4f629b8cb36bd03b480edc08b77c9a0187ce2206";
+        sha256 = "1ag6lqr74c1ml0vmai7a1b28dyf149pv3mhpg06kp27sawl71sy2";
+      };
       
-      # streamly =
-      #   pkgs.haskell.packages.${compilerjs}.callCabal2nix "streamly" streamlySrc {};
+      streamly =
+        pkgs.haskell.packages.${compilerjs}.callCabal2nix "streamly" streamlySrc {};
       
       foundation =
         pkgs.haskell.packages.${compilerjs}.callCabal2nix "foundation" (fdnSrc + /foundation) {};
@@ -102,11 +102,7 @@ let
         "concat-plugin" = pkgs.haskell.lib.dontHaddock (concatPkg "plugin");
         "concat-examples" = pkgs.haskell.lib.dontHaddock (pkgs.haskell.lib.dontCheck (concatPkg "examples"));
         "concat-graphics" = pkgs.haskell.lib.dontHaddock (pkgs.haskell.lib.dontCheck (concatPkg "graphics"));
-        "streamly" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
-          pkg = "streamly";
-          ver = "0.7.3";
-          sha256 = "0lwjyl9ygfppxcia9zkpgr7502ncx6sf6c5np2vriy5jm283xkza";
-        } {});
+        "streamly" = pkgs.haskell.lib.dontCheck streamly;
         "abstract-dequeue" = pkgs.haskell.lib.dontCheck hsuper.abstract-dequeue;
         "lockfree-queue" = pkgs.haskell.lib.dontCheck hsuper.lockfree-queue;
         "http-date" = pkgs.haskell.lib.dontCheck hsuper.http-date;

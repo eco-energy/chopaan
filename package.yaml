@@ -29,7 +29,7 @@ description:         Please see the README on Github at <https://github.com/faez
 dependencies:
 - base >= 4.11 && < 10
 - rio >= 0.1.8.0
-- streamly >= 0.7.2
+- streamly >= 0.8.0
 - network >= 3.1.2.1
 - async
 - adjunctions
@@ -110,6 +110,7 @@ dependencies:
 - envy
 - compensated
 - beam-core
+- optparse-applicative
 - monad-bayes
 - convertible
 - regex-applicative
@@ -122,7 +123,6 @@ when:
       - concat-examples
       - concat-plugin
       - concat-graphics
-      - optparse-applicative
       - net-spider
       - beam-postgres
       - beam-migrate
@@ -193,6 +193,8 @@ library:
         - Chopaan.Ui.WebSocket
         - Chopaan.Ui.ThreeD
         - Chopaan.Ui.Interaction
+        - Chopaan.Ui.Timeline
+        - Chopaan.Ui.Tables
         - Chopaan.UiTypes
         - Chopaan.View
         - Chopaan.Kibbutz.KbtzId
@@ -237,7 +239,6 @@ library:
         - Chopaan.Kibbutz.LinOpt
         - Chopaan.Kibbutz.Registry
         - Chopaan.Kibbutz.Serve
-        - Chopaan.Kibbutz.Ui
         - Chopaan.Run
         - Chopaan.Server
         - Chopaan.Testing
@@ -279,6 +280,7 @@ library:
         - Chopaan.Ui.WebSocket
         - Chopaan.Ui.ThreeD
         - Chopaan.Ui.Interaction
+        - Chopaan.Ui.Timeline
         - Chopaan.UiTypes
         - Chopaan.View
         - Chopaan.Kibbutz.KbtzId

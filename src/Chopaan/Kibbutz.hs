@@ -20,11 +20,12 @@ import Data.Maybe
 import Data.Bifunctor (bimap)
 import qualified Control.Concurrent.Async as A
 
-import Streamly as S
+import Streamly.Prelude as S (IsStream, MonadAsync, adapt)
 import qualified Streamly.Prelude as S
-import qualified Streamly.Internal.Prelude as S
+import qualified Streamly.Internal.Data.Stream.IsStream as S
 import qualified Streamly.Internal.Data.Fold as FL
-import qualified Streamly.Internal.Data.Fold.Types as FL
+import qualified Streamly.Internal.Data.Fold.Type as FL
+import qualified Streamly.Internal.Data.Fold.Tee as FL
 import qualified Streamly.Internal.Data.Unfold as UF
 
 import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, EnergyState)
@@ -82,7 +83,7 @@ twoSrc :: (KbtzConn t m n)
 twoSrc q q' = do
   (e, r, _) <- qSrc q
   (e', r', p') <- qSrc q'
-  return $ (e `parallel` e', r `parallel` r', p')
+  return $ (e `S.parallel` e', r `S.parallel` r', p')
 
 
 type S3S (t :: (* -> *) -> * -> *) m a b = t m ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, a) (NodeMAC, b))
@@ -93,7 +94,7 @@ s3Stream :: (IsStream t, MonadAsync m, MonadCatch m)
          -> S3Opts
          -> S3S t m EnergyState RuntimeStats
 s3Stream ns bucket = let
-  s' = S.bracketIO (liftIO $ newLogger Info stdout) (pure) s
+  s' = S.bracket (liftIO $ newLogger Info stdout) (pure) s
   align :: (a, ((b, c), d)) -> ((b, a, c), (b, d))
   align (a, ((b, c), d)) = ((b, a, c), (b, d)) 
   f :: (n, Either a b) -> Either (n, a) (n, b)
@@ -154,7 +155,7 @@ runKibbutz KbtzC{name, nodes, channelOpts} = do
 
     processRS = tapCount "rsPipe" . S.tap meshFold . S.map (second meshNodeLink)
   let
-    liveStream = (Left <$> (processES es)) `parallel` (Right <$> (processRS rs)) 
+    liveStream = (Left <$> (processES es)) `S.parallel` (Right <$> (processRS rs)) 
   return liveStream
   where
     plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
@@ -172,7 +173,7 @@ runKibbutz KbtzC{name, nodes, channelOpts} = do
     {-# INLINE getLatest #-}
     tapCount :: forall m a. (MonadAsync m, Show a) => String -> t m a -> t m a
     tapCount = S.tap . printCount
-    printCount s = FL.mkFoldId (\x a ->
+    printCount s = FL.foldlM' (\x a ->
                                   (liftIO . print $ s <> ": " <> (show x))
                                   >> (return $ x + (1 :: Int)))
                    (pure 0)
@@ -186,9 +187,8 @@ runKibbutz KbtzC{name, nodes, channelOpts} = do
 gridSensorR :: (KbtzConn t m n) => [n] -> t m (n, EnergyState) -> t m (n, M.Map n SensorR)
 gridSensorR ns s = S.map (first fromJust)
                    . S.filter (isJust . fst)
-                   . S.postscan ((,)
-                               <$> (FL.mkPureId ((const (Just . fst))) Nothing)
-                               <*> sensorFD) $ s
+                   . S.postscan (FL.tee (FL.foldl' ((const (Just . fst))) Nothing)
+                               sensorFD) $ s
   where
     sensorFD = FL.demux $ M.fromList $ (, sensorFold) <$> ns
     {-# INLINE sensorFD #-}
@@ -232,13 +232,13 @@ hydrateKbtz KbtzC{name, nodes, s3Opts} = case s3Opts of
           -- saveUF :: UF.Unfold GraphM ((NodeMAC, M.Map NodeMAC SensorR), (NodeMAC, M.Map NodeMAC (MeshNode, RxSignal))) (Bool, Bool)
           -- saveUF = bothUnfold flowFoldS3 meshFoldS3
 
-          -- saveAndId = UF.map snd $ UF.teeZipWith (,) saveUF UF.identity
+          -- saveAndId = UF.map snd $ UF.zipWith (,) saveUF UF.identity
 
           -- saveAndIdWithKey :: UF.Unfold GraphM Hydration Hydration
-          -- saveAndIdWithKey = UF.teeZipWith (,) (UF.singleton fst) (UF.discardFirst saveAndId)
+          -- saveAndIdWithKey = UF.zipWith (,) (UF.function fst) (UF.discardFirst saveAndId)
           
           process :: UF.Unfold GraphM ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats)) Hydration
-          process = UF.teeZipWith (,) (UF.singleton fst) (foldUF snd (eitherWalay nodes))
+          process = UF.zipWith (,) (UF.function fst) (foldUF snd (eitherWalay nodes))
 
         -- UF.map (bimap (first fromJust) (first fromJust)) $
         --                                                   (UF.filter (\((a, _), (b, _)) -> ((isJust $ a) && (isJust $ b)))) $
@@ -256,10 +256,10 @@ hydrateKbtz KbtzC{name, nodes, s3Opts} = case s3Opts of
 
 
 bothUnfold :: forall m a b c d. (Monad m) => FL.Fold m a b -> FL.Fold m c d -> UF.Unfold m (a, c) (b, d)
-bothUnfold f g = UF.teeZipWith (,) (foldUF fst f) (foldUF snd g)
+bothUnfold f g = UF.zipWith (,) (foldUF fst f) (foldUF snd g)
 
 foldUF :: forall m a b c. (Monad m) => (a -> c) -> FL.Fold m c b -> UF.Unfold m a b
-foldUF fn fld = UF.singletonM (UF.fold (UF.singleton fn) fld)
+foldUF fn fld = UF.functionM (UF.fold fld (UF.function fn))
 
 
 demuxWithLatest :: forall m n a b. (Monad m) =>
@@ -267,7 +267,7 @@ demuxWithLatest :: forall m n a b. (Monad m) =>
 demuxWithLatest fo = f
   where
     f :: FL.Fold m (n, a) (Maybe n, M.Map n b)
-    f = (,) <$> (FL.mkPureId ((const (Just . fst))) Nothing) <*> fo
+    f = FL.tee (FL.foldl' ((const (Just . fst))) Nothing) fo
 
 
 

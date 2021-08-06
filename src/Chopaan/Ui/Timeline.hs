@@ -8,7 +8,7 @@ import           Shpadoinkle.Lens
 
 import Control.Lens hiding (simple)
 
-import Streamly.Array.Foreign
+import qualified Streamly.Data.Array.Foreign as A
 import Data.Maybe
 import qualified Data.Vector as V
 import qualified Data.Text as T

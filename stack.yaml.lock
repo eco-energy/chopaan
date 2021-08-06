@@ -265,6 +265,17 @@ packages:
     git: https://github.com/Fresheyeball/Shpadoinkle.git
     commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
 - completed:
+    name: streamly
+    version: 0.8.0
+    git: https://github.com/composewell/streamly.git
+    pantry-tree:
+      size: 22320
+      sha256: 7d7920737f64688311cbe2e2e368a4ad231bae6e66bcaca8a1a30a2d49b8214a
+    commit: 4f629b8cb36bd03b480edc08b77c9a0187ce2206
+  original:
+    git: https://github.com/composewell/streamly.git
+    commit: 4f629b8cb36bd03b480edc08b77c9a0187ce2206
+- completed:
     hackage: base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
     pantry-tree:
       size: 2116
@@ -376,13 +387,6 @@ packages:
       sha256: 1668105b28027dd58fe688b80c92b75f091263fe5e704b3073b6b05fe707cc05
   original:
     hackage: estimator-1.2.0.0@sha256:44c85267299ea1e3eeb3e4eb9f317e4972563c84ba8220924c834a99b9048960,2424
-- completed:
-    hackage: streamly-0.7.3@sha256:5c528f670e7313a71971bae465fa04db5f7016471a3edb88eb53c272539970b9,28284
-    pantry-tree:
-      size: 12739
-      sha256: 153dbdb796efd528e597012d9b12057f575bf7ea1930d7cca38bd0a30b2fe54f
-  original:
-    hackage: streamly-0.7.3
 - completed:
     hackage: streamly-bytestring-0.1.0.1@sha256:aa522c22f992e70d005acbd7d4dba555b6a8b8f43f29cddba16fbeeb39f3e992,2471
     pantry-tree:

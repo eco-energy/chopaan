@@ -40,6 +40,8 @@ import Chopaan.Node.Metrics (toWattSeconds, toWatts
                             , Watts, WattSeconds
                             , SensorMetrics(..)
                             , Node(..)
+                            , BatteryR
+                            , PowerNR
                             , pToE
                             , Battery(..)
                             )
@@ -73,7 +75,7 @@ import Streamly (IsStream, MonadAsync, adapt)
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Pipe as P
-import qualified Streamly.Internal.Data.Pipe.Types as P
+import qualified Streamly.Internal.Data.Pipe.Type as P
 
 import qualified Data.Map.Strict as M
 import Data.Key hiding (Key)
@@ -97,7 +99,6 @@ import Chopaan.Graph.Greskell
 
 
 
-
 newtype Tx n a = Tx { unTx :: M.Map n a }
   deriving stock (Eq, Ord, Show, Generic, Traversable)
   deriving newtype (ToJSON, FromJSON, NFData, Functor, Foldable)
@@ -110,11 +111,11 @@ instance (Ord n) => Monoid (Tx n a) where
   mempty = Tx mempty
 
 
-type TxPlan n = Tx n Stake
+type TxPlan n = Tx n Stake -- Graph Stake n
 
-type TxState n = Tx n (Role, TxStatus)
+type TxState n = Tx n (Role, TxStatus) --Graph (TxStatus) (n, Role)
 
-type NodeStates n = Tx n SensorR
+type NodeStates n = Tx n SensorR --Graph PowerNR (n, SensorR)
 
 
 
@@ -194,14 +195,14 @@ mkTxDispatch uid stime (Tx txns) = defMessage
 
 
 
-foldTxState :: TxState n -> TxStatus
+foldTxState :: TxState n -> (TxStatus)
 foldTxState (Tx gt) = let
       gridTx = foldl (<>) mempty $ snd <$> gt
       loss = energyDispatched gridTx - energyReceived gridTx
       lossPerWS = loss / (energyDispatched gridTx)
       in gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
 {-# INLINE foldTxState #-}
--- The state will just be carried across as a TxStatus
+-- The state will just be carried across as a FLTxStatus
 
 --idFold' :: (Monad m) => FL.Fold m a (Maybe a)
 --idFold' = FL.lcatMaybes idFold 
@@ -210,7 +211,7 @@ foldTxState (Tx gt) = let
 --composeFold f g = g . f
   
 idFold :: (Monad m, Monoid a) => FL.Fold m a a
-idFold = FL.mkPureId (flip const) mempty
+idFold = FL.foldl' (flip const) mempty
 {-# INLINE idFold #-}
 
 secondF :: (Monad m, Monoid a) => FL.Fold m b c -> FL.Fold m (a, b) (a, c)
@@ -222,7 +223,7 @@ firstF = (flip FL.unzip) idFold
 {-# INLINE firstF #-}
 
 dupF :: (Monad m, Monoid a) => FL.Fold m a b -> FL.Fold m a (a, b)
-dupF f = (,) <$> idFold <*> f  
+dupF f = FL.tee idFold f  
 {-# INLINE dupF #-}
 
 txFold :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
@@ -234,16 +235,7 @@ txFold = dupF . transactionFold
 
 transactionFold :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
                 => TxPlan n -> FL.Fold m (NodeStates n, Maybe (TxPlan n)) (TxState n)
-transactionFold participants = FL.Fold step start end
-  where
-    step t n = pure $ incTxState t n
-    {-# INLINE step #-}
-    start :: m (TxState n)
-    start = return $ stakeStatus <$> participants
-    {-# INLINE start #-}
-    end :: TxState n -> m (TxState n)
-    end = pure
-    {-# INLINE end #-}
+transactionFold participants = FL.foldl' incTxState (stakeStatus <$> participants)
     -- shouldQuit (Tx t) = if (all ((\x -> timeRemaining x <= 0) . snd . snd) (M.toList t))
     --                then ( . Tx $ t)
     --                else ( . Tx $ t)
@@ -365,7 +357,7 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
 
 
 transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
-transactionPlanner timeHorizon = FL.Fold (\_ n -> txn timeHorizon n) (pure mempty) pure
+transactionPlanner timeHorizon = FL.foldlM' (\_ n -> txn timeHorizon n) (pure mempty)
 {-# INLINE transactionPlanner#-}
 
 

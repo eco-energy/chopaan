@@ -15,8 +15,8 @@ import Shpadoinkle (Html, MonadJSM)
 import Shpadoinkle.Widgets.Table (Tabular(..), Column, Row, SortCol(..), Sort(..))
 import Shpadoinkle.Widgets.Types (Humanize (..), Present(present))
 
-import Streamly (IsStream, adapt)
-import Streamly.Internal.Prelude (hoist)
+import Streamly.Prelude (IsStream, adapt)
+import Streamly.Internal.Data.Stream.IsStream (hoist)
 
 import Control.Monad.Trans.Class
 import Chopaan.Node.NodeId

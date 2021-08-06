@@ -77,7 +77,5 @@ x = dft . toC
 
 
 idFold :: (Monad m, Monoid a) => FL.Fold m a a
-idFold = liftF mempty (\_ a -> a)
+idFold = FL.foldl' (flip const) mempty
 
-liftF :: (Monad m) => b -> (b -> a -> b) -> FL.Fold m a b
-liftF b f = FL.Fold (\a b -> pure $ f a b) (pure b) pure

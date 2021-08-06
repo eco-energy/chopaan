@@ -9,6 +9,7 @@ import Control.Arrow
 import qualified Streamly.Prelude as S
 import Streamly as S
 import qualified Streamly.Internal.Data.Fold as FL
+import qualified Streamly.Internal.Data.Fold.Tee as FL
 
 import Data.Proxy
 import Data.Map (Map)
@@ -24,6 +25,7 @@ import Data.Pool
 
 import GHC.Generics
 import Control.DeepSeq
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Control.Monad.Trans.Reader hiding (ask)
@@ -208,12 +210,7 @@ spiderFold :: forall m a n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
            => Pool (Spider n v e)
            -> ((n, a) -> m (Maybe (FoundNode n v e)))
            -> FL.Fold m (n, a) Bool
-spiderFold p asFN = FL.mkFold step (pure True) end
-  where
-    {-# INLINE step #-}
-    step :: Bool -> (n, a) -> m Bool
-    step _ a = (addFNMaybe p) =<< (asFN a)
-    end x = return x
+spiderFold p asFN = FL.foldlM' (\_ -> addFNMaybe p <=< asFN) (pure True)
 {-# INLINE spiderFold #-}
 
 --utcToRange :: UTCTime -> UTCTime -> _
@@ -388,23 +385,10 @@ saveTx k = do
   stakeF' <- addTxNode k
   monF' <- addMonNode k
   flowF' <- addFlowNode k
-  let flowF = FL.lmap (\(n, (a, _, _)) -> (n, a)) flowF'
-  let monF = FL.lmap (\(n, (a, s, _)) -> (n, (a, s))) monF'
-  let stakeF = stakeF'
-  return $ (\(a, b, c) -> a && b && c) <$> ((,,) <$> stakeF <*> monF <*> flowF)
-
--- saveTx' ::  forall m. (MonadAsync m, MonadCatch m)
---   => KbtzName
---   -> SpiderM (FL.Fold m (NodeMAC,
---                          (NodeStates NodeMAC, Maybe (TxPlan NodeMAC), TxState NodeMAC))
---                (Bool, Bool))
--- saveTx' k = do
---   stakeF <- addTxNode k
---   monF <- addMonNode k
---   return $ (\(x, y) -> (truthFold x, truthFold y))
---     <$> ((,) <$> (FL.lmap  stakeF) <*> (FL.classify monF))
---   where
---     truthFold = (Prelude.foldl (&&) True)
+  let flowF = FL.Tee $ FL.lmap (\(n, (a, _, _)) -> (n, a)) flowF'
+  let monF = FL.Tee $ FL.lmap (\(n, (a, s, _)) -> (n, (a, s))) monF'
+  let stakeF = FL.Tee $ stakeF'
+  return $ FL.toFold $ (\(a, b, c) -> a && b && c) <$> ((,,) <$> stakeF <*> monF <*> flowF)
 
 
 gridSnapshot :: forall m v e. (SpiderConn NodeMAC v e, MonadIO m)

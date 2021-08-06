@@ -28,7 +28,7 @@ import Servant.API.QueryParam
 import Servant.Streamly
 import Streamly (IsStream, MonadAsync, AsyncT, adapt)
 import qualified Streamly.Prelude as S
-import qualified Streamly.Internal.Prelude as S
+import qualified Streamly.Internal.Data.Stream.IsStream as S
 import Servant.API.Stream
 
 #ifndef ghcjs_HOST_OS

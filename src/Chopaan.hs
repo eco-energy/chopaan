@@ -11,7 +11,7 @@ import Chopaan.Graph
 import Network.AWS.S3 (BucketName(..))
 import Streamly as S
 import qualified Streamly.Prelude as S
-import qualified Streamly.Internal.Prelude as S
+import qualified Streamly.Internal.Data.Stream.IsStream as S
 
 import Options.Applicative
 import RIO hiding (view, async, withAsync, Async)

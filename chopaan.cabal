@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 588c783c2c1e797c65b9dd4c90c9230a39359fca28df3b79e8eea11be57c196b
+-- hash: f6f1b90bdf74dbce5862578986646accf34df7b6a219079aa789e00ed706bed2
 
 name:           chopaan
 version:        0.1.0.0
@@ -106,6 +106,7 @@ library
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , optparse-applicative
     , pointed
     , proto-lens
     , proto-lens-runtime
@@ -118,7 +119,7 @@ library
     , servant
     , servant-client-js
     , stm
-    , streamly >=0.7.2
+    , streamly >=0.8.0
     , text
     , time
     , time-compat >=1.9.2.2
@@ -153,7 +154,6 @@ library
       , net-mqtt >=0.7.0
       , net-spider
       , network-uri
-      , optparse-applicative
       , postgresql-simple
       , sbv
       , servant-blaze
@@ -196,6 +196,8 @@ library
         Chopaan.Ui.WebSocket
         Chopaan.Ui.ThreeD
         Chopaan.Ui.Interaction
+        Chopaan.Ui.Timeline
+        Chopaan.Ui.Tables
         Chopaan.UiTypes
         Chopaan.View
         Chopaan.Kibbutz.KbtzId
@@ -240,7 +242,6 @@ library
         Chopaan.Kibbutz.LinOpt
         Chopaan.Kibbutz.Registry
         Chopaan.Kibbutz.Serve
-        Chopaan.Kibbutz.Ui
         Chopaan.Run
         Chopaan.Server
         Chopaan.Testing
@@ -281,6 +282,7 @@ library
         Chopaan.Ui.WebSocket
         Chopaan.Ui.ThreeD
         Chopaan.Ui.Interaction
+        Chopaan.Ui.Timeline
         Chopaan.UiTypes
         Chopaan.View
         Chopaan.Kibbutz.KbtzId
@@ -379,6 +381,7 @@ executable dev
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , optparse-applicative
     , pointed
     , proto-lens
     , proto-lens-runtime
@@ -391,7 +394,7 @@ executable dev
     , servant
     , servant-client-js
     , stm
-    , streamly >=0.7.2
+    , streamly >=0.8.0
     , text
     , time
     , time-compat >=1.9.2.2
@@ -426,7 +429,6 @@ executable dev
       , net-mqtt >=0.7.0
       , net-spider
       , network-uri
-      , optparse-applicative
       , postgresql-simple
       , sbv
       , servant-blaze
@@ -524,6 +526,7 @@ executable kbtzim
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , optparse-applicative
     , pointed
     , proto-lens
     , proto-lens-runtime
@@ -536,7 +539,7 @@ executable kbtzim
     , servant
     , servant-client-js
     , stm
-    , streamly >=0.7.2
+    , streamly >=0.8.0
     , text
     , time
     , time-compat >=1.9.2.2
@@ -571,7 +574,6 @@ executable kbtzim
       , net-mqtt >=0.7.0
       , net-spider
       , network-uri
-      , optparse-applicative
       , postgresql-simple
       , sbv
       , servant-blaze
@@ -668,6 +670,7 @@ executable server
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , optparse-applicative
     , pointed
     , proto-lens
     , proto-lens-runtime
@@ -680,7 +683,7 @@ executable server
     , servant
     , servant-client-js
     , stm
-    , streamly >=0.7.2
+    , streamly >=0.8.0
     , text
     , time
     , time-compat >=1.9.2.2
@@ -715,7 +718,6 @@ executable server
       , net-mqtt >=0.7.0
       , net-spider
       , network-uri
-      , optparse-applicative
       , postgresql-simple
       , sbv
       , servant-blaze
@@ -813,6 +815,7 @@ executable ui
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , optparse-applicative
     , pointed
     , proto-lens
     , proto-lens-runtime
@@ -825,7 +828,7 @@ executable ui
     , servant
     , servant-client-js
     , stm
-    , streamly >=0.7.2
+    , streamly >=0.8.0
     , text
     , time
     , time-compat >=1.9.2.2
@@ -860,7 +863,6 @@ executable ui
       , net-mqtt >=0.7.0
       , net-spider
       , network-uri
-      , optparse-applicative
       , postgresql-simple
       , sbv
       , servant-blaze
@@ -974,6 +976,7 @@ test-suite chopaan-test
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , optparse-applicative
     , pointed
     , proto-lens
     , proto-lens-runtime
@@ -986,7 +989,7 @@ test-suite chopaan-test
     , servant
     , servant-client-js
     , stm
-    , streamly >=0.7.2
+    , streamly >=0.8.0
     , text
     , time
     , time-compat >=1.9.2.2
@@ -1021,7 +1024,6 @@ test-suite chopaan-test
       , net-mqtt >=0.7.0
       , net-spider
       , network-uri
-      , optparse-applicative
       , postgresql-simple
       , sbv
       , servant-blaze

@@ -13,7 +13,8 @@ LANGUAGE ScopedTypeVariables
 module Chopaan.Node.Folds where
 
 import qualified Streamly.Data.Fold as FL
-import qualified Streamly.Internal.Data.Fold as FL
+import qualified Streamly.Data.Fold as FL
+import qualified Streamly.Data.Fold.Tee as FL
 
 import Data.Time
 import Data.Bifunctor
@@ -44,53 +45,48 @@ Folds of type FL.Fold, as functions to the instantatenous values of the system o
 
 
 -----------------------------------------------------------------------------------------------------}
-meshFold :: forall m. Applicative m => FL.Fold m (RuntimeStats) (MeshNode, RxSignal)
+meshFold :: forall m. Monad m => FL.Fold m (RuntimeStats) (MeshNode, RxSignal)
 meshFold = meshF
 {-# INLINE meshFold #-}
 
-timeFold :: forall m. Applicative m => FL.Fold m (EnergyState) Timestamp
-timeFold = FL.mkFold step' begin' done'
+timeFold :: forall m. Monad m => FL.Fold m (EnergyState) Timestamp
+timeFold = FL.foldl' step' begin'
   where
     {-# INLINE step'#-}
-    step' :: Timestamp -> EnergyState -> m (Timestamp)
-    step' (Nothing, _) cur = pure $ (Just tn, diffUTC tn tn)
+    step' :: Timestamp -> EnergyState -> Timestamp
+    step' (Nothing, _) cur = (Just tn, diffUTC tn tn)
       where
         tn = utcTimeES cur
-    step' ((Just !prev), _) cur = pure $ (Just tn, diffUTC tn prev)
+    step' ((Just !prev), _) cur = (Just tn, diffUTC tn prev)
       where
         tn = utcTimeES cur
     {-# INLINE begin' #-}
-    begin' :: m Timestamp
-    begin' = pure (Nothing, 0)
-    {-# INLINE done' #-}
-    done' :: Timestamp -> m Timestamp
-    done' = pure
+    begin' :: Timestamp
+    begin' = (Nothing, 0)
 
 
-powerFold :: forall m. Applicative m => FL.Fold m EnergyState (PowerNR)
-powerFold = FL.mkFold (\_ b-> pure $ power b) (pure $ mempty) pure 
+
+powerFold :: forall m. Monad m => FL.Fold m EnergyState (PowerNR)
+powerFold = FL.foldl' (\_ b -> power b) mempty 
 {-# INLINE powerFold #-}
 
-energyFold :: forall m. Applicative m => FL.Fold m (EnergyState) (EnergyNR)
-energyFold = FL.mkFold step begin end
+energyFold :: forall m. Monad m => FL.Fold m (EnergyState) (EnergyNR)
+energyFold = fmap fst $ FL.foldl' step begin
   where
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
     {-# INLINE step #-}
-    step :: (EnergyNR, Maybe UTCTime) -> EnergyState -> m (EnergyNR, Maybe UTCTime)
-    step (esPrev, (Just tPrev)) cur = pure $
+    step :: (EnergyNR, Maybe UTCTime) -> EnergyState -> (EnergyNR, Maybe UTCTime)
+    step (esPrev, (Just tPrev)) cur =
       (esPrev <> eAtT (power cur) (diffUTC tn tPrev), Just tn)
       where
         tn = utcTimeES cur
-    step (esPrev, Nothing) cur = pure $
+    step (esPrev, Nothing) cur =
       (esPrev <> (eAtT (power cur) 0), Just tn)
       where
         tn = utcTimeES cur
     {-# INLINE begin #-}
-    begin :: m (EnergyNR, Maybe UTCTime)
-    begin = pure $ (mempty, Nothing)
-    {-# INLINE end#-}
-    end :: (EnergyNR, Maybe UTCTime) -> m (EnergyNR)
-    end = pure . fst
+    begin :: (EnergyNR, Maybe UTCTime)
+    begin = (mempty, Nothing)
     {-# INLINE eAtT #-}
     eAtT :: PowerNR -> DiffTime -> (EnergyNR)
     eAtT p t = Node { tx = (pToE t tx)
@@ -103,17 +99,16 @@ energyFold = FL.mkFold step begin end
 
 batteryFold :: forall m e p. (Monad m)
   => BatteryParams R -> FL.Fold m EnergyState (Battery WattSeconds Watts)
-batteryFold bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts) $ FL.mkFold step begin end
+batteryFold bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts) $ fmap end $ FL.foldl' step begin
   where
     {-# INLINE step #-}
     step :: (Maybe UTCTime, Maybe (KF R))
       -> EnergyState
-      -> m (Maybe UTCTime, Maybe (KF R))-- (Battery R R))
-    step (t, pkf) sensorReadings = do
-      let
+      -> (Maybe UTCTime, Maybe (KF R))
+    step (t, pkf) sensorReadings = let
         (kf, ki) = runEstimator bat (tdiff t) (storageSensors sensorReadings)
           (guestimateInitialSOC pkf)
-      pure $ (Just tnow, Just kf)
+      in (Just tnow, Just kf)
       where
         guestimateInitialSOC (Just k) = k
         guestimateInitialSOC Nothing = initKF (initDynamic {
@@ -123,31 +118,30 @@ batteryFold bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts) $ FL.mkFold
         tdiff (Just t') = realToFrac $ diffUTCTime tnow t'
         tdiff Nothing = 0
     {-# INLINE begin #-}
-    begin :: m (Maybe UTCTime, Maybe (KF R))
-    begin = pure $ (Nothing, Nothing)
+    begin :: (Maybe UTCTime, Maybe (KF R))
+    begin = (Nothing, Nothing)
     {-# INLINE end #-}
-    end :: (Maybe UTCTime, Maybe (KF R)) -> m (Battery R R)
-    end (_, (Just (KalmanFilter (StateVector{..}) _))) = pure $
-      (emptyB @R @R)
+    end :: (Maybe UTCTime, Maybe (KF R)) -> Battery R R
+    end (_, (Just (KalmanFilter (StateVector{..}) _))) = (emptyB @R @R)
         { soc = clamp 0 99.9 soC
         , totalCapacity = chargeCapacity bat
         }
-    end (_, (Nothing)) = pure (emptyB @R @R)
+    end (_, (Nothing)) = emptyB @R @R
 {-# INLINE batteryFold #-}
 
 
 sensorFold :: forall m. (Monad m) => FL.Fold m (EnergyState) (SensorMetrics WattSeconds Watts) 
-sensorFold = SensorMetrics
-             <$> (fst <$> timeFold)
-             <*> (snd <$> timeFold)
-             <*> powerFold
-             <*> energyFold
-             <*> (batteryFold defBatteryParams)
-             <*> demandFold 
+sensorFold = FL.toFold $ SensorMetrics
+             <$> FL.Tee (fst <$> timeFold)
+             <*> FL.Tee (snd <$> timeFold)
+             <*> FL.Tee powerFold
+             <*> FL.Tee energyFold
+             <*> FL.Tee (batteryFold defBatteryParams)
+             <*> FL.Tee demandFold 
 {-# INLINE sensorFold #-}
 
-demandFold :: (Applicative m) => FL.Fold m (EnergyState) WattSeconds
-demandFold = FL.Fold (\_ nes -> pure $ (d $ power nes)) (pure 0) pure
+demandFold :: (Monad m) => FL.Fold m (EnergyState) WattSeconds
+demandFold = FL.foldl' (\_ nes -> (d $ power nes)) 0
   where
     {-# INLINE d #-}
     d (Node{..}) = pToE horizon consumed
@@ -155,8 +149,8 @@ demandFold = FL.Fold (\_ nes -> pure $ (d $ power nes)) (pure 0) pure
 {-# INLINE demandFold #-}
 
 
-sensors :: (Applicative m) => FL.Fold m EnergyState EnergyState
-sensors = FL.Fold (\_ nes -> pure nes) (pure zeroMsg) (pure) 
+sensors :: (Monad m) => FL.Fold m EnergyState EnergyState
+sensors = FL.foldl' (flip const) zeroMsg 
 
 type SensorR = SensorMetrics WattSeconds Watts 
 

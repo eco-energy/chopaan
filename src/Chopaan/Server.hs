@@ -30,8 +30,8 @@ import           Network.Wai               (Application)
 import           Network.Wai.Handler.Warp  (run)
 import           Network.Wai.Middleware.Cors
 
-import           Streamly                  (IsStream, AheadT, adapt)
-import           Streamly.Internal.Prelude (hoist)
+import           Streamly.Prelude          (IsStream, AheadT, adapt)
+import           Streamly.Internal.Data.Stream.IsStream (hoist)
 import qualified Streamly as S
 
 import           Servant.API

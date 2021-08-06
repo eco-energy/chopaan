@@ -140,8 +140,8 @@ meshNodeLink rts = (parseRTSToNode rts, parseRxSignal rts)
 {-# INLINE meshNodeLink #-}
 
 
-meshF :: forall m. (Applicative m) => FL.Fold m (N.RuntimeStats) (MeshNode, RxSignal)
-meshF = FL.Fold (\_ r -> pure . meshNodeLink $ r) (pure (initMeshNode, noSignal)) pure
+meshF :: forall m. (Monad m) => FL.Fold m (N.RuntimeStats) (MeshNode, RxSignal)
+meshF = FL.mkFold_ (\_ r -> FL.Partial $ meshNodeLink $ r) (FL.Partial (initMeshNode, noSignal))
 {-# INLINE meshF #-}
 
 

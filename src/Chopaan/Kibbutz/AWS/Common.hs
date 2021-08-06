@@ -13,8 +13,6 @@ import Control.Monad.Trans.Resource
 import Lens.Micro
 
 import qualified Streamly.Data.Unfold as UF
-import qualified Streamly.Internal.Data.Unfold.Types as UF
-import qualified Streamly.Internal.Data.Stream.StreamD.Type as STy
 
 type AWSC b = AWST' Env (ResourceT IO) b
 
@@ -24,13 +22,11 @@ inAwsContext lgr svc ma = do
   runResourceT . runAWST env $ ma
 
 pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)
-pageUF = UF.Unfold step inject
+pageUF = UF.lmap Just $ UF.unfoldrM step
   where
-    step :: Maybe a -> m (STy.Step (Maybe a) (Rs a)) 
+    step :: (Maybe a) -> m (Maybe (Rs a, Maybe a)) 
+    step Nothing = return Nothing
     step (Just req) = do
       y <- send req
-      return $ STy.Yield y (page req y)
-    step Nothing = do
-      return $ STy.Stop
-    inject :: a -> m (Maybe a)
-    inject = pure . Just
+      return $ Just (y, page req y)
+

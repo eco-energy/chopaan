@@ -13,7 +13,7 @@ import           Data.Proxy                  (Proxy (..))
 
 import           Streamly
 import qualified Streamly.Prelude as S
-import qualified Streamly.Internal.Prelude as S
+import qualified Streamly.Internal.Data.Stream.IsStream as S
 import           Servant.Streamly
 
 #ifndef ghcjs_HOST_OS

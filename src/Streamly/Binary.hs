@@ -14,8 +14,8 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Streamly.Internal.Data.Stream.StreamD as D
 
-import Streamly (SerialT, IsStream, MonadAsync)
-import Streamly.Internal.Data.Pipe.Types
+import Streamly.Prelude (SerialT, IsStream, MonadAsync)
+import Streamly.Internal.Data.Pipe.Type
 import Streamly.Internal.Data.Pipe
 import qualified Streamly.Prelude as S
 
