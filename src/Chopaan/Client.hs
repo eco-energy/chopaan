@@ -2,13 +2,15 @@
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeApplications, RankNTypes, StandaloneDeriving, UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances, TypeOperators, TemplateHaskell, LambdaCase  #-}
 
 module Chopaan.Client where
 
-import           Control.Monad.Catch         (MonadThrow)
+import           Control.Monad.Catch         (MonadThrow, MonadCatch)
 import           Control.Monad.Reader        (MonadIO, liftIO, ReaderT(..), ask, MonadReader)
+import           Control.Monad.Base
+import           Control.Monad.Trans.Control
 import           Data.Proxy                  (Proxy (..))
 
 import           Streamly
@@ -18,10 +20,10 @@ import           Servant.Streamly
 
 #ifndef ghcjs_HOST_OS
 import           Shpadoinkle                 (JSM, MonadJSM, MonadUnliftIO (..),
-                                              UnliftIO (..), askJSM, runJSM, liftJSM)
+                                              UnliftIO (..), askJSM, runJSM, liftJSM, type (~>))
 #else
 import           Shpadoinkle                 (JSM, MonadUnliftIO (..),
-                                              UnliftIO (..), askJSM, runJSM, liftJSM)
+                                              UnliftIO (..), askJSM, runJSM, liftJSM, type (~>))
 #endif
 
 import           Data.FileEmbed              (embedFile)
@@ -43,13 +45,20 @@ import           Chopaan.View                   (ainit, ginitM, onRouteChange, v
 
 import           Shpadoinkle.Run             (runJSorWarp, Env(Dev, Prod))
 
+
+--deriving instance MonadBaseControl IO JSM
+
 newtype AppC a = AppC { runAppC :: ReaderT ClientEnv JSM a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadReader ClientEnv)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadReader ClientEnv
+           , MonadBase IO, MonadBaseControl IO, MonadCatch)
 #ifndef ghcjs_HOST_OS
   deriving (MonadJSM)
 #endif
 
-runApp :: ClientEnv -> AppC a -> JSM a
+--natTrans :: ClientEnv -> AppC ~> JSM
+--natTrans c = (flip runReaderT c) . runAppC
+
+runApp :: ClientEnv -> AppC ~> JSM
 runApp c = (flip runReaderT c) . runAppC
 
 instance MonadUnliftIO AppC where

@@ -68,7 +68,8 @@ appToHandler c a = liftIO $ runReaderT (runApp a) c
 
 
 newtype Noop a = Noop (JSM a)
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadJSM)
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadJSM,
+                    MonadBase IO, MonadBaseControl IO, MonadThrow)
   deriving anyclass CRUDChopaan
 
 -- (forall t. IsStream t => (Monad (t App))) =>

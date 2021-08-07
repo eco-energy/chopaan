@@ -7,12 +7,16 @@
 {-# LANGUAGE IncoherentInstances, TupleSections #-}
 module Chopaan.Ui.GraphView where
 
+import Control.Arrow
+import Control.Monad.IO.Class
+
 import Data.Aeson as A
 import Data.Maybe
+import qualified Data.Map.Strict as M
 import Data.Text hiding (empty, zip, filter)
 import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding as T
-
+import Data.FileEmbed
 
 import           GHCJS.DOM                               (currentDocumentUnchecked,
                                                           currentWindowUnchecked)
@@ -28,6 +32,7 @@ import           Language.Javascript.JSaddle hiding (JSM, MonadJSM)
 
 import           Shpadoinkle
 
+import qualified Streamly.Prelude as S
 import Shpadoinkle (Html(..), liftC, text, JSM, MonadJSM, Continuation, Html,
                      RawNode (..),
                      atomically, retrySTM, baked,
@@ -36,7 +41,6 @@ import Shpadoinkle (Html(..), liftC, text, JSM, MonadJSM, Continuation, Html,
                      readTVarIO, text,
                      writeTVar)
 import Shpadoinkle.Widgets.Types (Humanize(..), Present(..))
-import Control.Monad.IO.Class
 import qualified Shpadoinkle.Html as H
 --import Shpadoinkle.Html.TH.AssetLink (assetLink)
 import Shpadoinkle.Template.TH
@@ -46,26 +50,30 @@ import Chopaan.Graph.G as G
 import qualified Chopaan.Ui.Style as Css
 import Chopaan.Graph.Snapshot
 import Chopaan.Ui.ThreeD (threeDM, grid3D)
-import Data.FileEmbed
+
 
 default (Text)
 
-render3dGrid :: forall m n a. (Applicative m, Eq n, Humanize n) => SG n -> Html m a
+render3dGrid :: forall m n a. (MonadJSM m, S.MonadAsync m, Eq n, Ord n, Humanize n, NFData n, Show n, ToJSONKey n) => SG n -> Html m a
 render3dGrid sg = case sg of
   (G.Mesh (SG ms)) -> renderBaked ms 
   (G.Transactor (SG ms)) -> renderBaked ms 
   (G.Status (SG ms)) -> renderBaked ms
   (G.Flow (SG ms)) -> renderBaked ms
   where
+    nt :: m ~> JSM
+    nt = undefined
     renderBaked :: forall a v l.
                  (Eq l, Eq v, NFData l, NFData v, Humanize l, Humanize v, ToJSON v, Show v)
                =>  SnapshotGraph n v l -> Html m a
     renderBaked (ns, _) = H.baked $ do
-      (, retrySTM) <$> (threeDM objF elements)
+      (, retrySTM) <$> (threeDM (nt, s) objF elements)
         where
-          elements = fmap (fromJust) $ filter (isJust) $ _nodeAttributes <$> ns
+          elements = M.fromList $ fmap (second fromJust) $ filter (isJust . snd) $
+                  (\n -> (_nodeId n, _nodeAttributes n)) <$> ns
           objF = grid3D 5 5 25
-
+          s :: S.AheadT m (n, v)
+          s = undefined
 
 -- renderKbtzGraph :: forall m n. (Applicative m, Ord n, Humanize n) => SG n -> Html m () -- SG
 -- renderKbtzGraph sg = case sg of

@@ -21,7 +21,7 @@ type NodeMAC = NodeId ThingName
 
 newtype NodeId a = NodeId { unNodeId :: a }
   deriving stock (Generic, Functor)
-  deriving newtype (Eq, Ord, Show, Read, IsString, Typeable, FromJSON, ToJSON, Humanize, Semigroup, Monoid, FromGraphSON)
+  deriving newtype (Eq, Ord, Show, Read, IsString, Typeable, FromJSON, ToJSON, Humanize, Semigroup, Monoid, FromGraphSON, ToJSONKey)
   deriving anyclass (Present, NFData, Binary)
 {--
 instance (Show a) => Show (NodeId a) where

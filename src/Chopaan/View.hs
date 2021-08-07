@@ -182,7 +182,7 @@ homePage k = H.div
                   ]
 
 
-view :: forall m. (MonadJSM m, CRUDChopaan m) => Frontend -> Html m Frontend
+view :: forall m. (MonadJSM m, S.MonadAsync m, CRUDChopaan m) => Frontend -> Html m Frontend
 view fe = case fe of
   MHomePage ks -> onSum #_MHomePage $ homePage ks
   MKibbutzim kbtzRoster -> onSum #_MKibbutzim $ H.div "container-fluid"
@@ -301,7 +301,7 @@ searchKbtzName = [ unKbtzId ]
 
 
 
-gView :: forall m. (MonadJSM m, CRUDChopaan m) => GView -> Html m (GView)
+gView :: forall m. (MonadJSM m, S.MonadAsync m, CRUDChopaan m) => GView -> Html m (GView)
 gView g = H.div [H.class' $ Css.relative <> Css.flex_grow <> Css.flex_col]
   [ case _currentG g of
       Nothing -> voidC $ H.text "No Graph Found Yet"
