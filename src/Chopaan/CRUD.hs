@@ -101,7 +101,7 @@ newtype KbtzList = KbtzList { unKbtzList :: Kbtzim }
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (NFData, ToJSON, FromJSON)
 
-data instance Column KbtzList = KId -- | KName | KDesc
+data instance Column KbtzList = KId --  | KName | KDesc
   deriving (Eq, Ord, Show, Generic, Bounded, Enum, NFData, ToJSON, FromJSON)
 
 newtype instance Row KbtzList = KbtzimRow { unKbtzimRow :: KbtzName }

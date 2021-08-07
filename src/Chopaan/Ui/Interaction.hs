@@ -223,7 +223,7 @@ zoomT :: PosState -> T
 zoomT z = Endo $ \m -> scaled (point $ unitV ^* (zoomFactor (z ^. _2 . _y))) !*! m
   where
     zoomFactor x = exp (x * zoomSpeed)
-    zoomSpeed = 1.2
+    zoomSpeed = exp 1.2
 
 
 

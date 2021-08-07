@@ -8,12 +8,9 @@ import GHC.Generics
 import Control.DeepSeq (NFData)
 
 import Data.Function (on)
-import Data.Int (Int64)
 import qualified Data.Map.Strict as M
-import qualified Data.Text as Txt
-import Text.Printf (printf)
 import Data.Aeson
-import Data.Time (UTCTime(..), formatTime, defaultTimeLocale)
+
 
 import Shpadoinkle
 import qualified Shpadoinkle.Html as H
@@ -22,6 +19,7 @@ import qualified Shpadoinkle.Widgets.Types as T
 
 import Chopaan.Node.Metrics
 import Chopaan.Node.Mesh
+import Chopaan.Ui.Base ()
 
 newtype MeshTable n = MeshTable { unMeshTable :: (M.Map n (MeshNode, RxSignal)) }
   deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
@@ -48,25 +46,6 @@ instance T.Humanize (T.Column (MeshTable n)) where
   humanize MVersion = "Software Version"
   humanize MUpTime = "Node Uptime"
 
-instance T.Humanize UTCTime where
-  humanize a = Txt.pack $ formatTime defaultTimeLocale "%H:%M:%S %d-%m-%y" a
-
-instance (T.Humanize a) => T.Humanize (Maybe a) where
-  humanize Nothing = "Not Available"
-  humanize (Just a) = T.humanize a
-
-instance T.Humanize (Double) where
-  humanize = Txt.pack . printf "%.2g"
-
-instance T.Humanize (Bool) where
-  humanize True = "Yes"
-  humanize False = "No"
-
-instance T.Humanize (Int) where
-  humanize = Txt.pack . printf "%d"
-
-instance T.Humanize (Int64) where
-  humanize = Txt.pack . printf "%d"
 
 instance (T.Humanize n, Ord n) => T.Tabular (MeshTable n) where
   type Effect (MeshTable n) m = (MonadJSM m)

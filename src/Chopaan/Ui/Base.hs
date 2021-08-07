@@ -22,6 +22,13 @@ import Linear.Metric
 import Linear.Projection
 import Data.Monoid
 
+import Shpadoinkle.Widgets.Types (Humanize(..))
+import Data.Int (Int64)
+import qualified Data.Text as T
+import Text.Printf (printf)
+import Data.Time (UTCTime, formatTime, defaultTimeLocale)
+
+
 type Unop a = a -> a 
 
 type T = Endo M44R
@@ -125,3 +132,24 @@ defQuat = normalize (axisAngle (V3 0 1 0) 90)
 zeroObj :: Obj
 zeroObj = mkObj zero zero (V3 1 1 1)
 
+
+
+instance Humanize UTCTime where
+  humanize a = T.pack $ formatTime defaultTimeLocale "%H:%M:%S %d-%m-%y" a
+
+instance (Humanize a) => Humanize (Maybe a) where
+  humanize Nothing = "Not Available"
+  humanize (Just a) = humanize a
+
+instance Humanize (Double) where
+  humanize = T.pack . printf "%.2g"
+
+instance Humanize (Bool) where
+  humanize True = "Yes"
+  humanize False = "No"
+
+instance Humanize (Int) where
+  humanize = T.pack . printf "%d"
+
+instance Humanize (Int64) where
+  humanize = T.pack . printf "%d"

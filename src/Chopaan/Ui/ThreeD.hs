@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, TypeApplications, ScopedTypeVariables, OverloadedLabels #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 {-# LANGUAGE AllowAmbiguousTypes, ImpredicativeTypes, QuantifiedConstraints       #-}
-{-# LANGUAGE DataKinds, GADTs                 #-}
+{-# LANGUAGE DataKinds, GADTs, TypeOperators                 #-}
 {-# LANGUAGE DuplicateRecordFields     #-}
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell, RecordWildCards, PackageImports, CPP #-}
@@ -21,10 +21,13 @@ import Data.Monoid (Endo(..))
 import Data.Aeson
 import System.IO (stderr, hPutStrLn, stdout, hFlush)
 
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import           Data.FileEmbed              (embedFile)
 import           Data.Text.Encoding          (decodeUtf8)
 
+import qualified Streamly.Prelude as S
+import qualified Streamly.Internal.Data.Stream.IsStream.Lift as S
 import UnliftIO.Concurrent (forkIO, threadDelay)
 import Language.Javascript.JSaddle (ToJSVal(..), FromJSVal(..), valToObject)
 import GHCJS.DOM (currentWindow, currentWindowUnchecked, currentDocumentUnchecked)
@@ -37,7 +40,9 @@ import GHCJS.DOM.RequestAnimationFrameCallback (newRequestAnimationFrameCallback
 
 import Shpadoinkle (Html, JSM, MonadJSM, liftJSM, TVar, shpadoinkle
                    , voidC, liftC', leftC', rightC', rightC, maybeC', liftCMay', eitherC'
-                   , Continuation, pur, impur, kleisli, RawNode(..), RawEvent, shouldUpdate)
+                   , Continuation, pur, impur, kleisli, RawNode(..), RawEvent, shouldUpdate
+                   , type (~>)
+                   )
 import Shpadoinkle.Run (runJSorWarp)
 import qualified Shpadoinkle.Html as H
 import Shpadoinkle.Html.Utils (getBody)
@@ -127,23 +132,33 @@ transformCamera t c = c & #cameraObj .~ (newO)
 worldDirection :: Camera -> V3 R
 worldDirection = normalize . (view (_xyz . column _z)) . matrixWorldInverse 
 
-newtype Scene a = Scene { runScene :: [(a, Obj)] }
+newtype Scene n a = Scene { runScene :: M.Map n (a, Obj) }
   deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
-mkScene :: (Int -> Obj) -> [a] -> Scene a
-mkScene objF = Scene . (flip zip (objF <$> [0,1..]))
+mkScene :: (Int -> Obj) -> M.Map n a -> Scene n a
+mkScene objF xs = Scene os
+  where
+    os = M.fromDistinctAscList
+      $ twid <$> ((flip zip) (objF <$> [0,1..])
+      $ M.toAscList xs)
+    twid ((a, b), c) = (a, (b, c))
 
-transformScene :: T -> Scene a -> Scene a
+addToScene :: Ord n => (n, a) -> Scene n a -> Scene n a
+addToScene (n, a) = Scene . M.insertWith keepObj n (a, undefined) . runScene
+  where
+    keepObj ~(x, _) (_, o') = (x, o')
+
+transformScene :: T -> Scene n a -> Scene n a
 transformScene p = Scene . fmap (second (transformObj p)) . runScene
 
 
-data ThreeModel a = ThreeModel
-  { scene :: Scene a
+data ThreeModel n a = ThreeModel
+  { scene :: Scene n a
   , camera :: Camera
   , screen :: Screen
   } deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
-transformModel :: T -> ThreeModel a -> ThreeModel a
+transformModel :: T -> ThreeModel n a -> ThreeModel n a
 transformModel p (ThreeModel s c x) = ThreeModel s c' x
   where
     c' = transformCamera p c
@@ -181,12 +196,12 @@ objectCSSMat = ("translate(-50%, -50%)" <>) . cssMatEp . negativeColY . _worldTr
 
 
 defCam :: V3 R -> Double -> Double -> Camera
-defCam p w h = mkCam o 40 (w / h) 1 10000
+defCam p w h = mkCam o 40 (w / h) 10 100000
   where
-    o = mkObj p zero (V3 1 1 1) 
+    o = mkObj p (zero) (V3 1 1 1) 
 
 
-mkModel :: Screen -> (Int -> Obj) -> [a] -> (ThreeModel a)
+mkModel :: Screen -> (Int -> Obj) -> M.Map n a -> (ThreeModel n a)
 mkModel s objF xs = ThreeModel (mkScene (objF' cam) xs) cam s
   where
     cam = (defCam camPos (widthG s) (heightG s))
@@ -194,17 +209,23 @@ mkModel s objF xs = ThreeModel (mkScene (objF' cam) xs) cam s
     camPos = V3 0 0 3000
 
 
-type ControlModel a = (ThreeModel a, Maybe Interact)
+type ControlModel n a = (ThreeModel n a, Maybe Interact)
 
-type Throttler m ev a = (H.Throttle m (ev -> JSM (Continuation m (ControlModel a))) (ControlModel a))
+type Throttler m n ev a = (H.Throttle m (ev -> JSM (Continuation m (ControlModel n a))) (ControlModel n a))
 
+human :: (Humanize a) => a -> Html m b
+human = H.text . humanize
 
-threeD :: forall m a. (MonadJSM m, Humanize a)
-       => ControlModel a
-       -> Html m (ControlModel a)
-threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
+titledHuman :: (Humanize a, Humanize n) => n -> a -> [Html m b]
+titledHuman n a = [human n, human a]
+
+threeD :: forall m n a. (MonadJSM m, Humanize a, Humanize n)
+       => (forall x. n -> a -> [Html m x])
+       -> ControlModel n a
+       -> Html m (ControlModel n a)
+threeD baseE ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
   H.div (cameraCSS) $
-    (\(x, y) -> H.div (objCSS y) . pure . H.text . humanize $ x) <$> xs
+    (\(n, (x, y)) -> H.div (objCSS y) $ baseE n x) <$> (M.toAscList xs)
   ]
   where
     rootProps = rootHandler <> rootCSS
@@ -216,7 +237,7 @@ threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
                   , rightC <$> onWheel
                   , voidC <$> noRightClick
                   ]
-    screenHandler :: RawNode -> RawEvent -> JSM (Continuation m (ThreeModel a, x))
+    screenHandler :: RawNode -> RawEvent -> JSM (Continuation m (ThreeModel n a, x))
     screenHandler (RawNode n) re = do
       let cont = do
             e <- valToObject n
@@ -245,9 +266,13 @@ threeD ((ThreeModel (Scene xs) c screen), track) = H.div rootProps [
     objCSS y = [ styleP "position:absolute"
                , styleP "pointer-events: auto"
                , transformP $ objectCSSMat y
-               , H.class' "element"
+               --, H.class' "element"
                , styleP "background-color: white"
                , styleP "opacity:0.9"
+               , H.class' "focus:ring-purpule-600"
+               , H.class' Css.resize
+               , H.class' Css.h_80
+               , H.class' Css.w_60
                ]
 
 
@@ -261,14 +286,14 @@ grid3D row col stack = (gridPos)
     ys = [(-2000), (-2000 + elHeight + heightOffset)..2000]
     -- Depth is infinite. So the zip must provide a surface for all depths
     zs = [-800, ((-800) - (elDepth + depthOffset))..]
-    elWidth = 400
+    elWidth = 800
     widthOffset = 800
     elDepth = 200
     depthOffset = 200
-    elHeight = 400
+    elHeight = 800
     heightOffset = 800
 
-deltaModel :: Interact -> ThreeModel a -> ThreeModel a
+deltaModel :: Interact -> ThreeModel n a -> ThreeModel n a
 deltaModel del = transformModel $ evalI del
 
 styleP :: T.Text -> (T.Text, H.Prop m a)
@@ -292,7 +317,7 @@ wait = 3000000
 dur :: Double
 dur = 3000
 
-animation :: Window -> TVar (ControlModel a) -> JSM (RequestAnimationFrameCallback)
+animation :: Window -> TVar (ControlModel n a) -> JSM (RequestAnimationFrameCallback)
 animation w tv = go
   where
     go = newRequestAnimationFrameCallback $ \(clock') -> () <$ do
@@ -320,27 +345,34 @@ animation w tv = go
       (requestAnimationFrame w) =<< (animation w tv)
 
 
-threeDM :: (Eq a, NFData a, ToJSON a, Humanize a, Show a) => (Int -> Obj) -> [a] -> JSM RawNode
-threeDM objF xs = do
+threeDM :: forall m n a. (S.MonadAsync m, MonadJSM m)
+  => (Ord n, Humanize n, NFData n, Show n, ToJSONKey n)
+  => (Eq a, NFData a, ToJSON a, Humanize a, Show a)
+  => (m ~> JSM, S.AheadT m (n, a)) -> (Int -> Obj) -> M.Map n a -> JSM RawNode
+threeDM (hoister, updates) objF xs = liftJSM $ do
   doc <- currentDocumentUnchecked
   isSubsequent <- traverse toJSVal =<< getElementById doc vId
   case isSubsequent of
     Just raw -> return $ RawNode raw
     Nothing -> do
       win <- currentWindowUnchecked
-      elm <- createElement doc "div"
+      elm <- createElement doc ("div" :: T.Text)
       setId elm vId
       (w, h) <- getWH
-      let mod = mkModel (Screen w h 0 h) objF xs 
-      model <- liftIO $ newTVarIO (mod, Nothing)
+      model <- liftIO $ newTVarIO (mkModel (Screen w h 0 h) objF xs, Nothing)
       _ <- requestAnimationFrame win =<< animation win model
       raw <- RawNode <$> toJSVal elm
       ctx <- askJSM
       _ <- forkIO $ threadDelay 1
-           >> shpadoinkle id runParDiff model (threeD . trapper @ToJSON ctx) (pure raw)
+           >> (hoister $ S.drain . S.fromAhead $ S.mapM (liftIO . atomically . onIncoming model) $ updates)
+      _ <- forkIO $ threadDelay 1
+           >> shpadoinkle id runParDiff model ((threeD titledHuman) . trapper @ToJSON ctx) (pure raw)
       return raw
   where
-    vId = "three-view"
+    vId = "three-view" :: T.Text
+
+onIncoming :: (Ord n) => TVar (ControlModel n a) -> (n, a) -> STM ()
+onIncoming m na = modifyTVar m (\x -> x & _1 . #scene %~ (addToScene na))
 
 #ifndef __GHCJS__
 main :: IO ()
@@ -351,8 +383,9 @@ main = runJSorWarp 8080 $ do
   scr <- (\x -> (getScreen x))
          =<< (getDocumentElementUnchecked =<< currentDocumentUnchecked)
   debug @ToJSON scr
+  let ids = [1..(100 :: Int)]
   let objF = grid3D 5 5 25
-  let mod = mkModel scr objF (take 100 $ repeat testText) 
+  let mod = mkModel scr objF (M.fromAscList $ zip ids (repeat testText)) 
   model <- liftIO $ newTVarIO (mod, Nothing)
   _ <- forkIO $ shouldUpdate (\c (m, d) -> do
                                  case d of
@@ -364,7 +397,7 @@ main = runJSorWarp 8080 $ do
                                      return c') (pure 0) model
   _ <- requestAnimationFrame win =<< animation win model
   ctx <- askJSM
-  shpadoinkle id runParDiff model (threeD . trapper @ToJSON ctx) (getBody)
+  shpadoinkle id runParDiff model ((threeD titledHuman) . trapper @ToJSON ctx) (getBody)
 --  . trapper @ToJSON ctx
 
 
