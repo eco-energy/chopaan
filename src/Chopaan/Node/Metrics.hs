@@ -204,16 +204,6 @@ instance (GreskellC a) => FromGraphSON (Node a) where
   parseGraphSON = parseJSON . unwrapAll
 #endif
 
-deriving instance Generic UTCTime
---deriving instance ToJSVal UTCTime
---deriving instance FromJSVal UTCTime
-deriving instance Generic Day
-deriving instance Binary Day
---deriving instance ToJSVal Day
---deriving instance FromJSVal Day
-
---deriving instance ToJSVal DiffTime
---deriving instance FromJSVal DiffTime
 
 
 instance Binary UTCTime

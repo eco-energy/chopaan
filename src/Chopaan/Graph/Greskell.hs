@@ -1,18 +1,19 @@
-{-# LANGUAGE ConstraintKinds, PackageImports, ExplicitForAll #-}
+{-# LANGUAGE ConstraintKinds, PackageImports, ExplicitForAll, StandaloneDeriving, DeriveAnyClass, DeriveGeneric #-}
 module Chopaan.Graph.Greskell where
 
+import GHC.Generics
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Lazy as B
 import qualified "base64" Data.ByteString.Base64 as B
-import Data.Time (UTCTime(..), DiffTime(..))
+import Data.Time (UTCTime(..), DiffTime(..), Day(..))
 --import qualified "base64" Data.Text.Encoding.Base64 as BT
 import Data.Aeson (ToJSON(..), FromJSON(..), parseJSON)
 import qualified Data.Aeson as Aeson
 import qualified Data.Vector as V
 
 import Data.Char (toLower)
-
+import Foreign.Storable.Generic
 import Data.Maybe
 import Data.Either
 import Data.Greskell
@@ -93,3 +94,18 @@ instance FromGraphSON UTCTime where
 
 instance FromGraphSON DiffTime where
   parseGraphSON = parseJSON . unwrapOne
+
+
+deriving instance Generic UTCTime
+deriving instance Generic Day
+deriving instance Binary Day
+
+-- deriving instance GStorable T.Text
+
+-- deriving instance GStorable Bool
+
+-- deriving instance (GStorable a) => (GStorable (Maybe a))
+
+-- deriving instance GStorable UTCTime
+
+

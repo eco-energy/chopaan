@@ -43,6 +43,7 @@ import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
 import Shpadoinkle.Widgets.Types (Humanize(..))
 
 import Data.Time (UTCTime(..), fromGregorian)
+import Foreign.Storable.Generic
 
 #ifndef ghcjs_HOST_OS
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
@@ -88,7 +89,6 @@ instance LinkAttributes RxSignal where
 
 data MeshLink = MeshLink
   deriving (Eq, Show, Ord, Generic, ToJSON, FromJSON, NFData)
-
 
 newtype NodeVersion = NodeVersion (Text)
   deriving (Eq, Ord, Show, Generic)
