@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies, DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies, DeriveGeneric, StandaloneDeriving, DeriveAnyClass, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances #-}
 module Chopaan.Comm.S3 where
 
 import Lens.Micro
@@ -6,7 +6,10 @@ import Lens.Micro
 import GHC.Generics
 import Control.Applicative
 import Control.Monad.IO.Class
+import Control.Monad.Base
+import Control.Monad.Trans.Control
 import Control.Monad.Trans.AWS
+import Control.Monad.Catch
 import Control.Arrow
 import Data.Conduit.Combinators (sinkLazy)
 
@@ -14,6 +17,7 @@ import Data.List (sort)
 import qualified Data.Text as T
 import Data.Maybe
 import Data.Either
+import Data.Void
 import qualified Data.Time as Time
 import qualified Data.Time.Clock.POSIX as TP
 import Network.AWS.S3 (s3)
@@ -34,9 +38,9 @@ import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStat
 
 
 import qualified Streamly.Prelude as S
-import Streamly (IsStream, MonadAsync, adapt)
-import qualified Streamly as S
-import Streamly.Internal.Data.Stream.StreamK (hoist)
+import Streamly.Prelude (IsStream, MonadAsync, adapt)
+import qualified Streamly.Internal.Data.Unfold as UF
+import qualified Streamly.Internal.Data.Stream.IsStream  as S
 import Control.Monad.Trans.Resource
 
 import System.IO
@@ -45,8 +49,6 @@ import Chopaan.Comm.Address
 import Chopaan.Comm.Dispatch
 import Chopaan.Kibbutz.Kibbutz
 
-inS3Context :: Logger -> AWST' Env (ResourceT IO) b -> IO b
-inS3Context l x = inAwsContext l s3 x  
 
 toNodeMAC :: S3.ObjectKey -> Maybe (NodeMAC, Time.UTCTime)
 toNodeMAC (S3.ObjectKey txt) = do
@@ -58,100 +60,61 @@ toNodeMAC (S3.ObjectKey txt) = do
 cleanMAC :: T.Text -> Maybe (T.Text, T.Text)
 cleanMAC = Just . (T.breakOnEnd ("/")) . (T.replace " " "")
 
-toMeshframe :: BS.ByteString -> (Either String MeshFrame)
-toMeshframe = decodeMessage
-
-
-downloadFromKey :: (MonadAsync m) => Logger
-               -> S3.BucketName
-               -> S3.ObjectKey
-               -> m ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame)
-downloadFromKey l bucket n = do 
-                mf <- (pure . toMeshframe =<< readObject l bucket n)
-                return $ ((nodeMAC, nodeTime), mf)
+downloadMF :: forall m. (MonadIO m, MonadCatch m)
+                => Env
+                -> S3.BucketName
+                -> S3.ObjectKey
+                -> m ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame)
+downloadMF env bucket n = do
+                mf <- liftIO $ withAwsEnv env (readObject bucket n)
+                return $ ((nodeMAC, nodeTime), decodeMessage mf)
   where
     nt = toNodeMAC n
     nodeMAC = fmap fst nt
     nodeTime = fmap snd nt
 
-readObject :: (MonadIO m) => Logger -> S3.BucketName -> S3.ObjectKey -> m BS.ByteString
-readObject l bucket k = liftIO . (inS3Context l) $ do
+readObject :: forall m. (MonadIO m, MonadCatch m)
+           => S3.BucketName -> S3.ObjectKey -> AWST' Env (ResourceT m) BS.ByteString
+readObject bucket k = do
       x <- send $ S3.getObject bucket k
       BS.concat . LBS.toChunks <$> (x ^. S3.gorsBody) `sinkBody` sinkLazy
 
-        
-listObjects :: forall t m. (IsStream t, MonadAsync m)
-              => Logger
-              -> S3.BucketName
-              -> Maybe T.Text
-              -> Maybe S3.ObjectKey
-              -> t m (S3.ListObjectsV2Response)
-listObjects l bucket prefix startAfter = hoist (liftIO . inS3Context l) $
-                     S.asyncly $ S.unfold pageUF $ S3.listObjectsV2 bucket
-                                     & S3.lovPrefix .~ prefix
-                                     & S3.lovStartAfter .~ (fmap unObject startAfter)
-  where
-    unObject (S3.ObjectKey k) = k
 
-s3Paths :: forall t m. (IsStream t, MonadAsync m)
-        => Logger
-        -> S3.BucketName
-        -> Maybe T.Text
-        -> Maybe S3.ObjectKey
-        -> t m (S3.ObjectKey)
-s3Paths l bucket prefix startAfter =
-  S.concatMapWith S.parallel sortConsume
-   S.|$ fmap (((^. S3.oKey) <$>) . (^. S3.lovrsContents))
-   S.|$ listObjects l bucket prefix startAfter
-  where
-    -- S.|$ S.trace (liftIO . print) 
-    comparator = (\a b -> fromMaybe EQ $ liftA2 compare (x a) (x b) )
-    sortConsume :: (Ord a) => [a] -> t m a
-    sortConsume = (S.fromList . sort)
-    x = fmap snd . toNodeMAC
-
-s3frames :: forall t m. (IsStream t, MonadAsync m)
-         => Logger
-         -> S3.BucketName
-         -> t m (S3.ObjectKey)
-         -> t m (S3.ObjectKey, ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame))
-s3frames l bucket = S.mapM (\p -> ((\x -> return (p, x)) =<< (downloadFromKey l bucket p)))
-
+s3Paths :: forall m. (MonadIO m, MonadCatch m)
+        => UF.Unfold (AWST' Env (ResourceT m)) S3.ListObjectsV2 (S3.ObjectKey)
+s3Paths = let
+  plist = UF.map (((^. S3.oKey) <$>) . (^. S3.lovrsContents)) pageUF
+  in UF.many plist UF.fromList
 
 
 s3Prefix :: (Address n) => n -> Maybe T.Text
 s3Prefix = Just . stateTopic
 
 
-
-data S3Meshframe = S3Meshframe
-  { mfMAC :: NodeMAC
-  , objectKey :: S3.ObjectKey
-  , createdOn :: Maybe Time.UTCTime
-  , mf :: Either EnergyState RuntimeStats
-  } deriving (Eq, Ord, Show, Generic)
-
-
-nodeS3 :: forall t m. (IsStream t, MonadAsync m) => Logger
-       -> S3.BucketName
+nodeS3 :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
+       => S3.BucketName
        -> NodeMAC
        -> Maybe S3.ObjectKey
        -> t m (S3.ObjectKey, ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats))
-nodeS3 l bucket n startAfter = (process . (s3frames l bucket))
-                               S.|$ s3Paths l bucket (s3Prefix n) startAfter
+nodeS3 bucket n startAfter = S.concatM $ do
+  env <- getAwsEnv s3
+  let paths = adapt $ S.hoist (liftIO . withAwsEnv env) $ S.unfold s3Paths req
+      mfs = S.mapM (\p -> ((\x -> return (p, x)) =<< (downloadMF env bucket p))) paths
+  return $ process mfs
   where
-    process :: forall t m x. (IsStream t, MonadAsync m)
-      => t m (x, ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame))
-      -> t m (x, ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats))
-    process = -- S.map (second (fromRight undefined))
-              -- . S.filter (isRight . snd)
-              S.map (second . second $ throwMFError)
+    unObject (S3.ObjectKey k) = k
+    req = S3.listObjectsV2 bucket
+          & S3.lovPrefix .~ (s3Prefix n)
+          & S3.lovStartAfter .~ (fmap unObject startAfter)
+    process :: forall n x. (MonadAsync n) => t n (x, ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame))
+           -> t n (x, ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats))
+    process = S.mapM (pure . (second . second $ throwMFError))
               . S.filter (isRight . snd . snd)
               . unpackMAC
       where
-        unpackMAC :: t m (x, ((Maybe a, Maybe c), b))
-                  -> t m (x, ((a, Maybe c), b))
-        unpackMAC = S.map (second . first . first $ fromJust)
+        unpackMAC :: t n (x, ((Maybe a, Maybe c), b))
+                  -> t n (x, ((a, Maybe c), b))
+        unpackMAC = S.mapM (pure . (second . first . first $ fromJust))
                     . S.filter (isJust . fst . fst . snd)
         throwMFError :: Either String MeshFrame -> (Either EnergyState RuntimeStats)
         throwMFError m' = case m' of
