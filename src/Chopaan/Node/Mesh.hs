@@ -43,7 +43,7 @@ import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
 import Shpadoinkle.Widgets.Types (Humanize(..))
 
 import Data.Time (UTCTime(..), fromGregorian)
-import Foreign.Storable.Generic
+--import Foreign.Storable.Generic
 
 #ifndef ghcjs_HOST_OS
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))
