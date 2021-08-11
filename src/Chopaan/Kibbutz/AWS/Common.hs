@@ -27,7 +27,8 @@ import qualified Streamly.Prelude as S
 
 type AWSC b = AWST' Env (ResourceT IO) b
 
-e = FromEnv "AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY" Nothing (Just "ap-southeast-1")
+e = FromFile "default" "/run/keys/aws-creds"
+  --FromEnv "AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY" Nothing (Just "ap-southeast-1")
 
 inAwsContext :: Logger -> Service -> AWSC b -> IO b
 inAwsContext lgr svc ma = do
