@@ -13,7 +13,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Vector as V
 
 import Data.Char (toLower)
-import Foreign.Storable.Generic
 import Data.Maybe
 import Data.Either
 import Data.Greskell

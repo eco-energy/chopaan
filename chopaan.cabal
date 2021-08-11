@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a6d6f799eba2be7db7c478a01c7d058464167d1594ac0161f7578e0fe35c1cf9
+-- hash: 14f583351e7fc0d5642f74b83f592af463b028266a9a88883d366ea56f625ee4
 
 name:           chopaan
 version:        0.1.0.0
@@ -77,7 +77,6 @@ library
     , dependent-map
     , dependent-sum
     , dependent-sum-template
-    , derive-storable
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -353,7 +352,6 @@ executable dev
     , dependent-map
     , dependent-sum
     , dependent-sum-template
-    , derive-storable
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -499,7 +497,6 @@ executable kbtzim
     , dependent-map
     , dependent-sum
     , dependent-sum-template
-    , derive-storable
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -644,7 +641,6 @@ executable server
     , dependent-map
     , dependent-sum
     , dependent-sum-template
-    , derive-storable
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -790,7 +786,6 @@ executable ui
     , dependent-map
     , dependent-sum
     , dependent-sum-template
-    , derive-storable
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
@@ -953,7 +948,6 @@ test-suite chopaan-test
     , dependent-map
     , dependent-sum
     , dependent-sum-template
-    , derive-storable
     , diagrams-contrib >=1.4.4
     , diagrams-lib
     , diagrams-svg >=1.4.3
