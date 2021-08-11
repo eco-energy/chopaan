@@ -142,7 +142,7 @@ homePage k = H.div
           H.a ([ H.onClickM_ . navigate @(SPA m) $ RKibbutzim ]) ["Add Kibbutz"]
           ]
       , H.div (headingBox <> boxingCss) [
-          H.a ([ H.onClickM_ . navigate @(SPA m) $ RGraph (KbtzId "test") ]) ["View Kibbutzim"]
+          H.a ([ H.onClickM_ . navigate @(SPA m) $ RGraph (KbtzId "Lab_TestGrid") ]) ["View Kibbutzim"]
           ]
       , H.div (headingBox <> boxingCss) [
           H.div [ H.class' "input-group"
