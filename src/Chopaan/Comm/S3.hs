@@ -165,8 +165,8 @@ nodeS3 :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
 nodeS3 bucket (startT, endT) n startAfter = S.concatM $ do
   env <- getAwsEnv s3
   let prefixes = S.uniq $ prefixRange Hour startT endT
-      pathT t = S.maxRate 100 $ adapt $ S.hoist (liftIO . withAwsEnv env) $ S.unfold s3Paths (req t)
-      paths = S.maxRate 100 $ S.concatMapWith S.ahead pathT prefixes
+      pathT t = adapt $ S.hoist (liftIO . withAwsEnv env) $ S.maxRate 10 $ S.unfold s3Paths (req t)
+      paths = S.maxRate 10 $ S.concatMapWith S.ahead pathT prefixes
       ts = S.mapM (\p -> do
                       let
                         nt = toNodeMAC p
@@ -174,7 +174,7 @@ nodeS3 bucket (startT, endT) n startAfter = S.concatM $ do
                         nodeTime = fmap snd nt
                       return (p, (nodeMAC, nodeTime)))
            paths
-      mfs = S.maxRate 100 $
+      mfs = S.maxRate 10 $
             S.tapRate 10 (liftIO . (print . (prefix <>) . show)) $ S.mapM (\(p, (n', t)) -> do
                        mf <- downloadMF env bucket p
                        return (p, ((n', t), mf))

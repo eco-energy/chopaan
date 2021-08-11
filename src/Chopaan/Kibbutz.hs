@@ -15,6 +15,7 @@ import Control.Monad.IO.Class
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.STM
+import Control.Monad.IO.Unlift
 import Control.Concurrent.STM.TVar
 import qualified Data.Map as M
 import Data.Maybe
@@ -54,7 +55,9 @@ import Chopaan.Utils.Time
 import Chopaan.Comm.Mqtt (runMqtt)
 import Chopaan.Comm.S3
 import Chopaan.Comm.Comm (MessageQs(..)
+                         , Address(..)
                          , mkCallback
+                         , mkCallback'
                          , PubQueue
                          , unfoldChan
                          , initMessageQs
@@ -62,28 +65,29 @@ import Chopaan.Comm.Comm (MessageQs(..)
 import Chopaan.Graph.Kbtz
 import Chopaan.Graph
 import Data.Time
+import Data.Text (pack)
 
 type S3Opts = BucketName
 type ChannelOpts = (MessageQs NodeMAC)
 
--- instance Eq ChannelOpts where
---   _ == _ = False
+instance Eq (MessageQs n) where
+  (==) = const (const False)
 
--- instance Ord ChannelOpts where
---   _ <= _ = False
+instance Ord (MessageQs n) where
+  (<=) = const (const False)
 
--- instance Show ChannelOpts where
---   show _ = "SomeChannelOpt"
+instance Show (MessageQs n) where
+  show = const "SomeQueue"
 
 data KbtzC n = KbtzC
   { name :: KbtzName
   , nodes :: [n]
-  , channelOpts :: Maybe MQTTOpts
+  , channelOpts :: Either MQTTOpts (MessageQs n)
   , s3Opts :: Maybe S3Opts
   } deriving (Eq, Ord, Show, Generic)
 
 
-mkKbtzConf :: KbtzName -> [n] -> Maybe MQTTOpts -> Maybe S3Opts -> KbtzC n
+mkKbtzConf :: KbtzName -> [n] -> Either MQTTOpts (MessageQs n) -> Maybe S3Opts -> KbtzC n
 mkKbtzConf = KbtzC
 
 qSrc :: forall t m n. (KbtzConn t m n)
@@ -94,18 +98,6 @@ qSrc (MessageQs{stateChan, statsChan, outbox}) = do
   rk <- unfoldChan statsChan
   return $ (sk, rk, outbox)
 
-
---xx :: forall m. (MonadAsync m) => S.SerialT m (Int, Int) -> m (A.Array (Int, Int))
---xx s = S.fold A.write s
-
-twoSrc :: (KbtzConn t m n)
-  => MessageQs n
-  -> MessageQs n
-  -> m (t m (n, EnergyState), t m (n, RuntimeStats), PubQueue)
-twoSrc q q' = do
-  (e, r, _) <- qSrc q
-  (e', r', p') <- qSrc q'
-  return $ (e `S.parallel` e', r `S.parallel` r', p')
 
 
 type S3S (t :: (* -> *) -> * -> *) m a b = t m ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, a) (NodeMAC, b))
@@ -118,7 +110,7 @@ s3Stream :: (IsStream t, MonadAsync m, MonadCatch m)
          -> S3S t m EnergyState RuntimeStats
 s3Stream bucket ns range = S.tapRate 10 (liftIO . (print . (prefix <>) . show))
                            $ S.mapM (pure . (second f) . align)
-                           $ S.maxRate 100
+                           $ S.maxRate 10
                            $ S.concatMapWith S.async (uncurry (nodeS3 bucket range))
                            $ S.fromList ns
   where
@@ -136,6 +128,19 @@ mqttQs qs opts name ns = do
   lg <- liftIO $ newLogger Info stdout
   (liftIO $ withMqttAuth lg name
     (runMqtt name ns qs mkCallback opts))
+
+mqttStreams :: (IsStream t, MonadAsync m, MonadUnliftIO m, Address n)
+  => MessageQs n
+  -> MQTTOpts
+  -> KbtzName
+  -> [n]
+  -> m (() -> m (), (t m (n, EnergyState), t m (n, RuntimeStats)))
+mqttStreams qs opts name ns = do
+  (cb, (es, rs))<- mkCallback'
+  lg <- liftIO $ newLogger Info stdout
+  let c () = (liftIO $ withMqttAuth lg name
+              (runMqtt name ns qs (const cb) opts))
+  return (c, (es, rs))
 
 --mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOpts
 --  -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
@@ -161,12 +166,17 @@ type KbtzScene n = Either (GridScene n) (MeshScene n)
 runKibbutz :: forall t. (IsStream t) => KbtzC NodeMAC -> GraphM (t GraphM (KbtzScene NodeMAC))
 runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
   -- Live Data
-  let mqopts = fromMaybe (error "error! Run Kibbutz MUST Have an MQTTOpts passed in!") channelOpts
   liftIO . print $ show kc
-  qs <- liftIO initMessageQs
-  liftIO . forkIO $ mqttQs qs mqopts name nodes
-  (es, rs, outbox) <- qSrc @t qs
-  -- Folds
+  t0 <- liftIO $ getCurrentTime 
+  (es, rs, outbox) <- case channelOpts of
+    (Left mqopts) -> do
+      qs <- liftIO initMessageQs
+      (mqclient, (es, rs)) <- mqttStreams qs mqopts (fmap (<> "_" <> (pack . show $ t0)) name) nodes
+      mq <- toIO $ mqclient ()
+      liftIO . forkIO $ mq
+      return (es, rs, (outbox qs))
+    (Right qs) -> qSrc qs  
+  
   gridFold <- withSpider $ saveTx name
   meshFold <- withSpider addMeshNode
   -- Stream Processors that run Folds

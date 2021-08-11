@@ -357,8 +357,7 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
 
 
 transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
-transactionPlanner timeHorizon = FL.foldl' (\_ -> const Nothing) (mempty)
-  --FL.foldlM' (\_ n -> txn timeHorizon n) (pure mempty)
+transactionPlanner timeHorizon = FL.foldlM' (\_ n -> txn timeHorizon n) (pure mempty)
   
 {-# INLINE transactionPlanner#-}
 

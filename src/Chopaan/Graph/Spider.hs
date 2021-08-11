@@ -32,6 +32,7 @@ import Control.Monad.Trans.Reader hiding (ask)
 import Control.Monad.Trans.Control
 import Control.Monad.Base
 import Control.Monad.Catch
+import Control.Monad.IO.Unlift
 
 import Chopaan.Node.NodeId
 import Chopaan.Node.Metrics hiding (Timestamp)
@@ -89,7 +90,7 @@ runSpider c a = liftIO $ runReaderT (runSpiderM a) c
 newtype SpiderM a = SpiderM { runSpiderM :: ReaderT (Spools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO,
                     MonadThrow, MonadCatch, MonadReader (Spools),
-                    MonadBase IO, MonadBaseControl IO)
+                    MonadBase IO, MonadBaseControl IO, MonadUnliftIO)
 
 
 type SpiderConn n v e = (SpiderNodeId n, NodeAttributes v, LinkAttributes e, Show n, Show v, Show e)

@@ -22,7 +22,7 @@ import           Control.Monad.Reader.Class
 import           Control.Monad.Catch
 import           Control.Monad.Base
 import           Control.Monad.Trans.Control
-
+import           Control.Monad.IO.Unlift
 
 import           Data.Proxy
 
@@ -60,7 +60,7 @@ import Chopaan.View (view, template, onRouteChange)
 
 newtype App a = App { runApp :: ReaderT TinkerConf IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader TinkerConf,
-                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
+                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch, MonadUnliftIO)
 
 
 appToHandler :: MonadIO m => TinkerConf -> App ~> m

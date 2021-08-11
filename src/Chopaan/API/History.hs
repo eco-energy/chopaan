@@ -169,7 +169,7 @@ createKbtzWithHydration k ns t t' = do
                      mapM_ (addNodeToKbtz c k) ns
                  )
   b <- s3Bucket <$> ask
-  hydrateKbtz (KbtzC k ns Nothing (Just b)) (t, t')
+  hydrateKbtz (KbtzC k ns undefined (Just b)) (t, t')
 
 hoistS :: forall t m. (IsStream t, MonadAsync m) => String -> Int -> (t GraphM) ~> (t m) 
 hoistS h p = adapt . S.hoist (runGraphM h p) . adapt

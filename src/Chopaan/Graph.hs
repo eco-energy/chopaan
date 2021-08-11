@@ -29,7 +29,7 @@ import Control.Monad.Reader.Class
 import Control.Monad.Catch
 import Control.Monad.Base
 import Control.Monad.Trans.Control
-
+import Control.Monad.IO.Unlift
 import Chopaan.Graph.Spider
 import Chopaan.Graph.Kbtz
 import Network.Greskell.WebSocket (Client)
@@ -44,7 +44,7 @@ import Chopaan.Graph.G
 #ifndef ghcjs_HOST_OS
 newtype GraphM a = GraphM { runGraphM' :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
-                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch)
+                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch, MonadUnliftIO)
 
 runGraphM :: MonadIO m => String -> Int -> GraphM ~> m
 runGraphM h p a = liftIO $ runReaderT (runGraphM' a) =<< (mkDBPools h p)
