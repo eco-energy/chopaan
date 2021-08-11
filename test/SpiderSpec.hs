@@ -56,8 +56,8 @@ import Data.Pool
     
 spec :: Spec
 spec = do
-  --kbtzSpec
-  hydrationSpec
+  kbtzSpec
+  --hydrationSpec
 
 kbtzSpec = do
   let
@@ -126,7 +126,7 @@ kbtzSpec = do
         qs <- initQs
         k <- runKibbutzM spiderHost spiderPort KbtzC { name = kId
                                                      , nodes = ns
-                                                     , channelOpts = qs
+                                                     , channelOpts = (Right qs)
                                                      , s3Opts = Nothing
                 }
         let ns' = S.fromList $ cycle ns
@@ -164,7 +164,7 @@ hydrationSpec = describe "hydration tests" $ do
     qs <- initQs
     h <- hydrateKbtzM "localhost" 8182 KbtzC { name = KbtzId "labKbtz"
                                              , nodes = labNodes
-                                             , channelOpts = qs
+                                             , channelOpts = Right qs
                                              , s3Opts = Just s3op
                                              } (t0, tn)
           --h = s3Stream (zip labNodes (repeat Nothing)) s3op
@@ -198,28 +198,6 @@ snapDebug snapfn sp ns t0 tn = do
 data ESType = Source | Sink deriving (Eq, Ord, Show, Bounded, Enum)
 
 data RSType = Root | Child deriving (Eq, Ord, Show, Bounded, Enum)
-
--- hydrateKbtz :: (IsStream t) => KbtzName -> [NodeMAC] -> Int -> Int -> GraphM (t GraphM Bool)
--- hydrateKbtz kId ns nNodes nMessages = do
---     es <- do
---       xs'' <- mapM (\i ->
---                       orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
---               $ [1..nNodes]
---       return $ foldl S.wSerial S.nil xs''
---     rs <- do
---       xs'' <- mapM (\i ->
---                       orderedRS (if (i == 1) then Root else Child) nMessages (head ns))
---               $ [1..nNodes]
---       return $ foldl S.wSerial S.nil xs''
---     qs <- liftIO $ initQs
---     let ns' = S.fromList $ cycle ns
---     S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
---     S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
---     runKibbutz KbtzC { name = kId
---                      , nodes = ns
---                      , channelOpts = qs
---                      , s3Opts = Nothing
---                      }
 
 
 orderedES :: ESType -> Int -> IO (S.Serial NM.EnergyState)

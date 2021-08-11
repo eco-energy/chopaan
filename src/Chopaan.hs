@@ -48,10 +48,10 @@ runKbtzim mq = do
     t0 = Ti.UTCTime (Ti.fromGregorian 2021 3 1) (Ti.secondsToDiffTime 0)
     tn = Ti.UTCTime (Ti.fromGregorian 2021 8 12) (Ti.secondsToDiffTime 0)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
-                                , nodes = ns
-                                , channelOpts = Just mq
-                                , s3Opts = Just (BucketName "dosti-datastream")
-                                }
+                          , nodes = ns
+                          , channelOpts = Left mq
+                          , s3Opts = Just (BucketName "dosti-datastream")
+                          }
 
 
 run :: RIO App ()

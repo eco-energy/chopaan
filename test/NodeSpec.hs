@@ -3,6 +3,7 @@
 
 module NodeSpec (spec) where
 
+import Common
 import Chopaan.Node.Metrics
 import Test.Hspec
 import Test.QuickCheck.Classes
@@ -45,22 +46,22 @@ import Numeric.Compensated
 instance (Eq a) => EqProp (Node a) where
   a =-= b = eq a b
 
-instance (Arbitrary v) => Arbitrary (Node v) where
-  arbitrary = genericArbitrary
-  shrink = genericShrink
+-- instance (Arbitrary v) => Arbitrary (Node v) where
+--   arbitrary = genericArbitrary
+--   shrink = genericShrink
 
-instance (Arbitrary e, Arbitrary p) => Arbitrary (Battery e p) where
-  arbitrary = genericArbitrary
-  shrink = genericShrink
+-- instance (Arbitrary e, Arbitrary p) => Arbitrary (Battery e p) where
+--   arbitrary = genericArbitrary
+--   shrink = genericShrink
+
+-- -- instance (Arbitrary e, Arbitrary p) => Arbitrary (SensorMetrics e p) where
+-- --   arbitrary = genericArbitrary
+-- --   shrink = genericShrink
+
 
 -- instance (Arbitrary e, Arbitrary p) => Arbitrary (SensorMetrics e p) where
 --   arbitrary = genericArbitrary
 --   shrink = genericShrink
-
-
-instance (Arbitrary e, Arbitrary p) => Arbitrary (SensorMetrics e p) where
-  arbitrary = genericArbitrary
-  shrink = genericShrink
 
 spec :: Spec
 spec = do
