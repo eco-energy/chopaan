@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, CPP, TypeFamilies, MultiParamTypeClasses, FlexibleInstances, UndecidableInstances, FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables, CPP, TypeFamilies, MultiParamTypeClasses, FlexibleInstances, UndecidableInstances, FlexibleContexts, OverloadedStrings #-}
 module Chopaan.Kibbutz.AWS.Common
   ( inAwsContext
   , pageUF
@@ -29,7 +29,7 @@ type AWSC b = AWST' Env (ResourceT IO) b
 
 inAwsContext :: Logger -> Service -> AWSC b -> IO b
 inAwsContext lgr svc ma = do
-  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure svc  
+  env <- newEnv (FromProfile "chopaanRole") <&> set envLogger lgr . set envRegion Singapore <&> configure svc  
   runResourceT . runAWST env $ ma
 
 withAwsEnv :: Env -> AWSC b -> IO b
@@ -38,7 +38,7 @@ withAwsEnv env ma = runResourceT . runAWST env $ ma
 getAwsEnv :: (MonadIO m, MonadCatch m) => Service -> m Env
 getAwsEnv svc = do
   lgr <- newLogger Info stdout
-  env <- newEnv Discover <&> set envLogger lgr . set envRegion Singapore <&> configure svc
+  env <- newEnv (FromProfile "chopaanRole") <&> set envLogger lgr . set envRegion Singapore <&> configure svc
   return env
   
 pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)
