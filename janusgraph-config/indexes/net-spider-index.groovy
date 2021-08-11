@@ -48,13 +48,16 @@ if(mg.getGraphIndex("byNodeId") == null) {
     if(kbtz_id == null) {
         kbtz_id = mg.makePropertyKey("@kbtz_id").dataType(String.class).make();
     }
+    ntype = mg.getPropertyKey("@node_type");
+    if(ntype == null) {
+        ntype = mg.makePropertyKey("@node_type").dataType(String.class).make();
+    }
 
     println("--- get hh_id");
     hh_id = mg.getPropertyKey("@hh_id");
     if(hh_id == null) {
         hh_id = mg.makePropertyKey("@hh_id").dataType(String.class).make();
     }
-
 
     println("--- get node_id");
     node_id = mg.getPropertyKey("@node_id");
@@ -93,7 +96,9 @@ if(mg.getGraphIndex("byNodeId") == null) {
     mg.buildIndex("byTxNode", Vertex.class).addKey(tx_node).buildCompositeIndex();
     mg.buildIndex("byStatusNode", Vertex.class).addKey(status_node).buildCompositeIndex();
     mg.buildIndex("byKbtzId", Vertex.class).addKey(kbtz_id).buildCompositeIndex();
-    mg.buildIndex("byHHId", Vertex.class).addKey(hh_id).buildCompositeIndex();  
+    mg.buildIndex("byHHId", Vertex.class).addKey(hh_id).buildCompositeIndex();
+    mg.buildIndex("byType", Vertex.class).addKey(ntype).buildCompositeIndex();
+
 
     println("--- commit");
     mg.commit();

@@ -124,24 +124,30 @@ parseRTSToNode rts = m
       { isRoot = (rts ^? N.isRoot)
       , uptime = (fromIntegral $ rts ^. N.uptime)
       , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
-      , version = (Just . NodeVersion $ rts ^. N.version)
+      , version = (NodeVersion <$> rts ^? N.version)
       , nodeTime = utcTimeNow $ rts ^. N.cpuTime
   }
 {-# INLINE parseRTSToNode #-}
 
 parseRxSignal :: N.RuntimeStats -> RxSignal
 parseRxSignal rts = RxSignal
-                    (Just . fromIntegral $ rts ^. N.meshParentStrength)
-                    (Just . NodeId $ rts ^. N.parent ^. N.macAddr)
+                    (fromIntegral <$> rts ^? N.meshParentStrength)
+                    (NodeId <$> rts ^? N.parent . N.macAddr)
 {-# INLINE parseRxSignal #-}
 
-meshNodeLink :: N.RuntimeStats -> (MeshNode, RxSignal)
-meshNodeLink rts = (parseRTSToNode rts, parseRxSignal rts)
+meshNodeLink :: NodeMAC -> N.RuntimeStats -> (MeshNode, RxSignal)
+meshNodeLink kn rts = (parseRTSToNode rts, rx')
+  where
+    rx = parseRxSignal rts
+    rx' = case parent rx of
+      Nothing -> rx { parent = Just kn }
+      Just (NodeId "") -> rx { parent = Just kn }
+      Just (NodeId _) -> rx
 {-# INLINE meshNodeLink #-}
 
 
-meshF :: forall m. (Monad m) => FL.Fold m (N.RuntimeStats) (MeshNode, RxSignal)
-meshF = FL.mkFold_ (\_ r -> FL.Partial $ meshNodeLink $ r) (FL.Partial (initMeshNode, noSignal))
+meshF :: forall m. (Monad m) => NodeMAC -> FL.Fold m (N.RuntimeStats) (MeshNode, RxSignal)
+meshF n = FL.mkFold_ (\_ r -> FL.Partial $ meshNodeLink n $ r) (FL.Partial (initMeshNode, noSignal))
 {-# INLINE meshF #-}
 
 

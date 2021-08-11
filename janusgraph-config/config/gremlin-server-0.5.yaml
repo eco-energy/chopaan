@@ -92,3 +92,5 @@ writeBufferLowWaterMark: 32768
 writeBufferHighWaterMark: 131072
 threadPoolWorker: 2
 gremlinPool: 0
+idleConnectionTimeout: 2000
+

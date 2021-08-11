@@ -17,8 +17,8 @@ module Proto.NodeMessageSchema.NodeMessages
         _MeshFrame'MeshConf, _MeshFrame'OtaConf, _MeshFrame'Meshversion,
         _MeshFrame'Parent, _MeshFrame'Child, _MeshFrame'ForcedActions,
         _MeshFrame'Otastatus, _MeshFrame'NodeTxRequest, NodeAddr(),
-        NodeControl(), OTAConfig(), PDirection(..), PDirection(),
-        PDirection'UnrecognizedValue, PVParameters(),
+        NodeControl(), NodeQueueGauge(), OTAConfig(), PDirection(..),
+        PDirection(), PDirection'UnrecognizedValue, PVParameters(),
         ReconciliationChild(), ReconciliationParent(), RuntimeStats(),
         SetVersion(), StreamState(..), StreamState(),
         StreamState'UnrecognizedValue, Transaction(),
@@ -3262,6 +3262,218 @@ instance Control.DeepSeq.NFData NodeControl where
                           (())))))
 {- | Fields :
 
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.serialOutboxQc' @:: Lens' NodeQueueGauge Data.Word.Word32@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.serialInboxQc' @:: Lens' NodeQueueGauge Data.Word.Word32@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.meshOutboxQc' @:: Lens' NodeQueueGauge Data.Word.Word32@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.meshInboxQc' @:: Lens' NodeQueueGauge Data.Word.Word32@
+ -}
+data NodeQueueGauge = NodeQueueGauge{_NodeQueueGauge'serialOutboxQc
+                                     :: !Data.Word.Word32,
+                                     _NodeQueueGauge'serialInboxQc :: !Data.Word.Word32,
+                                     _NodeQueueGauge'meshOutboxQc :: !Data.Word.Word32,
+                                     _NodeQueueGauge'meshInboxQc :: !Data.Word.Word32,
+                                     _NodeQueueGauge'_unknownFields :: !Data.ProtoLens.FieldSet}
+                        deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show NodeQueueGauge where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField NodeQueueGauge
+           "serialOutboxQc"
+           (Data.Word.Word32)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _NodeQueueGauge'serialOutboxQc
+               (\ x__ y__ -> x__{_NodeQueueGauge'serialOutboxQc = y__}))
+              Prelude.. Prelude.id
+instance Data.ProtoLens.Field.HasField NodeQueueGauge
+           "serialInboxQc"
+           (Data.Word.Word32)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _NodeQueueGauge'serialInboxQc
+               (\ x__ y__ -> x__{_NodeQueueGauge'serialInboxQc = y__}))
+              Prelude.. Prelude.id
+instance Data.ProtoLens.Field.HasField NodeQueueGauge
+           "meshOutboxQc"
+           (Data.Word.Word32)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _NodeQueueGauge'meshOutboxQc
+               (\ x__ y__ -> x__{_NodeQueueGauge'meshOutboxQc = y__}))
+              Prelude.. Prelude.id
+instance Data.ProtoLens.Field.HasField NodeQueueGauge "meshInboxQc"
+           (Data.Word.Word32)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _NodeQueueGauge'meshInboxQc
+               (\ x__ y__ -> x__{_NodeQueueGauge'meshInboxQc = y__}))
+              Prelude.. Prelude.id
+instance Data.ProtoLens.Message NodeQueueGauge where
+        messageName _ = Data.Text.pack "NodeQueueGauge"
+        fieldsByTag
+          = let serialOutboxQc__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "serial_outbox_qc"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Optional
+                         (Data.ProtoLens.Field.field @"serialOutboxQc"))
+                      :: Data.ProtoLens.FieldDescriptor NodeQueueGauge
+                serialInboxQc__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "serial_inbox_qc"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Optional
+                         (Data.ProtoLens.Field.field @"serialInboxQc"))
+                      :: Data.ProtoLens.FieldDescriptor NodeQueueGauge
+                meshOutboxQc__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "mesh_outbox_qc"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Optional
+                         (Data.ProtoLens.Field.field @"meshOutboxQc"))
+                      :: Data.ProtoLens.FieldDescriptor NodeQueueGauge
+                meshInboxQc__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "mesh_inbox_qc"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Optional
+                         (Data.ProtoLens.Field.field @"meshInboxQc"))
+                      :: Data.ProtoLens.FieldDescriptor NodeQueueGauge
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, serialOutboxQc__field_descriptor),
+                 (Data.ProtoLens.Tag 2, serialInboxQc__field_descriptor),
+                 (Data.ProtoLens.Tag 3, meshOutboxQc__field_descriptor),
+                 (Data.ProtoLens.Tag 4, meshInboxQc__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _NodeQueueGauge'_unknownFields
+              (\ x__ y__ -> x__{_NodeQueueGauge'_unknownFields = y__})
+        defMessage
+          = NodeQueueGauge{_NodeQueueGauge'serialOutboxQc =
+                             Data.ProtoLens.fieldDefault,
+                           _NodeQueueGauge'serialInboxQc = Data.ProtoLens.fieldDefault,
+                           _NodeQueueGauge'meshOutboxQc = Data.ProtoLens.fieldDefault,
+                           _NodeQueueGauge'meshInboxQc = Data.ProtoLens.fieldDefault,
+                           _NodeQueueGauge'_unknownFields = ([])}
+        parseMessage
+          = let loop ::
+                     NodeQueueGauge ->
+                       Data.ProtoLens.Encoding.Bytes.Parser NodeQueueGauge
+                loop x
+                  = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+                       if end then
+                         do let missing = [] in
+                              if Prelude.null missing then Prelude.return () else
+                                Prelude.fail
+                                  (("Missing required fields: ") Prelude.++
+                                     Prelude.show (missing :: ([Prelude.String])))
+                            Prelude.return
+                              (Lens.Family2.over Data.ProtoLens.unknownFields
+                                 (\ !t -> Prelude.reverse t)
+                                 x)
+                         else
+                         do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                            case tag of
+                                8 -> do y <- (Prelude.fmap Prelude.fromIntegral
+                                                Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                               Data.ProtoLens.Encoding.Bytes.<?> "serial_outbox_qc"
+                                        loop
+                                          (Lens.Family2.set
+                                             (Data.ProtoLens.Field.field @"serialOutboxQc")
+                                             y
+                                             x)
+                                16 -> do y <- (Prelude.fmap Prelude.fromIntegral
+                                                 Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                                Data.ProtoLens.Encoding.Bytes.<?> "serial_inbox_qc"
+                                         loop
+                                           (Lens.Family2.set
+                                              (Data.ProtoLens.Field.field @"serialInboxQc")
+                                              y
+                                              x)
+                                24 -> do y <- (Prelude.fmap Prelude.fromIntegral
+                                                 Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                                Data.ProtoLens.Encoding.Bytes.<?> "mesh_outbox_qc"
+                                         loop
+                                           (Lens.Family2.set
+                                              (Data.ProtoLens.Field.field @"meshOutboxQc")
+                                              y
+                                              x)
+                                32 -> do y <- (Prelude.fmap Prelude.fromIntegral
+                                                 Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                                Data.ProtoLens.Encoding.Bytes.<?> "mesh_inbox_qc"
+                                         loop
+                                           (Lens.Family2.set
+                                              (Data.ProtoLens.Field.field @"meshInboxQc")
+                                              y
+                                              x)
+                                wire -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                                   wire
+                                           loop
+                                             (Lens.Family2.over Data.ProtoLens.unknownFields
+                                                (\ !t -> (:) y t)
+                                                x)
+              in
+              (do loop Data.ProtoLens.defMessage)
+                Data.ProtoLens.Encoding.Bytes.<?> "NodeQueueGauge"
+        buildMessage
+          = (\ _x ->
+               (let _v
+                      = Lens.Family2.view (Data.ProtoLens.Field.field @"serialOutboxQc")
+                          _x
+                  in
+                  if (_v) Prelude.== Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty else
+                    (Data.ProtoLens.Encoding.Bytes.putVarInt 8) Data.Monoid.<>
+                      ((Data.ProtoLens.Encoding.Bytes.putVarInt) Prelude..
+                         Prelude.fromIntegral)
+                        _v)
+                 Data.Monoid.<>
+                 (let _v
+                        = Lens.Family2.view (Data.ProtoLens.Field.field @"serialInboxQc")
+                            _x
+                    in
+                    if (_v) Prelude.== Data.ProtoLens.fieldDefault then
+                      Data.Monoid.mempty else
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 16) Data.Monoid.<>
+                        ((Data.ProtoLens.Encoding.Bytes.putVarInt) Prelude..
+                           Prelude.fromIntegral)
+                          _v)
+                   Data.Monoid.<>
+                   (let _v
+                          = Lens.Family2.view (Data.ProtoLens.Field.field @"meshOutboxQc") _x
+                      in
+                      if (_v) Prelude.== Data.ProtoLens.fieldDefault then
+                        Data.Monoid.mempty else
+                        (Data.ProtoLens.Encoding.Bytes.putVarInt 24) Data.Monoid.<>
+                          ((Data.ProtoLens.Encoding.Bytes.putVarInt) Prelude..
+                             Prelude.fromIntegral)
+                            _v)
+                     Data.Monoid.<>
+                     (let _v
+                            = Lens.Family2.view (Data.ProtoLens.Field.field @"meshInboxQc") _x
+                        in
+                        if (_v) Prelude.== Data.ProtoLens.fieldDefault then
+                          Data.Monoid.mempty else
+                          (Data.ProtoLens.Encoding.Bytes.putVarInt 32) Data.Monoid.<>
+                            ((Data.ProtoLens.Encoding.Bytes.putVarInt) Prelude..
+                               Prelude.fromIntegral)
+                              _v)
+                       Data.Monoid.<>
+                       Data.ProtoLens.Encoding.Wire.buildFieldSet
+                         (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+instance Control.DeepSeq.NFData NodeQueueGauge where
+        rnf
+          = (\ x__ ->
+               Control.DeepSeq.deepseq (_NodeQueueGauge'_unknownFields x__)
+                 (Control.DeepSeq.deepseq (_NodeQueueGauge'serialOutboxQc x__)
+                    (Control.DeepSeq.deepseq (_NodeQueueGauge'serialInboxQc x__)
+                       (Control.DeepSeq.deepseq (_NodeQueueGauge'meshOutboxQc x__)
+                          (Control.DeepSeq.deepseq (_NodeQueueGauge'meshInboxQc x__)
+                             (()))))))
+{- | Fields :
+
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.endpoint' @:: Lens' OTAConfig Data.Text.Text@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.timeOfDay' @:: Lens' OTAConfig Data.Word.Word32@
  -}
@@ -3927,6 +4139,8 @@ instance Control.DeepSeq.NFData ReconciliationParent where
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.parent' @:: Lens' RuntimeStats NodeAddr@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.maybe'parent' @:: Lens' RuntimeStats (Prelude.Maybe NodeAddr)@
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.cpuTime' @:: Lens' RuntimeStats Data.Word.Word64@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.counters' @:: Lens' RuntimeStats NodeQueueGauge@
+    * 'Proto.NodeMessageSchema.NodeMessages_Fields.maybe'counters' @:: Lens' RuntimeStats (Prelude.Maybe NodeQueueGauge)@
  -}
 data RuntimeStats = RuntimeStats{_RuntimeStats'minFreeHeap ::
                                  !Data.Word.Word32,
@@ -3939,6 +4153,7 @@ data RuntimeStats = RuntimeStats{_RuntimeStats'minFreeHeap ::
                                  _RuntimeStats'uptime :: !Data.Word.Word64,
                                  _RuntimeStats'parent :: !(Prelude.Maybe NodeAddr),
                                  _RuntimeStats'cpuTime :: !Data.Word.Word64,
+                                 _RuntimeStats'counters :: !(Prelude.Maybe NodeQueueGauge),
                                  _RuntimeStats'_unknownFields :: !Data.ProtoLens.FieldSet}
                       deriving (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show RuntimeStats where
@@ -4026,6 +4241,21 @@ instance Data.ProtoLens.Field.HasField RuntimeStats "cpuTime"
           = (Lens.Family2.Unchecked.lens _RuntimeStats'cpuTime
                (\ x__ y__ -> x__{_RuntimeStats'cpuTime = y__}))
               Prelude.. Prelude.id
+instance Data.ProtoLens.Field.HasField RuntimeStats "counters"
+           (NodeQueueGauge)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _RuntimeStats'counters
+               (\ x__ y__ -> x__{_RuntimeStats'counters = y__}))
+              Prelude.. Data.ProtoLens.maybeLens Data.ProtoLens.defMessage
+instance Data.ProtoLens.Field.HasField RuntimeStats
+           "maybe'counters"
+           (Prelude.Maybe NodeQueueGauge)
+         where
+        fieldOf _
+          = (Lens.Family2.Unchecked.lens _RuntimeStats'counters
+               (\ x__ y__ -> x__{_RuntimeStats'counters = y__}))
+              Prelude.. Prelude.id
 instance Data.ProtoLens.Message RuntimeStats where
         messageName _ = Data.Text.pack "RuntimeStats"
         fieldsByTag
@@ -4099,6 +4329,13 @@ instance Data.ProtoLens.Message RuntimeStats where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Optional
                          (Data.ProtoLens.Field.field @"cpuTime"))
                       :: Data.ProtoLens.FieldDescriptor RuntimeStats
+                counters__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "counters"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor NodeQueueGauge)
+                      (Data.ProtoLens.OptionalField
+                         (Data.ProtoLens.Field.field @"maybe'counters"))
+                      :: Data.ProtoLens.FieldDescriptor RuntimeStats
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, minFreeHeap__field_descriptor),
@@ -4110,7 +4347,8 @@ instance Data.ProtoLens.Message RuntimeStats where
                  (Data.ProtoLens.Tag 7, version__field_descriptor),
                  (Data.ProtoLens.Tag 8, uptime__field_descriptor),
                  (Data.ProtoLens.Tag 9, parent__field_descriptor),
-                 (Data.ProtoLens.Tag 10, cpuTime__field_descriptor)]
+                 (Data.ProtoLens.Tag 10, cpuTime__field_descriptor),
+                 (Data.ProtoLens.Tag 11, counters__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _RuntimeStats'_unknownFields
               (\ x__ y__ -> x__{_RuntimeStats'_unknownFields = y__})
@@ -4126,6 +4364,7 @@ instance Data.ProtoLens.Message RuntimeStats where
                          _RuntimeStats'uptime = Data.ProtoLens.fieldDefault,
                          _RuntimeStats'parent = Prelude.Nothing,
                          _RuntimeStats'cpuTime = Data.ProtoLens.fieldDefault,
+                         _RuntimeStats'counters = Prelude.Nothing,
                          _RuntimeStats'_unknownFields = ([])}
         parseMessage
           = let loop ::
@@ -4225,6 +4464,16 @@ instance Data.ProtoLens.Message RuntimeStats where
                                                 Data.ProtoLens.Encoding.Bytes.<?> "cpu_time"
                                          loop
                                            (Lens.Family2.set (Data.ProtoLens.Field.field @"cpuTime")
+                                              y
+                                              x)
+                                90 -> do y <- (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                                  Data.ProtoLens.Encoding.Bytes.isolate
+                                                    (Prelude.fromIntegral len)
+                                                    Data.ProtoLens.parseMessage)
+                                                Data.ProtoLens.Encoding.Bytes.<?> "counters"
+                                         loop
+                                           (Lens.Family2.set
+                                              (Data.ProtoLens.Field.field @"counters")
                                               y
                                               x)
                                 wire -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
@@ -4348,8 +4597,29 @@ instance Data.ProtoLens.Message RuntimeStats where
                                       (Data.ProtoLens.Encoding.Bytes.putVarInt 80) Data.Monoid.<>
                                         Data.ProtoLens.Encoding.Bytes.putVarInt _v)
                                    Data.Monoid.<>
-                                   Data.ProtoLens.Encoding.Wire.buildFieldSet
-                                     (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+                                   (case
+                                      Lens.Family2.view
+                                        (Data.ProtoLens.Field.field @"maybe'counters")
+                                        _x
+                                      of
+                                        (Prelude.Nothing) -> Data.Monoid.mempty
+                                        Prelude.Just _v -> (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                              90)
+                                                             Data.Monoid.<>
+                                                             (((\ bs ->
+                                                                  (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                                     (Prelude.fromIntegral
+                                                                        (Data.ByteString.length
+                                                                           bs)))
+                                                                    Data.Monoid.<>
+                                                                    Data.ProtoLens.Encoding.Bytes.putBytes
+                                                                      bs))
+                                                                Prelude..
+                                                                Data.ProtoLens.encodeMessage)
+                                                               _v)
+                                     Data.Monoid.<>
+                                     Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                       (Lens.Family2.view Data.ProtoLens.unknownFields _x))
 instance Control.DeepSeq.NFData RuntimeStats where
         rnf
           = (\ x__ ->
@@ -4364,7 +4634,8 @@ instance Control.DeepSeq.NFData RuntimeStats where
                                       (Control.DeepSeq.deepseq (_RuntimeStats'uptime x__)
                                          (Control.DeepSeq.deepseq (_RuntimeStats'parent x__)
                                             (Control.DeepSeq.deepseq (_RuntimeStats'cpuTime x__)
-                                               (()))))))))))))
+                                               (Control.DeepSeq.deepseq (_RuntimeStats'counters x__)
+                                                  (())))))))))))))
 {- | Fields :
 
     * 'Proto.NodeMessageSchema.NodeMessages_Fields.version' @:: Lens' SetVersion Data.Text.Text@

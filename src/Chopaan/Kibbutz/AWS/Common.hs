@@ -1,7 +1,8 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, CPP, TypeFamilies, MultiParamTypeClasses, FlexibleInstances, UndecidableInstances, FlexibleContexts #-}
 module Chopaan.Kibbutz.AWS.Common
   ( inAwsContext
   , pageUF
+  , pageS
   , newLogger
   , LogLevel (..)
   , AWSC
@@ -11,13 +12,18 @@ module Chopaan.Kibbutz.AWS.Common
   ) where
 
 import Control.Monad.IO.Class
+import Control.Monad.Base
 import Control.Monad.Catch
+import Control.Monad.Trans
 import Control.Monad.Trans.AWS
 import Control.Monad.Trans.Resource
+import Control.Monad.Trans.Resource.Internal
+import Control.Monad.Trans.Control
 import Lens.Micro
 import System.IO (stdout)
 
 import qualified Streamly.Data.Unfold as UF
+import qualified Streamly.Prelude as S
 
 type AWSC b = AWST' Env (ResourceT IO) b
 
@@ -44,3 +50,45 @@ pageUF = UF.lmap Just $ UF.unfoldrM step
       y <- send req
       return $ Just (y, page req y)
 
+pageS :: forall t m a r. (S.IsStream t, S.MonadAsync m, AWSPager a) => Env -> a -> t m (Rs a)
+pageS env req = S.unfoldrM step start
+  where
+    start = Just req
+    step :: (Maybe a) -> m (Maybe (Rs a, Maybe a)) 
+    step Nothing = return Nothing
+    step (Just req') = do
+      y <- liftIO $ withAwsEnv env $ send req'
+      return $ Just (y, page req' y)
+
+
+
+instance MonadBase b m => MonadBase b (ResourceT m) where
+    liftBase = lift . liftBase
+
+instance MonadTransControl ResourceT where
+#if MIN_VERSION_monad_control(1,0,0)
+    type StT ResourceT a = a
+    liftWith f = ResourceT $ \r -> f $ \(ResourceT t) -> t r
+    restoreT = ResourceT . const
+#else
+    newtype StT ResourceT a = StReader {unStReader :: a}
+    liftWith f = ResourceT $ \r -> f $ \(ResourceT t) -> liftM StReader $ t r
+    restoreT = ResourceT . const . liftM unStReader
+#endif
+    {-# INLINE liftWith #-}
+    {-# INLINE restoreT #-}
+
+instance MonadBaseControl b m => MonadBaseControl b (ResourceT m) where
+#if MIN_VERSION_monad_control(1,0,0)
+     type StM (ResourceT m) a = StM m a
+     liftBaseWith f = ResourceT $ \reader' ->
+         liftBaseWith $ \runInBase ->
+             f $ runInBase . (\(ResourceT r) -> r reader'  )
+     restoreM = ResourceT . const . restoreM
+#else
+     newtype StM (ResourceT m) a = StMT (StM m a)
+     liftBaseWith f = ResourceT $ \reader' ->
+         liftBaseWith $ \runInBase ->
+             f $ liftM StMT . runInBase . (\(ResourceT r) -> r reader'  )
+     restoreM (StMT base) = ResourceT $ const $ restoreM base
+#endif

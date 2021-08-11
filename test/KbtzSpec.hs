@@ -2,6 +2,7 @@
 module KbtzSpec (spec) where
 
 import Chopaan.Kibbutz
+import Chopaan.Kibbutz.Transactor (secondF)
 import Chopaan.Kibbutz.KbtzId
 import Streamly
 import qualified Streamly.Prelude as S
@@ -37,13 +38,12 @@ spec = do
   describe "Utilities and such" $ do
     it "turn a fold and a function to an unfold that propagates the fold's accumulator" $ do
       let
-        fl :: forall m. (Monad m) => FL.Fold m (Int, Int) (M.Map Int Int) 
-        fl = FL.demux $ M.fromList [(i, FL.sum) | i <- [(0 :: Int)..9]]
-        is = S.map (\a -> (mod a 10, a)) $ S.enumerateFromTo 0 99
+        fl :: forall m. (Monad m) => FL.Fold m (Int, (Int, Int)) (Int, M.Map Int Int) 
+        fl = secondF $ FL.demux $ M.fromList [(i, FL.sum) | i <- [(0 :: Int)..9]]
+        is = S.map (\a -> (1, (mod a 10, a))) $ S.enumerateFromTo 0 99
       s <- S.fold fl is
-      s' <- S.fold FL.mconcat $ S.concatUnfold (foldUF id fl) is
       --(length s) `shouldBe` (length s')
-      s' `shouldBe` s 
+      s `shouldBe` (1, M.fromList [(0, 0)])
       --trivial
 
 

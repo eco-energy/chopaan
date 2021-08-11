@@ -22,7 +22,7 @@ import Data.ByteString.Lazy (toStrict)
 import qualified Data.Vector as V
 import Data.Monoid
 import Data.Either
-import Data.Greskell.Greskell (Greskell)
+import Data.Greskell.Greskell (Greskell, string)
 import Data.Greskell.Graph (AVertex, AEdge, ElementData, Element, Vertex, Edge, Key, Keys(..))
 import Data.Greskell.GraphSON (FromGraphSON(..), GValue)
 import Data.Greskell.Binder
@@ -145,7 +145,9 @@ addKbtz' k = do
   let
     addId :: Binder (Walk SideEffect VKbtz VKbtz)
     addId = return $ gProperty "@kbtz_id" kid
-  addId <*.> (pure $ sAddV "kbtz" $ source "g")
+    addType :: Binder (Walk SideEffect VKbtz VKbtz)
+    addType = return $ gProperty "@node_type" (string ("k" :: T.Text))
+  addType <*.> addId <*.> (pure $ sAddV "kbtz" $ source "g")
 
 
 
@@ -153,7 +155,8 @@ addHH' :: ANode -> Binder (GTraversal SideEffect () VHH)
 addHH' nx = do
   n <- newBind $ anId nx
   let addId = return $ gProperty "@hh_id" n
-  addId <*.> (pure $ sAddV "hh" $ source "g")
+      addType = return $ gProperty "@node_type" (string ("h" :: T.Text))
+  addType <*.> addId <*.> (pure $ sAddV "hh" $ source "g")
 
 
 addHHToKbtz' :: KbtzName -> ANode -> Binder (GTraversal SideEffect () EKbtzIncludes) 
@@ -171,10 +174,10 @@ allV :: GTraversal Transform () AVertex
 allV = source "g" & sV []
 
 isKbtz :: Walk Filter VKbtz VKbtz
-isKbtz = gHasLabel "kbtz"
+isKbtz = gHas2 "@node_type" (string "k") >>> gHasLabel "kbtz"
 
 isHH :: Walk Filter VHH VHH
-isHH = gHasLabel "hh"
+isHH = gHas2 "@node_type" (string "h") >>> gHasLabel "hh"
 
 allKbtz :: GTraversal Transform () VKbtz
 allKbtz =  source "g" & sV [] &. (liftWalk isKbtz)

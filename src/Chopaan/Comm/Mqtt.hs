@@ -37,6 +37,7 @@ import Control.Concurrent.STM
 
 import Data.ProtoLens (encodeMessage)
 
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.AWS.Things (ThingCreds(..))
 import Chopaan.Comm.Mqtt.AWS (MQTTCreds) --, withMqttAuth)
 import Chopaan.Types (MQTTOpts(..))
@@ -84,44 +85,52 @@ mkTLSSettingsFromDisk cert key caPath hostName name = do
 
 runMqtt ::
   forall m n. (MonadIO m, Address n)
-  => [n]
+  => KbtzName
+  -> [n]
+  -> MessageQs n
   -> (MessageQs n -> MQ.MessageCallback)
   -> MQTTOpts
   -> MQTTCreds
-  -> m (MessageQs n)
-runMqtt ns msgCB opts creds = do
-  qs@MessageQs{..} <- liftIO initMessageQs
-  c <- liftIO $ client opts (msgCB qs) creds
-  runMQ c $ (runMqtt' ns outbox)
-  return qs
+  -> m ()
+runMqtt kbtz ns qs@MessageQs{..} msgCB opts creds = do
+  c <- liftIO $ client kbtz opts (msgCB qs) creds
+  liftIO $ print ("Obtained Client!")
+  _ <- liftIO . forkIO $ runMQ c (forever $ pubQ outbox)
+  liftIO . (recoverC "waiting for client" 10) . runMQ c $ (runMqtt' ns outbox)
 
 -- need reader for creds and logs
 runMqtt' :: forall m a. (MonadIO m, Address a) => [a] -> PubQueue -> MonadMQ m ()
 runMqtt' ts outbox = do
-  _ <- pubQ outbox
   -- liftIO . forkIO $ forever $ catches (runReaderT mc) [(Handler errorHandler)]
   connStatus <- resub ts
+  liftIO $ print "Connection Status!"
   liftIO $ print connStatus
-  liftIO . (recoverC "waiting for client" 10) . (liftIO . MQ.waitForClient) =<< ask
+  (liftIO . MQ.waitForClient) =<< ask
 
 
 client ::
-  MQTTOpts
+  KbtzName
+  -> MQTTOpts
   -> MQ.MessageCallback
   -> MQTTCreds
   -> IO (MQ.MQTTClient)
-client fileOpts msgCB awsCreds = do
-  tlsConf <- return $ mkTLSSettingsFromMemory (cert awsCreds) (privateKey awsCreds) undefined (mqttURI fileOpts) (connId fileOpts)
+client (KbtzId k) fileOpts msgCB awsCreds = do
+  --liftIO . print $ (fileOpts, awsCreds)
+  tlsConf <- return $ mkTLSSettingsFromMemory (cert awsCreds) (privateKey awsCreds) undefined (mqttURI fileOpts) k
   let
-    (Just uri) = parseURI $ Text.unpack $ (mqttURI fileOpts) <> "#" <> (connId fileOpts)
+    (Just uri) = parseURI $ Text.unpack $ (mqttURI fileOpts) <> "#" <> k
     conf = MQ.mqttConfig
            { MQ._protocol=MQ.Protocol311
-           , MQ._connID=Text.unpack $ (connId fileOpts)
+           , MQ._connID=Text.unpack $ k
            --, MQ._port=8883
            , MQ._msgCB=msgCB
            , MQ._connectTimeout=18000000
            , MQ._tlsSettings=tlsConf}
-  MQ.connectURI conf uri
+  --print $ show conf
+  recoverC "connectURI Attempting" 100000 $ MQ.connectURI conf uri
+
+resub :: (MonadIO m, Address n) => [n] -> MonadMQ m [(Either MQTy.SubErr MQ.QoS)]
+resub ns = (\c -> liftIO $ (subscribe c ns)) =<< ask
 
 subscribe :: (Address n) => MQ.MQTTClient -> [n] -> IO [(Either MQTy.SubErr MQ.QoS)]
 subscribe c ns = fst <$> (MQ.subscribe c (subTopic <$> ns) [])
@@ -150,9 +159,6 @@ pub s = do
       pub' c (nId, mf) =
         liftIO $ MQ.publish c nId (encode mf) False
       encode = BL.fromStrict . encodeMessage
-
-resub :: (MonadIO m, Address n) => [n] -> MonadMQ m [(Either MQTy.SubErr MQ.QoS)]
-resub ns = (\c -> liftIO $ (subscribe c ns)) =<< ask
 
 
 errorHandler :: MQ.MQTTException -> IO ()

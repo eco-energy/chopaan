@@ -115,6 +115,7 @@ dependencies:
 - convertible
 - regex-applicative
 - generic-lens
+- derive-storable
 when:
   condition: "!impl(ghcjs)"
   then:

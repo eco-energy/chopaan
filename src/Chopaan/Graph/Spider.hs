@@ -260,7 +260,7 @@ hasConfig (h, p) label = defConfig
 
 spiderPool :: forall m n v e. MonadIO m => Config n v e -> m (Pool (Spider n v e))
 spiderPool c = liftIO $ createPool
-  ((recoverC "retrying kbtz janusgraph connection" 100) (connectWith c)) close 10 100 10
+  ((recoverC "retrying kbtz janusgraph connection" 100) (connectWith c)) close 100 10 100
 
 
 fromNSGraphM = (pure . fromNSGraph)
@@ -343,9 +343,43 @@ addFlow k (n, v) = do
   addFNMaybe (unSpool . flowG $ spool) (Just fn)
 
 addMeshN :: (NodeMAC, (MeshNode, RxSignal)) -> SpiderM (Bool)
-addMeshN v = do
+addMeshN (v, l) = do
   spool <- ask
-  addFNMaybe (unSpool . meshG $ spool) (Just $ sigToFN v)
+  let fn = sigToFN (v, l)
+  addFNMaybe (unSpool . meshG $ spool) (Just $ fn)
+
+
+addTx :: KbtzName -> (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus)) -> SpiderM Bool
+addTx k (n, (s, stake, status)) = do
+  spool <- ask
+  let stake' = fromMaybe mempty stake
+      status' = fromMaybe mempty status
+  fn <- Just <$> (x (_time s) n stake' status')
+  addFNMaybe (unSpool . txG $ spool) fn
+  where
+    x :: Maybe UTCTime -> NodeMAC -> Stake -> TxStatus -> SpiderM (FoundNode NodeMAC Stake TxStatus)
+    x t n v e = do
+      t' <- liftIO getCurrentTime
+      pure $ toFN (fromUTCTime . (fromMaybe t') $ t) n v [toLink (getGridRoot k) e]
+
+
+addMon :: KbtzName -> (NodeMAC, (SensorR, Maybe Stake)) -> SpiderM Bool
+addMon k (n, (s, st)) = do
+  spool <- ask
+  fn <- x n s st
+  addFNMaybe (unSpool . statusG $ spool) fn
+  where
+    x :: NodeMAC
+      -> SensorR
+      -> Maybe (Stake)
+      -> SpiderM (Maybe (FoundNode NodeMAC SensorR Stake))
+    x n v e = do
+      let stake = case e of
+                 Nothing -> mempty
+                 Just stk -> stk
+      t <- liftIO getCurrentTime
+      pure . Just $
+        toFN (fromUTCTime . (fromMaybe t) .  _time $ v) n v [toLink (getGridRoot k) stake]
 
 addFlowNode :: forall m. (MonadAsync m, MonadCatch m)
   => KbtzName -> SpiderM (FL.Fold m (NodeMAC, SensorR) Bool)

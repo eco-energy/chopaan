@@ -24,6 +24,7 @@ import Numeric.Estimator (KalmanFilter(..))
 import ConCat.Misc (R)
 #endif
 
+import Chopaan.Node.NodeId (NodeMAC)
 import Chopaan.Node.Storage
 import Chopaan.Node.Metrics
 import Chopaan.Utils.Time
@@ -45,7 +46,7 @@ Folds of type FL.Fold, as functions to the instantatenous values of the system o
 
 
 -----------------------------------------------------------------------------------------------------}
-meshFold :: forall m. Monad m => FL.Fold m (RuntimeStats) (MeshNode, RxSignal)
+meshFold :: forall m. Monad m => NodeMAC -> FL.Fold m (RuntimeStats) (MeshNode, RxSignal)
 meshFold = meshF
 {-# INLINE meshFold #-}
 
@@ -137,7 +138,8 @@ sensorFold = FL.toFold $ SensorMetrics
              <*> FL.Tee powerFold
              <*> FL.Tee energyFold
              <*> FL.Tee (batteryFold defBatteryParams)
-             <*> FL.Tee demandFold 
+             <*> FL.Tee demandFold
+             <*> FL.Tee sensors 
 {-# INLINE sensorFold #-}
 
 demandFold :: (Monad m) => FL.Fold m (EnergyState) WattSeconds
@@ -155,4 +157,4 @@ sensors = FL.foldl' (flip const) zeroMsg
 type SensorR = SensorMetrics WattSeconds Watts 
 
 defSensorR :: SensorR
-defSensorR = SensorMetrics Nothing 0 mempty mempty mempty 0
+defSensorR = SensorMetrics Nothing 0 mempty mempty mempty 0 zeroMsg

@@ -56,6 +56,10 @@ import Data.Pool
     
 spec :: Spec
 spec = do
+  --kbtzSpec
+  hydrationSpec
+
+kbtzSpec = do
   let
     nNodes = 10
     nMessages = 100
@@ -150,7 +154,6 @@ spec = do
       (gotNs, gotLs) <- snapDebug flowNodesSnapshot sp ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
-      
 
 hydrationSpec :: Spec
 hydrationSpec = describe "hydration tests" $ do
@@ -163,10 +166,13 @@ hydrationSpec = describe "hydration tests" $ do
                                              , nodes = labNodes
                                              , channelOpts = qs
                                              , s3Opts = Just s3op
-                                             }
+                                             } (t0, tn)
           --h = s3Stream (zip labNodes (repeat Nothing)) s3op
-    S.mapM_ (print) h
+    S.drain h
     1 `shouldBe` 1
+    where
+      t0 = Ti.UTCTime (Ti.fromGregorian 2021 8 9) (Ti.secondsToDiffTime 0)
+      tn = Ti.UTCTime (Ti.fromGregorian 2021 8 11) (Ti.secondsToDiffTime 0)
 
 oneNodePerMACPlusRoot sn nNodes = ((length $ sn)
                                     `shouldBe` (nNodes + 1))
@@ -261,6 +267,7 @@ orderedRS r n (NodeId root) = do
 
 tsL = iterate (Ti.addUTCTime d) t
 t = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
+et = Ti.UTCTime (Ti.fromGregorian 2021 8 10) (Ti.secondsToDiffTime 0)
 d = Ti.diffUTCTime (Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 60)) t
 
 

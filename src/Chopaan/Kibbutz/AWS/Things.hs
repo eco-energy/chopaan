@@ -31,7 +31,7 @@ import qualified Network.AWS.IoT.DeleteCertificate as Cert
 import qualified Network.AWS.IoT.DetachPolicy as Policy
 
 import Control.Monad
-
+import Control.Monad.IO.Class
 import Control.Monad.Trans.AWS
 import Control.Monad.Trans.Resource
 
@@ -147,18 +147,23 @@ registerThing kbtz thing certId roleTemplate = do
   let req = Thing.registerThing roleTemplate
         & Thing.rtParameters .~ thingMap thing kbtz certId
   c <- send req
+  --liftIO . print $ "Thing Registration: " <> (show c)
   return $ c ^. Thing.rtrsResourceARNs
 
 deleteThing :: ThingName -> AWSC (Bool)
 deleteThing thing = do
   c <- send $ Thing.deleteThing thing
+  
   return $ success (c ^. Thing.ddrsResponseStatus)
 
 deleteCert :: CertId -> CertARN  -> AWSC ()
 deleteCert certId certArn = do
-  void $ send $ Policy.detachPolicy chopaanPolicy certArn
-  void $ send $ Cert.updateCertificate certId Iot.CSInactive
-  void $ send $ Cert.deleteCertificate certId
+  p <- send $ Policy.detachPolicy chopaanPolicy certArn
+  liftIO . print $ "Detaching Policy: " <> (show p)
+  i <- send $ Cert.updateCertificate certId Iot.CSInactive
+  liftIO . print $ "Detaching Policy: " <> (show i)
+  d <- send $ Cert.deleteCertificate certId
+  liftIO . print $ "Certificate Deletion: " <> (show d)
   return ()
   where
     chopaanPolicy = "kibbutz-node-comm"

@@ -92,6 +92,12 @@ control ::
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "control" a) =>
           Lens.Family2.LensLike' f s a
 control = Data.ProtoLens.Field.field @"control"
+counters ::
+         forall f s a .
+           (Prelude.Functor f,
+            Data.ProtoLens.Field.HasField s "counters" a) =>
+           Lens.Family2.LensLike' f s a
+counters = Data.ProtoLens.Field.field @"counters"
 cpuTime ::
         forall f s a .
           (Prelude.Functor f, Data.ProtoLens.Field.HasField s "cpuTime" a) =>
@@ -248,6 +254,12 @@ maybe'control ::
                  Data.ProtoLens.Field.HasField s "maybe'control" a) =>
                 Lens.Family2.LensLike' f s a
 maybe'control = Data.ProtoLens.Field.field @"maybe'control"
+maybe'counters ::
+               forall f s a .
+                 (Prelude.Functor f,
+                  Data.ProtoLens.Field.HasField s "maybe'counters" a) =>
+                 Lens.Family2.LensLike' f s a
+maybe'counters = Data.ProtoLens.Field.field @"maybe'counters"
 maybe'forcedActions ::
                     forall f s a .
                       (Prelude.Functor f,
@@ -347,12 +359,24 @@ meshConf ::
             Data.ProtoLens.Field.HasField s "meshConf" a) =>
            Lens.Family2.LensLike' f s a
 meshConf = Data.ProtoLens.Field.field @"meshConf"
+meshInboxQc ::
+            forall f s a .
+              (Prelude.Functor f,
+               Data.ProtoLens.Field.HasField s "meshInboxQc" a) =>
+              Lens.Family2.LensLike' f s a
+meshInboxQc = Data.ProtoLens.Field.field @"meshInboxQc"
 meshName ::
          forall f s a .
            (Prelude.Functor f,
             Data.ProtoLens.Field.HasField s "meshName" a) =>
            Lens.Family2.LensLike' f s a
 meshName = Data.ProtoLens.Field.field @"meshName"
+meshOutboxQc ::
+             forall f s a .
+               (Prelude.Functor f,
+                Data.ProtoLens.Field.HasField s "meshOutboxQc" a) =>
+               Lens.Family2.LensLike' f s a
+meshOutboxQc = Data.ProtoLens.Field.field @"meshOutboxQc"
 meshParentStrength ::
                    forall f s a .
                      (Prelude.Functor f,
@@ -465,6 +489,18 @@ secondsToCompletion ::
                       Lens.Family2.LensLike' f s a
 secondsToCompletion
   = Data.ProtoLens.Field.field @"secondsToCompletion"
+serialInboxQc ::
+              forall f s a .
+                (Prelude.Functor f,
+                 Data.ProtoLens.Field.HasField s "serialInboxQc" a) =>
+                Lens.Family2.LensLike' f s a
+serialInboxQc = Data.ProtoLens.Field.field @"serialInboxQc"
+serialOutboxQc ::
+               forall f s a .
+                 (Prelude.Functor f,
+                  Data.ProtoLens.Field.HasField s "serialOutboxQc" a) =>
+                 Lens.Family2.LensLike' f s a
+serialOutboxQc = Data.ProtoLens.Field.field @"serialOutboxQc"
 solar ::
       forall f s a .
         (Prelude.Functor f, Data.ProtoLens.Field.HasField s "solar" a) =>

@@ -115,6 +115,7 @@ mkCallback (MessageQs { stateChan, statsChan })  = MQ.SimpleCallback $ writer
   where
     writer :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> IO ()
     writer _ t msg _ = do
+      --liftIO . print $ "Message Recieved"
       case nodeId of
         Nothing -> print $ "MQTT Topic Decode error: " <> (show t)
         (Just n) ->

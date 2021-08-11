@@ -9,6 +9,7 @@ import GHC.Generics
 import Network.AWS.S3 (BucketName, ObjectKey(..))
 import Chopaan.Types hiding (DBOpts)
 
+import Control.Applicative
 import Control.Arrow
 import Control.Monad.IO.Class
 import Control.Monad
@@ -18,7 +19,10 @@ import Control.Concurrent.STM.TVar
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Bifunctor (bimap)
-import qualified Control.Concurrent.Async as A
+import Data.Greskell (runBinder)
+import NetSpider.Graph (NodeAttributes(..))
+import Control.Concurrent (forkIO)
+import Control.Lens
 
 import Streamly.Prelude as S (IsStream, MonadAsync, adapt)
 import qualified Streamly.Prelude as S
@@ -27,8 +31,11 @@ import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold.Type as FL
 import qualified Streamly.Internal.Data.Fold.Tee as FL
 import qualified Streamly.Internal.Data.Unfold as UF
+import qualified Streamly.Internal.Data.Pipe as P
+import qualified Streamly.Data.Array.Foreign as A
 
 import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, EnergyState)
+import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N (cpuTime)
 import System.IO (stdout)
 
 import Chopaan.Kibbutz.KbtzId
@@ -40,7 +47,9 @@ import Chopaan.Kibbutz.Transactor
 import Chopaan.Node.NodeId (NodeMAC)
 import Chopaan.Node.Folds (SensorR, sensorFold)
 import Chopaan.Node.Metrics (initSM)
-import Chopaan.Node.Mesh (MeshNode, RxSignal, meshNodeLink, meshF)
+import Chopaan.Node.Mesh (MeshNode, RxSignal, meshNodeLink, meshF, sigToFN)
+import Chopaan.Utils.Time
+
 
 import Chopaan.Comm.Mqtt (runMqtt)
 import Chopaan.Comm.S3
@@ -48,6 +57,7 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          , mkCallback
                          , PubQueue
                          , unfoldChan
+                         , initMessageQs
                          )
 import Chopaan.Graph.Kbtz
 import Chopaan.Graph
@@ -56,15 +66,24 @@ import Data.Time
 type S3Opts = BucketName
 type ChannelOpts = (MessageQs NodeMAC)
 
+-- instance Eq ChannelOpts where
+--   _ == _ = False
+
+-- instance Ord ChannelOpts where
+--   _ <= _ = False
+
+-- instance Show ChannelOpts where
+--   show _ = "SomeChannelOpt"
+
 data KbtzC n = KbtzC
   { name :: KbtzName
   , nodes :: [n]
-  , channelOpts :: ChannelOpts
+  , channelOpts :: Maybe MQTTOpts
   , s3Opts :: Maybe S3Opts
-  } deriving (Generic)
+  } deriving (Eq, Ord, Show, Generic)
 
 
-mkKbtzConf :: KbtzName -> [n] -> ChannelOpts -> Maybe S3Opts -> KbtzC n
+mkKbtzConf :: KbtzName -> [n] -> Maybe MQTTOpts -> Maybe S3Opts -> KbtzC n
 mkKbtzConf = KbtzC
 
 qSrc :: forall t m n. (KbtzConn t m n)
@@ -75,6 +94,9 @@ qSrc (MessageQs{stateChan, statsChan, outbox}) = do
   rk <- unfoldChan statsChan
   return $ (sk, rk, outbox)
 
+
+--xx :: forall m. (MonadAsync m) => S.SerialT m (Int, Int) -> m (A.Array (Int, Int))
+--xx s = S.fold A.write s
 
 twoSrc :: (KbtzConn t m n)
   => MessageQs n
@@ -90,32 +112,33 @@ type S3S (t :: (* -> *) -> * -> *) m a b = t m ((NodeMAC, ObjectKey, Maybe UTCTi
 
 
 s3Stream :: (IsStream t, MonadAsync m, MonadCatch m)
-         => [(NodeMAC, Maybe ObjectKey)]
-         -> S3Opts
+         => S3Opts
+         -> [(NodeMAC, Maybe ObjectKey)]
+         -> (UTCTime, UTCTime)
          -> S3S t m EnergyState RuntimeStats
-s3Stream ns bucket = let
-  s' = S.bracket (liftIO $ newLogger Info stdout) (pure) s
-  align :: (a, ((b, c), d)) -> ((b, a, c), (b, d))
-  align (a, ((b, c), d)) = ((b, a, c), (b, d)) 
-  f :: (n, Either a b) -> Either (n, a) (n, b)
-  f (n, c) = case c of
-    Left x -> Left (n, x)
-    Right y -> Right (n, y)
-  in (fmap (second f) $ fmap align s')
+s3Stream bucket ns range = S.tapRate 10 (liftIO . (print . (prefix <>) . show))
+                           $ S.mapM (pure . (second f) . align)
+                           $ S.concatMapWith S.async (uncurry (nodeS3 bucket range))
+                           $ S.fromList ns
   where
-    s lg = S.concatMapWith S.parallel (uncurry (nodeS3 lg bucket)) $ S.fromList ns
+    prefix = "combined rate: "
+    -- (S.mergeBy onTime)
+    onTime (_, ((_, a), _)) (_, ((_, b), _)) = fromMaybe EQ $ liftA2 compare a b
+    align (a, ((b, c), d)) = ((b, a, c), (b, d)) 
+    f (n, c) = case c of
+      Left x -> Left (n, x)
+      Right y -> Right (n, y)
 
 
-mqttQs :: (MonadIO m) => MQTTOpts -> KbtzName -> [NodeMAC] -> m (MessageQs NodeMAC)
-mqttQs opts name ns = do
+mqttQs :: (MonadIO m) => (MessageQs NodeMAC) -> MQTTOpts -> KbtzName -> [NodeMAC] -> m ()
+mqttQs qs opts name ns = do
   lg <- liftIO $ newLogger Info stdout
-  liftIO $ (A.wait
-              =<< A.async (liftIO $ withMqttAuth lg name
-                            (runMqtt ns mkCallback opts)))
+  (liftIO $ withMqttAuth lg name
+    (runMqtt name ns qs mkCallback opts))
 
-mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOpts
-  -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
-mqttSrc k ns o = qSrc  =<< (mqttQs o k ns)
+--mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOpts
+--  -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
+--mqttSrc k ns o = (qSrc qs)  =<< (mqttQs qs o k ns)
 
 
 
@@ -135,27 +158,35 @@ type KbtzScene n = Either (GridScene n) (MeshScene n)
 
 
 runKibbutz :: forall t. (IsStream t) => KbtzC NodeMAC -> GraphM (t GraphM (KbtzScene NodeMAC))
-runKibbutz KbtzC{name, nodes, channelOpts} = do
+runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
   -- Live Data
-  (es, rs, outbox) <- qSrc @t channelOpts
+  let mqopts = fromMaybe (error "error! Run Kibbutz MUST Have an MQTTOpts passed in!") channelOpts
+  liftIO . print $ show kc
+  qs <- liftIO initMessageQs
+  liftIO . forkIO $ mqttQs qs mqopts name nodes
+  (es, rs, outbox) <- qSrc @t qs
   -- Folds
   gridFold <- withSpider $ saveTx name
   meshFold <- withSpider addMeshNode
   -- Stream Processors that run Folds
   let
     processES :: t GraphM (NodeMAC, EnergyState) -> t GraphM (GridScene NodeMAC)
-    processES = tapCount "esPipe"
-                . S.map snd
-                . S.tap (FL.lmap getLatest gridFold)
-                . status
-                -- . S.trace (dispatchTxSafe outbox . snd . snd)
-                . plan
-                . (fmap (second Tx))
-                . gridSensorR nodes
+    processES s = S.tapRate 30 (\x -> liftIO . print $ "Grid Processed Rate: " <> show x)
+                S.|$ S.map snd
+                S.|$ S.tap (FL.lmap getLatest gridFold)
+                S.|$ status
+                S.|$ S.trace (dispatchTxSafe outbox . snd . snd)
+                S.|$ plan
+                S.|$ S.mapM (pure . second Tx)
+                S.|$ gridSensorR nodes
+                $ S.tapRate 30 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
 
-    processRS = tapCount "rsPipe" . S.tap meshFold . S.map (second meshNodeLink)
+    processRS s = S.tapRate 30 (\x -> liftIO . print $ "Mesh Processed Rate: " <> show x)
+                . S.tap meshFold
+                . S.map (second (meshNodeLink $ getGridRoot name))
+                $ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
   let
-    liveStream = (Left <$> (processES es)) `S.parallel` (Right <$> (processRS rs)) 
+    liveStream = (Left <$> (processES es)) `S.async` (Right <$> (processRS rs)) 
   return liveStream
   where
     plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
@@ -195,64 +226,71 @@ gridSensorR ns s = S.map (first fromJust)
 {-# INLINE gridSensorR #-}
 
 hydrateKbtz' :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
-  => String -> Int -> KbtzC NodeMAC -> t m Hydration
-hydrateKbtz' h p = S.concatM . (hydrateKbtzM h p)
+  => String -> Int -> KbtzC NodeMAC -> Range -> t m Hydration
+hydrateKbtz' h p k = S.concatM . (hydrateKbtzM h p k)
 
 hydrateKbtzM :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
-  => String -> Int -> KbtzC NodeMAC -> m (t m Hydration)
-hydrateKbtzM h p = (pure . S.adapt . S.hoist (runGraphM h p)) <=< (runGraphM h p . hydrateKbtz)
+  => String -> Int -> KbtzC NodeMAC -> Range -> m (t m Hydration)
+hydrateKbtzM h p k = (pure . S.adapt . S.hoist (runGraphM h p))
+                   <=< (runGraphM h p . hydrateKbtz k)
 
 type Hydration = ((NodeMAC, ObjectKey, Maybe UTCTime)
-                 , ((Maybe NodeMAC, M.Map NodeMAC SensorR)
-                   , (Maybe NodeMAC, M.Map NodeMAC (MeshNode, RxSignal))))
+                 , ((M.Map NodeMAC SensorR)
+                   , (M.Map NodeMAC (MeshNode, RxSignal))))
 
-type Hydration' = ((NodeMAC, ObjectKey, Maybe UTCTime)
-                 , ((NodeMAC, M.Map NodeMAC SensorR)
-                   , (NodeMAC, M.Map NodeMAC (MeshNode, RxSignal))))
+type Range = (UTCTime, UTCTime)
 
-hydrateKbtz :: forall t. (IsStream t) => KbtzC NodeMAC -> GraphM (t GraphM (Hydration))
-hydrateKbtz KbtzC{name, nodes, s3Opts} = case s3Opts of
+hydrateKbtz :: forall t. (IsStream t) => KbtzC NodeMAC -> Range -> GraphM (t GraphM (Hydration))
+hydrateKbtz KbtzC{name, nodes, s3Opts} range = case s3Opts of
       Nothing -> return $ S.nil
-      Just s -> do
-        --x <- liftIO $ newTVarIO (M.fromList [])
+      Just bucket -> do
+        -- x <- liftIO $ newTVarIO (M.fromList [])
         -- lsyncs <- mapM (\n -> do
         --                    ls <- withKbtzPool (flip getNodeLastSync n) 
         --                    return $ (\a -> (n, ObjectKey <$> a)) (listToMaybe ls)
         --                ) nodes
-        -- flowFoldS3 <- (FL.lmap (getLatest initSM)) <$> (withSpider $ addFlowNode name)
-        -- meshFoldS3 <- (FL.lmap (getLatest undefined)) <$> (withSpider addMeshNode)
         let
           lsyncs = zip nodes (repeat Nothing)
           srcs :: t GraphM ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats))
-          srcs = s3Stream lsyncs s -- S.trace (thatF . fst) $ 
-            --where
-              --thatF :: (NodeMAC, ObjectKey, Maybe UTCTime) -> GraphM ()
-              --thatF (n, k, t) = liftIO . atomically $ modifyTVar' x (M.insert n (k, t))
+          srcs = S.mapM (pure . fixMeshTS) $ s3Stream bucket lsyncs range
+                 --where
+                 --  ml = meshNodeLink (getGridRoot name)
+            -- where
+            -- S.trace (\((_, _, t), a) -> case a of
+            --                  Left _ -> return ()
+            --                  Right (n, r) -> do
+            --                    liftIO . print $ n
+            --                    liftIO . print $ r
+            --                    liftIO . print $ t 
+            --                    liftIO . print $ ml r
+            --                    liftIO . print $ sigToFN (n, (ml r))
+            --                  ) $ 
+            --   thatF :: (NodeMAC, ObjectKey, Maybe UTCTime) -> GraphM ()
+            --   thatF (n, k, t) = liftIO . atomically $ modifyTVar' x (M.insert n (k, t))
           
-          -- saveUF :: UF.Unfold GraphM ((NodeMAC, M.Map NodeMAC SensorR), (NodeMAC, M.Map NodeMAC (MeshNode, RxSignal))) (Bool, Bool)
-          -- saveUF = bothUnfold flowFoldS3 meshFoldS3
-
-          -- saveAndId = UF.map snd $ UF.zipWith (,) saveUF UF.identity
-
-          -- saveAndIdWithKey :: UF.Unfold GraphM Hydration Hydration
-          -- saveAndIdWithKey = UF.zipWith (,) (UF.function fst) (UF.discardFirst saveAndId)
+          process :: FL.Fold GraphM ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats)) Hydration
+          process = secondF (eitherWalay name nodes (fSave name) (mSave))
           
-          process :: UF.Unfold GraphM ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats)) Hydration
-          process = UF.zipWith (,) (UF.function fst) (foldUF snd (eitherWalay nodes))
-
-        -- UF.map (bimap (first fromJust) (first fromJust)) $
-        --                                                   (UF.filter (\((a, _), (b, _)) -> ((isJust $ a) && (isJust $ b)))) $
-                                                          
         -- let finalize = do
         --       m <- liftIO . atomically $ readTVar x
         --       mapM_ (\(n, ((ObjectKey k), _)) ->
         --                                withKbtzPool (\p -> addLastSyncToHH p n k)) $ M.toList m
-        --let f = UF.concat process saveAndIdWithKey
-        return $ S.trace (\_ -> liftIO . print $ "p") $ (S.concatUnfold process) S.|$ srcs
-      where
-        -- S.finallyIO finalize $ 
-        getLatest :: forall n a. (Ord n) => a -> (n, M.Map n a) -> (n, a)
-        getLatest a' (n, a) = (n, fromMaybe a' (M.lookup n a))
+        --let f = UF.concat (UF.fromStream S.postscan process) saveAndIdWithKey
+        return $ S.tapRate 10 (liftIO . (print . (prefix <>) . show))
+                                               $ (S.postscan process) S.|$ srcs
+        where
+          prefix = "processing rate: "
+          fixMeshTS :: ((NodeMAC, ObjectKey, Maybe UTCTime)
+                       , Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats))
+            -> ((NodeMAC, ObjectKey, Maybe UTCTime)
+               , Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats))
+          fixMeshTS a@(_, (Left _)) = a
+          fixMeshTS a@((_, _, Nothing), _) = a
+          fixMeshTS a@((n, o, Just t), Right (n', r)) = case r ^? N.cpuTime of
+            Nothing -> ((n, o, Just t), Right (n', r & N.cpuTime .~ (timeToUIntSeconds t)))
+            (Just t') -> case (t' == 0) of
+              True -> ((n, o, Just t), Right (n', r & N.cpuTime .~ (timeToUIntSeconds t)))
+              False -> a
 
 
 bothUnfold :: forall m a b c d. (Monad m) => FL.Fold m a b -> FL.Fold m c d -> UF.Unfold m (a, c) (b, d)
@@ -263,19 +301,35 @@ foldUF fn fld = UF.functionM (UF.fold fld (UF.function fn))
 
 
 demuxWithLatest :: forall m n a b. (Monad m) =>
-            FL.Fold m (n, a) (M.Map n b)  -> FL.Fold m (n, a) (Maybe n, M.Map n b)
-demuxWithLatest fo = f
+            FL.Fold m (n, a) (M.Map n b)  -> FL.Fold m (n, a) (n, M.Map n b)
+demuxWithLatest fo = FL.lmap (\(n, a) -> (n, (n, a))) f
   where
-    f :: FL.Fold m (n, a) (Maybe n, M.Map n b)
-    f = FL.tee (FL.foldl' ((const (Just . fst))) Nothing) fo
+    f :: FL.Fold m (n, (n, a)) (n, M.Map n b)
+    f = secondF fo
 
+fSave k n = (\x -> withSpider $ do
+                a <- addFlow k (n, x)
+                b <- addMon k (n, (x, Nothing))
+                c <- addTx k (n, (x, Nothing, Nothing))
+                return ((a && b && c) `seq` x )
+          )
 
+mSave n = (\x -> do
+              -- a <- withSpider $ addMeshN (n, x)
+              -- case a of
+              --   True -> liftIO $ print "Mesh Added No Exception!"
+              --   False -> liftIO $ print ("Add Mesh Failed on" <> show x)
+              return x
+          )
 
-eitherWalay :: [NodeMAC] -> FL.Fold GraphM (Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats)) ((Maybe NodeMAC, M.Map NodeMAC SensorR), (Maybe NodeMAC, M.Map NodeMAC (MeshNode, RxSignal)))
-eitherWalay nodes = FL.partition
-  (demuxWithLatest (FL.demux $ M.fromList $ zip nodes (repeat sensorFold)))
-  (demuxWithLatest (FL.demux $ M.fromList $ zip nodes (repeat meshF)))
-
+eitherWalay :: KbtzName
+            -> [NodeMAC]
+            -> (NodeMAC -> SensorR -> GraphM SensorR)
+            -> (NodeMAC -> (MeshNode, RxSignal) -> GraphM (MeshNode, RxSignal))
+            -> FL.Fold GraphM (Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats)) ((M.Map NodeMAC SensorR), (M.Map NodeMAC (MeshNode, RxSignal)))
+eitherWalay k nodes fSave mSave = FL.partition
+  ((FL.demux $ M.fromList $ fmap (\n -> (n, FL.rmapM (fSave n) sensorFold)) nodes))
+  ((FL.demux $ M.fromList $ fmap (\n -> (n, FL.rmapM (mSave n) (meshF $ getGridRoot k))) nodes))
 
 -- pfart :: Monad m => FL.Fold m b x -> FL.Fold m c y -> FL.Fold m (Either b c) (Either x y)
 -- pfart (FL.Fold stepL beginL doneL) (FL.Fold stepR beginR doneR) = FL.mkFold step begin done

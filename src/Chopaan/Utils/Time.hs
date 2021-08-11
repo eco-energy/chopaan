@@ -28,10 +28,13 @@ timeToUIntSeconds = fromInteger . (\x -> round $ (realToFrac x) / 10e11) . fromP
 utcTimeNow :: Word64 -> UTCTime
 utcTimeNow = posixSecondsToUTCTime . fromIntegral
 
--- $ converts the millisecond timestamp in the EnergyState to a UTCTime  
+-- $ converts the timestamp (in seconds) in the EnergyState to a UTCTime  
 parseUTCTime :: T.Text -> UTCTime
 parseUTCTime = utcTimeNow . read . T.unpack
 
+-- $ converts the timestamp (in milliseconds) in the EnergyState to a UTCTime  
+parseUTCTimeMS :: T.Text -> UTCTime
+parseUTCTimeMS = utcTimeNow . (flip div 1000) . read . T.unpack
 
 diffUTC :: UTCTime -> UTCTime -> DiffTime
 diffUTC a b = realToFrac $ diffUTCTime a b

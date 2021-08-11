@@ -1,11 +1,12 @@
 {-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction, ScopedTypeVariables, PackageImports #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports, CPP #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports, CPP, ExtendedDefaultRules #-}
 module Chopaan.Node.Metrics where
 
 import GHC.Generics hiding (R)
 import Control.Applicative
 import Control.DeepSeq (NFData)
-import Data.Binary (Binary(..))
+import Control.Lens
+import Data.Binary (Binary)
 import qualified Data.Binary as B
 import qualified "base64" Data.ByteString.Base64 as B64
 import Data.Time
@@ -15,7 +16,7 @@ import Data.Either
 import Data.Bifunctor
 
 import qualified Data.HashMap.Strict as HM
-import qualified Data.Csv as Csv
+import qualified Data.Csv as Csv hiding (encode)
 import qualified Data.Vector as Vec (fromList)
 
 import Data.ByteString.Char8 (pack)
@@ -25,7 +26,7 @@ import Data.Maybe
 import Numeric.Compensated
 
 import Data.ProtoLens
-import Lens.Micro
+--import Lens.Micro
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Text.Printf
@@ -57,6 +58,9 @@ import Chopaan.Node.Storage
 import Chopaan.Utils.JSON
 import Chopaan.Utils.Time
 import Chopaan.Graph.Greskell
+
+
+default(T.Text)
 
 
 toField = Csv.toField
@@ -165,40 +169,19 @@ instance (Num a) => Monoid (Node a) where
 
 
 #ifndef ghcjs_HOST_OS
-txKey :: (FromJSON a, ToJSON a) => Key n a
-txKey = "tx"
-
-consumedKey :: (FromJSON a, ToJSON a) => Key n a
-consumedKey = "consumed"
-
-generatedKey :: (FromJSON a, ToJSON a) => Key n a
-generatedKey = "generated"
-
+nodeKey :: Key n BL.ByteString
+nodeKey = "nodeKey"
 
                
 instance (GreskellC a) => LinkAttributes (Node a) where
   writeLinkAttributes node = fmap writeKeyValues $ sequence $
-    [ txKey <=:> tx node
-    , consumedKey <=:> consumed node
-    , generatedKey <=:> generated node
-    ]
-  parseLinkAttributes props = pMapToFail (Node
-                                          <$> lookupAs txKey props
-                                          <*> lookupAs consumedKey props
-                                          <*> lookupAs generatedKey props
-                                         )
+    [ nodeKey <=:> A.encode node ]
+  parseLinkAttributes props = pMapToFail $ decodeBin $ lookupAs nodeKey props
                
 instance (GreskellC a) => NodeAttributes (Node a) where
   writeNodeAttributes node = fmap writeKeyValues $ sequence $
-    [ txKey <=:> tx node
-    , consumedKey <=:> consumed node
-    , generatedKey <=:> generated node
-    ]
-  parseNodeAttributes props = pMapToFail (Node
-                                          <$> lookupAs txKey props
-                                          <*> lookupAs consumedKey props
-                                          <*> lookupAs generatedKey props
-                                         )
+    [ nodeKey <=:> A.encode node ]
+  parseNodeAttributes props = pMapToFail $ decodeBin $ lookupAs nodeKey props
 
 instance (GreskellC a) => FromGraphSON (Node a) where
   parseGraphSON = parseJSON . unwrapAll
@@ -208,7 +191,7 @@ instance (GreskellC a) => FromGraphSON (Node a) where
 
 instance Binary UTCTime
 instance Binary DiffTime where
-  put a = put @Int $ round a
+  put a = B.put @Int $ round a
   get = secondsToDiffTime <$> B.get 
 
 
@@ -219,10 +202,11 @@ data SensorMetrics e p = SensorMetrics
   , _energyT :: !(Node e)
   , _battery :: !(Battery e p)
   , _demand :: !e
-  } deriving (Eq, Ord, Generic, Binary, Show, NFData, ToJSON, FromJSON, Humanize)
+  , _sensors :: EnergyState
+  } deriving (Eq, Ord, Generic, Show, NFData, ToJSON, FromJSON, Humanize)
 
 initSM :: (Fractional e, Fractional p) => SensorMetrics e p
-initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0 
+initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0 zeroMsg 
   
 
 -- instance (Binary e, Binary p) => ToJSON (SensorMetrics e p) where
@@ -249,9 +233,11 @@ energyKey = "energyKey"
 batteryKey :: Key VFoundNode (BL.ByteString)
 batteryKey = "batteryKey"
 
-demandKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
+demandKey :: Key VFoundNode (BL.ByteString)
 demandKey = "demandKey"
 
+esMsgKey :: Key VFoundNode (BL.ByteString)
+esMsgKey = "esMsg"
 
 instance FromJSON B.ByteString where
   parseJSON (String t) = pure $ (either (const "") id . B64.decodeBase64 . T.encodeUtf8) t
@@ -276,7 +262,8 @@ instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
     , powerKey <=:> A.encode _powerT
     , energyKey <=:> A.encode _energyT
     , batteryKey <=:> A.encode _battery
-    , demandKey <=:> _demand
+    , demandKey <=:> A.encode _demand
+    , esMsgKey <=:> A.encode _sensors
     ]
   parseNodeAttributes props = pMapToFail (SensorMetrics
                                           <$> lookupAs' timeKey props
@@ -284,44 +271,92 @@ instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
                                           <*> (decodeBin $ lookupAs powerKey props)
                                           <*> (decodeBin $ lookupAs energyKey props)
                                           <*> (decodeBin $ lookupAs batteryKey props)
-                                          <*> lookupAs demandKey props
+                                          <*> (decodeBin $ lookupAs demandKey props)
+                                          <*> (decodeBin $ lookupAs esMsgKey props)
                                          )
-    where
-      decodeBin (Left a) = (Left a)
-      decodeBin (Right x) = case A.decode x of
-        Nothing -> (Left $ PMapParseError "sensorMetric Key" "aeson decode failed for sensor metrics")
-        Just x' -> Right x'
+decodeBin :: (FromJSON a) => Either PMapLookupException BL.ByteString -> Either PMapLookupException a 
+decodeBin (Left a) = (Left a)
+decodeBin (Right x) = case A.decode x of
+  Nothing -> (Left $ PMapParseError "sensorMetric Key" "aeson decode failed for sensor metrics")
+  Just x' -> Right x'
+
+
 #endif
+--instance Binary EnergyState where
+--  encode = undefined
+
+instance ToJSON (StreamState) where
+  toJSON a = toJSON . fromEnum $ a
+
+instance FromJSON (StreamState) where
+  parseJSON a = toEnum <$> (parseJSON a)
 
 instance ToJSON (EnergyState) where
-  toJSON a = object $ zipWith (A..=) esFieldNamesJSON (fieldAccessorsJSON a)
+  toJSON a = object $ [
+    "batteryVoltage" A..= (a ^. batteryVoltage)
+    , "gridVoltage" A..= (a ^. gridVoltage)
+    , "batteryToLoadCurrent" A..= (a ^. batteryToLoadCurrent)
+    , "batteryToGridCurrent" A..= (a ^. batteryToGridCurrent)
+    , "gridToBatteryCurrent" A..= (a ^. gridToBatteryCurrent)
+    , "solarInputCurrent" A..= (a ^. solarInputCurrent)
+    , "temperature" A..= (a ^. temperature)
+    , "dutyCycle" A..= (a ^. dutyCycle)
+    , "cpu_time" A..= (a ^. cpuTime)
+    , "status" A..= (a ^. status)
+    , "gridCurrent" A..= (a ^. gridCurrent)
+    , "solarVoltage" A..= (a ^. solarVoltage)
+    ]
   toEncoding = messageToEncoding
 
 instance FromJSON (EnergyState) where
-  parseJSON (Object v) = do
-    bv <- v .: "batteryV"
-    gv <- v .: "gridV"
-    b2l <- v .: "battery2LoadC"
-    b2g <- v .: "battery2GridC"
-    g2b <- v .: "grid2BatteryC"
-    si <- v .: "solarC"
-    return $ defMessage
-                         & batteryVoltage .~ bv
-                         & gridVoltage .~ gv
-                         & batteryToLoadCurrent .~ b2l
-                         & batteryToGridCurrent .~ b2g
-                         & gridToBatteryCurrent .~ g2b
-                         & solarInputCurrent .~ si
-  parseJSON _ = mempty
-
+  parseJSON = withObject "EnergyState" $ \v -> do
+    let m = defMessage
+    x1 <- (v .: "batteryVoltage")
+    x2 <- (v .: "gridVoltage")
+    x3 <- (v .: "batteryToLoadCurrent")
+    x4 <- (v .: "batteryToGridCurrent")
+    x5 <- (v .: "gridToBatteryCurrent")
+    x6 <- (v .: "solarInputCurrent")
+    x7 <- (v .: "temperature")
+    x8 <- (v .: "dutyCycle")
+    x9 <- (v .: "cpu_time")
+    x10 <- (v .: "status")
+    x11 <- (v .: "gridCurrent")
+    x12 <- (v .: "solarVoltage")
+    return $ m
+      & batteryVoltage .~ x1
+      & gridVoltage .~ x2
+      & batteryToLoadCurrent .~ x3
+      & batteryToGridCurrent .~ x4
+      & gridToBatteryCurrent .~ x5
+      & solarInputCurrent .~ x6
+      & temperature .~ x7
+      & dutyCycle .~ x8
+      & cpuTime .~ x9
+      & status .~ x10
+      & gridCurrent .~ x11
+      & solarVoltage .~ x12
+    where
+      revC mv a = do
+        s <- mv
+        a .~ mv
+        return a
+  --parseJSON _ = error "MUST BE OBJECT"
+  
 
 esFieldNamesJSON :: [T.Text]
-esFieldNamesJSON = ["batteryV",
-                     "gridV",
-                     "battery2LoadC",
-                     "battery2GridC",
-                     "grid2BatteryC",
-                     "solarC"
+esFieldNamesJSON = ["batteryVoltage",
+                     "gridVoltage",
+                     "batteryToLoadCurrent",
+                     "batteryToGridCurrent",
+                     "gridToBatteryCurrent",
+                     "solarInputCurrent",
+                     "temperature",
+                     "dutyCycle",
+                     "cpu_time",
+                     "status",
+                     "gridCurrent",
+                     "solarVoltage" 
                    ]
 
 fieldAccessorsJSON es = es ^.. ( batteryVoltage
@@ -330,6 +365,12 @@ fieldAccessorsJSON es = es ^.. ( batteryVoltage
                           <> batteryToGridCurrent
                           <> gridToBatteryCurrent
                           <> solarInputCurrent
+                          <> temperature
+                          <> dutyCycle
+                          <> cpuTime
+                          <> status
+                          <> gridCurrent
+                          <> solarVoltage
                         )
 #ifndef ghcjs_HOST_OS
 esFieldNamesCSV :: [Csv.Name]
@@ -426,33 +467,13 @@ instance (FromJSON e, FromJSON p) => FromJSON (Battery e p)
 instance (GreskellC e, GreskellC p) => FromGraphSON (Battery e p) where
   parseGraphSON = parseJSON . unwrapAll
 
-socKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
-socKey = "soc"
-
-chargeLimKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
-chargeLimKey = "chargeLim"
-
-dischargeLimKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
-dischargeLimKey = "dischargeLim"
-
-totalCapacityKey :: (FromJSON a, ToJSON a) => Key VFoundNode a
-totalCapacityKey = "batteryCapacity"
-
-
+batKey :: Key VFoundNode BL.ByteString
+batKey = "battKey"
 
 instance (GreskellC e, GreskellC p) => NodeAttributes (Battery e p) where
-  writeNodeAttributes b = fmap writeKeyValues $ sequence $
-    [ socKey <=:> soc b
-    , chargeLimKey <=:> chargeLim b
-    , dischargeLimKey <=:> dischargeLim b
-    , totalCapacityKey <=:> totalCapacity b
-    ]
-  parseNodeAttributes props = pMapToFail (Battery
-                                          <$> lookupAs socKey props
-                                          <*> lookupAs chargeLimKey props
-                                          <*> lookupAs dischargeLimKey props
-                                          <*> lookupAs totalCapacityKey props
-                                         )
+  writeNodeAttributes bat = fmap writeKeyValues $ sequence $
+    [ batKey <=:> A.encode bat ]
+  parseNodeAttributes props = pMapToFail $ decodeBin $ lookupAs batKey props
 #endif
 
 emptyB :: (Fractional e, Fractional p) => Battery e p
@@ -464,11 +485,12 @@ instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (Battery e p)
 #endif
 
 instance (Fractional e, Fractional p, Ord e, Ord p) => Semigroup (Battery e p) where
-  b <> b' = emptyB { soc = min (soc b)  (soc b')
-                   , chargeLim = min (chargeLim b) (chargeLim b')
-                   , dischargeLim = min (dischargeLim b) (dischargeLim b')
-                   , totalCapacity = min (totalCapacity b) (totalCapacity b')
-                   }
+  b <> b' = (emptyB @e @p) { soc = min (soc b)  (soc b')
+                           , chargeLim = min (chargeLim b) (chargeLim b')
+                           , dischargeLim = min (dischargeLim b) (dischargeLim b')
+                           , totalCapacity = min (totalCapacity b) (totalCapacity b')
+                           }
+
 instance (Fractional e, Fractional p, Ord e, Ord p) => Monoid (Battery e p) where
   mempty = emptyB
 

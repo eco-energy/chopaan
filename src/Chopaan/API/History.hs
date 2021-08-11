@@ -46,7 +46,7 @@ import Chopaan.Graph.Spider ( meshNodesSnapshot
                             , statusNodesSnapshot
                             , flowNodesSnapshot
                             )
-import Chopaan.Comm.Comm (initMessageQs)
+import Chopaan.Comm.Comm
 import Chopaan.Comm.Address
 import Data.Pool
 
@@ -168,9 +168,8 @@ createKbtzWithHydration k ns t t' = do
                      addKbtz c k
                      mapM_ (addNodeToKbtz c k) ns
                  )
-  qs <- liftIO $ initMessageQs
   b <- s3Bucket <$> ask
-  hydrateKbtz $ KbtzC k ns qs (Just b)
+  hydrateKbtz (KbtzC k ns Nothing (Just b)) (t, t')
 
 hoistS :: forall t m. (IsStream t, MonadAsync m) => String -> Int -> (t GraphM) ~> (t m) 
 hoistS h p = adapt . S.hoist (runGraphM h p) . adapt

@@ -210,19 +210,19 @@ foldTxState (Tx gt) = let
 --composeFold :: FL.Fold m a b -> FL.Fold m b c -> FL.Fold m a c
 --composeFold f g = g . f
   
-idFold :: (Monad m, Monoid a) => FL.Fold m a a
-idFold = FL.foldl' (flip const) mempty
+idFold :: (Monad m) => FL.Fold m a a
+idFold = fmap fromJust $ FL.foldl' (flip (const . Just)) Nothing
 {-# INLINE idFold #-}
 
-secondF :: (Monad m, Monoid a) => FL.Fold m b c -> FL.Fold m (a, b) (a, c)
+secondF :: (Monad m) => FL.Fold m b c -> FL.Fold m (a, b) (a, c)
 secondF = FL.unzip idFold
 {-# INLINE secondF #-}
 
-firstF :: (Monad m, Monoid c) => FL.Fold m a b -> FL.Fold m (a, c) (b, c)
+firstF :: (Monad m) => FL.Fold m a b -> FL.Fold m (a, c) (b, c)
 firstF = (flip FL.unzip) idFold 
 {-# INLINE firstF #-}
 
-dupF :: (Monad m, Monoid a) => FL.Fold m a b -> FL.Fold m a (a, b)
+dupF :: (Monad m) => FL.Fold m a b -> FL.Fold m a (a, b)
 dupF f = FL.tee idFold f  
 {-# INLINE dupF #-}
 
