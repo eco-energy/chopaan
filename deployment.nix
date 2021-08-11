@@ -1,6 +1,7 @@
 let
   region = "ap-southeast-1";
   app = (import ./. {}).chopaan;
+  pkgs = (import ./nix/default.nix {});
   accessKeyId = "default";
   ui = (import ./nix/snowman.nix).build { isJS = true; };
   staticUi = (import ./nix/website.nix) {};
@@ -26,13 +27,13 @@ in
         ec2 = {
           inherit accessKeyId region;
 
-          instanceType = "t3.micro";
+          instanceType = "t3.medium";
 
           ebsBoot = true;
           ebsInitialRootDiskSize = 100;
 
           keyPair = resources.ec2KeyPairs.chopaan-key-pair;
-
+          instanceProfile = resources.iamRoles.chopaan-role.name;
           securityGroups = [
             resources.ec2SecurityGroups."http"
             resources.ec2SecurityGroups."https"
@@ -46,12 +47,20 @@ in
           hostName = dnsName;
           usePublicDNSName = true;
         };
+
+        keys.aws-creds = { text = builtins.readFile ./key;
+                   };
       };
-
+      
       boot.loader.grub.device = lib.mkForce "/dev/nvme0n1";
-
-      networking.firewall.allowedTCPPorts = [ 80 443 ];
-
+      networking.firewall.enable = false;
+      #networking.firewall.allowedTCPPorts = [ 80 443 ];
+      environment.systemPackages = [ pkgs.z3 ];
+      environment.variables = { SERVER_HOST = dnsName;
+                                SERVER_PORT = "443";
+                                REGION = region;
+                              };
+      
       docker-containers."janusgraph" = {
            image = "docker.io/janusgraph/janusgraph:latest";
            ports = [ "${toString janusPort}:${toString janusPort}" ];
@@ -65,8 +74,11 @@ in
       systemd.services.chopaan = {
         wantedBy = [ "multi-user.target" ];
 
-        after = [ "docker-janusgraph.service" ];
-
+        after = [ "network.target" "docker-janusgraph.service" ];
+        environment = {
+          HOME = "/root";
+          PATH = "${pkgs.z3}/lib"
+        };
         script =
           let
             chopaan = app.kbtzim;
@@ -114,7 +126,6 @@ in
       '';
         
         virtualHosts.${dnsName} = {
-          #addSSL = true;
           forceSSL = true;
           enableACME = true;
           locations."/" = {
@@ -127,7 +138,6 @@ in
             extraConfig = "proxy_cache chop-cache;";
             tryFiles = "$uri uri/ =404";
           };
-          # root = uijs;
         };
       };
     };
@@ -162,5 +172,33 @@ in
       };
       
       elasticIPs.chopaan-ip = { inherit region accessKeyId; };
+
+      iamRoles.chopaan-role = { inherit region accessKeyId;
+                                name = "chopaanRole";
+                                policy = ''
+                                {
+                                   "Version": "2012-10-17",
+                                   "Statement": [
+                                       {
+                                           "Effect": "Allow",
+                                           "Action": [
+                                               "iot:*"
+                                           ],
+                                           "Resource": "*"
+                                       },
+                                       {
+                                           "Effect": "Allow",
+                                           "Action": "s3:*",
+                                           "Resource": "*"
+                                       },
+                                       {
+                                           "Effect": "Allow",
+                                           "Action": "ec2:*",
+                                           "Resource": "*"
+                                       }
+                                   ]
+                                }
+                                '';
+                              };
     };
   }
