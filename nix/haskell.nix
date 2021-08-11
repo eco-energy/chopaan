@@ -30,8 +30,9 @@ let
     src = haskell-nix.haskellLib.cleanGit { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
     index-state = "2021-02-01T00:00:00Z";
-    plan-sha256 = "1v5ic879mqmkp16bgi09gxzzp7pp97s2x56zcayhkkhnffz9k942";
+    plan-sha256 = "07016xv2l2xnjc8qpqmg9zi7h9qxvn8wfakspmhhv0lnavdfjci1";
     materialized = ./chopaan.materialized;
+    #checkMaterialization = true;
     # these extras will provide additional packages
     # ontop of the package set derived from cabal resolution.
     pkg-def-extras = [(hackage: {
@@ -58,14 +59,20 @@ let
             gcc = !cudaSupport && pkgs.stdenv.hostPlatform.isDarwin;
           };
         };
+        # z3 fixes
+        packages.sbv.components.library.libs = pkgs.lib.mkForce
+          [ buildPackages.z3 ];
       }
-
       # Add dependencies
       {
         
         packages.chopaan = {
           #components.tests.chopaan-tests.build-tools = [ ]; # jormungandr
           doCoverage = false;
+          configureFlags = [
+            "--extra-lib-dirs=${buildPackages.z3}/lib"
+            "--extra-include-dirs=${buildPackages.z3}/include"
+          ];
           # How to set environment variables for builds
           #preBuild = "export NETWORK=testnet";
 
