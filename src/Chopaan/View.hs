@@ -86,10 +86,10 @@ ainit :: (Monad m, CRUDChopaan m) => Route -> m Frontend
 ainit _ = MHomePage . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
 
 defGView :: GView
-defGView = GView (KbtzId "test") StatusG t0 t1 (t0, t1) Nothing
+defGView = GView (KbtzId "Lab_TestGrid") StatusG t0 t1 (t0, t1) Nothing
   where
-    t0 = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
-    t1 = Ti.UTCTime (Ti.fromGregorian 2021 4 7) (Ti.secondsToDiffTime 0)
+    t0 = Ti.UTCTime (Ti.fromGregorian 2021 7 11) (Ti.secondsToDiffTime 0)
+    t1 = Ti.UTCTime (Ti.fromGregorian 2021 10 11) (Ti.secondsToDiffTime 0)
 
 requestGView :: forall m. (CRUDChopaan m, Monad m) => GView -> m (SG NodeMAC) 
 requestGView (GView k g t0 t1 _ _) = case g of
