@@ -36,9 +36,9 @@ runKbtzim mq = do
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks
   --qss <- mapM (\(k, ns) -> mqttQs mq k ns) $ zip ks nss
   let confss = fmap sConf (zip ks nss)-- qss
-      --past = S.concatMapWith S.async (S.concatM . (flip hydrateKbtz $ (t0, tn))) $ S.fromList confss
+      past = S.concatMapWith S.async (S.concatM . (flip hydrateKbtz $ (t0, tn))) $ S.fromList confss
       present = S.concatMapWith S.async (S.concatM . runKibbutz @t) $ S.fromList confss
-  return $ --(S.map (const True) $ past) `S.async`
+  return $ (S.map (const True) $ past) `S.async`
     (S.map (const True) $ present)
   where
     futPrefix = "runKibbutz :" 
