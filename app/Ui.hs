@@ -34,8 +34,8 @@ data ClientArgs = ClientArgs
 
 parser :: Parser ClientArgs
 parser = ClientArgs
-  <$> strOption   (long "host" <> short 'h' <> metavar "HOST"  <> showDefault <> value "localhost")
-  <*> option auto (long "port"   <> short 'p' <> metavar "PORT" <> showDefault <> value 8080)
+  <$> strOption   (long "host" <> short 'h' <> metavar "HOST"  <> showDefault <> value "dosti.ecoenergy.global")
+  <*> option auto (long "port"   <> short 'p' <> metavar "PORT" <> showDefault <> value 443)
 
 
 options :: ParserInfo ClientArgs
