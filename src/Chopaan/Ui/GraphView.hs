@@ -56,13 +56,26 @@ default (Text)
 
 render3dGrid :: forall m n a. (MonadJSM m, S.MonadAsync m, Eq n, Ord n, Humanize n, NFData n, Show n, ToJSONKey n) => SG n -> Html m a
 render3dGrid sg = case sg of
-  (G.Mesh (SG ms)) -> renderBaked ms 
-  (G.Transactor (SG ms)) -> renderBaked ms 
-  (G.Status (SG ms)) -> renderBaked ms
-  (G.Flow (SG ms)) -> renderBaked ms
+  (G.Mesh (SG ms)) -> renderunBaked ms 
+  (G.Transactor (SG ms)) -> renderunBaked ms 
+  (G.Status (SG ms)) -> renderunBaked ms
+  (G.Flow (SG ms)) -> renderunBaked ms
   where
     nt :: m ~> JSM
     nt = undefined
+    renderunBaked :: forall a v l.
+                 (Eq l, Eq v, NFData l, NFData v, Humanize l, Humanize v, ToJSON v, Show v)
+               =>  SnapshotGraph n v l -> Html m a
+    renderunBaked (ns, es) = H.div rootCSS (
+      Prelude.concat $ (uncurry titledHuman) <$> (M.toAscList elements)
+      )
+      --H.baked $ do
+      --(, retrySTM) <$> (threeDM (nt, s) objF elements)
+        where
+          rootCSS = [H.class' $ Css.grid <> Css.flex_1]
+          elements = M.fromList $ fmap (second fromJust) $ filter (isJust . snd) $
+                  (\n -> (_nodeId n, _nodeAttributes n)) <$> ns
+
     renderBaked :: forall a v l.
                  (Eq l, Eq v, NFData l, NFData v, Humanize l, Humanize v, ToJSON v, Show v)
                =>  SnapshotGraph n v l -> Html m a
@@ -74,6 +87,13 @@ render3dGrid sg = case sg of
           objF = grid3D 5 5 25
           s :: S.AheadT m (n, v)
           s = undefined
+
+
+human :: forall m a b. (Humanize a) => a -> Html m b
+human = H.text . humanize
+
+titledHuman :: forall m n a b. (Humanize a, Humanize n) => n -> a -> [Html m b]
+titledHuman n a = [human n, human a]
 
 -- renderKbtzGraph :: forall m n. (Applicative m, Ord n, Humanize n) => SG n -> Html m () -- SG
 -- renderKbtzGraph sg = case sg of
