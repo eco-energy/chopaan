@@ -118,6 +118,7 @@ s3Stream :: (IsStream t, MonadAsync m, MonadCatch m)
          -> S3S t m EnergyState RuntimeStats
 s3Stream bucket ns range = S.tapRate 10 (liftIO . (print . (prefix <>) . show))
                            $ S.mapM (pure . (second f) . align)
+                           $ S.maxRate 100
                            $ S.concatMapWith S.async (uncurry (nodeS3 bucket range))
                            $ S.fromList ns
   where
