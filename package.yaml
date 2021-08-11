@@ -115,6 +115,7 @@ dependencies:
 - convertible
 - regex-applicative
 - generic-lens
+- unliftio-core
 when:
   condition: "!impl(ghcjs)"
   then:

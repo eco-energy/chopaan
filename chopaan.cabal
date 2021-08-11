@@ -1,10 +1,8 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: 14f583351e7fc0d5642f74b83f592af463b028266a9a88883d366ea56f625ee4
 
 name:           chopaan
 version:        0.1.0.0
@@ -128,6 +126,7 @@ library
     , ulid
     , unagi-chan
     , unliftio
+    , unliftio-core
     , unordered-containers
     , vector
     , vector-sized
@@ -403,6 +402,7 @@ executable dev
     , ulid
     , unagi-chan
     , unliftio
+    , unliftio-core
     , unordered-containers
     , vector
     , vector-sized
@@ -548,6 +548,7 @@ executable kbtzim
     , ulid
     , unagi-chan
     , unliftio
+    , unliftio-core
     , unordered-containers
     , vector
     , vector-sized
@@ -692,6 +693,7 @@ executable server
     , ulid
     , unagi-chan
     , unliftio
+    , unliftio-core
     , unordered-containers
     , vector
     , vector-sized
@@ -837,6 +839,7 @@ executable ui
     , ulid
     , unagi-chan
     , unliftio
+    , unliftio-core
     , unordered-containers
     , vector
     , vector-sized
@@ -999,6 +1002,7 @@ test-suite chopaan-test
     , ulid
     , unagi-chan
     , unliftio
+    , unliftio-core
     , unordered-containers
     , vector
     , vector-sized
