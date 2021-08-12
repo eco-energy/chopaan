@@ -1,8 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 8e4817cc81502854f7cb81bb6f547c64c5ef4bf3006f3621d4efd451aa4c8b27
 
 name:           chopaan
 version:        0.1.0.0
