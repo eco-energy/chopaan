@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8e4817cc81502854f7cb81bb6f547c64c5ef4bf3006f3621d4efd451aa4c8b27
+-- hash: 584a1ef20aa775030d0011c4902307361d2bbfdbc290b53bb2a70efccae15a85
 
 name:           chopaan
 version:        0.1.0.0
@@ -44,8 +44,7 @@ library
   hs-source-dirs:
       src
   build-depends:
-      SVGFonts
-    , Shpadoinkle >=0.3.0.0
+      Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
@@ -78,7 +77,7 @@ library
     , dependent-sum
     , dependent-sum-template
     , diagrams-contrib >=1.4.4
-    , diagrams-lib
+    , diagrams-lib >=1.4.4
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
@@ -99,7 +98,7 @@ library
     , jsaddle >=0.9.7.1
     , keys
     , lens
-    , linear
+    , linear >=1.21.6
     , microlens
     , monad-bayes
     , monad-control
@@ -320,8 +319,7 @@ executable dev
   hs-source-dirs:
       app
   build-depends:
-      SVGFonts
-    , Shpadoinkle >=0.3.0.0
+      Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
@@ -354,7 +352,7 @@ executable dev
     , dependent-sum
     , dependent-sum-template
     , diagrams-contrib >=1.4.4
-    , diagrams-lib
+    , diagrams-lib >=1.4.4
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
@@ -375,7 +373,7 @@ executable dev
     , jsaddle >=0.9.7.1
     , keys
     , lens
-    , linear
+    , linear >=1.21.6
     , microlens
     , monad-bayes
     , monad-control
@@ -466,8 +464,7 @@ executable kbtzim
   hs-source-dirs:
       app
   build-depends:
-      SVGFonts
-    , Shpadoinkle >=0.3.0.0
+      Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
@@ -500,7 +497,7 @@ executable kbtzim
     , dependent-sum
     , dependent-sum-template
     , diagrams-contrib >=1.4.4
-    , diagrams-lib
+    , diagrams-lib >=1.4.4
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
@@ -521,7 +518,7 @@ executable kbtzim
     , jsaddle >=0.9.7.1
     , keys
     , lens
-    , linear
+    , linear >=1.21.6
     , microlens
     , monad-bayes
     , monad-control
@@ -611,8 +608,7 @@ executable server
   hs-source-dirs:
       app
   build-depends:
-      SVGFonts
-    , Shpadoinkle >=0.3.0.0
+      Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
@@ -645,7 +641,7 @@ executable server
     , dependent-sum
     , dependent-sum-template
     , diagrams-contrib >=1.4.4
-    , diagrams-lib
+    , diagrams-lib >=1.4.4
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
@@ -666,7 +662,7 @@ executable server
     , jsaddle >=0.9.7.1
     , keys
     , lens
-    , linear
+    , linear >=1.21.6
     , microlens
     , monad-bayes
     , monad-control
@@ -757,8 +753,7 @@ executable ui
   hs-source-dirs:
       app
   build-depends:
-      SVGFonts
-    , Shpadoinkle >=0.3.0.0
+      Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
@@ -791,7 +786,7 @@ executable ui
     , dependent-sum
     , dependent-sum-template
     , diagrams-contrib >=1.4.4
-    , diagrams-lib
+    , diagrams-lib >=1.4.4
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
@@ -812,7 +807,7 @@ executable ui
     , jsaddle >=0.9.7.1
     , keys
     , lens
-    , linear
+    , linear >=1.21.6
     , microlens
     , monad-bayes
     , monad-control
@@ -920,8 +915,7 @@ test-suite chopaan-test
   hs-source-dirs:
       test
   build-depends:
-      SVGFonts
-    , Shpadoinkle >=0.3.0.0
+      Shpadoinkle >=0.3.0.0
     , Shpadoinkle-backend-pardiff
     , Shpadoinkle-backend-snabbdom
     , Shpadoinkle-console
@@ -954,7 +948,7 @@ test-suite chopaan-test
     , dependent-sum
     , dependent-sum-template
     , diagrams-contrib >=1.4.4
-    , diagrams-lib
+    , diagrams-lib >=1.4.4
     , diagrams-svg >=1.4.3
     , dimensional
     , directory
@@ -975,7 +969,7 @@ test-suite chopaan-test
     , jsaddle >=0.9.7.1
     , keys
     , lens
-    , linear
+    , linear >=1.21.6
     , microlens
     , monad-bayes
     , monad-control
@@ -1068,4 +1062,5 @@ test-suite chopaan-test
       , proto-lens-arbitrary
       , quickcheck-instances
       , quickspec
+      , testcontainers
   default-language: Haskell2010

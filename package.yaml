@@ -68,7 +68,7 @@ dependencies:
 - estimator
 - cassava
 - distributive
-- linear >= 1.21.0
+- linear >= 1.21.6
 - ad
 - keys
 - vector

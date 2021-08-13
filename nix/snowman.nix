@@ -114,7 +114,6 @@ let
         "foundation" = pkgs.haskell.lib.dontCheck foundation;
         "cereal" = pkgs.haskell.lib.dontCheck hsuper.cereal;
         "lens" = pkgs.haskell.lib.dontCheck hsuper.lens;
-        "linear" = pkgs.haskell.lib.dontCheck hsuper.linear;
         "compensated" = pkgs.haskell.lib.dontCheck hsuper.compensated;
         "log-domain" = pkgs.haskell.lib.dontCheck hsuper.log-domain;
         "rio" = pkgs.haskell.lib.dontCheck hsuper.rio;
@@ -122,11 +121,80 @@ let
         "exact-pi" = pkgs.haskell.lib.dontCheck hsuper.exact-pi;
         "dimensional" = pkgs.haskell.lib.dontCheck hsuper.dimensional;
         "shelly" = pkgs.haskell.lib.dontCheck hsuper.shelly;
+        "html-parse" = pkgs.haskell.lib.dontCheck hsuper.html-parse;               
         "fingertree" = pkgs.haskell.lib.dontCheck hsuper.fingertree;
-        "diagrams-lib" = pkgs.haskell.lib.dontCheck hsuper.diagrams-lib;
         "generic-deriving" = pkgs.haskell.lib.dontCheck hsuper.generic-deriving;
         "streaming-commons" = pkgs.haskell.lib.dontCheck hsuper.streaming-commons;
         "lattices" = pkgs.haskell.lib.dontCheck hsuper.lattices;
+        "linear" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "linear";
+          ver = "1.21.6";
+          sha256 = "1vyh33k14b6plk5ic2yrkl8z618ivd2gjz6qll2xrsswrkdfwxhr";
+        } {});
+        "indexed-traversable" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "indexed-traversable";
+          ver = "0.1.1";
+          sha256 = "1r5hvz6c90qcjc6r79r1vdv38l898saiv0027xzknlp48hcx8292";
+        } {});
+        "base-orphans" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "base-orphans";
+          ver = "0.8.3";
+          sha256 = "12lgnyg0qd5nvg7cvknv8b2lkm7s0mhbgi60a223nfqwq6684ynl";
+        } {});
+        "diagrams-core" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "diagrams-core";
+          ver = "1.5.0";
+          sha256 = "0aqzb2ka4nqp13mljfxs9g29b06w5f4gax2vmgy00s72d824bnv1";
+        } {});
+        "diagrams-lib" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "diagrams-lib";
+          ver = "1.4.4";
+          sha256 = "13l701nxny5cgqbfqpjpmb2qfxlrifs0ggzxf4baicf9sb85gvh2";
+        } {});
+        "diagrams-contrib" = pkgs.haskell.lib.dontCheck (pkgs.haskell.lib.overrideCabal (hsuper.callHackageDirect {
+          pkg = "diagrams-contrib";
+          ver = "1.4.4";
+          sha256 = "1bnf193lh100fv268mdq2kg51fy9407gd134s4yk6saxlk0bg31g";
+        } {}) (_: {
+          revision = "2";
+          editedCabalFile = "4f767211b35c60a018534c23cee1b00f560df999c111e5a2c1629d6fcac077d6";
+        }));
+        "diagrams-svg" = pkgs.haskell.lib.dontCheck (pkgs.haskell.lib.overrideCabal (hsuper.callHackageDirect {
+          pkg = "diagrams-svg";
+          ver = "1.4.3";
+          sha256 = "0598dfx7c22wnq6qk4cr8fzqj0clwwsvmrmpyxbiyiz149h2digk";
+        } {}) (_: {
+          revision = "3";
+          editedCabalFile = "7b4eefffba2b25267eea25155dded4309a153a965eebf16923d289bb797ac3a6";
+        }));
+        "force-layout" = pkgs.haskell.lib.dontCheck (pkgs.haskell.lib.overrideCabal (hsuper.callHackageDirect {
+          pkg = "force-layout";
+          ver = "0.4.0.6";
+          sha256 = "0km1h9wix5d0zngbdbcdnv9ga8rmmlj5rmr2axdcfay8g01rx6fg";
+        } {}) (_: {
+          revision = "7";
+          editedCabalFile = "4adae4a45a09a9378ea87930f082a968767a2bc95f6b2122e11966c57046a01c";
+        }));
+        "active" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "active";
+          ver = "0.2.0.15";
+          sha256 = "18prfvmn0k6kfn5asqqzinwqfamrxvkfczcymi0gfmbw5h351gdv";
+        } {});
+        "monoid-extras" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "monoid-extras";
+          ver = "0.6";
+          sha256 = "1z9nvhpcfhzahzx3m9x7z0dbnrqb08pqnb1k4h8na3vq0fva8jq7";
+        } {});
+        "dual-tree" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "dual-tree";
+          ver = "0.2.3.0";
+          sha256 = "152ljd2q73fngh5n7z7nz7kqkx507zabqv0nri4yyp5x6l8sqf9x";
+        } {});
+        "newtype-generics" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "newtype-generics";
+          ver = "0.6";
+          sha256 = "1gr9r8xwqxrp2w9qfqqir5y2k166lih5wll59r36qr8apj1w33pz";
+        } {});
         "monad-bayes" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
           pkg = "monad-bayes";
           ver = "0.1.1.0";
