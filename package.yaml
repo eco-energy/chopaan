@@ -68,7 +68,7 @@ dependencies:
 - estimator
 - cassava
 - distributive
-- linear
+- linear >= 1.21.0
 - ad
 - keys
 - vector
@@ -78,10 +78,9 @@ dependencies:
 - algebraic-graphs >= 0.5
 - resource-pool
 - servant
-- diagrams-lib
+- diagrams-lib >= 1.4.4
 - diagrams-svg >= 1.4.3
 - diagrams-contrib >= 1.4.4
-- SVGFonts
 - comonad
 - pointed
 - interpolatedstring-perl6
@@ -438,6 +437,7 @@ tests:
           - proto-lens-arbitrary
           - hspec-golden-aeson
           - hspec-wai
+          - testcontainers
         ghc-options:
           - -threaded
           - -with-rtsopts=-N

@@ -117,9 +117,15 @@ extra-deps:
  - twee-lib-2.2@sha256:9fe9327505d8f450a94f2fc9eea74b292901b7992d520aa1dd4f0410fbe0e594,2112
  - quickspec-2.1.5
  - suavemente-0.2.0.0
- - diagrams-svg-1.4.3
- - diagrams-contrib-1.4.4
+ - diagrams-lib-1.4.4
+ - diagrams-core-1.5.0
+ - diagrams-svg-1.4.3@sha256:7b4eefffba2b25267eea25155dded4309a153a965eebf16923d289bb797ac3a6
+ - diagrams-contrib-1.4.4@sha256:4f767211b35c60a018534c23cee1b00f560df999c111e5a2c1629d6fcac077d6
  - diagrams-graphviz-1.4.1.1@sha256:e71afa8f89904c2a6a2cb490dba7108c6425779c2174b90bd90dbaf507a9d3dc,1388
+ - dual-tree-0.2.3.0
+ - force-layout-0.4.0.6@sha256:4adae4a45a09a9378ea87930f082a968767a2bc95f6b2122e11966c57046a01c
+ - active-0.2.0.15
+ - newtype-generics-0.6@sha256:ac08e4b6caff80c8310649581ffba887e9d65b659c8b5697feaf32cf135b6c68,2010
  - beam-core-0.9.0.0
  - beam-postgres-0.5.0.0
  - beam-migrate-0.5.0.0
@@ -141,6 +147,19 @@ extra-deps:
  - html-parse-0.2.0.2@sha256:268c6c3a723aae77ff799bf501d60a91e60536facab3ae70df7a74cea75e29c3,3898
  - ghcjs-base-stub-0.3.0.2@sha256:1ce3ac155173b8036873ad990d3ed86137a643264fb6dad294a935a32e1105a2,3669
  - derive-storable-0.3.0.0@sha256:819332e8dd666ec88dab17e3aca0cffced197c1a560f5a003789a9372e7f07f1,2299
+ - testcontainers-0.3.0.1@sha256:af20f1fe0384f0ace51a8095a19f25271df44e82b15e37cad052f57df1df7fb9,2662
+ - aeson-optics-1.1.0.1@sha256:730de585030e820cc3ade10d756f257be846d891028942b8c545a8498e6b5580,1629
+ - exceptions-0.10.4@sha256:d2546046d7ba4b460d3bc7fd269cd2c52d0b7fb3cfecc038715dd0881b78a484,2796
+ - resourcet-1.2.4.2@sha256:d57516781d1721f70aa0b9ec8ea9200ab02bf76349cb76d73ad57729302289cc,1730
+ - indexed-profunctors-0.1.1@sha256:363e1bcd89f8498a770ae783e8388fcce35e6515b4c38dca47327aad81196a7b,1063
+ - optics-extra-0.3
+ - indexed-traversable-instances-0.1@sha256:3aaf97040001bbe583e29c2b9c7d41660df265e6565a0d2ac09a3ed5b8bc21be,2874
+ - optics-core-0.3.0.1@sha256:50845a47810eb5a5f03dfa9bb1edd8a577fc7ca1702ba4bde68b235f7cb44528,4536
+ - indexed-traversable-0.1.1@sha256:e330ec1ab336ee2fb1eff117ebe3480d1663396fecd981f185b7123dc7941ae1,2469
+ - vector-0.12.3.0@sha256:0ae2c1ba86f0077910be242ec6802cc3d7725fe7b2bea6987201aa3737b239b5,7953
+ - linear-1.21.6
+ - base-orphans-0.8.4@sha256:9a70dc95761ab9a9d49a038a4599b7b7945d486d80ed1678f347445bc336f3e0,3149
+ - monoid-extras-0.6@sha256:fabcab0a59ac48d8f271016cf8190b21969b202c760df2db85add2fef93d38b4,2197
 
  #- z3-408.2@sha256:1f8b6ccbcc6d06a6701900a09fcfcbaf86ed8a8495615710bef4da5cdb073a3f,4226
 # Override default flag values for local packages and extra-deps
