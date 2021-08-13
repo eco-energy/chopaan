@@ -69,6 +69,7 @@ let
         packages.chopaan = {
           #components.tests.chopaan-tests.build-tools = [ ]; # jormungandr
           doCoverage = false;
+          doCheck = false;
           configureFlags = [
             "--extra-lib-dirs=${buildPackages.z3}/lib"
             "--extra-include-dirs=${buildPackages.z3}/include"
