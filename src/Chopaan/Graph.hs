@@ -14,7 +14,7 @@ module Chopaan.Graph ( module Chopaan.Graph
 #endif
                      ) where
 
-import Prelude hiding ((.), id)
+import Prelude
 import Control.Monad
 
 import GHC.Generics (Generic, Generic1)
@@ -48,6 +48,9 @@ newtype GraphM a = GraphM { runGraphM' :: ReaderT (DBPools) IO a }
 
 runGraphM :: MonadIO m => String -> Int -> GraphM ~> m
 runGraphM h p a = liftIO $ runReaderT (runGraphM' a) =<< (mkDBPools h p)
+
+runGraphWithDB :: MonadIO m => DBPools -> GraphM ~> m
+runGraphWithDB db = liftIO . (flip runReaderT db) . runGraphM'
 
 mkDBPools :: MonadIO m => String -> Int -> m (DBPools)
 mkDBPools h p = do
