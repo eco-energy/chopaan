@@ -33,8 +33,10 @@ import GHC.Generics
 import Data.Monoid (Last(..))
 import Data.Int
 import Data.Text as T
-import Data.Binary
-import Data.Aeson (FromJSON(..), ToJSON)
+import Data.Binary (Binary)
+import qualified Data.ByteString.Lazy as BL
+import Data.Aeson (FromJSON(..), ToJSON(..))
+import qualified Data.Aeson as A
 import Data.Maybe (fromJust)
 import qualified Streamly.Internal.Data.Fold as FL
 
@@ -51,7 +53,7 @@ import NetSpider.Spider
   (Spider, addFoundNode)
 import NetSpider.Graph (LinkAttributes(..), EFinds, NodeAttributes(..), VFoundNode)
 import NetSpider.Timestamp (fromUTCTime)
-import Chopaan.Graph.Greskell ()
+import Chopaan.Graph.Greskell
 #endif
 
 import Chopaan.Node.NodeId
@@ -69,22 +71,15 @@ data RxSignal = RxSignal
 noSignal = RxSignal Nothing Nothing
 
 #ifndef ghcjs_HOST_OS
-sigKey :: Key n (Maybe Double)
-sigKey = "signalStrength"
-
-parentKey :: Key n (Maybe NodeMAC)
-parentKey = "connParent"
+signalKey :: Key n (BL.ByteString)
+signalKey = "rxSignal"
 
 instance LinkAttributes RxSignal where
-  writeLinkAttributes (RxSignal s p) = fmap writeKeyValues $
+  writeLinkAttributes n = fmap writeKeyValues $
                           sequence $
-                          [ sigKey <=?> s
-                          , parentKey <=?> p
-                          ]
-  parseLinkAttributes props =
-    pMapToFail $ RxSignal
-    <$> lookupAs' sigKey props
-    <*> lookupAs' parentKey props
+                          [ signalKey <=:> A.encode n]
+                          
+  parseLinkAttributes props = pMapToFail $ decodeBin "RxSignal" $ lookupAs signalKey props
 #endif
 
 data MeshLink = MeshLink
@@ -154,20 +149,8 @@ meshF n = FL.mkFold_ (\_ r -> FL.Partial $ meshNodeLink n $ r) (FL.Partial (init
 
 #ifndef ghcjs_HOST_OS
 
-rootKey :: Key VFoundNode (Maybe Bool)
-rootKey = "isRoot"
-
-uptimeKey :: Key VFoundNode Text
-uptimeKey = "uptime"
-
-routerRSSIKey :: Key VFoundNode Int
-routerRSSIKey = "routerRSSI"
-
-versionKey :: Key VFoundNode (Maybe NodeVersion)
-versionKey = "version"
-
-nodeTimeKey :: Key VFoundNode (UTCTime)
-nodeTimeKey = "version"
+meshNodeKey :: Key VFoundNode (BL.ByteString)
+meshNodeKey = "meshNode"
 
 --instance FromGraphSON UTCTime where
   
@@ -175,22 +158,9 @@ nodeTimeKey = "version"
 instance NodeAttributes MeshNode where
   writeNodeAttributes n = fmap writeKeyValues $
                           sequence $
-                          [ rootKey <=?> isRoot n
-                          , uptimeKey <=:> (T.pack . show . uptime $ n)
-                          , routerRSSIKey <=:> routerRSSI n
-                          , versionKey <=?> (version n)
-                          , nodeTimeKey <=:> (nodeTime n)
-                          ]
-  parseNodeAttributes props = pMapToFail (MeshNode
-                 <$> lookupAs' rootKey props
-                 <*> (onE (lookupAs uptimeKey props))
-                 <*> lookupAs routerRSSIKey props
-                 <*> lookupAs' versionKey props
-                 <*> lookupAs nodeTimeKey props
-               )
-    where
-      onE (Left a) = (Left a)
-      onE (Right a) = Right . read . T.unpack $ a
+                          [ meshNodeKey <=:> A.encode n]
+                          
+  parseNodeAttributes props = pMapToFail $ decodeBin "MeshNode" $ lookupAs meshNodeKey props
 
 addRTS :: (MonadIO m)
         => Spider NodeMAC MeshNode RxSignal

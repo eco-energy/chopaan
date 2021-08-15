@@ -494,20 +494,14 @@ instance (ToJSON n, FromJSON n) => NodeAttributes (Stake' n) where
   writeNodeAttributes s = fmap writeKeyValues $
     sequence [ (stakeKey @VFoundNode <=:> A.encode s)
              ]
-  parseNodeAttributes props = pMapToFail (decodeBin $ lookupAs stakeKey props)
+  parseNodeAttributes props = pMapToFail (decodeBin "Stake' Node" $ lookupAs stakeKey props)
 
-
-decodeBin (Left a) = (Left a)
-decodeBin (Right x) = case A.decode x of
-        Nothing -> (Left $
-                    PMapParseError "Transactor or Stake Key" "aeson decode failed for sensor metrics")
-        Just x' -> Right x'
 
 instance (ToJSON n, FromJSON n) => LinkAttributes (Stake' n) where
   writeLinkAttributes s = fmap writeKeyValues $
     sequence [ (stakeKey @EFinds <=:> A.encode s)
              ]
-  parseLinkAttributes props = pMapToFail (decodeBin $ lookupAs stakeKey props)
+  parseLinkAttributes props = pMapToFail (decodeBin "Stake' Link" $ lookupAs stakeKey props)
 
 
 
@@ -570,11 +564,11 @@ instance (ToJSON n, FromJSON n) => LinkAttributes (TxStatus' n) where
   writeLinkAttributes s = fmap writeKeyValues $
     sequence [ (txStatusKey @EFinds <=:> A.encode s)
              ]
-  parseLinkAttributes props = pMapToFail (decodeBin $ lookupAs txStatusKey props)
+  parseLinkAttributes props = pMapToFail (decodeBin "TxStatus' Link" $ lookupAs txStatusKey props)
 
 instance (ToJSON n, FromJSON n) => NodeAttributes (TxStatus' n) where
   writeNodeAttributes s = fmap writeKeyValues $
     sequence [ (txStatusKey @VFoundNode <=:> A.encode s)
              ]
-  parseNodeAttributes props = pMapToFail (decodeBin $ lookupAs txStatusKey props)
+  parseNodeAttributes props = pMapToFail (decodeBin "TxStatus' Node" $ lookupAs txStatusKey props)
 #endif

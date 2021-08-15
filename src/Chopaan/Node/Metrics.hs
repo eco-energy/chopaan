@@ -176,23 +176,18 @@ nodeKey = "nodeKey"
 instance (GreskellC a) => LinkAttributes (Node a) where
   writeLinkAttributes node = fmap writeKeyValues $ sequence $
     [ nodeKey <=:> A.encode node ]
-  parseLinkAttributes props = pMapToFail $ decodeBin $ lookupAs nodeKey props
+  parseLinkAttributes props = pMapToFail $ decodeBin "Node As Link" $ lookupAs nodeKey props
                
 instance (GreskellC a) => NodeAttributes (Node a) where
   writeNodeAttributes node = fmap writeKeyValues $ sequence $
     [ nodeKey <=:> A.encode node ]
-  parseNodeAttributes props = pMapToFail $ decodeBin $ lookupAs nodeKey props
+  parseNodeAttributes props = pMapToFail $ decodeBin "Node as Node" $ lookupAs nodeKey props
 
 instance (GreskellC a) => FromGraphSON (Node a) where
   parseGraphSON = parseJSON . unwrapAll
 #endif
 
 
-
-instance Binary UTCTime
-instance Binary DiffTime where
-  put a = B.put @Int $ round a
-  get = secondsToDiffTime <$> B.get 
 
 
 data SensorMetrics e p = SensorMetrics
@@ -239,21 +234,6 @@ demandKey = "demandKey"
 esMsgKey :: Key VFoundNode (BL.ByteString)
 esMsgKey = "esMsg"
 
-instance FromJSON B.ByteString where
-  parseJSON (String t) = pure $ (either (const "") id . B64.decodeBase64 . T.encodeUtf8) t
-  parseJSON _ = empty
-
-instance ToJSON B.ByteString where
-  toJSON = String . T.decodeUtf8 . B64.encodeBase64'
-
-instance FromJSON BL.ByteString where
-  parseJSON a = (pure . BL.fromStrict) =<< A.parseJSON a
-
-instance ToJSON BL.ByteString where
-  toJSON = String . T.decodeUtf8 . B64.encodeBase64' . BL.toStrict
-
-instance FromGraphSON BL.ByteString where
-  parseGraphSON = parseJSON . unwrapOne
 
 instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
   writeNodeAttributes SensorMetrics{..} = fmap writeKeyValues $ sequence $
@@ -268,19 +248,12 @@ instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
   parseNodeAttributes props = pMapToFail (SensorMetrics
                                           <$> lookupAs' timeKey props
                                           <*> lookupAs timeDiffKey props
-                                          <*> (decodeBin $ lookupAs powerKey props)
-                                          <*> (decodeBin $ lookupAs energyKey props)
-                                          <*> (decodeBin $ lookupAs batteryKey props)
-                                          <*> (decodeBin $ lookupAs demandKey props)
-                                          <*> (decodeBin $ lookupAs esMsgKey props)
+                                          <*> (decodeBin "sensorM: power" $ lookupAs powerKey props)
+                                          <*> (decodeBin "sensorM: energy" $ lookupAs energyKey props)
+                                          <*> (decodeBin "sensorM: battery" $ lookupAs batteryKey props)
+                                          <*> (decodeBin "sensorM: demand" $ lookupAs demandKey props)
+                                          <*> (decodeBin "sensorM: message" $ lookupAs esMsgKey props)
                                          )
-decodeBin :: (FromJSON a) => Either PMapLookupException BL.ByteString -> Either PMapLookupException a 
-decodeBin (Left a) = (Left a)
-decodeBin (Right x) = case A.decode x of
-  Nothing -> (Left $ PMapParseError "sensorMetric Key" "aeson decode failed for sensor metrics")
-  Just x' -> Right x'
-
-
 #endif
 --instance Binary EnergyState where
 --  encode = undefined
@@ -301,12 +274,12 @@ instance ToJSON (EnergyState) where
     , "solarInputCurrent" A..= (a ^. solarInputCurrent)
     , "temperature" A..= (a ^. temperature)
     , "dutyCycle" A..= (a ^. dutyCycle)
-    , "cpu_time" A..= (a ^. cpuTime)
+    , "cpuTime" A..= (a ^. cpuTime)
     , "status" A..= (a ^. status)
     , "gridCurrent" A..= (a ^. gridCurrent)
     , "solarVoltage" A..= (a ^. solarVoltage)
     ]
-  toEncoding = messageToEncoding
+  --toEncoding = messageToEncoding
 
 instance FromJSON (EnergyState) where
   parseJSON = withObject "EnergyState" $ \v -> do
@@ -319,7 +292,7 @@ instance FromJSON (EnergyState) where
     x6 <- (v .: "solarInputCurrent")
     x7 <- (v .: "temperature")
     x8 <- (v .: "dutyCycle")
-    x9 <- (v .: "cpu_time")
+    x9 <- (v .: "cpuTime")
     x10 <- (v .: "status")
     x11 <- (v .: "gridCurrent")
     x12 <- (v .: "solarVoltage")
@@ -473,7 +446,7 @@ batKey = "battKey"
 instance (GreskellC e, GreskellC p) => NodeAttributes (Battery e p) where
   writeNodeAttributes bat = fmap writeKeyValues $ sequence $
     [ batKey <=:> A.encode bat ]
-  parseNodeAttributes props = pMapToFail $ decodeBin $ lookupAs batKey props
+  parseNodeAttributes props = pMapToFail $ decodeBin "battery: battery" $ lookupAs batKey props
 #endif
 
 emptyB :: (Fractional e, Fractional p) => Battery e p

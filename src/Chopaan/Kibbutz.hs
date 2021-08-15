@@ -110,8 +110,7 @@ s3Stream :: (IsStream t, MonadAsync m, MonadCatch m)
          -> S3S t m EnergyState RuntimeStats
 s3Stream bucket ns range = S.tapRate 10 (liftIO . (print . (prefix <>) . show))
                            $ S.mapM (pure . (second f) . align)
-                           $ S.maxRate 10
-                           $ S.concatMapWith S.async (uncurry (nodeS3 bucket range))
+                           $ S.concatMapWith S.parallel (uncurry (nodeS3 bucket range))
                            $ S.fromList ns
   where
     prefix = "combined rate: "
@@ -149,12 +148,12 @@ mqttStreams qs opts name ns = do
 
 
 runKibbutz' :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
-  => String -> Int -> KbtzC NodeMAC -> t m (KbtzScene NodeMAC)
-runKibbutz' h p = S.concatM . (runKibbutzM h p)
+  => DBPools -> KbtzC NodeMAC -> t m (KbtzScene NodeMAC)
+runKibbutz' poo = S.concatM . (runKibbutzM poo)
 
 runKibbutzM :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
-  => String -> Int -> KbtzC NodeMAC -> m (t m (KbtzScene NodeMAC))
-runKibbutzM h p = (pure . S.adapt . S.hoist (runGraphM h p)) <=< (runGraphM h p . runKibbutz)
+  => DBPools -> KbtzC NodeMAC -> m (t m (KbtzScene NodeMAC))
+runKibbutzM poo = (pure . S.adapt . S.hoist (runGraphWithDB poo)) <=< (runGraphWithDB poo . runKibbutz)
 
 
 type GridScene n = ((NodeStates n, Maybe (TxPlan n)), TxState n)
@@ -182,22 +181,24 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
   -- Stream Processors that run Folds
   let
     processES :: t GraphM (NodeMAC, EnergyState) -> t GraphM (GridScene NodeMAC)
-    processES s = S.tapRate 30 (\x -> liftIO . print $ "Grid Processed Rate: " <> show x)
+    processES s = tapCount "ES: " --S.tapRate 30 (\x -> liftIO . print $ "Grid Processed Rate: " <> show x)
                 S.|$ S.map snd
                 S.|$ S.tap (FL.lmap getLatest gridFold)
                 S.|$ status
-                S.|$ S.trace (dispatchTxSafe outbox . snd . snd)
+                --S.|$ S.trace (dispatchTxSafe outbox . snd . snd)
                 S.|$ plan
                 S.|$ S.mapM (pure . second Tx)
                 S.|$ gridSensorR nodes
-                $ S.tapRate 30 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
+                $ s
+                -- $ S.tapRate 30 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
 
-    processRS s = S.tapRate 30 (\x -> liftIO . print $ "Mesh Processed Rate: " <> show x)
+    processRS s = tapCount "RS: " -- S.tapRate 30 (\x -> liftIO . print $ "Mesh Processed Rate: " <> show x)
                 . S.tap meshFold
                 . S.map (second (meshNodeLink $ getGridRoot name))
-                $ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
+                $ s
+                -- $ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
   let
-    liveStream = (Left <$> (processES es)) `S.async` (Right <$> (processRS rs)) 
+    liveStream = (Left <$> (processES es)) `S.parallel` (Right <$> (processRS rs)) 
   return liveStream
   where
     plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
@@ -237,13 +238,13 @@ gridSensorR ns s = S.map (first fromJust)
 {-# INLINE gridSensorR #-}
 
 hydrateKbtz' :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
-  => String -> Int -> KbtzC NodeMAC -> Range -> t m Hydration
-hydrateKbtz' h p k = S.concatM . (hydrateKbtzM h p k)
+  => DBPools -> KbtzC NodeMAC -> Range -> t m Hydration
+hydrateKbtz' poo k = S.concatM . (hydrateKbtzM poo k)
 
 hydrateKbtzM :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
-  => String -> Int -> KbtzC NodeMAC -> Range -> m (t m Hydration)
-hydrateKbtzM h p k = (pure . S.adapt . S.hoist (runGraphM h p))
-                   <=< (runGraphM h p . hydrateKbtz k)
+  => DBPools -> KbtzC NodeMAC -> Range -> m (t m Hydration)
+hydrateKbtzM poo k = (pure . S.adapt . S.hoist (runGraphWithDB poo))
+                   <=< (runGraphWithDB poo . hydrateKbtz k)
 
 type Hydration = ((NodeMAC, ObjectKey, Maybe UTCTime)
                  , ((M.Map NodeMAC SensorR)

@@ -36,6 +36,8 @@ import Network.Greskell.WebSocket (Client)
 import Data.Pool
 import Network.AWS.S3 (BucketName(..))
 #endif
+import qualified Streamly as S
+import qualified Streamly.Internal.Data.Stream.IsStream as S
 import Shpadoinkle.Widgets.Types (Humanize)
 
 import Chopaan.Graph.G
@@ -73,4 +75,7 @@ withKbtzPool f = do
 
 withSpider :: SpiderM ~> GraphM
 withSpider f = (\s -> runSpider s f) =<< (fmap spools ask)
+
+hoistG :: forall t m. (S.IsStream t, S.MonadAsync m) => DBPools -> (t GraphM) ~> (t m) 
+hoistG db = S.adapt . S.hoist (runGraphWithDB db) . S.adapt
 #endif

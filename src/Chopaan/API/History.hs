@@ -170,24 +170,19 @@ createKbtzWithHydration k ns t t' = do
                  )
   b <- s3Bucket <$> ask
   hydrateKbtz (KbtzC k ns undefined (Just b)) (t, t')
-
-hoistS :: forall t m. (IsStream t, MonadAsync m) => String -> Int -> (t GraphM) ~> (t m) 
-hoistS h p = adapt . S.hoist (runGraphM h p) . adapt
  
 
 serveHistoryAPI :: forall t. (IsStream t)
-  => String
-  -> Int
+  => DBPools
   -> Server (HistoryAPI t)
-serveHistoryAPI h p = history
+serveHistoryAPI poo = history
   where
-    history k g t t' = (runGraphM h p) $ do
-      (hoistS @t @IO h p) <$> getHistoryForGraph @t k g t t' 
+    history k g t t' = (runGraphWithDB poo) $ do
+      (hoistG poo) <$> getHistoryForGraph @t k g t t' 
 
-historyApp :: String
-           -> Int
+historyApp :: DBPools
            -> Application
-historyApp h p = serve (Proxy :: Proxy (HistoryAPI AsyncT)) $ serveHistoryAPI h p
+historyApp = serve (Proxy :: Proxy (HistoryAPI AsyncT)) . serveHistoryAPI
 #endif
 
 

@@ -58,42 +58,23 @@ import Chopaan.Graph
 import Chopaan.View (view, template, onRouteChange)
 
 
-newtype App a = App { runApp :: ReaderT TinkerConf IO a }
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader TinkerConf,
-                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch, MonadUnliftIO)
-
-
-appToHandler :: MonadIO m => TinkerConf -> App ~> m
-appToHandler c a = liftIO $ runReaderT (runApp a) c
-
 
 newtype Noop a = Noop (JSM a)
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadJSM,
                     MonadBase IO, MonadBaseControl IO, MonadThrow)
   deriving anyclass CRUDChopaan
 
--- (forall t. IsStream t => (Monad (t App))) =>
-instance CRUDChopaan App where
-  listNodezim k = (\(TinkerConf h p) -> (runGraphM h p) $ listNodezim k)
-                  =<< ask 
-  listKibbutzim = (\(TinkerConf h p) -> (runGraphM h p) listKibbutzim) =<< ask
-  getGraph g k t t' = S.aheadly $ do
-    (TinkerConf h p) <- ask
-    g <- runGraphM h p $ do
-      return $ getGraph g k t t'
-    hoistS h p $ g
-
 
 type Static = Raw
 
-app :: Env -> FilePath -> TinkerConf -> Application
-app ev root (TinkerConf h p) =
-  serve (Proxy @ ((HistoryAPI AheadT) :<|> SPA App :<|> Static))
-  ((serveHistoryAPI h p) :<|> serveSPA :<|> (serveDirectoryWebApp root))
+app :: Env -> FilePath -> DBPools -> Application
+app ev root poo =
+  serve (Proxy @ ((HistoryAPI AheadT) :<|> SPA Noop :<|> Static))
+  ((serveHistoryAPI poo) :<|> (serveSPA poo) :<|> (serveDirectoryWebApp root))
   where
-    serveSPA :: Server (SPA App)
-    serveSPA = serveUI @ (SPA App) root
-      (\r -> appToHandler (TinkerConf h p) $ do
+    serveSPA :: DBPools -> Server (SPA GraphM)
+    serveSPA poo = serveUI @ (SPA GraphM) root
+      (\r -> runGraphWithDB poo $ do
           i <- onRouteChange r
           return . template ev i $ view @ Noop i) routes
 
@@ -118,7 +99,9 @@ options = info (parser <**> helper) $
              <> header "Servers the SPA and the Backend API"
 
 application :: Env -> FilePath -> TinkerConf -> IO Application
-application e f tk = return . simpleCors $ app e f tk 
+application e f (TinkerConf h p) = do
+  poo <- mkDBPools h p
+  return $ simpleCors $ app e f poo 
 
 
 main :: IO ()
