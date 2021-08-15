@@ -1,12 +1,13 @@
-{-# LANGUAGE ConstraintKinds, PackageImports, ExplicitForAll, StandaloneDeriving, DeriveAnyClass, DeriveGeneric #-}
+{-# LANGUAGE ConstraintKinds, PackageImports, ExplicitForAll, StandaloneDeriving, DeriveAnyClass, DeriveGeneric, OverloadedStrings, TypeApplications #-}
 module Chopaan.Graph.Greskell where
 
 import GHC.Generics
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as B
 import qualified "base64" Data.ByteString.Base64 as B
-import Data.Time (UTCTime(..), DiffTime(..), Day(..))
+import Data.Time (UTCTime(..), DiffTime(..), Day(..), secondsToDiffTime)
 --import qualified "base64" Data.Text.Encoding.Base64 as BT
 import Data.Aeson (ToJSON(..), FromJSON(..), parseJSON)
 import qualified Data.Aeson as Aeson
@@ -20,6 +21,16 @@ import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
 import Data.Binary
 
 type GreskellC a = (ToJSON a, FromJSON a, FromGraphSON a, Binary a, Show a)
+
+
+decodeBin :: (FromJSON a)
+          => T.Text
+          -> Either PMapLookupException BL.ByteString
+          -> Either PMapLookupException a 
+decodeBin _ (Left a) = (Left a)
+decodeBin tag (Right x) = case Aeson.eitherDecode x of
+  (Left e) -> Left (PMapParseError tag e)
+  (Right x') -> Right x'
 
 
 parseUnwrapTraversable :: (Traversable t, FromJSON (t GValue), FromGraphSON a)
@@ -79,12 +90,12 @@ binaryJSONEncode :: (Binary a) => a -> Aeson.Encoding
 binaryJSONEncode a = toEncoding . Aeson.String . encB $ a
 
 encB :: forall a. (Binary a) => a -> T.Text
-encB = B.encodeBase64 . B.toStrict . encode
+encB = B.encodeBase64 . BL.toStrict . encode
 
-decB :: T.Text -> Parser (B.ByteString)
+decB :: T.Text -> Parser (BL.ByteString)
 decB = (either
          (\x -> fail $ "Could not decode Base64" <> (T.unpack x))
-         (pure . B.fromStrict))
+         (pure . BL.fromStrict))
        . B.decodeBase64 . T.encodeUtf8
 --toBinaryTextHW = binaryJSON
 
@@ -98,6 +109,30 @@ instance FromGraphSON DiffTime where
 deriving instance Generic UTCTime
 deriving instance Generic Day
 deriving instance Binary Day
+
+instance Binary UTCTime
+instance Binary DiffTime where
+  put a = put @Integer $ round a
+  get = secondsToDiffTime <$> get
+
+instance FromJSON B.ByteString where
+  parseJSON (Aeson.String t) = pure $ (either (fail "ByteString Parse Failed!") id . B.decodeBase64 . T.encodeUtf8) t
+  parseJSON _ = fail "ByteString should always be an Aeson.String!"
+
+instance ToJSON B.ByteString where
+  toJSON = Aeson.String . T.decodeUtf8 . B.encodeBase64'
+
+instance FromJSON BL.ByteString where
+  parseJSON a = (pure . BL.fromStrict) =<< Aeson.parseJSON a
+
+instance ToJSON BL.ByteString where
+  toJSON = Aeson.String . T.decodeUtf8 . B.encodeBase64' . BL.toStrict
+
+instance FromGraphSON BL.ByteString where
+  parseGraphSON = parseJSON . unwrapOne
+ 
+
+
 
 -- deriving instance GStorable T.Text
 
