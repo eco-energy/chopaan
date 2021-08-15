@@ -134,7 +134,7 @@ when:
       - amazonka
       - amazonka-iot
       - amazonka-s3
-      - net-mqtt >= 0.7.0
+      - net-mqtt == 0.7.0.1
       - wai
       - warp
       - wai-cors
@@ -427,7 +427,7 @@ tests:
       else:
         dependencies:
           - chopaan
-          - hspec
+          - hspec >= 2.8.3
           - QuickCheck
           - checkers
           - quickspec
