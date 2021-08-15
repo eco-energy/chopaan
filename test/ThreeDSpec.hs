@@ -72,7 +72,7 @@ spec = do
     --   xs <- arbs @CurPos 100
     -- it "Rotations on a point are invertible" $ property $
     --   prop_rotate_invertible
-    it "Panning on a point is invertible" $ property $
+    xit "Panning on a point is invertible" $ property $
       prop_pan_invertible
       
 applyIs :: [Interact] -> T

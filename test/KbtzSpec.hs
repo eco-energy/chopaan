@@ -36,7 +36,7 @@ type SI = Sum Int
 spec :: Spec
 spec = do
   describe "Utilities and such" $ do
-    it "turn a fold and a function to an unfold that propagates the fold's accumulator" $ do
+    xit "turn a fold and a function to an unfold that propagates the fold's accumulator" $ do
       let
         fl :: forall m. (Monad m) => FL.Fold m (Int, (Int, Int)) (Int, M.Map Int Int) 
         fl = secondF $ FL.demux $ M.fromList [(i, FL.sum) | i <- [(0 :: Int)..9]]

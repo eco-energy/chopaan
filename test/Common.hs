@@ -3,7 +3,9 @@ module Common (
   module Test.Hspec,
   module Test.QuickCheck.Checkers,
   module Test.QuickCheck,
-  almostEqual) where
+  almostEqual,
+  runJanus
+  ) where
 
 import Test.Hspec
 import Test.QuickCheck.Checkers
@@ -11,8 +13,19 @@ import Test.QuickCheck
 import Test.QuickCheck.Arbitrary.Generic
 import Test.QuickCheck.Instances.Time
 import Data.ProtoLens.Arbitrary
+import Data.Function ((&))
+import qualified TestContainers.Docker as TC
+import qualified TestContainers.Hspec as TC
+import qualified TestContainers.Image as TC
 
+import GHC.IO.Handle
+import Control.Monad.IO.Class
+import Control.Monad.Reader.Class
+import Control.Monad.Trans.Reader hiding (ask)
+import Control.Monad.Trans.Resource
+import System.Directory
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import qualified Data.Time as Ti
 import Numeric.Compensated
 import Linear.V2
@@ -42,6 +55,55 @@ import Chopaan.Ui.ThreeD
 
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
+
+-- tc = TC.newTracer print
+
+-- runC action = do
+--   let conf = TC.Config (Just 300) tc
+--   let tr = \c -> TC.withLogs c ((\stdout stderr -> liftIO $ do
+--                  print =<< hGetLine stdout
+--                  print =<< hGetLine stderr
+--                  ))
+--   runReaderT (runResourceT $ do
+--                  c <- (TC.run action)
+--                  tr c
+--              ) conf
+
+runJanus :: (TC.MonadDocker m) => T.Text -> m (String, Int)
+runJanus name = do
+  c <- ask
+  let t = TC.newTracer print
+  let c' = c --{ TC.configTracer = t }
+  jC <- (flip runReaderT $ c') $ TC.run =<< (janus name)
+  --liftIO . print $ c
+  pure ("localhost", TC.containerPort jC 8182)
+
+janus :: (MonadIO m) => T.Text -> m TC.ContainerRequest
+janus name = do
+  conf <- liftIO $ makeAbsolute confRel
+  idx <- liftIO $ makeAbsolute idxRel
+  liftIO . print $ (conf, idx)
+  return $ withMounts janus' conf idx
+  where
+    confRel = "./janusgraph-config/config/"
+    idxRel = "./janusgraph-config/indexes/net-spider-index.groovy"
+    janus' = TC.fromTag "janusgraph/janusgraph:0.5.3"
+    withMounts toImg conf idx = TC.containerRequest toImg
+                       & TC.setName ("janus-test-" <> name)          
+                       & TC.setVolume vols
+                       & TC.setExpose [ 8182 ]
+                       & TC.setWaitingFor -- (TC.waitUntilMappedPortReachable 8182)
+                         (TC.waitForLogLine TC.Stdout (TL.isInfixOf readyLog))
+      where
+        readyLog = "Channel started at port 8182"
+        vols =
+          [ ( T.pack conf
+            , "/etc/opt/janusgraph:ro"
+            )
+          , ( T.pack idx
+            , "/files/net-spider-index.groovy"
+            )
+          ]
 
 almostEqual :: (Show a, Eq a, Num a, Ord a) => a -> a -> a -> Expectation
 almostEqual eta a b = do
