@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b897acf28910c4f8ec98ddaacf2b92ee3688982868aa1224198254ed16f60a36
+-- hash: 8f3fcf1633612aecbe8bc0562f2eb2781e5e2cb40fc5411eeb46a11cd543de58
 
 name:           chopaan
 version:        0.1.0.0
@@ -1056,7 +1056,7 @@ test-suite chopaan-test
       , checkers
       , chopaan
       , generic-arbitrary
-      , hspec >=2.8.3
+      , hspec >=2.8.2
       , hspec-golden-aeson
       , hspec-wai
       , proto-lens-arbitrary
