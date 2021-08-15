@@ -53,8 +53,8 @@ in
       };
       
       boot.loader.grub.device = lib.mkForce "/dev/nvme0n1";
-      networking.firewall.enable = false;
-      #networking.firewall.allowedTCPPorts = [ 80 443 ];
+      networking.firewall.enable = true;
+      networking.firewall.allowedTCPPorts = [ 80 443 ];
       environment.systemPackages = [ pkgs.z3 ];
       environment.variables = { SERVER_HOST = dnsName;
                                 SERVER_PORT = "443";
@@ -77,7 +77,7 @@ in
         after = [ "network.target" "docker-janusgraph.service" ];
         environment = {
           HOME = "/root";
-          PATH = "${pkgs.z3}/lib"
+          #PATH = "${pkgs.z3}/lib";
         };
         script =
           let
