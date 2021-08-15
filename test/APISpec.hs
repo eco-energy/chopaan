@@ -31,8 +31,8 @@ spec :: Spec
 spec = serverSpec
 
 
-withUserApp :: (Warp.Port -> IO ()) -> IO ()
-withUserApp action = Warp.testWithApplication (pure $ historyApp "localhost" 8182) action
+-- withUserApp :: (Warp.Port -> IO ()) -> IO ()
+-- withUserApp action = Warp.testWithApplication (pure $ historyApp "localhost" 8182) action
 
 
 t0 = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
@@ -41,21 +41,24 @@ tn = Ti.addUTCTime (60 * 60) t0
 
 serverSpec :: Spec
 serverSpec = do
-  let kbtzId = (KbtzId "test")
+  describe "API TODO" $ do
+    it "TODO" $ do
+      1 `shouldBe` 1
+  -- let kbtzId = (KbtzId "test")
 
-  around withUserApp $ do
-      let getHistory = client (Proxy :: Proxy (HistoryAPI AheadT))
-      baseUrl <- runIO $ parseBaseUrl "http://localhost"
-      manager <- runIO $ newManager defaultManagerSettings
-      let clientEnv port = mkClientEnv manager (baseUrl { baseUrlPort = port })
-      xdescribe "GET Graph" $ do
-        it "responds with 200" $ \p -> do
-          withClientM (getHistory kbtzId MeshG t0 tn) (clientEnv p) $
-            \res -> case res of
-              Left e -> do
-                print e
-              Right r -> do
-                S.mapM_ print $ adapt r
-          1 `shouldBe` 1 --(Right (x)) 
+  -- around withUserApp $ do
+  --     let getHistory = client (Proxy :: Proxy (HistoryAPI AheadT))
+  --     baseUrl <- runIO $ parseBaseUrl "http://localhost"
+  --     manager <- runIO $ newManager defaultManagerSettings
+  --     let clientEnv port = mkClientEnv manager (baseUrl { baseUrlPort = port })
+  --     xdescribe "GET Graph" $ do
+  --       it "responds with 200" $ \p -> do
+  --         withClientM (getHistory kbtzId MeshG t0 tn) (clientEnv p) $
+  --           \res -> case res of
+  --             Left e -> do
+  --               print e
+  --             Right r -> do
+  --               S.mapM_ print $ adapt r
+  --         1 `shouldBe` 1 --(Right (x)) 
 
   
