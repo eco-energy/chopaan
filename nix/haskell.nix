@@ -67,7 +67,7 @@ let
       {
         
         packages.chopaan = {
-          components.tests.chopaan-tests.build-tools = [ buildPackages.docker ]; # jormungandr
+          components.tests.build-tools = [ buildPackages.docker ]; # jormungandr
           doCoverage = false;
           doCheck = true;
           configureFlags = [
