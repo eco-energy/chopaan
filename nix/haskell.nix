@@ -32,7 +32,7 @@ let
     index-state = "2021-08-01T00:00:00Z";
     plan-sha256 = "1rm89nbkag9k37q13yh7v8hh3ba9br35ykc6j6h48s50q9ricwjb";
     materialized = ./chopaan.materialized;
-    checkMaterialization = true;
+    #checkMaterialization = true;
     # these extras will provide additional packages
     # ontop of the package set derived from cabal resolution.
     pkg-def-extras = [(hackage: {
