@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 584a1ef20aa775030d0011c4902307361d2bbfdbc290b53bb2a70efccae15a85
+-- hash: b897acf28910c4f8ec98ddaacf2b92ee3688982868aa1224198254ed16f60a36
 
 name:           chopaan
 version:        0.1.0.0
@@ -151,7 +151,7 @@ library
       , greskell-websocket >=0.1.2.5
       , http-client
       , katip
-      , net-mqtt >=0.7.0
+      , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
       , postgresql-simple
@@ -426,7 +426,7 @@ executable dev
       , greskell-websocket >=0.1.2.5
       , http-client
       , katip
-      , net-mqtt >=0.7.0
+      , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
       , postgresql-simple
@@ -571,7 +571,7 @@ executable kbtzim
       , greskell-websocket >=0.1.2.5
       , http-client
       , katip
-      , net-mqtt >=0.7.0
+      , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
       , postgresql-simple
@@ -715,7 +715,7 @@ executable server
       , greskell-websocket >=0.1.2.5
       , http-client
       , katip
-      , net-mqtt >=0.7.0
+      , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
       , postgresql-simple
@@ -860,7 +860,7 @@ executable ui
       , greskell-websocket >=0.1.2.5
       , http-client
       , katip
-      , net-mqtt >=0.7.0
+      , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
       , postgresql-simple
@@ -1022,7 +1022,7 @@ test-suite chopaan-test
       , greskell-websocket >=0.1.2.5
       , http-client
       , katip
-      , net-mqtt >=0.7.0
+      , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
       , postgresql-simple
@@ -1056,7 +1056,7 @@ test-suite chopaan-test
       , checkers
       , chopaan
       , generic-arbitrary
-      , hspec
+      , hspec >=2.8.3
       , hspec-golden-aeson
       , hspec-wai
       , proto-lens-arbitrary

@@ -29,8 +29,8 @@ let
   pkgSet = haskell-nix.cabalProject  {
     src = haskell-nix.haskellLib.cleanGit { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
-    index-state = "2021-02-01T00:00:00Z";
-    plan-sha256 = "07016xv2l2xnjc8qpqmg9zi7h9qxvn8wfakspmhhv0lnavdfjci1";
+    index-state = "2021-08-01T00:00:00Z";
+    #plan-sha256 = "07016xv2l2xnjc8qpqmg9zi7h9qxvn8wfakspmhhv0lnavdfjci1";
     materialized = ./chopaan.materialized;
     #checkMaterialization = true;
     # these extras will provide additional packages
