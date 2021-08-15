@@ -69,6 +69,9 @@ extra-deps:
  - git: https://github.com/composewell/streamly.git
    commit: 4f629b8cb36bd03b480edc08b77c9a0187ce2206
    # nix-sha256: 1ag6lqr74c1ml0vmai7a1b28dyf149pv3mhpg06kp27sawl71sy2
+ - git: https://github.com/faezs/testcontainers-hs.git
+   commit: 9c83f9d11a1a55d30b6dc75d3f266cf5f275ee40
+   # nix-sha256: 0lbkh1m2y472hkvs0cqcgl6hxxn6anrpk0wd4dkk8v9k0b4k15fy
    
  - base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
@@ -147,7 +150,6 @@ extra-deps:
  - html-parse-0.2.0.2@sha256:268c6c3a723aae77ff799bf501d60a91e60536facab3ae70df7a74cea75e29c3,3898
  - ghcjs-base-stub-0.3.0.2@sha256:1ce3ac155173b8036873ad990d3ed86137a643264fb6dad294a935a32e1105a2,3669
  - derive-storable-0.3.0.0@sha256:819332e8dd666ec88dab17e3aca0cffced197c1a560f5a003789a9372e7f07f1,2299
- - testcontainers-0.3.0.1@sha256:af20f1fe0384f0ace51a8095a19f25271df44e82b15e37cad052f57df1df7fb9,2662
  - aeson-optics-1.1.0.1@sha256:730de585030e820cc3ade10d756f257be846d891028942b8c545a8498e6b5580,1629
  - exceptions-0.10.4@sha256:d2546046d7ba4b460d3bc7fd269cd2c52d0b7fb3cfecc038715dd0881b78a484,2796
  - resourcet-1.2.4.2@sha256:d57516781d1721f70aa0b9ec8ea9200ab02bf76349cb76d73ad57729302289cc,1730
@@ -160,6 +162,10 @@ extra-deps:
  - linear-1.21.6
  - base-orphans-0.8.4@sha256:9a70dc95761ab9a9d49a038a4599b7b7945d486d80ed1678f347445bc336f3e0,3149
  - monoid-extras-0.6@sha256:fabcab0a59ac48d8f271016cf8190b21969b202c760df2db85add2fef93d38b4,2197
+ - hspec-2.8.3@sha256:43a42e23994a6c61a7adead7e8a412016680234f5a14a157f68c020871e59534,1709
+ - hspec-core-2.8.3@sha256:e4c1e08e16842804c470c2b4722e417ed2a556a47a74107401ad42195522f7a7,4992
+ - hspec-discover-2.8.3@sha256:b94758b375b5a810ea4c4c187381211c3acc77007f6f795c4e79f206ed6da56a,2025
+
 
  #- z3-408.2@sha256:1f8b6ccbcc6d06a6701900a09fcfcbaf86ed8a8495615710bef4da5cdb073a3f,4226
 # Override default flag values for local packages and extra-deps
