@@ -2,7 +2,7 @@ version: '3'
 
 services:
   db:
-    image: docker.io/janusgraph/janusgraph:latest
+    image: docker.io/janusgraph/janusgraph:0.5.3
     container_name: janusgraph-default
     ports:
       - "8182:8182"
