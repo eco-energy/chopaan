@@ -21,6 +21,27 @@ let
   nixpkgs = haskellNix.sources.nixpkgs-2009 or
     (builtins.trace "Using IOHK default nixpkgs" iohKNix.nixpkgs);
 
+  nixUnstable = import (haskellNix.sources.nixpkgs-unstable) {};
+  newPodman = nixUnstable.podman;
+  newPodmanUnwrapped = nixUnstable.podman-unwrapped;
+
+  # Embed a default signing policy to work around https://github.com/containers/libpod/issues/6053
+  overridePodman = drv: drv.overrideAttrs(old: let
+    defaultPolicyFile = pkgs.runCommand "skopeo-default-policy.json" {} "cp ${pkgs.skopeo.src}/default-policy.json $out";    vendorPath = "${old.goPackagePath}/vendor/github.com/containers/image/v5";
+  in rec {
+    postPatch = ''
+      for f in $(grep -lri /etc/containers/policy.json); do
+         sed -i -e "s#/etc/containers/policy.json#${defaultPolicyFile}#g" "$f"
+       done
+    '';
+  });
+  
+
+  podmanOverlay = [
+    (pkgs: _: with pkgs; {
+      podman = (newPodman.override { podman-unwrapped = (overridePodman newPodmanUnwrapped); });
+    })
+  ];
   hasktorchOverlays = [
       (pkgs: _: with pkgs;
         let libtorchSrc = callPackage "${sources.pytorch-world}/libtorch/release.nix" { }; in
@@ -94,7 +115,7 @@ let
     # hasktorch
     ++ hasktorchOverlays
     ++ shpadoinkleOverlays
-    #++ stackhack
+    ++ podmanOverlay
     # our own overlays:
     ++ [
       (pkgs: _: with pkgs; {
