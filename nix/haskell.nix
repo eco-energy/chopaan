@@ -47,33 +47,58 @@ let
         #packages.chopaan.configureFlags = [ "--ghc-option=-Werror" ];
         enableLibraryProfiling = profiling;
         doCoverage = false;
-         # Fixes for libtorch-ffi
-        packages.libtorch-ffi = {
-          configureFlags = [
-            "--extra-lib-dirs=${buildPackages.torch_cuda}/lib"
-            "--extra-include-dirs=${buildPackages.torch_cuda}/include"
-            "--extra-include-dirs=${buildPackages.torch_cuda}/include/torch/csrc/api/include"
-          ];
-          flags = {
-            cuda = cudaSupport;
-            gcc = !cudaSupport && pkgs.stdenv.hostPlatform.isDarwin;
-          };
-        };
-        # z3 fixes
-        packages.sbv.components.library.libs = pkgs.lib.mkForce
-          [ buildPackages.z3 ];
       }
       # Add dependencies
       {
         
         packages.chopaan = {
-          components.tests.chopaan-test.build-tools = [ buildPackages.docker ]; # jormungandr
-          doCoverage = false;
-          doCheck = true;
+          doCheck = false;
+          components.exes.kbtzim.dontStrip = false;
+          components.exes.server.dontStrip = false;
+          components.library.build-tools = [ buildPackages.z3 ];
           configureFlags = [
             "--extra-lib-dirs=${buildPackages.z3}/lib"
             "--extra-include-dirs=${buildPackages.z3}/include"
+            "--ghc-option=-O1"
           ];
+          # components.tests.chopaan-test.build-tools = let
+          #   dockerCompat = pkgs.runCommandNoCC "docker-podman-compat" {} ''
+          #                  mkdir -p $out/bin
+          #                  ln -s ${pkgs.podman}/bin/podman $out/bin/docker
+          #                  '';
+          # in [
+          #   dockerCompat
+          #   buildPackages.podman
+          #   buildPackages.slirp4netns
+          #   buildPackages.runc
+          #   buildPackages.conmon
+          #   buildPackages.skopeo
+          #   buildPackages.fuse-overlayfs
+          #   buildPackages.newuidmap
+          #   buildPackages.newgidmap
+          # ];
+          # jormungandr
+          # components.tests.chopaan-test.preBuild = let
+          #   janusImg = buildPackages.dockerTools.pullImage
+          #     { imageName = "janusgraph/janusgraph";
+          #       imageDigest = "sha256:a3c3c55922ce882485ac920cf49fff966427846117b41395f6018abcbf8f0839";
+          #       sha256 = "1amwhrfjr54vxalx98lb4cvzwgzqslbqfjqpkbbwsr8r2wldgyj1";
+
+          #     };
+          # in ''
+          # export HOME=`mktemp -d`
+          # echo "THIS IS HOME: " $HOME
+          # ls -l ${janusImg}
+          # cat /proc/self/uid_map
+          # cat>/proc/self/uid_map <<EOF
+          # 0       1000          1
+          # 1     100000      65536
+          # EOF
+          # ${buildPackages.podman}/bin/podman load < ${janusImg}
+          # echo "ima load buzzo!"
+          # alias docker=${buildPackages.podman}/bin/podman
+          # echo "hey docker! $(docker)"
+          # '';
           # How to set environment variables for builds
           #preBuild = "export NETWORK=testnet";
 
@@ -96,6 +121,21 @@ let
 
       # Misc. build fixes for dependencies
       {
+         # Fixes for libtorch-ffi
+        packages.libtorch-ffi = {
+          configureFlags = [
+            "--extra-lib-dirs=${buildPackages.torch_cuda}/lib"
+            "--extra-include-dirs=${buildPackages.torch_cuda}/include"
+            "--extra-include-dirs=${buildPackages.torch_cuda}/include/torch/csrc/api/include"
+          ];
+          flags = {
+            cuda = cudaSupport;
+            gcc = !cudaSupport && pkgs.stdenv.hostPlatform.isDarwin;
+          };
+        };
+        # z3 fixes
+        packages.sbv.components.library.libs = pkgs.lib.mkForce
+          [ buildPackages.z3 ];
 
         # Disable shpadoinkle tests
         packages.Shpadoinkle-html.components.tests.doCheck = false;
