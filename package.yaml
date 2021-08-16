@@ -159,7 +159,7 @@ when:
       - -fdicts-strict
       - -fmax-worker-args=16
       - -fspec-constr-recursive=16
-      #- -fplugin Fusion.Plugin
+      - -fplugin Fusion.Plugin
       - -O2
   else:
     dependencies:
