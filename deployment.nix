@@ -60,7 +60,7 @@ in
                                 SERVER_PORT = "443";
                                 REGION = region;
                               };
-      
+
       docker-containers."janusgraph" = {
            image = "docker.io/janusgraph/janusgraph:latest";
            ports = [ "${toString janusPort}:${toString janusPort}" ];
@@ -76,9 +76,9 @@ in
 
         after = [ "network.target" "docker-janusgraph.service" ];
         environment = {
-          HOME = "/root";
-          #PATH = "${pkgs.z3}/lib";
+          AWS_CREDS = ${deployment.keys.aws-creds};
         };
+        serviceConfig.LimitNOFILE = 64000;
         script =
           let
             chopaan = app.kbtzim;
