@@ -110,10 +110,6 @@ runWithDBPools = do
   let c = mkConfG (host, port)
   sp <- mkDBPools host port
   let kp = gremlinPool sp
-  -- NS.withSpider (unConf $ meshG c) NS.clearAll
-  -- NS.withSpider (unConf $ txG c) NS.clearAll
-  -- NS.withSpider (unConf $ flowG c) NS.clearAll
-  -- NS.withSpider (unConf $ statusG c) NS.clearAll
   ns <- liftIO $ arbs @NodeMAC nNodes
   liftIO $ withResource kp  (\c -> addKbtz c kId)
   liftIO $ mapM_ (\n -> withResource kp (\c -> addNodeToKbtz c kId n)) ns
@@ -139,7 +135,7 @@ kbtzSpec = do
         runKibbutz KbtzC { name = kId
                          , nodes = ns
                          , channelOpts = (Right qs)
-                         , s3Opts = Nothing
+                         , s3Opts = Nothing 
                          })
       let ns' = S.fromList $ cycle ns
       forkIO $ do
@@ -173,25 +169,25 @@ kbtzSpec = do
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
 
-hydrationSpec :: Spec
-hydrationSpec = aroundAll (TC.withContainers (runJanus "hydrationSpec")) $ describe "hydration tests" $ do
-  it "Hydration Works" $ \(host, port) -> do
-    let labNodes = [ "7c:9e:bd:f5:ec:74", "c4:4f:33:67:ea:69"
-                     , "ac:67:b2:11:e5:c4", "7c:9e:bd:f6:43:88" ]
-        s3op = "dosti-datastream"
-    qs <- initQs
-    ps <- mkDBPools host port
-    let kc = KbtzC { name = KbtzId "labKbtz"
-                   , nodes = labNodes
-                   , channelOpts = Right qs
-                   , s3Opts = Just s3op }
-    h <- hydrateKbtzM ps kc (t0, tn)
-          --h = s3Stream (zip labNodes (repeat Nothing)) s3op
-    S.drain h
-    1 `shouldBe` 1
-    where
-      t0 = Ti.UTCTime (Ti.fromGregorian 2021 8 9) (Ti.secondsToDiffTime 0)
-      tn = Ti.UTCTime (Ti.fromGregorian 2021 8 11) (Ti.secondsToDiffTime 0)
+-- hydrationSpec :: Spec
+-- hydrationSpec = aroundAll (TC.withContainers (runJanus "hydrationSpec")) $ describe "hydration tests" $ do
+--   it "Hydration Works" $ \(host, port) -> do
+--     let labNodes = [ "7c:9e:bd:f5:ec:74", "c4:4f:33:67:ea:69"
+--                      , "ac:67:b2:11:e5:c4", "7c:9e:bd:f6:43:88" ]
+--         s3op = "dosti-datastream"
+--     qs <- initQs
+--     ps <- mkDBPools host port
+--     let kc = KbtzC { name = KbtzId "labKbtz"
+--                    , nodes = labNodes
+--                    , channelOpts = Right qs
+--                    , s3Opts = Just s3op }
+--     h <- hydrateKbtzM ps kc (t0, tn)
+--           --h = s3Stream (zip labNodes (repeat Nothing)) s3op
+--     S.drain h
+--     1 `shouldBe` 1
+--     where
+--       t0 = Ti.UTCTime (Ti.fromGregorian 2021 8 9) (Ti.secondsToDiffTime 0)
+--       tn = Ti.UTCTime (Ti.fromGregorian 2021 8 11) (Ti.secondsToDiffTime 0)
 
 oneNodePerMACPlusRoot sn nNodes = ((length $ sn)
                                     `shouldBe` (nNodes + 1))
