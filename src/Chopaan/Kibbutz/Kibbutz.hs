@@ -117,7 +117,7 @@ sub :: forall t m n a. (IsStream t, MonadAsync m, Address n, Dispatch a)
   -> m (t m a)
 sub = flip (subStream @t @m @n @a) 
 
-#ifndef ghcjs_HOST_OS
+#if 0
 getNodes :: (MonadIO m) => KbtzName -> m [NodeMAC]
 getNodes (KbtzId n) = do
   lgr <- liftIO $ newLogger Info stdout

@@ -21,18 +21,20 @@ import Control.Monad.Trans.Resource.Internal
 import Control.Monad.Trans.Control
 import Lens.Micro
 import System.IO (stdout)
+import System.Environment
+
 
 import qualified Streamly.Data.Unfold as UF
 import qualified Streamly.Prelude as S
 
 type AWSC b = AWST' Env (ResourceT IO) b
 
-e = Discover --FromFile "default" "/run/keys/aws-creds"
+creds fp = FromFile "default" fp --"/run/keys/aws-creds"
   --FromEnv "AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY" Nothing (Just "ap-southeast-1")
 
 inAwsContext :: Logger -> Service -> AWSC b -> IO b
 inAwsContext lgr svc ma = do
-  env <- newEnv e <&> set envLogger lgr . set envRegion Singapore <&> configure svc  
+  env <- getAwsEnv svc
   runResourceT . runAWST env $ ma
 
 withAwsEnv :: Env -> AWSC b -> IO b
@@ -42,9 +44,12 @@ frmrl = (FromProfile "chopaanRole")
 
 getAwsEnv :: (MonadIO m, MonadCatch m) => Service -> m Env
 getAwsEnv svc = do
+  liftIO . print $ "AWS ENV REQUESTED!"
   lgr <- newLogger Info stdout
-  env <- newEnv e <&> set envLogger lgr . set envRegion Singapore <&> configure svc
-  return env
+  e <- liftIO $ lookupEnv "AWS_CREDS"
+  case e of
+    Nothing -> error "AWS CONTEXT NOT AVAILABLE, AWS_CREDS NOT DEFINED"
+    Just fp -> newEnv (creds fp) <&> set envLogger lgr . set envRegion Singapore <&> configure svc
   
 pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)
 pageUF = UF.lmap Just $ UF.unfoldrM step
