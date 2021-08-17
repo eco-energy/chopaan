@@ -143,7 +143,7 @@ mkCallback' = do
   let
     writer' :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> m ()
     writer' _ t msg _ = do
-      --liftIO . print $ "Message Recieved"
+      liftIO . print $ "Message Recieved"
       case nodeId of
         Nothing -> liftIO $ print $ "MQTT Topic Decode error: " <> (show t)
         (Just n) ->

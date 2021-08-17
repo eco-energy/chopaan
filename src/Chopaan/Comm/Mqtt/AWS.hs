@@ -1,5 +1,5 @@
 {-# LANGUAGE QuasiQuotes, NamedFieldPuns, OverloadedStrings  #-}
-module Chopaan.Comm.Mqtt.AWS where
+module Chopaan.Comm.Mqtt.AWS (withMqttAuth, getIoTEndpoint, MQTTCreds(..)) where
 
 
 import qualified Data.Text as Text
