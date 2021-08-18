@@ -3,6 +3,7 @@ module Chopaan where
 
 import Control.Monad.IO.Class
 import Chopaan.Kibbutz
+import Chopaan.Hydrate
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 import Chopaan.API.History

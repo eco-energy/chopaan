@@ -210,21 +210,6 @@ foldTxState (Tx gt) = let
 --composeFold :: FL.Fold m a b -> FL.Fold m b c -> FL.Fold m a c
 --composeFold f g = g . f
   
-idFold :: (Monad m) => FL.Fold m a a
-idFold = fmap fromJust $ FL.foldl' (flip (const . Just)) Nothing
-{-# INLINE idFold #-}
-
-secondF :: (Monad m) => FL.Fold m b c -> FL.Fold m (a, b) (a, c)
-secondF = FL.unzip idFold
-{-# INLINE secondF #-}
-
-firstF :: (Monad m) => FL.Fold m a b -> FL.Fold m (a, c) (b, c)
-firstF = (flip FL.unzip) idFold 
-{-# INLINE firstF #-}
-
-dupF :: (Monad m) => FL.Fold m a b -> FL.Fold m a (a, b)
-dupF f = FL.tee idFold f  
-{-# INLINE dupF #-}
 
 txFold :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
        => TxPlan n

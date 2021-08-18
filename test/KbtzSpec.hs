@@ -2,7 +2,7 @@
 module KbtzSpec (spec) where
 
 import Chopaan.Kibbutz
-import Chopaan.Kibbutz.Transactor (secondF)
+import Chopaan.Utils.Streamly (secondF)
 import Chopaan.Kibbutz.KbtzId
 import Streamly
 import qualified Streamly.Prelude as S

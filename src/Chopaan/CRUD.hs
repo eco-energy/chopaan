@@ -27,7 +27,7 @@ import Chopaan.Node.NodeT
 import Chopaan.Node.Mesh (MeshNode, RxSignal)
 import Chopaan.Node.Folds (SensorR)
 #ifndef ghcjs_HOST_OS
-import Chopaan.Kibbutz (Hydration)
+import Chopaan.Hydrate (Hydration)
 #endif
 import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Kibbutz.KbtzId

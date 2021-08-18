@@ -155,11 +155,11 @@ when:
       - servant-js
       - katip
     ghc-options:
-      - -fplugin=ConCat.Plugin
+      #- -fplugin=ConCat.Plugin
       - -fdicts-strict
-      - -fmax-worker-args=8
-      - -fspec-constr-recursive=8
-      - -fplugin Fusion.Plugin
+      - -fmax-worker-args=4
+      - -fspec-constr-recursive=4
+      #- -fplugin Fusion.Plugin
       - -O2
   else:
     dependencies:
@@ -197,10 +197,6 @@ library:
         - Chopaan.Ui.Tables
         - Chopaan.UiTypes
         - Chopaan.View
-        - Chopaan.Kibbutz.KbtzId
-        - Chopaan.Kibbutz.KbtzimT
-        - Chopaan.Kibbutz.Kibbutz
-        - Chopaan.Kibbutz.Transactor
         - Chopaan.Monad.Env
         - Chopaan.Node.Calibration
         - Chopaan.Node.Components
@@ -233,6 +229,11 @@ library:
         - Chopaan.Graph.VI
         - Chopaan.Haxl.Kbtz
         - Chopaan.Kibbutz
+        - Chopaan.Hydrate
+        - Chopaan.Kibbutz.KbtzId
+        - Chopaan.Kibbutz.KbtzimT
+        - Chopaan.Kibbutz.Kibbutz
+        - Chopaan.Kibbutz.Transactor
         - Chopaan.Kibbutz.Allocate
         - Chopaan.Kibbutz.AWS.Common
         - Chopaan.Kibbutz.AWS.Things

@@ -26,6 +26,7 @@ import Control.Monad.Bayes.Class
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId (KbtzId(..), KbtzName)
 import Chopaan.Kibbutz
+import Chopaan.Hydrate
 import Chopaan.Graph.Spider
 import Chopaan.Comm.Comm (initQs, writeChan, MessageQs(..), readPubQ)
 import Chopaan.Comm.Queues

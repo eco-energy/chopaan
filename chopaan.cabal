@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3fc7b1dfc33f96434d64306e45d5edb580107fc93429d12f21247e521589cf80
+-- hash: 0016b1cab49a141696120e4fc8cad35710c43a0d6d0766972fce36f1939426cf
 
 name:           chopaan
 version:        0.1.0.0
@@ -132,7 +132,7 @@ library
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
+    ghc-options: -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -200,10 +200,6 @@ library
         Chopaan.Ui.Tables
         Chopaan.UiTypes
         Chopaan.View
-        Chopaan.Kibbutz.KbtzId
-        Chopaan.Kibbutz.KbtzimT
-        Chopaan.Kibbutz.Kibbutz
-        Chopaan.Kibbutz.Transactor
         Chopaan.Monad.Env
         Chopaan.Node.Calibration
         Chopaan.Node.Components
@@ -236,6 +232,11 @@ library
         Chopaan.Graph.VI
         Chopaan.Haxl.Kbtz
         Chopaan.Kibbutz
+        Chopaan.Hydrate
+        Chopaan.Kibbutz.KbtzId
+        Chopaan.Kibbutz.KbtzimT
+        Chopaan.Kibbutz.Kibbutz
+        Chopaan.Kibbutz.Transactor
         Chopaan.Kibbutz.Allocate
         Chopaan.Kibbutz.AWS.Common
         Chopaan.Kibbutz.AWS.Things
@@ -407,7 +408,7 @@ executable dev
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
+    ghc-options: -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -552,7 +553,7 @@ executable kbtzim
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
+    ghc-options: -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -696,7 +697,7 @@ executable server
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
+    ghc-options: -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -841,7 +842,7 @@ executable ui
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
+    ghc-options: -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -1003,7 +1004,7 @@ test-suite chopaan-test
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
+    ghc-options: -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -O2
     build-depends:
         amazonka
       , amazonka-iot
