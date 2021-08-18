@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 51658bc22f50c347a8073dfb5b4924fd133923a3a25c84e74403dc941bf38c82
+-- hash: 3fc7b1dfc33f96434d64306e45d5edb580107fc93429d12f21247e521589cf80
 
 name:           chopaan
 version:        0.1.0.0
@@ -132,7 +132,7 @@ library
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -407,7 +407,7 @@ executable dev
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -552,7 +552,7 @@ executable kbtzim
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -593,7 +593,7 @@ executable kbtzim
     build-depends:
         ghcjs-base
   if !impl(ghcjs)
-    ghc-options: -threaded -O2 -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16
+    ghc-options: -threaded -O2 -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin
     build-depends:
         base
       , chopaan
@@ -696,7 +696,7 @@ executable server
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -741,7 +741,7 @@ executable server
   else
     other-modules:
         Paths_chopaan
-    ghc-options: -threaded -O2 -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16
+    ghc-options: -threaded -O2 -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin
     build-depends:
         base
       , chopaan
@@ -841,7 +841,7 @@ executable ui
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot
@@ -882,14 +882,14 @@ executable ui
     build-depends:
         ghcjs-base
   if !impl(ghcjs)
-    ghc-options: -threaded -O2
+    ghc-options: -threaded -O1
     build-depends:
         base
       , chopaan
       , optparse-simple
     buildable: True
   else
-    ghc-options: -threaded -O2
+    ghc-options: -threaded -O1
     build-depends:
         base
       , chopaan
@@ -1003,7 +1003,7 @@ test-suite chopaan-test
     , vector
     , vector-sized
   if !impl(ghcjs)
-    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2
+    ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=8 -fspec-constr-recursive=8 -fplugin Fusion.Plugin -O2
     build-depends:
         amazonka
       , amazonka-iot

@@ -157,8 +157,8 @@ when:
     ghc-options:
       - -fplugin=ConCat.Plugin
       - -fdicts-strict
-      - -fmax-worker-args=16
-      - -fspec-constr-recursive=16
+      - -fmax-worker-args=8
+      - -fspec-constr-recursive=8
       - -fplugin Fusion.Plugin
       - -O2
   else:
@@ -331,7 +331,7 @@ executables:
           - -fdicts-strict
           - -fmax-worker-args=16
           - -fspec-constr-recursive=16
-          #- -fplugin Fusion.Plugin          
+          - -fplugin Fusion.Plugin          
   dev:
     main:             Dev.hs
     other-modules: []
@@ -362,7 +362,7 @@ executables:
           - base
         ghc-options:
           - -threaded
-          - -O2
+          - -O1
           #- -fplugin=ConCat.Plugin
       else:
         buildable: true
@@ -372,7 +372,7 @@ executables:
           - base
         ghc-options:
           - -threaded
-          - -O2
+          - -O1
   kbtzim:
     main:                Main.hs
     other-modules:
@@ -392,7 +392,7 @@ executables:
           - -fdicts-strict
           - -fmax-worker-args=16
           - -fspec-constr-recursive=16
-          #- -fplugin Fusion.Plugin          
+          - -fplugin Fusion.Plugin          
       else:
         buildable: false
   # hydrate:
