@@ -154,13 +154,20 @@ when:
       - servant-blaze
       - servant-js
       - katip
-    ghc-options:
-      #- -fplugin=ConCat.Plugin
-      - -fdicts-strict
-      - -fmax-worker-args=4
-      - -fspec-constr-recursive=4
-      #- -fplugin Fusion.Plugin
-      - -O2
+    when:
+    - condition: flag(prod)
+      then:
+        ghc-options:
+          - -fplugin=ConCat.Plugin
+          - -fdicts-strict
+          - -fmax-worker-args=4
+          - -fspec-constr-recursive=4
+          - -fplugin Fusion.Plugin
+          - -O2
+      else:
+        ghc-options:
+          - -fdicts-strict
+          - -O1
   else:
     dependencies:
       - ghcjs-base
@@ -445,3 +452,9 @@ tests:
           - -O2
         build-tools:
           hspec-discover:hspec-discover
+
+flags:
+  prod:
+    description: Build for production
+    manual: yes
+    default: no
