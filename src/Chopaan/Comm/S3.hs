@@ -8,7 +8,7 @@ import Control.Applicative
 import Control.Monad.IO.Class
 import Control.Monad.Base
 import Control.Monad.Trans.Control
-import Control.Monad.Trans.AWS
+import Control.Monad.Trans.AWS -- (AWST'(..))
 import Control.Monad.Catch
 import Control.Arrow
 import Data.Conduit.Combinators (sinkLazy)
@@ -20,6 +20,8 @@ import Data.Time.Clock.Compat (nominalDiffTimeToSeconds)
 import Data.Maybe
 import Data.Either
 import Data.Void
+
+--import Network.AWS
 import qualified Data.Time as Time
 import qualified Data.Time.Clock.POSIX as TP
 import Network.AWS.S3 (s3)
@@ -35,6 +37,7 @@ import Chopaan.Kibbutz.AWS.Common
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.AWS.Things
 import Chopaan.Utils.Time
+import Chopaan.Utils.Retry
 
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
 
@@ -69,8 +72,12 @@ downloadMF :: forall m. (MonadIO m, MonadCatch m)
                 => Env
                 -> S3.BucketName
                 -> S3.ObjectKey
-                -> m (Either String MeshFrame)
-downloadMF env bucket n = decodeMessage <$> (liftIO $ withAwsEnv env (readObject bucket n))
+                -> m (Maybe (Either String MeshFrame))
+downloadMF env bucket n = (fmap decodeMessage)
+                          <$> (liftIO $
+                               handleAll (pure . (const Nothing))
+                                (Just <$> (withAwsEnv env (readObject bucket n)))
+                              )
 
 
 readObject :: forall m. (MonadIO m, MonadCatch m)
@@ -78,6 +85,7 @@ readObject :: forall m. (MonadIO m, MonadCatch m)
 readObject bucket k = do
       x <- send $ S3.getObject bucket k
       BS.concat . LBS.toChunks <$> (x ^. S3.gorsBody) `sinkBody` sinkLazy
+
 
 firstPath bucket n = do
   o <- send req
@@ -176,7 +184,12 @@ nodeS3 bucket (startT, endT) n startAfter = S.concatM $ do
            paths
       mfs = S.tapRate 10 (liftIO . (print . (prefix <>) . show)) $ S.mapM (\(p, (n', t)) -> do
                        mf <- downloadMF env bucket p
-                       return (p, ((n', t), mf))
+                       case mf of
+                         Nothing -> do
+                           liftIO . print $ "Fetch Failed: " <> (show p)
+                           return (p, ((n', t), Left "Fetch Failed!"))
+                         Just f ->
+                           return (p, ((n', t), f))
                    ) ts
   return $ process mfs
   where

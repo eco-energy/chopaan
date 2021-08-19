@@ -19,6 +19,7 @@ import Control.Monad.Trans.AWS
 import Control.Monad.Trans.Resource
 import Control.Monad.Trans.Resource.Internal
 import Control.Monad.Trans.Control
+import Network.AWS.Env
 import Lens.Micro
 import System.IO (stdout)
 import System.Environment
@@ -29,6 +30,7 @@ import qualified Streamly.Prelude as S
 
 type AWSC b = AWST' Env (ResourceT IO) b
 
+creds :: FilePath -> Credentials
 creds fp = FromFile "default" fp --"/run/keys/aws-creds"
   --FromEnv "AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY" Nothing (Just "ap-southeast-1")
 
@@ -40,6 +42,7 @@ inAwsContext lgr svc ma = do
 withAwsEnv :: Env -> AWSC b -> IO b
 withAwsEnv env ma = runResourceT . runAWST env $ ma
 
+frmrl :: Credentials
 frmrl = (FromProfile "chopaanRole")
 
 getAwsEnv :: (MonadIO m, MonadCatch m) => Service -> m Env
@@ -49,7 +52,10 @@ getAwsEnv svc = do
   e <- liftIO $ lookupEnv "AWS_CREDS"
   case e of
     Nothing -> error "AWS CONTEXT NOT AVAILABLE, AWS_CREDS NOT DEFINED"
-    Just fp -> newEnv (creds fp) <&> set envLogger lgr . set envRegion Singapore <&> configure svc
+    Just fp -> newEnv (creds fp)
+      <&> set envLogger lgr . set envRegion Singapore
+      <&> set envRetryCheck (retryConnectionFailure 10)
+      <&> configure svc
   
 pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)
 pageUF = UF.lmap Just $ UF.unfoldrM step
@@ -60,7 +66,7 @@ pageUF = UF.lmap Just $ UF.unfoldrM step
       y <- send req
       return $ Just (y, page req y)
 
-pageS :: forall t m a r. (S.IsStream t, S.MonadAsync m, AWSPager a) => Env -> a -> t m (Rs a)
+pageS :: forall t m a. (S.IsStream t, S.MonadAsync m, AWSPager a) => Env -> a -> t m (Rs a)
 pageS env req = S.unfoldrM step start
   where
     start = Just req
