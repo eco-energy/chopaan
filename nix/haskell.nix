@@ -53,13 +53,14 @@ let
         
         packages.chopaan = {
           doCheck = false;
+          flags.prod = true;
           components.exes.kbtzim.dontStrip = false;
           components.exes.server.dontStrip = false;
           components.library.build-tools = [ buildPackages.z3 ];
           configureFlags = [
             "--extra-lib-dirs=${buildPackages.z3}/lib"
             "--extra-include-dirs=${buildPackages.z3}/include"
-            "--ghc-option=-O1"
+            #"--ghc-option=-O1"
           ];
           # components.tests.chopaan-test.build-tools = let
           #   dockerCompat = pkgs.runCommandNoCC "docker-podman-compat" {} ''
