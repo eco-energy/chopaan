@@ -102,21 +102,18 @@ hydrateKbtz KbtzC{name, nodes, s3Opts} range = case s3Opts of
         --       mapM_ (\(n, ((ObjectKey k), _)) ->
         --                                withKbtzPool (\p -> addLastSyncToHH p n k)) $ M.toList m
         return $ S.tapRate 10 (liftIO . (print . (prefix <>) . show))
-                                               $ (S.postscan process) S.|$ (srcs lsyncs)
+                                               $ S.minRate 10000 $ (S.postscan process) S.|$ (srcs lsyncs)
         where
           srcs :: [(NodeMAC, Maybe ObjectKey)] -> t GraphM ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, EnergyState) (NodeMAC, (MeshNode, RxSignal)))
           srcs lsyncs = S.trace (saveM) $ S.mapM (pure . mfn . fixMeshTS) $ s3Stream bucket lsyncs range
-          {-# INLINE srcs #-}
           mfn :: (a, Either (n, x) (n, RuntimeStats))
             -> (a, Either (n, x) (n, (MeshNode, RxSignal))) 
           mfn = second (fmap (second (meshNodeLink (getGridRoot name))))
-          {-# INLINE mfn #-}
           saveM :: (a, Either (NodeMAC, x) (NodeMAC, (MeshNode, RxSignal))) -> GraphM Bool
           saveM x = case (snd  x) of
             (Left _) -> return False
             (Right r) -> do
               withSpider $ addMeshN r
-          {-# INLINE saveM #-}
           process :: FL.Fold GraphM ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, EnergyState) (NodeMAC, (MeshNode, RxSignal))) Hydration
           process = secondF (eitherWalay)
           prefix = "processing rate: "
