@@ -333,13 +333,20 @@ executables:
           - base
         other-modules:
           - Paths_chopaan
-        ghc-options:
-          - -threaded
-          - -O2
-          - -fdicts-strict
-          - -fmax-worker-args=16
-          - -fspec-constr-recursive=16
-          - -fplugin Fusion.Plugin          
+        when:
+          - condition: flag(prod)
+            then:
+              ghc-options:
+                - -fplugin=ConCat.Plugin
+                - -fdicts-strict
+                - -fmax-worker-args=4
+                - -fspec-constr-recursive=4
+                - -fplugin Fusion.Plugin
+                - -O2
+            else:
+              ghc-options:
+                - -fdicts-strict
+                - -O1
   dev:
     main:             Dev.hs
     other-modules: []
@@ -353,34 +360,32 @@ executables:
           - chopaan
           - optparse-simple
           - base
-        ghc-options:
-          - -threaded
-          - -O2
+        when:
+          - condition: flag(prod)
+            then:
+              ghc-options:
+                - -fplugin=ConCat.Plugin
+                - -fdicts-strict
+                - -fmax-worker-args=4
+                - -fspec-constr-recursive=4
+                - -fplugin Fusion.Plugin
+                - -O2
+            else:
+              ghc-options:
+                - -fdicts-strict
+                - -O1
   ui:
     main:                Ui.hs
     other-modules: []
     source-dirs:         app
-    when:
-      condition: "!impl(ghcjs)"
-      then:
-        buildable: true
-        dependencies:
-          - chopaan
-          - optparse-simple
-          - base
-        ghc-options:
-          - -threaded
-          - -O1
-          #- -fplugin=ConCat.Plugin
-      else:
-        buildable: true
-        dependencies:
-          - chopaan
-          - optparse-simple
-          - base
-        ghc-options:
-          - -threaded
-          - -O1
+    dependencies:
+      - chopaan
+      - optparse-simple
+      - base
+    ghc-options:
+      - -threaded
+      - -O1
+
   kbtzim:
     main:                Main.hs
     other-modules:
@@ -394,13 +399,20 @@ executables:
           - chopaan
           - optparse-simple
           - base
-        ghc-options:
-          - -threaded
-          - -O2
-          - -fdicts-strict
-          - -fmax-worker-args=16
-          - -fspec-constr-recursive=16
-          - -fplugin Fusion.Plugin          
+        when:
+          - condition: flag(prod)
+            then:
+              ghc-options:
+                - -fplugin=ConCat.Plugin
+                - -fdicts-strict
+                - -fmax-worker-args=4
+                - -fspec-constr-recursive=4
+                - -fplugin Fusion.Plugin
+                - -O2
+            else:
+              ghc-options:
+                - -fdicts-strict
+                - -O1
       else:
         buildable: false
   # hydrate:
