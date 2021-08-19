@@ -72,11 +72,11 @@ downloadMF :: forall m. (MonadIO m, MonadCatch m)
                 => Env
                 -> S3.BucketName
                 -> S3.ObjectKey
-                -> m (Maybe (Either String MeshFrame))
+                -> m (Either SomeException (Either String MeshFrame))
 downloadMF env bucket n = (fmap decodeMessage)
                           <$> (liftIO $
-                               handleAll (pure . (const Nothing))
-                                (Just <$> (withAwsEnv env (readObject bucket n)))
+                               handleAll (pure . Left)
+                                (Right <$> (withAwsEnv env (readObject bucket n)))
                               )
 
 
@@ -185,10 +185,10 @@ nodeS3 bucket (startT, endT) n startAfter = S.concatM $ do
       mfs = S.tapRate 10 (liftIO . (print . (prefix <>) . show)) $ S.mapM (\(p, (n', t)) -> do
                        mf <- downloadMF env bucket p
                        case mf of
-                         Nothing -> do
-                           liftIO . print $ "Fetch Failed: " <> (show p)
-                           return (p, ((n', t), Left "Fetch Failed!"))
-                         Just f ->
+                         (Left e) -> do
+                           liftIO . print $ "Fetch Failed: " <> (show p) <> " error: " <> (show e)
+                           return (p, ((n', t), Left (show e)))
+                         (Right f) ->
                            return (p, ((n', t), f))
                    ) ts
   return $ process mfs
