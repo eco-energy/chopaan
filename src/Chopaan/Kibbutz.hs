@@ -103,9 +103,6 @@ qSrc (MessageQs{stateChan, statsChan, outbox}) = do
   return $ (sk, rk, outbox)
 
 
-
-
-
 mqttQs :: (MonadIO m) => (MessageQs NodeMAC) -> MQTTOpts -> KbtzName -> [NodeMAC] -> m ()
 mqttQs qs opts name ns = do
   lg <- liftIO $ newLogger Info stdout
@@ -176,20 +173,15 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
                 S.|$ gridSensorR nodes
                 --  $ s
                 S.|$ S.tapRate 30 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
-    {-# INLINE processES #-}
     processRS meshFold s = S.tapRate 30 (\x -> liftIO . print $ "Mesh Processed Rate: " <> show x)
                 S.|$ S.tap meshFold
                 S.|$ S.mapM (pure . second (meshNodeLink $ getGridRoot name))
                 --  $ s
                 S.|$ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
-    {-# INLINE processRS #-}
     liveStream g m es rs = (Left <$> (processES g es))
                  `S.parallel` (Right <$> (processRS m rs))
-    {-#INLINE liveStream #-}
     plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
-    {-# INLINE plan #-}
     status = S.postscan (secondF (txFold (Tx . M.fromList $ [(n, mempty @Stake) | n <- nodes])))
-    {-# INLINE status#-}
     getLatest ::
       (NodeMAC, ((NodeStates NodeMAC, Maybe (TxPlan NodeMAC)), (TxState NodeMAC)))
       -> (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus))
@@ -219,8 +211,6 @@ gridSensorR ns s = S.map (first fromJust)
                                sensorFD) $ s
   where
     sensorFD = FL.demux $ M.fromList $ (, sensorFold) <$> ns
-    {-# INLINE sensorFD #-}
-{-# INLINE gridSensorR #-}
 
 
 -- bothUnfold :: forall m a b c d. (Monad m) => FL.Fold m a b -> FL.Fold m c d -> UF.Unfold m (a, c) (b, d)
