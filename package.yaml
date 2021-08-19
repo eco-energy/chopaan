@@ -343,6 +343,7 @@ executables:
                 - -fspec-constr-recursive=4
                 - -fplugin Fusion.Plugin
                 - -O2
+                - -threaded 
             else:
               ghc-options:
                 - -fdicts-strict
@@ -370,6 +371,7 @@ executables:
                 - -fspec-constr-recursive=4
                 - -fplugin Fusion.Plugin
                 - -O2
+                - -threaded
             else:
               ghc-options:
                 - -fdicts-strict
@@ -409,6 +411,7 @@ executables:
                 - -fspec-constr-recursive=4
                 - -fplugin Fusion.Plugin
                 - -O2
+                - -threaded                
             else:
               ghc-options:
                 - -fdicts-strict

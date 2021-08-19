@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ec457e9e591d5ba1b7a384ebb938d4ec43a2521dafb0dcda4c98b643c31dd91f
+-- hash: 2cc637b15c75b1c635638fedf10fe22ddd221d649e6ba858bf99e6755379331d
 
 name:           chopaan
 version:        0.1.0.0
@@ -467,7 +467,7 @@ executable dev
       , chopaan
       , optparse-simple
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded
     else
       ghc-options: -fdicts-strict -O1
   default-language: Haskell2010
@@ -617,7 +617,7 @@ executable kbtzim
       , optparse-simple
     buildable: True
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -770,7 +770,7 @@ executable server
       , chopaan
       , optparse-simple
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded
     else
       ghc-options: -fdicts-strict -O1
   default-language: Haskell2010
