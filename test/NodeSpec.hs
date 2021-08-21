@@ -3,6 +3,7 @@
 
 module NodeSpec (spec) where
 
+import System.IO.Unsafe
 import Common
 import Chopaan.Node.Metrics
 import Test.Hspec
@@ -33,7 +34,7 @@ import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (isEmptyTChan, dupTChan)
 import Control.Monad (forever, liftM)
 import Chopaan.Graph.Greskell
-
+import Chopaan.Utils.Time
 import Numeric.Compensated
 
 --instance Arbitrary EnergyState where
@@ -77,6 +78,27 @@ spec = do
       -- print x
       -- print y
       (decode . encode . head $ sms) `shouldBe` (Just . head $ sms)
+    it "time encoding and decoding works" $ (withMaxSuccess 1000 prop_isoSecondUTCTimeWord64)
+
+
+posTime = fmap (fmap posixSecondsToUTCTime) (arbitrary @(NonNegative Time.NominalDiffTime))
+
+prop_isoSecondUTCTimeWord64 :: Property
+prop_isoSecondUTCTimeWord64 = forAll posTime (\(NonNegative a) -> let 
+                                            cond = (utcTimeNow . timeToUIntSeconds $ a)
+                                                   == (a {
+                                                          Time.utctDayTime =
+                                                          Time.secondsToDiffTime . floor . Time.utctDayTime $ a
+                                                         })
+                                            -- debug = unsafePerformIO $ do
+                                            --   print a
+                                            --   print (timeToUIntSeconds a)
+                                            --   print (utcTimeNow . timeToUIntSeconds $ a)
+                                            in cond -- `fseq` debug 
+                                         )
+  where
+    fseq = flip seq
+
 {--    it "a stream at a 1 sec interval with a fixed power has an energy after n steps equivalent to the sum of the powers" $ do
       let
         len = 102 :: Int

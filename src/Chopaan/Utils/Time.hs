@@ -6,6 +6,7 @@ import Data.Time.Compat
 import Data.Time.LocalTime.Compat
 import Data.Time.Clock.POSIX.Compat
 import Data.Word
+import Data.Int
 import Data.Ix
 import qualified Data.Text as T
 import GHC.Read
@@ -21,7 +22,11 @@ asUTC = localTimeToUTC tz
     tz = TimeZone (round $ 5.5 * 60) False "PK"
 
 timeToUIntSeconds :: UTCTime -> Word64
-timeToUIntSeconds = fromInteger . (\x -> round $ (realToFrac x) / 10e11) . fromPico . nominalDiffTimeToSeconds . utcTimeToPOSIXSeconds
+timeToUIntSeconds = fromIntegral . secondsSinceEpoch
+
+secondsSinceEpoch :: UTCTime -> Int64
+secondsSinceEpoch =
+  floor . nominalDiffTimeToSeconds . utcTimeToPOSIXSeconds
 
 
 -- $ converts the timestamp (in seconds) in the EnergyState to a UTCTime  
