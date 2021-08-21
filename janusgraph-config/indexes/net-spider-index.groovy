@@ -43,6 +43,12 @@ if(mg.getGraphIndex("byNodeId") == null) {
         hh = mg.makeVertexLabel("hh");
     }
 
+    println("--- get @timestamp");
+    ts = mg.getPropertyKey("@timestamp");
+    if(ts == null) {
+        ts = mg.makePropertyKey("@timestamp").dataType(Long.class).make();
+    }
+
     println("--- get kbtz_id");
     kbtz_id = mg.getPropertyKey("@kbtz_id");
     if(kbtz_id == null) {
@@ -98,6 +104,7 @@ if(mg.getGraphIndex("byNodeId") == null) {
     mg.buildIndex("byKbtzId", Vertex.class).addKey(kbtz_id).buildCompositeIndex();
     mg.buildIndex("byHHId", Vertex.class).addKey(hh_id).buildCompositeIndex();
     mg.buildIndex("byType", Vertex.class).addKey(ntype).buildCompositeIndex();
+    mg.buildIndex("byTime", Vertex.class).addKey(ts).buildCompositeIndex();
 
 
     println("--- commit");
