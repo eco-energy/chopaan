@@ -46,46 +46,42 @@ import Chopaan.Graph
 import Chopaan.Kibbutz
 
 
-type S3S (t :: (* -> *) -> * -> *) m a b = t m ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, a) (NodeMAC, b))
+type S3S (t :: (* -> *) -> * -> *) m a b = t m (Either a b)
 
 
-s3Stream :: (IsStream t, MonadAsync m, MonadCatch m)
+s3Stream' :: (IsStream t, MonadAsync m, MonadCatch m)
          => S3Opts
          -> [(NodeMAC, Maybe ObjectKey)]
          -> (UTCTime, UTCTime)
-         -> S3S t m EnergyState RuntimeStats
-s3Stream bucket ns range = S.tapRate 10 (liftIO . (print . (prefix <>) . show))
-                           $ S.maxRate 10000
-                           S.|$ S.mapM (pure . (second f) . align)
-                           S.|$ S.concatMapWith S.parallel (uncurry (nodeS3 bucket range))
-                           S.|$ S.fromList ns
-  where
-    prefix = "combined rate: "
-    -- (S.mergeBy onTime)
-    onTime (_, ((_, a), _)) (_, ((_, b), _)) = fromMaybe EQ $ liftA2 compare a b
-    align (a, ((b, c), d)) = ((b, a, c), (b, d)) 
-    f (n, c) = case c of
-      Left x -> Left (n, x)
-      Right y -> Right (n, y)
+         -> M.Map NodeMAC (t m (Either EnergyState RuntimeStats))
+s3Stream' bucket ns range = M.fromList $ fmap (\(n, o) -> (n, nodeS3 bucket range n o)) ns
 
 
 
 hydrateKbtz' :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
-  => DBPools -> KbtzC NodeMAC -> Range -> t m Hydration
+             => DBPools
+             -> KbtzC NodeMAC
+             -> Range
+             -> t m Hydration
 hydrateKbtz' poo k = S.concatM . (hydrateKbtzM poo k)
 
 hydrateKbtzM :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
-  => DBPools -> KbtzC NodeMAC -> Range -> m (t m Hydration)
+             => DBPools
+             -> KbtzC NodeMAC
+             -> Range
+             -> m (t m Hydration)
 hydrateKbtzM poo k = (pure . S.adapt . S.hoist (runGraphWithDB poo))
                    <=< (runGraphWithDB poo . hydrateKbtz k)
 
-type Hydration = ((NodeMAC, ObjectKey, Maybe UTCTime)
+type Hydration' = ((NodeMAC, ObjectKey, Maybe UTCTime)
                  , ((M.Map NodeMAC SensorR)
                    , (M.Map NodeMAC (MeshNode, RxSignal))))
 
+type Hydration = Bool
+
 type Range = (UTCTime, UTCTime)
 
-hydrateKbtz :: forall t. (IsStream t) => KbtzC NodeMAC -> Range -> GraphM (t GraphM (Hydration))
+hydrateKbtz :: forall t. (IsStream t) => KbtzC NodeMAC -> Range -> GraphM (t GraphM Bool)
 hydrateKbtz KbtzC{name, nodes, s3Opts} range = case s3Opts of
       Nothing -> return $ S.nil
       Just bucket -> do
@@ -102,39 +98,36 @@ hydrateKbtz KbtzC{name, nodes, s3Opts} range = case s3Opts of
         --       mapM_ (\(n, ((ObjectKey k), _)) ->
         --                                withKbtzPool (\p -> addLastSyncToHH p n k)) $ M.toList m
         return $ S.tapRate 10 (liftIO . (print . (prefix <>) . show))
-                                               $ S.minRate 10000 $ (S.postscan process) S.|$ (srcs lsyncs)
+                                               $ S.mapM (pure . (const True))
+                                               $ S.minRate 10000
+                                               $ S.concatFoldableWith S.parallel
+                                               $ grider $ mesher lsyncs 
         where
-          srcs :: [(NodeMAC, Maybe ObjectKey)] -> t GraphM ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, EnergyState) (NodeMAC, (MeshNode, RxSignal)))
-          srcs lsyncs = S.trace (saveM) $ S.mapM (pure . mfn . fixMeshTS) $ s3Stream bucket lsyncs range
-          mfn :: (a, Either (n, x) (n, RuntimeStats))
-            -> (a, Either (n, x) (n, (MeshNode, RxSignal))) 
-          mfn = second (fmap (second (meshNodeLink (getGridRoot name))))
-          saveM :: (a, Either (NodeMAC, x) (NodeMAC, (MeshNode, RxSignal))) -> GraphM Bool
-          saveM x = case (snd  x) of
-            (Left _) -> return False
-            (Right r) -> do
-              withSpider $ addMeshN r
-          process :: FL.Fold GraphM ((NodeMAC, ObjectKey, Maybe UTCTime), Either (NodeMAC, EnergyState) (NodeMAC, (MeshNode, RxSignal))) Hydration
-          process = secondF (eitherWalay)
+          mesher :: [(NodeMAC, Maybe ObjectKey)]
+               -> M.Map NodeMAC (t GraphM (Either EnergyState (MeshNode, RxSignal)))
+          mesher lsyncs = M.mapWithKey (\n s ->
+                                        S.trace (saveM n) $ S.mapM (pure . mfn) $ s) $
+                        s3Stream' bucket lsyncs range
+            where
+              mfn :: (Either x RuntimeStats)
+                -> (Either x (MeshNode, RxSignal)) 
+              mfn = (fmap ((meshNodeLink (getGridRoot name))))
+              saveM :: NodeMAC -> (Either x (MeshNode, RxSignal)) -> GraphM Bool
+              saveM n x = case x of
+                (Left _) -> return False
+                (Right r) -> do
+                  --liftIO $ print r >> return False
+                  withSpider $ addMeshN (n, r)
+          grider :: M.Map NodeMAC (t GraphM (Either EnergyState (MeshNode, RxSignal)))
+            -> M.Map NodeMAC (t GraphM SensorR)
+          grider = M.mapWithKey (\n s -> S.trace -- (liftIO . print)
+                                                 (withSpider . (saveGrid name n))
+                                         $ S.postscan sensorFold
+                                         $ S.lefts s)
           prefix = "processing rate: "
-          fixMeshTS :: ((NodeMAC, ObjectKey, Maybe UTCTime)
-                       , Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats))
-            -> ((NodeMAC, ObjectKey, Maybe UTCTime)
-               , Either (NodeMAC, EnergyState) (NodeMAC, RuntimeStats))
-          fixMeshTS a@(_, (Left _)) = a
-          fixMeshTS a@((_, _, Nothing), _) = a
-          fixMeshTS a@((n, o, Just t), Right (n', r)) = case r ^? N.cpuTime of
-            Nothing -> ((n, o, Just t), Right (n', r & N.cpuTime .~ (timeToUIntSeconds t)))
-            (Just t') -> case (t' == 0) of
-              True -> ((n, o, Just t), Right (n', r & N.cpuTime .~ (timeToUIntSeconds t)))
-              False -> a
           saveGrid k n = (\x -> do
                 a <- addFlow k (n, x)
                 b <- addMon k (n, (x, Nothing))
                 c <- addTx k (n, (x, Nothing, Nothing))
                 return ((a && b && c) `seq` x )
                          )
-          eitherWalay :: FL.Fold GraphM (Either (NodeMAC, EnergyState) (NodeMAC, (MeshNode, RxSignal))) ((M.Map NodeMAC SensorR), (M.Map NodeMAC (MeshNode, RxSignal)))
-          eitherWalay = FL.partition
-            ((FL.demux $ M.fromList $ fmap (\n -> (n, FL.rmapM (withSpider . saveGrid name n) sensorFold)) nodes))
-            ((FL.demux $ M.fromList $ fmap (\n -> (n, idFold)) nodes))

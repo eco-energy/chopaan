@@ -40,6 +40,7 @@ import Chopaan.Utils.Time
 import Chopaan.Utils.Retry
 
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
+import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N (cpuTime)
 
 import Data.Int
 import qualified Streamly.Prelude as S
@@ -82,7 +83,7 @@ downloadMF env bucket n = (fmap decodeMessage)
 
 readObject :: forall m. (MonadIO m, MonadCatch m)
            => S3.BucketName -> S3.ObjectKey -> AWST' Env (ResourceT m) BS.ByteString
-readObject bucket k = do
+readObject bucket k = timeout 120 $ do
       x <- send $ S3.getObject bucket k
       BS.concat . LBS.toChunks <$> (x ^. S3.gorsBody) `sinkBody` sinkLazy
 
@@ -169,7 +170,7 @@ nodeS3 :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
        -> (UTCTime, UTCTime)
        -> NodeMAC
        -> Maybe S3.ObjectKey
-       -> t m (S3.ObjectKey, ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats))
+       -> t m (Either EnergyState RuntimeStats)
 nodeS3 bucket (startT, endT) n startAfter = S.concatM $ do
   env <- getAwsEnv s3
   let prefixes = S.uniq $ prefixRange Hour startT endT
@@ -199,9 +200,10 @@ nodeS3 bucket (startT, endT) n startAfter = S.concatM $ do
     req t = S3.listObjectsV2 bucket
           & S3.lovPrefix .~ (timedPrefix n t)
           & S3.lovStartAfter .~ (fmap unObject startAfter)
-    process :: forall n x. (MonadAsync n) => t n (x, ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame))
-           -> t n (x, ((NodeMAC, Maybe Time.UTCTime), Either EnergyState RuntimeStats))
-    process = S.mapM (pure . (second . second $ throwMFError))
+    process :: forall n x. (MonadAsync n)
+      => t n (x, ((Maybe NodeMAC, Maybe Time.UTCTime), Either String MeshFrame))
+      -> t n (Either EnergyState RuntimeStats)
+    process = S.mapM (pure . (\(x, ((n, t), e)) -> throwMFError t e))
               . S.filter (isRight . snd . snd)
               . unpackMAC
       where
@@ -209,17 +211,36 @@ nodeS3 bucket (startT, endT) n startAfter = S.concatM $ do
                   -> t n (x, ((a, Maybe c), b))
         unpackMAC = S.mapM (pure . (second . first . first $ fromJust))
                     . S.filter (isJust . fst . fst . snd)
-        throwMFError :: Either String MeshFrame -> (Either EnergyState RuntimeStats)
-        throwMFError m' = case m' of
+        throwMFError :: Maybe Time.UTCTime
+                     -> Either String MeshFrame
+                     -> (Either EnergyState RuntimeStats)
+        throwMFError t m' = case m' of
           Left e -> error $ "nodeS3 ::" <> (show n) <> "Parse Meshframe Failed: " <> e 
           Right m ->
             case accessEnergyState m of
-              Just e -> Left e
+              Just e -> Left (fixGridTS t e)
               Nothing ->
                 case accessRTS m of
-                  Just r -> Right r
-                  Nothing -> error $ ""
-
+                  Just r -> Right (fixMeshTS t r)
+                  Nothing -> error $ "Parse Meshframe Failed: Not ES or RTS"
+        fixGridTS :: Maybe UTCTime
+                  -> EnergyState
+                  -> EnergyState
+        fixGridTS Nothing r = r
+        fixGridTS (Just t) r = case r ^? N.cpuTime of
+            Nothing -> r & N.cpuTime .~ (timeToUIntSeconds t)
+            (Just t') -> case (t' == 0) of
+              True -> r & N.cpuTime .~ (timeToUIntSeconds t)
+              False -> r
+        fixMeshTS :: Maybe UTCTime
+                  -> RuntimeStats
+                  -> RuntimeStats
+        fixMeshTS Nothing r = r
+        fixMeshTS (Just t) r = case r ^? N.cpuTime of
+            Nothing -> r & N.cpuTime .~ (timeToUIntSeconds t)
+            (Just t') -> case (t' == 0) of
+              True -> r & N.cpuTime .~ (timeToUIntSeconds t)
+              False -> r
 
 metadataKey :: S3.ObjectKey
 metadataKey = "chopaanMetadata"
@@ -228,6 +249,16 @@ bucketN :: S3.BucketName
 bucketN = S3.BucketName "dosti-datastream"
 
 
+
+partitionEither :: (IsStream t, Monad m) => S.SerialT m (Either a b) -> m (t m a, t m b)
+partitionEither = S.foldr (either left' right') (S.nil, S.nil)
+  where
+    left' a ~(l, r) = (S.cons a l, r)
+    right' a ~(l, r) = (l, S.cons a r)
+
+
+partitionEither' :: (IsStream t, Monad m) => t m (Either a b) -> (t m a, t m b)
+partitionEither' s = (S.lefts s, S.rights s)
 -- createBucketIndex :: IO ()
 -- createBucketIndex = do
 --   l <- liftIO $ newLogger Info stdout
