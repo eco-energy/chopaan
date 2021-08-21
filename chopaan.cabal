@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2cc637b15c75b1c635638fedf10fe22ddd221d649e6ba858bf99e6755379331d
+-- hash: 86ccf7359281de69ab336155c869ff51836d1a360bafdda2456a625288559263
 
 name:           chopaan
 version:        0.1.0.0
@@ -469,7 +469,7 @@ executable dev
     if flag(prod)
       ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded
     else
-      ghc-options: -fdicts-strict -O1
+      ghc-options: -fdicts-strict -O1 -threaded
   default-language: Haskell2010
 
 executable kbtzim
@@ -619,7 +619,7 @@ executable kbtzim
     if flag(prod)
       ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded
     else
-      ghc-options: -fdicts-strict -O1
+      ghc-options: -fdicts-strict -O1 -threaded
   else
     buildable: False
   default-language: Haskell2010
@@ -772,7 +772,7 @@ executable server
     if flag(prod)
       ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded
     else
-      ghc-options: -fdicts-strict -O1
+      ghc-options: -fdicts-strict -O1 -threaded
   default-language: Haskell2010
 
 executable ui

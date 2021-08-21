@@ -348,6 +348,7 @@ executables:
               ghc-options:
                 - -fdicts-strict
                 - -O1
+                - -threaded 
   dev:
     main:             Dev.hs
     other-modules: []
@@ -376,6 +377,7 @@ executables:
               ghc-options:
                 - -fdicts-strict
                 - -O1
+                - -threaded 
   ui:
     main:                Ui.hs
     other-modules: []
@@ -416,6 +418,7 @@ executables:
               ghc-options:
                 - -fdicts-strict
                 - -O1
+                - -threaded 
       else:
         buildable: false
   # hydrate:
