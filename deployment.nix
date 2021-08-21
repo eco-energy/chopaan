@@ -76,7 +76,7 @@ in
 
         after = [ "network.target" "docker-janusgraph.service" ];
         environment = {
-          AWS_CREDS = ${deployment.keys.aws-creds};
+          AWS_CREDS = "/run/keys/aws-creds";
         };
         serviceConfig.LimitNOFILE = 64000;
         script =
