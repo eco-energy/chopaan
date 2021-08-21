@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 86ccf7359281de69ab336155c869ff51836d1a360bafdda2456a625288559263
+-- hash: 9c2e4bf0e65872ae22fb0d2fcea0eb9691af3c09a8084ac5957bd92e779b0a36
 
 name:           chopaan
 version:        0.1.0.0
@@ -174,7 +174,7 @@ library
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2
+      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -453,7 +453,7 @@ executable dev
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2
+      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -604,7 +604,7 @@ executable kbtzim
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2
+      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -754,7 +754,7 @@ executable server
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2
+      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -908,7 +908,7 @@ executable ui
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2
+      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -1059,7 +1059,7 @@ test-suite chopaan-test
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2
+      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
