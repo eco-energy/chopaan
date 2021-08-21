@@ -90,7 +90,7 @@ maxAccumulationBufferComponents: 8192
 resultIterationBatchSize: 16
 writeBufferLowWaterMark: 32768
 writeBufferHighWaterMark: 131072
-threadPoolWorker: 2
+threadPoolWorker: 8
 gremlinPool: 0
-idleConnectionTimeout: 20000
+idleConnectionTimeout: 200000
 
