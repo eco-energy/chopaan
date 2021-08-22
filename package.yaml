@@ -115,6 +115,8 @@ dependencies:
 - regex-applicative
 - generic-lens
 - unliftio-core
+- streamly-bytestring >= 0.1.3
+- winery >= 1.3.2
 when:
   condition: "!impl(ghcjs)"
   then:
