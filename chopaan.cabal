@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9c2e4bf0e65872ae22fb0d2fcea0eb9691af3c09a8084ac5957bd92e779b0a36
+-- hash: b6161fcbc11e92918f437c6a02a63e1b6ba30405def5a01028387adf82b78f27
 
 name:           chopaan
 version:        0.1.0.0
@@ -124,6 +124,7 @@ library
     , servant-client-js
     , stm
     , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
     , text
     , time
     , time-compat >=1.9.2.2
@@ -136,6 +137,7 @@ library
     , unordered-containers
     , vector
     , vector-sized
+    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
@@ -403,6 +405,7 @@ executable dev
     , servant-client-js
     , stm
     , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
     , text
     , time
     , time-compat >=1.9.2.2
@@ -415,6 +418,7 @@ executable dev
     , unordered-containers
     , vector
     , vector-sized
+    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
@@ -554,6 +558,7 @@ executable kbtzim
     , servant-client-js
     , stm
     , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
     , text
     , time
     , time-compat >=1.9.2.2
@@ -566,6 +571,7 @@ executable kbtzim
     , unordered-containers
     , vector
     , vector-sized
+    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
@@ -704,6 +710,7 @@ executable server
     , servant-client-js
     , stm
     , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
     , text
     , time
     , time-compat >=1.9.2.2
@@ -716,6 +723,7 @@ executable server
     , unordered-containers
     , vector
     , vector-sized
+    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
@@ -858,6 +866,7 @@ executable ui
     , servant-client-js
     , stm
     , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
     , text
     , time
     , time-compat >=1.9.2.2
@@ -870,6 +879,7 @@ executable ui
     , unordered-containers
     , vector
     , vector-sized
+    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
@@ -1009,6 +1019,7 @@ test-suite chopaan-test
     , servant-client-js
     , stm
     , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
     , text
     , time
     , time-compat >=1.9.2.2
@@ -1021,6 +1032,7 @@ test-suite chopaan-test
     , unordered-containers
     , vector
     , vector-sized
+    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
