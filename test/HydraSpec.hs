@@ -8,11 +8,14 @@ import Test.QuickCheck.Checkers
 import Test.QuickCheck
 import Test.QuickCheck.Classes
 import Test.QuickCheck.Instances.Time
+import Test.QuickCheck.Instances.Text
 
 import Control.Monad.IO.Class
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import Chopaan.Comm.S3
+import Streamly.Binary
+import Streamly.Internal.Data.Array.Foreign as A
 
 spec :: Spec
 spec = describe "S3 Hydration Checks" $ do
@@ -37,6 +40,16 @@ spec = describe "S3 Hydration Checks" $ do
     m' `shouldBe` (Just 7)
     h' `shouldBe` (Just 5) 
     w' `shouldBe` (Just 3)
+  --it "length prefix encoding decoding" $ property prop_enc_dec_roundtrip
+
+arbS :: Int -> SerialT IO T.Text
+arbS n = S.fromListM (arbs n)
+
+-- prop_enc_dec_roundtrip :: Property
+-- prop_enc_dec_roundtrip = forAll (arbitrary @T.Text) (\t ->
+--                                                        let s = S.repeat t
+--                                                        in S.all ((==)) 
+--                                                        )
 
 
 unM (MilliSecond64 w') = w'
