@@ -18,6 +18,8 @@
         "mtl-compat".flags.two-point-two = false;
         "regex-pcre".revision = (((hackage."regex-pcre")."0.95.0.0").revisions).default;
         "regex-pcre".flags.pkg-config = true;
+        "barbies".revision = (((hackage."barbies")."2.0.3.0").revisions).default;
+        "fast-builder".revision = (((hackage."fast-builder")."0.1.2.1").revisions).default;
         "diagrams-lib".revision = (((hackage."diagrams-lib")."1.4.4").revisions).default;
         "foreign-store".revision = (((hackage."foreign-store")."0.2").revisions).default;
         "wai-websockets".revision = (((hackage."wai-websockets")."3.0.1.2").revisions).default;
@@ -510,6 +512,7 @@
         "aeson-pretty".revision = (((hackage."aeson-pretty")."0.8.8").revisions).default;
         "aeson-pretty".flags.lib-only = false;
         "tasty-discover".revision = (((hackage."tasty-discover")."4.2.2").revisions).default;
+        "barbies-th".revision = (((hackage."barbies-th")."0.1.8").revisions).default;
         "base".revision = (((hackage."base")."4.12.0.0").revisions).default;
         "fast-math".revision = (((hackage."fast-math")."1.0.2").revisions).default;
         "servant-client".revision = (((hackage."servant-client")."0.17").revisions).default;
@@ -600,6 +603,7 @@
         "ghc-tcplugins-extra".revision = (((hackage."ghc-tcplugins-extra")."0.4.2").revisions).default;
         "ghc-tcplugins-extra".flags.deverror = false;
         "unbounded-delays".revision = (((hackage."unbounded-delays")."0.1.1.1").revisions).default;
+        "streamly-bytestring".revision = (((hackage."streamly-bytestring")."0.1.3").revisions).default;
         "hspec-core".revision = (((hackage."hspec-core")."2.8.2").revisions).default;
         "cborg".revision = (((hackage."cborg")."0.2.5.0").revisions).default;
         "cborg".flags.optimize-gmp = true;
@@ -618,8 +622,11 @@
         "microlens-mtl".revision = (((hackage."microlens-mtl")."0.2.0.1").revisions).default;
         "proto-lens-arbitrary".revision = (((hackage."proto-lens-arbitrary")."0.1.2.9").revisions).default;
         "resourcet".revision = (((hackage."resourcet")."1.2.4.2").revisions).default;
+        "cpu".revision = (((hackage."cpu")."0.1.2").revisions).default;
+        "cpu".flags.executable = false;
         "fsnotify".revision = (((hackage."fsnotify")."0.3.0.1").revisions).default;
         "pretty".revision = (((hackage."pretty")."1.1.3.6").revisions).default;
+        "winery".revision = (((hackage."winery")."1.3.2").revisions).default;
         "circle-packing".revision = (((hackage."circle-packing")."0.1.0.6").revisions).default;
         "generic-lens-core".revision = (((hackage."generic-lens-core")."2.2.0.0").revisions).default;
         "cabal-doctest".revision = (((hackage."cabal-doctest")."1.0.8").revisions).default;
@@ -756,7 +763,7 @@
           "Shpadoinkle-template" = { flags = {}; };
           "concat-graphics" = { flags = {}; };
           "Shpadoinkle" = { flags = {}; };
-          "chopaan" = { flags = {}; };
+          "chopaan" = { flags = { "prod" = lib.mkOverride 900 false; }; };
           "Shpadoinkle-backend-snabbdom" = { flags = {}; };
           "Shpadoinkle-router" = { flags = {}; };
           "concat-satisfy" = { flags = {}; };

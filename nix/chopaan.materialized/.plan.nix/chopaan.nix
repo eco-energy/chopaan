@@ -8,7 +8,7 @@
   , config
   , ... }:
   ({
-    flags = {};
+    flags = { prod = false; };
     package = {
       specVersion = "1.12";
       identifier = { name = "chopaan"; version = "0.1.0.0"; };
@@ -108,6 +108,7 @@
           (hsPkgs."servant-client-js" or (errorHandler.buildDepError "servant-client-js"))
           (hsPkgs."stm" or (errorHandler.buildDepError "stm"))
           (hsPkgs."streamly" or (errorHandler.buildDepError "streamly"))
+          (hsPkgs."streamly-bytestring" or (errorHandler.buildDepError "streamly-bytestring"))
           (hsPkgs."text" or (errorHandler.buildDepError "text"))
           (hsPkgs."time" or (errorHandler.buildDepError "time"))
           (hsPkgs."time-compat" or (errorHandler.buildDepError "time-compat"))
@@ -120,6 +121,7 @@
           (hsPkgs."unordered-containers" or (errorHandler.buildDepError "unordered-containers"))
           (hsPkgs."vector" or (errorHandler.buildDepError "vector"))
           (hsPkgs."vector-sized" or (errorHandler.buildDepError "vector-sized"))
+          (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
           ] ++ (if !(compiler.isGhcjs && true)
           then [
             (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
@@ -190,10 +192,6 @@
             "Chopaan/Ui/Tables"
             "Chopaan/UiTypes"
             "Chopaan/View"
-            "Chopaan/Kibbutz/KbtzId"
-            "Chopaan/Kibbutz/KbtzimT"
-            "Chopaan/Kibbutz/Kibbutz"
-            "Chopaan/Kibbutz/Transactor"
             "Chopaan/Monad/Env"
             "Chopaan/Node/Calibration"
             "Chopaan/Node/Components"
@@ -226,6 +224,11 @@
             "Chopaan/Graph/VI"
             "Chopaan/Haxl/Kbtz"
             "Chopaan/Kibbutz"
+            "Chopaan/Hydrate"
+            "Chopaan/Kibbutz/KbtzId"
+            "Chopaan/Kibbutz/KbtzimT"
+            "Chopaan/Kibbutz/Kibbutz"
+            "Chopaan/Kibbutz/Transactor"
             "Chopaan/Kibbutz/Allocate"
             "Chopaan/Kibbutz/AWS/Common"
             "Chopaan/Kibbutz/AWS/Things"
@@ -379,6 +382,7 @@
             (hsPkgs."servant-client-js" or (errorHandler.buildDepError "servant-client-js"))
             (hsPkgs."stm" or (errorHandler.buildDepError "stm"))
             (hsPkgs."streamly" or (errorHandler.buildDepError "streamly"))
+            (hsPkgs."streamly-bytestring" or (errorHandler.buildDepError "streamly-bytestring"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."time" or (errorHandler.buildDepError "time"))
             (hsPkgs."time-compat" or (errorHandler.buildDepError "time-compat"))
@@ -391,6 +395,7 @@
             (hsPkgs."unordered-containers" or (errorHandler.buildDepError "unordered-containers"))
             (hsPkgs."vector" or (errorHandler.buildDepError "vector"))
             (hsPkgs."vector-sized" or (errorHandler.buildDepError "vector-sized"))
+            (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
@@ -438,7 +443,11 @@
             ];
           buildable = if compiler.isGhcjs && true then false else true;
           hsSourceDirs = [ "app" ];
-          mainPath = ([ "Dev.hs" ] ++ [ "" ]) ++ [ "" ];
+          mainPath = ([ "Dev.hs" ] ++ (if !(compiler.isGhcjs && true)
+            then [ "" ] ++ [ "" ]
+            else [ "" ])) ++ (if compiler.isGhcjs && true
+            then [ "" ]
+            else [ "" ] ++ [ "" ]);
           };
         "kbtzim" = {
           depends = ([
@@ -517,6 +526,7 @@
             (hsPkgs."servant-client-js" or (errorHandler.buildDepError "servant-client-js"))
             (hsPkgs."stm" or (errorHandler.buildDepError "stm"))
             (hsPkgs."streamly" or (errorHandler.buildDepError "streamly"))
+            (hsPkgs."streamly-bytestring" or (errorHandler.buildDepError "streamly-bytestring"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."time" or (errorHandler.buildDepError "time"))
             (hsPkgs."time-compat" or (errorHandler.buildDepError "time-compat"))
@@ -529,6 +539,7 @@
             (hsPkgs."unordered-containers" or (errorHandler.buildDepError "unordered-containers"))
             (hsPkgs."vector" or (errorHandler.buildDepError "vector"))
             (hsPkgs."vector-sized" or (errorHandler.buildDepError "vector-sized"))
+            (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
@@ -577,7 +588,11 @@
           buildable = if !(compiler.isGhcjs && true) then true else false;
           modules = [ "Paths_chopaan" ];
           hsSourceDirs = [ "app" ];
-          mainPath = ([ "Main.hs" ] ++ [ "" ]) ++ [ "" ];
+          mainPath = ([ "Main.hs" ] ++ (if !(compiler.isGhcjs && true)
+            then [ "" ] ++ [ "" ]
+            else [ "" ])) ++ (if !(compiler.isGhcjs && true)
+            then [ "" ] ++ [ "" ]
+            else [ "" ]);
           };
         "server" = {
           depends = ([
@@ -656,6 +671,7 @@
             (hsPkgs."servant-client-js" or (errorHandler.buildDepError "servant-client-js"))
             (hsPkgs."stm" or (errorHandler.buildDepError "stm"))
             (hsPkgs."streamly" or (errorHandler.buildDepError "streamly"))
+            (hsPkgs."streamly-bytestring" or (errorHandler.buildDepError "streamly-bytestring"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."time" or (errorHandler.buildDepError "time"))
             (hsPkgs."time-compat" or (errorHandler.buildDepError "time-compat"))
@@ -668,6 +684,7 @@
             (hsPkgs."unordered-containers" or (errorHandler.buildDepError "unordered-containers"))
             (hsPkgs."vector" or (errorHandler.buildDepError "vector"))
             (hsPkgs."vector-sized" or (errorHandler.buildDepError "vector-sized"))
+            (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
@@ -716,10 +733,14 @@
           buildable = if compiler.isGhcjs && true then false else true;
           modules = (pkgs.lib).optional (!(compiler.isGhcjs && true)) "Paths_chopaan";
           hsSourceDirs = [ "app" ];
-          mainPath = ([ "Server.hs" ] ++ [ "" ]) ++ [ "" ];
+          mainPath = ([ "Server.hs" ] ++ (if !(compiler.isGhcjs && true)
+            then [ "" ] ++ [ "" ]
+            else [ "" ])) ++ (if compiler.isGhcjs && true
+            then [ "" ]
+            else [ "" ] ++ [ "" ]);
           };
         "ui" = {
-          depends = ([
+          depends = [
             (hsPkgs."Shpadoinkle" or (errorHandler.buildDepError "Shpadoinkle"))
             (hsPkgs."Shpadoinkle-backend-pardiff" or (errorHandler.buildDepError "Shpadoinkle-backend-pardiff"))
             (hsPkgs."Shpadoinkle-backend-snabbdom" or (errorHandler.buildDepError "Shpadoinkle-backend-snabbdom"))
@@ -740,6 +761,7 @@
             (hsPkgs."binary" or (errorHandler.buildDepError "binary"))
             (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
             (hsPkgs."cassava" or (errorHandler.buildDepError "cassava"))
+            (hsPkgs."chopaan" or (errorHandler.buildDepError "chopaan"))
             (hsPkgs."clay" or (errorHandler.buildDepError "clay"))
             (hsPkgs."colour" or (errorHandler.buildDepError "colour"))
             (hsPkgs."comonad" or (errorHandler.buildDepError "comonad"))
@@ -782,6 +804,7 @@
             (hsPkgs."network" or (errorHandler.buildDepError "network"))
             (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
             (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
+            (hsPkgs."optparse-simple" or (errorHandler.buildDepError "optparse-simple"))
             (hsPkgs."pointed" or (errorHandler.buildDepError "pointed"))
             (hsPkgs."proto-lens" or (errorHandler.buildDepError "proto-lens"))
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
@@ -795,6 +818,7 @@
             (hsPkgs."servant-client-js" or (errorHandler.buildDepError "servant-client-js"))
             (hsPkgs."stm" or (errorHandler.buildDepError "stm"))
             (hsPkgs."streamly" or (errorHandler.buildDepError "streamly"))
+            (hsPkgs."streamly-bytestring" or (errorHandler.buildDepError "streamly-bytestring"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."time" or (errorHandler.buildDepError "time"))
             (hsPkgs."time-compat" or (errorHandler.buildDepError "time-compat"))
@@ -807,6 +831,7 @@
             (hsPkgs."unordered-containers" or (errorHandler.buildDepError "unordered-containers"))
             (hsPkgs."vector" or (errorHandler.buildDepError "vector"))
             (hsPkgs."vector-sized" or (errorHandler.buildDepError "vector-sized"))
+            (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
@@ -847,14 +872,12 @@
               ]
             else [
               (hsPkgs."ghcjs-base" or (errorHandler.buildDepError "ghcjs-base"))
-              ])) ++ [
-            (hsPkgs."base" or (errorHandler.buildDepError "base"))
-            (hsPkgs."chopaan" or (errorHandler.buildDepError "chopaan"))
-            (hsPkgs."optparse-simple" or (errorHandler.buildDepError "optparse-simple"))
-            ];
+              ]);
           buildable = true;
           hsSourceDirs = [ "app" ];
-          mainPath = ([ "Ui.hs" ] ++ [ "" ]) ++ [ "" ];
+          mainPath = [ "Ui.hs" ] ++ (if !(compiler.isGhcjs && true)
+            then [ "" ] ++ [ "" ]
+            else [ "" ]);
           };
         };
       tests = {
@@ -935,6 +958,7 @@
             (hsPkgs."servant-client-js" or (errorHandler.buildDepError "servant-client-js"))
             (hsPkgs."stm" or (errorHandler.buildDepError "stm"))
             (hsPkgs."streamly" or (errorHandler.buildDepError "streamly"))
+            (hsPkgs."streamly-bytestring" or (errorHandler.buildDepError "streamly-bytestring"))
             (hsPkgs."text" or (errorHandler.buildDepError "text"))
             (hsPkgs."time" or (errorHandler.buildDepError "time"))
             (hsPkgs."time-compat" or (errorHandler.buildDepError "time-compat"))
@@ -947,6 +971,7 @@
             (hsPkgs."unordered-containers" or (errorHandler.buildDepError "unordered-containers"))
             (hsPkgs."vector" or (errorHandler.buildDepError "vector"))
             (hsPkgs."vector-sized" or (errorHandler.buildDepError "vector-sized"))
+            (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
