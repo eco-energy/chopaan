@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings, TypeApplications, ScopedTypeVariables, OverloadedLabels #-}
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, StandaloneDeriving, DerivingStrategies #-}
 {-# LANGUAGE AllowAmbiguousTypes, ImpredicativeTypes, QuantifiedConstraints       #-}
 {-# LANGUAGE DataKinds, GADTs, TypeOperators                 #-}
 {-# LANGUAGE DuplicateRecordFields     #-}
-{-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell, RecordWildCards, PackageImports, CPP #-}
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses          #-}
+{-# LANGUAGE NoMonomorphismRestriction, ExtendedDefaultRules, TypeFamilies, NamedFieldPuns, TemplateHaskell, RecordWildCards, PackageImports, CPP, TupleSections #-}
 
 module Chopaan.Ui.ThreeD where
 
@@ -15,6 +15,8 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State
 
+import           Control.Monad.Base
+import           Control.Monad.Trans.Control
 import Control.Concurrent.STM
 import Data.Functor.Rep
 import Data.Monoid (Endo(..))
@@ -355,6 +357,7 @@ threeDM (hoister, updates) objF xs = liftJSM $ do
   case isSubsequent of
     Just raw -> return $ RawNode raw
     Nothing -> do
+      --(notify, stream) <- mkGlobalMailboxAffored
       win <- currentWindowUnchecked
       elm <- createElement doc ("div" :: T.Text)
       setId elm vId
@@ -375,29 +378,25 @@ onIncoming :: (Ord n) => TVar (ControlModel n a) -> (n, a) -> STM ()
 onIncoming m na = modifyTVar m (\x -> x & _1 . #scene %~ (addToScene na))
 
 #ifndef __GHCJS__
+deriving instance MonadBase IO JSM
+deriving instance MonadBaseControl IO JSM
+
 main :: IO ()
-main = runJSorWarp 8080 $ do
+main = do
+  runJSorWarp 8080 $ do
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
   H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
-  win <- currentWindowUnchecked
   scr <- (\x -> (getScreen x))
          =<< (getDocumentElementUnchecked =<< currentDocumentUnchecked)
   debug @ToJSON scr
+  let stream = S.minRate 1 $ S.map (, "Changed") $ S.enumerateFromTo 1 100 
   let ids = [1..(100 :: Int)]
+      dat = M.fromList $ zip ids (repeat testText)
   let objF = grid3D 5 5 25
-  let mod = mkModel scr objF (M.fromAscList $ zip ids (repeat testText)) 
-  model <- liftIO $ newTVarIO (mod, Nothing)
-  _ <- forkIO $ shouldUpdate (\c (m, d) -> do
-                                 case d of
-                                   Nothing -> return c
-                                   Just d' -> do
-                                     let c' = c ^+^ (snd . getState $ d')
-                                     liftIO $ hPutStrLn stdout $ show c' 
-                                     liftIO $ hFlush stdout
-                                     return c') (pure 0) model
-  _ <- requestAnimationFrame win =<< animation win model
-  ctx <- askJSM
-  shpadoinkle id runParDiff model ((threeD titledHuman) . trapper @ToJSON ctx) (getBody)
+      c :: M.Map Int T.Text -> Html m a
+      c m = H.baked $ (, retry) <$> (threeDM (id, stream) objF m)
+  m <- liftIO $ newTVarIO dat
+  shpadoinkle id runParDiff m c (getBody)
 --  . trapper @ToJSON ctx
 
 

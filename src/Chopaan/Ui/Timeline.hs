@@ -25,14 +25,15 @@ default(T.Text)
 
 timeline :: (Functor m)
   => (Ti.UTCTime, Ti.UTCTime)
+  -> (Ti.UTCTime, Ti.UTCTime)
   -> Html m (Ti.UTCTime, Ti.UTCTime)
-timeline (start, end) = H.div sliderStack
+timeline (startG, endG) (start, end) = H.div sliderStack
   [ H.div labelledSlider
-    [ H.label [] [H.text $ "Start Date :: "]
+    [ H.label [] [H.text $ "Start Date :: " <> (T.pack . show $ start)]
     , generalize _1 $ rangeInput [H.onInput fromSlider] (0 :: Int) (length r)
     ]
   , H.div labelledSlider
-    [ H.label [] [H.text $ "End Date :: "]
+    [ H.label [] [H.text $ "End Date :: " <> (T.pack . show $ end)]
     , generalize _2 $ rangeInput [H.onInput fromSlider] (0 :: Int) (length r)
     ]
   ]
@@ -42,8 +43,8 @@ timeline (start, end) = H.div sliderStack
     fromSlider :: T.Text -> Ti.UTCTime -> Ti.UTCTime
     fromSlider v t = fromMaybe t (getTime v)
       where
-        getTime = (r V.!?) . ((flip div 10). round . read @Float . T.unpack)
-    r = V.fromList $ dayRange start end
+        getTime = (r V.!?) . ((flip div 10) . round . read @Float . T.unpack)
+    r = V.fromList $ dayRange startG endG
 
 rangeInput props min max = H.input (props <> [ tp "type" "range"
                                              , tp "min" (T.pack . show $ (min * 10))
