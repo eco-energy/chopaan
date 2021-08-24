@@ -65,8 +65,6 @@
         "attoparsec-iso8601".revision = (((hackage."attoparsec-iso8601")."1.0.1.0").revisions).default;
         "attoparsec-iso8601".flags.fast = false;
         "attoparsec-iso8601".flags.developer = false;
-        "beam-migrate".revision = (((hackage."beam-migrate")."0.5.1.0").revisions).default;
-        "beam-migrate".flags.werror = false;
         "exact-pi".revision = (((hackage."exact-pi")."0.5.0.1").revisions).default;
         "base64".revision = (((hackage."base64")."0.4.2.3").revisions).default;
         "ghc-prim".revision = (((hackage."ghc-prim")."0.5.3").revisions).default;
@@ -160,8 +158,6 @@
         "cmdargs".flags.testprog = false;
         "cmdargs".flags.quotation = true;
         "easy-file".revision = (((hackage."easy-file")."0.2.2").revisions).default;
-        "beam-core".revision = (((hackage."beam-core")."0.9.1.0").revisions).default;
-        "beam-core".flags.werror = false;
         "dimensional".revision = (((hackage."dimensional")."1.4").revisions).default;
         "ghci".revision = (((hackage."ghci")."8.6.5").revisions).default;
         "servant-rawm".revision = (((hackage."servant-rawm")."1.0.0.0").revisions).default;
@@ -169,8 +165,6 @@
         "optparse-simple".revision = (((hackage."optparse-simple")."0.1.1.4").revisions).default;
         "optparse-simple".flags.build-example = false;
         "th-expand-syns".revision = (((hackage."th-expand-syns")."0.4.7.0").revisions).default;
-        "beam-postgres".revision = (((hackage."beam-postgres")."0.5.1.0").revisions).default;
-        "beam-postgres".flags.werror = false;
         "compensated".revision = (((hackage."compensated")."0.8.3").revisions).default;
         "cubicbezier".revision = (((hackage."cubicbezier")."0.6.0.6").revisions).default;
         "cubicbezier".flags.debug = false;
@@ -184,7 +178,6 @@
         "cryptonite".flags.support_pclmuldq = false;
         "cryptonite".flags.check_alignment = false;
         "cryptonite".flags.old_toolchain_inliner = false;
-        "postgresql-simple".revision = (((hackage."postgresql-simple")."0.6.3").revisions).default;
         "ghc-byteorder".revision = (((hackage."ghc-byteorder")."4.11.0.0.10").revisions).default;
         "indexed-list-literals".revision = (((hackage."indexed-list-literals")."0.2.1.3").revisions).default;
         "clock".revision = (((hackage."clock")."0.8.2").revisions).default;
@@ -451,6 +444,7 @@
         "wcwidth".revision = (((hackage."wcwidth")."0.0.2").revisions).default;
         "wcwidth".flags.split-base = true;
         "wcwidth".flags.cli = false;
+        "directory-tree".revision = (((hackage."directory-tree")."0.12.1").revisions).default;
         "StateVar".revision = (((hackage."StateVar")."1.2.2").revisions).default;
         "typed-process".revision = (((hackage."typed-process")."0.2.6.0").revisions).default;
         "vault".revision = (((hackage."vault")."0.3.1.5").revisions).default;
@@ -493,8 +487,6 @@
         "parser-combinators".revision = (((hackage."parser-combinators")."1.3.0").revisions).default;
         "parser-combinators".flags.dev = false;
         "blaze-markup".revision = (((hackage."blaze-markup")."0.8.2.8").revisions).default;
-        "postgresql-libpq".revision = (((hackage."postgresql-libpq")."0.9.4.3").revisions).default;
-        "postgresql-libpq".flags.use-pkg-config = false;
         "tasty-golden".revision = (((hackage."tasty-golden")."2.3.4").revisions).default;
         "tasty-golden".flags.build-example = false;
         "uuid".revision = (((hackage."uuid")."1.3.15").revisions).default;
@@ -646,7 +638,6 @@
         "http-types".revision = (((hackage."http-types")."0.12.3").revisions).default;
         "ghc-boot-th".revision = (((hackage."ghc-boot-th")."8.6.5").revisions).default;
         "net-mqtt".revision = (((hackage."net-mqtt")."0.7.0.1").revisions).default;
-        "pqueue".revision = (((hackage."pqueue")."1.4.1.3").revisions).default;
         "th-lift-instances".revision = (((hackage."th-lift-instances")."0.1.18").revisions).default;
         "lattices".revision = (((hackage."lattices")."2.0.2").revisions).default;
         "servant-server".revision = (((hackage."servant-server")."0.17").revisions).default;
