@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b6161fcbc11e92918f437c6a02a63e1b6ba30405def5a01028387adf82b78f27
+-- hash: 2c2c3f00f67e6becd1b541e3d086a06d1bc5ab9b11ba7096a402719ed5a4fccb
 
 name:           chopaan
 version:        0.1.0.0
@@ -65,7 +65,6 @@ library
     , async
     , base >=4.11 && <10
     , base64
-    , beam-core
     , binary
     , bytestring
     , cassava
@@ -137,14 +136,11 @@ library
     , unordered-containers
     , vector
     , vector-sized
-    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
       , amazonka-iot
       , amazonka-s3
-      , beam-migrate
-      , beam-postgres
       , blaze-markup
       , concat-classes
       , concat-examples
@@ -153,6 +149,7 @@ library
       , conduit
       , connection
       , dhall >=1.33.0
+      , directory-tree
       , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
@@ -160,7 +157,6 @@ library
       , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
-      , postgresql-simple
       , sbv
       , servant-blaze
       , servant-client
@@ -173,10 +169,11 @@ library
       , wai-cors
       , warp
       , websockets
+      , winery >=1.3.2
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -234,9 +231,6 @@ library
         Chopaan.Comm.Queues
         Chopaan.Comm.S3
         Chopaan.Comm.Socket
-        Chopaan.DB
-        Chopaan.DB.Nodes
-        Chopaan.DB.Sensors
         Chopaan.Graph.Kbtz
         Chopaan.Graph.Spider
         Chopaan.Graph.VI
@@ -346,7 +340,6 @@ executable dev
     , async
     , base >=4.11 && <10
     , base64
-    , beam-core
     , binary
     , bytestring
     , cassava
@@ -418,14 +411,11 @@ executable dev
     , unordered-containers
     , vector
     , vector-sized
-    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
       , amazonka-iot
       , amazonka-s3
-      , beam-migrate
-      , beam-postgres
       , blaze-markup
       , concat-classes
       , concat-examples
@@ -434,6 +424,7 @@ executable dev
       , conduit
       , connection
       , dhall >=1.33.0
+      , directory-tree
       , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
@@ -441,7 +432,6 @@ executable dev
       , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
-      , postgresql-simple
       , sbv
       , servant-blaze
       , servant-client
@@ -454,10 +444,11 @@ executable dev
       , wai-cors
       , warp
       , websockets
+      , winery >=1.3.2
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -471,7 +462,7 @@ executable dev
       , chopaan
       , optparse-simple
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded -with-rtsopts=-N
     else
       ghc-options: -fdicts-strict -O1 -threaded
   default-language: Haskell2010
@@ -499,7 +490,6 @@ executable kbtzim
     , async
     , base >=4.11 && <10
     , base64
-    , beam-core
     , binary
     , bytestring
     , cassava
@@ -571,14 +561,11 @@ executable kbtzim
     , unordered-containers
     , vector
     , vector-sized
-    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
       , amazonka-iot
       , amazonka-s3
-      , beam-migrate
-      , beam-postgres
       , blaze-markup
       , concat-classes
       , concat-examples
@@ -587,6 +574,7 @@ executable kbtzim
       , conduit
       , connection
       , dhall >=1.33.0
+      , directory-tree
       , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
@@ -594,7 +582,6 @@ executable kbtzim
       , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
-      , postgresql-simple
       , sbv
       , servant-blaze
       , servant-client
@@ -607,10 +594,11 @@ executable kbtzim
       , wai-cors
       , warp
       , websockets
+      , winery >=1.3.2
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -623,7 +611,7 @@ executable kbtzim
       , optparse-simple
     buildable: True
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -with-rtsopts=-N -threaded
     else
       ghc-options: -fdicts-strict -O1 -threaded
   else
@@ -651,7 +639,6 @@ executable server
     , async
     , base >=4.11 && <10
     , base64
-    , beam-core
     , binary
     , bytestring
     , cassava
@@ -723,14 +710,11 @@ executable server
     , unordered-containers
     , vector
     , vector-sized
-    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
       , amazonka-iot
       , amazonka-s3
-      , beam-migrate
-      , beam-postgres
       , blaze-markup
       , concat-classes
       , concat-examples
@@ -739,6 +723,7 @@ executable server
       , conduit
       , connection
       , dhall >=1.33.0
+      , directory-tree
       , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
@@ -746,7 +731,6 @@ executable server
       , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
-      , postgresql-simple
       , sbv
       , servant-blaze
       , servant-client
@@ -759,10 +743,11 @@ executable server
       , wai-cors
       , warp
       , websockets
+      , winery >=1.3.2
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -778,7 +763,7 @@ executable server
       , chopaan
       , optparse-simple
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -threaded
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=4 -fspec-constr-recursive=4 -fplugin Fusion.Plugin -O2 -with-rtsopts=-N -threaded
     else
       ghc-options: -fdicts-strict -O1 -threaded
   default-language: Haskell2010
@@ -805,7 +790,6 @@ executable ui
     , async
     , base
     , base64
-    , beam-core
     , binary
     , bytestring
     , cassava
@@ -879,14 +863,11 @@ executable ui
     , unordered-containers
     , vector
     , vector-sized
-    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
       , amazonka-iot
       , amazonka-s3
-      , beam-migrate
-      , beam-postgres
       , blaze-markup
       , concat-classes
       , concat-examples
@@ -895,6 +876,7 @@ executable ui
       , conduit
       , connection
       , dhall >=1.33.0
+      , directory-tree
       , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
@@ -902,7 +884,6 @@ executable ui
       , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
-      , postgresql-simple
       , sbv
       , servant-blaze
       , servant-client
@@ -915,10 +896,11 @@ executable ui
       , wai-cors
       , warp
       , websockets
+      , winery >=1.3.2
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -960,7 +942,6 @@ test-suite chopaan-test
     , async
     , base >=4.11 && <10
     , base64
-    , beam-core
     , binary
     , bytestring
     , cassava
@@ -1032,14 +1013,11 @@ test-suite chopaan-test
     , unordered-containers
     , vector
     , vector-sized
-    , winery >=1.3.2
   if !impl(ghcjs)
     build-depends:
         amazonka
       , amazonka-iot
       , amazonka-s3
-      , beam-migrate
-      , beam-postgres
       , blaze-markup
       , concat-classes
       , concat-examples
@@ -1048,6 +1026,7 @@ test-suite chopaan-test
       , conduit
       , connection
       , dhall >=1.33.0
+      , directory-tree
       , fusion-plugin
       , greskell-websocket >=0.1.2.5
       , http-client
@@ -1055,7 +1034,6 @@ test-suite chopaan-test
       , net-mqtt ==0.7.0.1
       , net-spider
       , network-uri
-      , postgresql-simple
       , sbv
       , servant-blaze
       , servant-client
@@ -1068,10 +1046,11 @@ test-suite chopaan-test
       , wai-cors
       , warp
       , websockets
+      , winery >=1.3.2
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=2 -fspec-constr-recursive=2 -fplugin Fusion.Plugin -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -1082,7 +1061,7 @@ test-suite chopaan-test
         base
     buildable: False
   else
-    ghc-options: -threaded -with-rtsopts=-N -O2
+    ghc-options: -threaded
     build-tool-depends:
         hspec-discover:hspec-discover
     build-depends:
