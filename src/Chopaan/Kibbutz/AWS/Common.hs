@@ -9,6 +9,7 @@ module Chopaan.Kibbutz.AWS.Common
   , Logger
   , withAwsEnv
   , getAwsEnv
+  , Env(..)
   ) where
 
 import Control.Monad.IO.Class

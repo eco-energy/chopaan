@@ -80,7 +80,7 @@ instance CRUDChopaan AppC where
     (S.hoist (AppC . liftIO) . adapt) <$> (liftJSM $ runXHR' r env)
     where
       r = historyAPI k g t0 t1
-    
+
 
 getClientEnv :: String -> Int -> ClientEnv
 getClientEnv host port = ClientEnv $ BaseUrl (scheme host) host port "" 
