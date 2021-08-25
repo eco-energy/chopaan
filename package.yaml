@@ -234,7 +234,6 @@ library:
         - Chopaan.Kibbutz
         - Chopaan.Hydrate
         - Chopaan.Kibbutz.KbtzId
-        - Chopaan.Kibbutz.KbtzimT
         - Chopaan.Kibbutz.Kibbutz
         - Chopaan.Kibbutz.Transactor
         - Chopaan.Kibbutz.Allocate
@@ -288,7 +287,6 @@ library:
         - Chopaan.UiTypes
         - Chopaan.View
         - Chopaan.Kibbutz.KbtzId
-        - Chopaan.Kibbutz.KbtzimT
         - Chopaan.Kibbutz.Transactor
         - Chopaan.Monad.Env
         - Chopaan.Node.Calibration

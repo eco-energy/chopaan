@@ -384,19 +384,20 @@ deriving instance MonadBaseControl IO JSM
 main :: IO ()
 main = do
   runJSorWarp 8080 $ do
-  H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
-  H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
-  scr <- (\x -> (getScreen x))
-         =<< (getDocumentElementUnchecked =<< currentDocumentUnchecked)
-  debug @ToJSON scr
-  let stream = S.minRate 1 $ S.map (, "Changed") $ S.enumerateFromTo 1 100 
-  let ids = [1..(100 :: Int)]
+    H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/tailwind.min.css")
+    H.addInlineStyle $ decodeUtf8 $(embedFile "./assets/style.css")
+    scr <- (\x -> (getScreen x))
+           =<< (getDocumentElementUnchecked =<< currentDocumentUnchecked)
+    debug @ToJSON scr
+    let
+      stream = S.minRate 1 $ S.map (, "Changed") $ S.enumerateFromTo 1 100 
+      ids = [1..(100 :: Int)]
       dat = M.fromList $ zip ids (repeat testText)
-  let objF = grid3D 5 5 25
+      objF = grid3D 5 5 25
       c :: M.Map Int T.Text -> Html m a
       c m = H.baked $ (, retry) <$> (threeDM (id, stream) objF m)
-  m <- liftIO $ newTVarIO dat
-  shpadoinkle id runParDiff m c (getBody)
+    m <- liftIO $ newTVarIO dat
+    shpadoinkle id runParDiff m c (getBody)
 --  . trapper @ToJSON ctx
 
 

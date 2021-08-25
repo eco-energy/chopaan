@@ -33,7 +33,6 @@ import Shpadoinkle.Widgets.Table (SortCol(..))
 import Chopaan.Node.NodeId
 import Chopaan.Node.NodeT
 import Chopaan.Kibbutz.KbtzId
-import Chopaan.Kibbutz.KbtzimT ()
 import Chopaan.CRUD
 import Chopaan.Graph
 import qualified Data.Time as Ti
@@ -92,6 +91,7 @@ instance Routed (SPA m) Route where
 
 
 {------------------ TABALS -----------}
+
 
 data RosterKbtzim = RosterKbtzim
   { _sortK :: SortCol KbtzList

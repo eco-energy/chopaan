@@ -72,7 +72,6 @@ import Chopaan.Node.NodeT
 import Chopaan.Node.NodeId
 import Chopaan.Node.HW
 import Chopaan.Node.Components
-import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Ui.FormCommon
 import Chopaan.Ui.GraphView
 import Chopaan.Ui.Timeline

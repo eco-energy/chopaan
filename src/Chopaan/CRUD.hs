@@ -29,7 +29,7 @@ import Chopaan.Node.Folds (SensorR)
 #ifndef ghcjs_HOST_OS
 import Chopaan.Hydrate (Hydration)
 #endif
-import Chopaan.Kibbutz.KbtzimT
+
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Graph
 import Data.Time
@@ -73,6 +73,7 @@ instance Humanize (Column NodeList) where
     --NMac -> "MAC Address"
     --NHW -> "Hardware Configuration"
 
+type Nodezim = [NodeMAC]
 
 instance Tabular NodeList where
   type Effect NodeList m = (MonadJSM m, CRUDChopaan m)
@@ -96,6 +97,7 @@ instance Tabular NodeList where
         DESC -> flip
       g l = compare `on` l . unNodezimRow
 
+type Kbtzim = [KbtzName]
 
 newtype KbtzList = KbtzList { unKbtzList :: Kbtzim }
   deriving (Eq, Ord, Show, Generic)

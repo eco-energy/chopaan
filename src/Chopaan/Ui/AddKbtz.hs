@@ -20,7 +20,6 @@ import GHC.Generics (Generic)
 
 import Chopaan.Node.NodeT
 import Chopaan.Node.NodeId
-import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Kibbutz.KbtzId
 
 import Shpadoinkle.Widgets.Types

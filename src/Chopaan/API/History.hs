@@ -54,7 +54,6 @@ import Network.Wai (Application)
 
 import Chopaan.Kibbutz (KbtzC(..))
 import Chopaan.Hydrate (hydrateKbtz, Hydration)
-import Chopaan.Kibbutz.KbtzimT
 import Chopaan.Utils.Time (dayRange)
 import qualified System.Envy as E
 import Options.Applicative

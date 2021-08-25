@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2c2c3f00f67e6becd1b541e3d086a06d1bc5ab9b11ba7096a402719ed5a4fccb
+-- hash: f361c3e745ffed7218f8999d17a498d9cc234f65f8c6992171371963499187ff
 
 name:           chopaan
 version:        0.1.0.0
@@ -238,7 +238,6 @@ library
         Chopaan.Kibbutz
         Chopaan.Hydrate
         Chopaan.Kibbutz.KbtzId
-        Chopaan.Kibbutz.KbtzimT
         Chopaan.Kibbutz.Kibbutz
         Chopaan.Kibbutz.Transactor
         Chopaan.Kibbutz.Allocate
@@ -291,7 +290,6 @@ library
         Chopaan.UiTypes
         Chopaan.View
         Chopaan.Kibbutz.KbtzId
-        Chopaan.Kibbutz.KbtzimT
         Chopaan.Kibbutz.Transactor
         Chopaan.Monad.Env
         Chopaan.Node.Calibration

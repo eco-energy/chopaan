@@ -16,9 +16,6 @@ import qualified Data.Text as T
 import Data.Text.Encoding
 
 
-import Database.Beam (Beamable, Columnar)
-
-
 import Shpadoinkle.Widgets.Types (Field, Humanize (..)
                                  , Hygiene (Clean)
                                  , Input (Input), getValue
@@ -32,10 +29,6 @@ import Shpadoinkle.Widgets.Validation ( between
 import Chopaan.Node.NodeId
 import Chopaan.Node.HW
 
-
-
-
-type Nodezim = [NodeMAC]
 
 
 data NodeUpdate s = NodeUpdate
