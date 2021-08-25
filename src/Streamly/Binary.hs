@@ -4,6 +4,7 @@ module Streamly.Binary
     Bin,
     PB,
     Txt,
+    EncT(..),
     parseMsgS,
     parseBinS,
     toPB,
@@ -55,7 +56,10 @@ class HasEncoding a where
   default chunkBytes :: (MonadAsync m, MonadCatch m) => P.Parser m Word8 (A.Array Word8)
   chunkBytes = parseLengthPrefixed
   {-# INLINE chunkBytes #-}
-  
+
+
+data EncT = BinFmt | PBFmt | TxtFmt
+
 newtype Bin a = Bin { unBin :: a }
   deriving (Generic)
   deriving newtype Binary
