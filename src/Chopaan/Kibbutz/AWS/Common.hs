@@ -21,13 +21,16 @@ import Control.Monad.Trans.Resource
 import Control.Monad.Trans.Resource.Internal
 import Control.Monad.Trans.Control
 import Network.AWS.Env
+
+import qualified Data.Time as Time
 import Lens.Micro
-import System.IO (stdout)
+import System.IO (stdout, withFile, IOMode(..), openFile)
 import System.Environment
 
 
 import qualified Streamly.Data.Unfold as UF
 import qualified Streamly.Prelude as S
+import Chopaan.Utils.Retry (recoverC)
 
 type AWSC b = AWST' Env (ResourceT IO) b
 
@@ -49,13 +52,16 @@ frmrl = (FromProfile "chopaanRole")
 getAwsEnv :: (MonadIO m, MonadCatch m) => Service -> m Env
 getAwsEnv svc = do
   liftIO . print $ "AWS ENV REQUESTED!"
-  lgr <- newLogger Info stdout
   e <- liftIO $ lookupEnv "AWS_CREDS"
+  t <- liftIO $ (Time.formatTime Time.defaultTimeLocale "%y-%m-%d-%R-%Q") <$> Time.getCurrentTime
+  let fname = "aws_log_" <> t --(showText . toText . _svcAbbrev $ svc) <> "_" <> t
+  lgHandle <- liftIO $ openFile fname WriteMode
+  lgr <- newLogger Info lgHandle
   case e of
     Nothing -> error "AWS CONTEXT NOT AVAILABLE, AWS_CREDS NOT DEFINED"
     Just fp -> newEnv (creds fp)
       <&> set envLogger lgr . set envRegion Singapore
-      <&> set envRetryCheck (retryConnectionFailure 1000)
+      <&> set envRetryCheck (retryConnectionFailure 200)
       <&> configure svc
   
 pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)
@@ -67,14 +73,14 @@ pageUF = UF.lmap Just $ UF.unfoldrM step
       y <- send req
       return $ Just (y, page req y)
 
-pageS :: forall t m a. (S.IsStream t, S.MonadAsync m, AWSPager a) => Env -> a -> t m (Rs a)
+pageS :: forall t m a. (S.IsStream t, S.MonadAsync m, MonadCatch m, AWSPager a) => Env -> a -> t m (Rs a)
 pageS env req = S.unfoldrM step start
   where
     start = Just req
     step :: (Maybe a) -> m (Maybe (Rs a, Maybe a)) 
     step Nothing = return Nothing
     step (Just req') = do
-      y <- liftIO $ withAwsEnv env $ send req'
+      y <- liftIO $ withAwsEnv env $ recoverC ("paging retry" :: String) 100 $ timeout 120 $ send req'
       return $ Just (y, page req' y)
 
 
