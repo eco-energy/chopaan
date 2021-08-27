@@ -260,9 +260,9 @@ hasConfig (h, p) label = defConfig
 {-# INLINE hasConfig #-}
 
 spiderPool :: forall m n v e. MonadIO m => Config n v e -> m (Pool (Spider n v e))
-spiderPool c = liftIO $ createPool
-  ((recoverC "retrying kbtz janusgraph connection" 10) (connectWith c)) close 1 5 100
-
+spiderPool c = liftIO $ createPool mkConn close 1 2 10
+  where
+    mkConn = ((recoverC "retrying kbtz janusgraph connection" 10) (connectWith c))
 
 fromNSGraphM = (pure . fromNSGraph)
 
