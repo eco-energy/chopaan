@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications, FlexibleContexts, ScopedTypeVariables, RankNTypes, ConstraintKinds, KindSignatures, QuantifiedConstraints, MultiParamTypeClasses, GADTs, FlexibleInstances#-}
 {-# LANGUAGE OverloadedStrings, RecordWildCards, NamedFieldPuns  #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, TupleSections, AllowAmbiguousTypes #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, TupleSections, AllowAmbiguousTypes, BangPatterns #-}
 
 module Chopaan.Hydrate ( hydrateKbtz
                        , hydrateKbtz'
@@ -19,7 +19,7 @@ import Control.Monad.Catch
 import Streamly.Prelude as S (IsStream, MonadAsync, adapt)
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
--- import qualified Streamly.Internal.Data.Fold as FL
+import qualified Streamly.Internal.Data.Fold as FL
 -- import qualified Streamly.Internal.Data.Fold.Type as FL
 -- import qualified Streamly.Internal.Data.Fold.Tee as FL
 -- import qualified Streamly.Internal.Data.Unfold as UF
@@ -92,11 +92,19 @@ hydrateKbtz KbtzC{name, nodes, s3Opts} range = case s3Opts of
           lsyncs = zip nodes (repeat Nothing)
         return $ S.tapRate 10 (liftIO . (print . (prefix <>) . show))
           $ S.concatFoldableWith S.parallel --IxFoldable
-          $ (s3Stream' env bucket lsyncs range) & mesher & grider 
+          $ grider
+          $ mesher
+          (s3Stream' env bucket lsyncs range) -- & mesher & grider 
         where
+          tapCount :: forall m a. (MonadAsync m, Show a) => String -> t m a -> t m a
+          tapCount n = S.tap (printCount n)
+          printCount s = FL.foldlM' (\x a ->
+                                  (liftIO . print $ s <> ": " <> (show x))
+                                  >> (return $ x + (1 :: Int))) (pure 1)
           mesher :: M.Map NodeMAC (t GraphM (Either EnergyState RuntimeStats))
                -> M.Map NodeMAC (t GraphM (Either EnergyState (MeshNode, RxSignal)))
-          mesher  = M.mapWithKey (\n s -> S.trace (saveM n) $ S.map (mfn) $ s)               
+          mesher  = M.mapWithKey (\n s -> -- S.trace (saveM n) $
+                                          S.map (mfn) $ s)               
             where
               mfn :: (Either x RuntimeStats)
                 -> (Either x (MeshNode, RxSignal)) 
@@ -105,17 +113,18 @@ hydrateKbtz KbtzC{name, nodes, s3Opts} range = case s3Opts of
               saveM n x = case x of
                 (Left _) -> return True
                 (Right r) -> do
-                  withSpider $ addMeshN (n, r)
+                  withSpider $! addMeshN (n, r)
           grider :: M.Map NodeMAC (t GraphM (Either EnergyState (MeshNode, RxSignal)))
                  -> M.Map NodeMAC (t GraphM Bool) --(Either SensorR (MeshNode, RxSignal)))
-          grider = M.mapWithKey (\n s -> S.mapM (withSpider . (saveGrid name n))
+          grider = M.mapWithKey (\n s -> S.map (const True)
+                                         --  $ S.trace (withSpider . (saveGrid name n))
                                          $ S.postscan sensorFold
                                          $ S.lefts s)
-          prefix = "processing rate: "
+          prefix = "Hydration Rate: "
           saveGrid k n = (\x -> do
-                a <- addFlow k (n, x)
-                b <- addMon k (n, (x, Nothing))
-                c <- addTx k (n, (x, Nothing, Nothing))
+                !a <- addFlow k (n, x)
+                !b <- addMon k (n, (x, Nothing))
+                !c <- addTx k (n, (x, Nothing, Nothing))
                 return (a && b && c)
                          )
           -- saveGM _ n (Right r) = addMeshN (n, r)
