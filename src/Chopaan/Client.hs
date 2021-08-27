@@ -95,11 +95,11 @@ getClientEnv host port = ClientEnv $ BaseUrl (scheme host) host port ""
   = client (Proxy @ (HistoryAPI AheadT))
 
 
-app :: String -> Int -> JSM ()
-app h p = do
+frontend :: String -> Int -> JSM ()
+frontend h p = do
   let e = getClientEnv h p
   fullPageSPA @(SPA JSM) (runApp e) runParDiff (withHydration ainit) view getBody onRouteChange routes
 
 
 main :: IO ()
-main = runJSorWarp 8080 (app "localhost" 8080)
+main = runJSorWarp 8080 (frontend "localhost" 8080)
