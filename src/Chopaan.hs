@@ -37,17 +37,17 @@ runKbtzim mq = do
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks
   --qss <- mapM (\(k, ns) -> mqttQs mq k ns) $ zip ks nss
   let confss = fmap sConf (zip ks nss)-- qss
-      past = S.concatMapWith S.async (S.concatM . (flip hydrateKbtz $ (t0, tn))) $ S.fromList confss
-      present = S.concatMapWith S.async (S.concatM . runKibbutz @t) $ S.fromList confss
-  return $ (S.map (const True) $ past) `S.ahead`
+      past = S.concatMapWith S.parallel (S.concatM . (flip hydrateKbtz $ (t0, tn))) $ S.fromList confss
+      present = S.concatMapWith S.parallel (S.concatM . runKibbutz @t) $ S.fromList confss
+  return $ (S.map (const True) $ past) `S.parallel`
     (S.map (const True) $ present)
   where
     futPrefix = "runKibbutz :" 
     labKbtz = (KbtzId "Lab_TestGrid")
     labNodes = NodeId <$> [ "7c:9e:bd:f5:ec:74", "c4:4f:33:67:ea:69"
                               , "ac:67:b2:11:e5:c4", "7c:9e:bd:f6:43:88" ]
-    t0 = Ti.UTCTime (Ti.fromGregorian 2021 3 1) (Ti.secondsToDiffTime 0)
-    tn = Ti.UTCTime (Ti.fromGregorian 2021 8 12) (Ti.secondsToDiffTime 0)
+    t0 = Ti.UTCTime (Ti.fromGregorian 2021 8 20) (Ti.secondsToDiffTime 0)
+    tn = Ti.UTCTime (Ti.fromGregorian 2021 8 27) (Ti.secondsToDiffTime 0)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
                           , nodes = ns
                           , channelOpts = Left mq
@@ -57,11 +57,12 @@ runKbtzim mq = do
 
 run :: RIO App ()
 run = do
+  hSetBuffering stdout LineBuffering 
   app <- ask
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
   TinkerConf{..} <- liftIO $ execParser tkOptions
   liftIO $ runGraphM (janusHost) (janusPort) $ do
-    ks <- runKbtzim @S.AheadT mqttOpts
-    S.drain $ S.fromAhead ks
+    ks <- runKbtzim @S.AsyncT mqttOpts
+    S.drain $ S.fromAsync ks
