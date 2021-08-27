@@ -8,7 +8,7 @@ import Data.Either
 import Control.Monad.IO.Class
 
 chopaanPolicy :: (MonadIO m) => Int -> RetryPolicyM m
-chopaanPolicy n = exponentialBackoff 100 <> limitRetries n
+chopaanPolicy n = exponentialBackoff 10 <> limitRetries n
 
 recoverC :: (MonadIO m, C.MonadMask m, Show e) => e -> Int -> m a -> m a
 recoverC msg n action = recovering (chopaanPolicy n) [logDef] (\_ -> action)
