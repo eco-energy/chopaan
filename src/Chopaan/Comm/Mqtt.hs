@@ -96,7 +96,7 @@ runMqtt kbtz ns qs@MessageQs{..} msgCB opts creds = do
   c <- liftIO $ client kbtz opts (msgCB qs) creds
   liftIO $ print ("Obtained Client!")
   _ <- liftIO . forkIO $ runMQ c (forever $ pubQ outbox)
-  liftIO . (recoverC "waiting for client" 10) . runMQ c $ (runMqtt' ns outbox)
+  liftIO . (recoverC "waiting for client" 1000) . runMQ c $ (runMqtt' ns outbox)
 
 -- need reader for creds and logs
 runMqtt' :: forall m a. (MonadIO m, Address a) => [a] -> PubQueue -> MonadMQ m ()
@@ -124,7 +124,7 @@ client (KbtzId k) fileOpts msgCB awsCreds = do
            , MQ._connID=Text.unpack $ k
            --, MQ._port=8883
            , MQ._msgCB=msgCB
-           , MQ._connectTimeout=18000000
+           , MQ._connectTimeout=20000000
            , MQ._tlsSettings=tlsConf}
   --print $ show conf
   recoverC "connectURI Attempting" 100000 $ MQ.connectURI conf uri
