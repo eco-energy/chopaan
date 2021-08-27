@@ -48,4 +48,4 @@ defCA = ClientArgs "localhost" 8080
 main :: IO ()
 main = do
   c <- execParser options
-  runJSorWarp 8080 (C.app (serverHost c) (serverPort c))
+  runJSorWarp 8080 (C.frontend (serverHost c) (serverPort c))
