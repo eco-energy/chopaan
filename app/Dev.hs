@@ -6,8 +6,14 @@ import           Shpadoinkle.Run (liveWithBackend, Env(Dev))
 import Control.Monad
 import Control.Concurrent
 
+import Paths_chopaan
+
+
 main :: IO ()
-main = liveAndWait 8080 (C.frontend "localhost" 8080) $ S.application Dev "./webdev" (S.TinkerConf "localhost" 8182)
+main = do
+  opts <- getDataFileName "options.dhall"
+  liveAndWait 8080 (C.frontend "localhost" 8080)
+    $ S.application opts Dev "./webdev" (S.TinkerConf "localhost" 8182)
 
 
 
