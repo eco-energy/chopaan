@@ -159,8 +159,8 @@ when:
         ghc-options:
           - -fplugin=ConCat.Plugin
           - -fdicts-strict
-          - -fmax-worker-args=2
-          - -fspec-constr-recursive=2
+          - -fmax-worker-args=16
+          - -fspec-constr-recursive=16
           - -fplugin Fusion.Plugin
           - -O2
       else:
@@ -346,7 +346,8 @@ executables:
                 - -threaded 
   dev:
     main:             Dev.hs
-    other-modules: []
+    other-modules:
+      - Paths_chopaan
     source-dirs:         app
     when:
       condition: "impl(ghcjs)"
@@ -405,17 +406,22 @@ executables:
               ghc-options:
                 - -fplugin=ConCat.Plugin
                 - -fdicts-strict
-                - -fmax-worker-args=4
-                - -fspec-constr-recursive=4
+                - -fmax-worker-args=16
+                - -fspec-constr-recursive=16
                 - -fplugin Fusion.Plugin
                 - -O2
                 - -with-rtsopts=-N
-                - -threaded                
+                - '"-with-rtsopts=-A64m -n4m"'
+                - -threaded
+                - -rtsopts
+                - -eventlog
             else:
               ghc-options:
+                - -rtsopts
                 - -fdicts-strict
                 - -O1
-                - -threaded 
+                - -threaded
+                - -eventlog
       else:
         buildable: false
   # hydrate:
