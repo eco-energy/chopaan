@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, TypeApplications #-}
 module Chopaan.Utils.Retry where
 
 import Control.Retry
@@ -14,6 +14,9 @@ recoverC :: (MonadIO m, C.MonadMask m, Show e) => e -> Int -> m a -> m a
 recoverC msg n action = recovering (chopaanPolicy n) [logDef] (\_ -> action)
   where
     logDef r = logRetries (\_ -> return True) (\b (C.SomeException e) rr -> liftIO $ print $ defaultLogMsg b e rr) r
+
+recoverOrNothing :: forall m a e. (MonadIO m, C.MonadMask m, C.MonadCatch m, Show e) => e -> Int -> m a -> m (Maybe a)
+recoverOrNothing msg n act = C.catchAll ((pure . Just) =<< (recoverC msg n act)) (\e -> (liftIO . print $ ("Failed After Retries: " <> show e))  >> return Nothing) 
 
 retryEither :: (MonadIO m) => n -> (n -> m (Either a b)) -> m (Either a b)
 retryEither n f = retrying (chopaanPolicy 10) shouldRetryEither (\retryStatus ->  (liftIO $ print retryStatus) >> f n)
