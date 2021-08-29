@@ -8,6 +8,7 @@
 , DeriveAnyClass
 , DerivingVia
 , StandaloneDeriving
+, BangPatterns
 #-}
 {-# LANGUAGE ScopedTypeVariables
 , TypeOperators
@@ -60,8 +61,8 @@ import Chopaan.Node.NodeId
 import Chopaan.Utils.Time (utcTimeNow)
 
 data RxSignal = RxSignal
-  { strength :: (Maybe Double)
-  , parent :: Maybe (NodeMAC)
+  { strength :: !(Maybe Double)
+  , parent :: !(Maybe NodeMAC)
   }
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (ToJSON, FromJSON, NFData, Binary)
@@ -75,11 +76,11 @@ signalKey :: Key n (BL.ByteString)
 signalKey = "rxSignal"
 
 instance LinkAttributes RxSignal where
-  writeLinkAttributes n = fmap writeKeyValues $
+  writeLinkAttributes !n = fmap writeKeyValues $
                           sequence $
                           [ signalKey <=:> A.encode n]
                           
-  parseLinkAttributes props = pMapToFail $ decodeBin "RxSignal" $ lookupAs signalKey props
+  parseLinkAttributes !props = pMapToFail $ decodeBin "RxSignal" $ lookupAs signalKey props
 #endif
 
 data MeshLink = MeshLink
@@ -91,11 +92,11 @@ newtype NodeVersion = NodeVersion (Text)
 
 
 data MeshNode = MeshNode
-  { isRoot :: Maybe Bool
-  , uptime :: Int64
-  , routerRSSI :: Int
-  , version :: Maybe NodeVersion
-  , nodeTime :: UTCTime
+  { isRoot :: !(Maybe Bool)
+  , uptime :: !Int64
+  , routerRSSI :: !(Int)
+  , version :: !(Maybe NodeVersion)
+  , nodeTime :: !(UTCTime)
   }
   deriving (Eq, Ord, Show, Generic, NFData, Humanize)
 
@@ -112,7 +113,7 @@ initMeshNode = MeshNode Nothing 0 0 Nothing t
 
 
 parseRTSToNode :: N.RuntimeStats -> MeshNode
-parseRTSToNode rts = m
+parseRTSToNode !rts = m
   where
     {-# INLINE m #-}
     m = MeshNode
@@ -125,13 +126,13 @@ parseRTSToNode rts = m
 {-# INLINE parseRTSToNode #-}
 
 parseRxSignal :: N.RuntimeStats -> RxSignal
-parseRxSignal rts = RxSignal
+parseRxSignal !rts = RxSignal
                     (fromIntegral <$> rts ^? N.meshParentStrength)
                     (NodeId <$> rts ^? N.parent . N.macAddr)
 {-# INLINE parseRxSignal #-}
 
 meshNodeLink :: NodeMAC -> N.RuntimeStats -> (MeshNode, RxSignal)
-meshNodeLink kn rts = (parseRTSToNode rts, rx')
+meshNodeLink !kn !rts = (parseRTSToNode rts, rx')
   where
     rx = parseRxSignal rts
     rx' = case parent rx of
@@ -166,11 +167,11 @@ addRTS :: (MonadIO m)
         => Spider NodeMAC MeshNode RxSignal
         -> (NodeMAC, N.RuntimeStats)
         -> m ()
-addRTS spider (n, rts) = liftIO $ addFoundNode spider $ rsToFN (n, rts)
+addRTS spider (!n, !rts) = liftIO $ addFoundNode spider $ rsToFN (n, rts)
 {-# INLINE addRTS #-}
 
 rsToFN :: (NodeMAC, N.RuntimeStats) -> FoundNode NodeMAC MeshNode RxSignal
-rsToFN (n, rts) = let
+rsToFN (!n, !rts) = let
   finding = FoundNode { subjectNode = n
                       , foundAt = fromUTCTime . utcTimeNow $ rts ^. N.cpuTime 
                       , neighborLinks = [link]
@@ -185,7 +186,7 @@ rsToFN (n, rts) = let
 {-# INLINE rsToFN #-}
 
 sigToFN :: (NodeMAC, (MeshNode, RxSignal)) -> FoundNode NodeMAC MeshNode RxSignal
-sigToFN (n, (v, e)) = let
+sigToFN (!n, (!v, !e)) = let
   finding = FoundNode { subjectNode = n
                       , foundAt = fromUTCTime . nodeTime $ v 
                       , neighborLinks = [link]

@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction, ScopedTypeVariables, PackageImports #-}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports, CPP, ExtendedDefaultRules #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports, CPP, ExtendedDefaultRules, BangPatterns, StrictData #-}
 module Chopaan.Node.Metrics where
 
 import GHC.Generics hiding (R)
@@ -130,9 +130,9 @@ instance FromGraphSON Watts where
 -- Episodic Metrics
 
 data Node a = Node
-  { tx :: ! a
-  , consumed :: !a
-  , generated :: !a
+  { tx :: {-# UNPACK #-} !a
+  , consumed :: {-# UNPACK #-} !a
+  , generated :: {-# UNPACK #-} !a
   } deriving (Eq, Ord, Show, Binary, Generic, Functor, NFData, ToJSON, FromJSON, Humanize)
   
 
@@ -191,13 +191,13 @@ instance (GreskellC a) => FromGraphSON (Node a) where
 
 
 data SensorMetrics e p = SensorMetrics
-  { _time :: !(Maybe UTCTime)
-  , lastTimeDiff :: !DiffTime
-  , _powerT :: !(Node p)
-  , _energyT :: !(Node e)
-  , _battery :: !(Battery e p)
-  , _demand :: !e
-  , _sensors :: EnergyState
+  { _time :: {-# UNPACK #-} !(Maybe UTCTime)
+  , lastTimeDiff :: {-# UNPACK #-} !DiffTime
+  , _powerT :: {-# UNPACK #-} !(Node p)
+  , _energyT :: {-# UNPACK #-} !(Node e)
+  , _battery :: {-# UNPACK #-} !(Battery e p)
+  , _demand :: {-# UNPACK #-} !e
+  , _sensors :: {-# UNPACK #-} !EnergyState
   } deriving (Eq, Ord, Generic, Show, NFData, ToJSON, FromJSON, Humanize)
 
 initSM :: (Fractional e, Fractional p) => SensorMetrics e p
@@ -418,10 +418,10 @@ type Timestamp = (Maybe UTCTime, DiffTime)
 type BatteryR = Battery WattSeconds Watts
 
 data Battery e p = Battery
-  { soc :: !e
-  , chargeLim :: !p
-  , dischargeLim :: !p
-  , totalCapacity :: !e
+  { soc :: {-# UNPACK #-} !e
+  , chargeLim :: {-# UNPACK #-} !p
+  , dischargeLim :: {-# UNPACK #-} !p
+  , totalCapacity :: {-# UNPACK #-} !e
   } deriving (Eq, Ord, Show, Binary, Generic, NFData, Functor, Humanize)
 
 instance Bifunctor Battery where
@@ -468,7 +468,7 @@ instance (Fractional e, Fractional p, Ord e, Ord p) => Monoid (Battery e p) wher
   mempty = emptyB
 
 runTime :: ParamType a => Battery a p -> SensorVector a -> a
-runTime Battery{soc} SensorVector{..} = soc / ((normC sensorCurrent) * sensorTerminalV)
+runTime !Battery{soc} !SensorVector{..} = soc / ((normC sensorCurrent) * sensorTerminalV)
   where
     normC c
       | c >= 0 = c
@@ -477,7 +477,7 @@ runTime Battery{soc} SensorVector{..} = soc / ((normC sensorCurrent) * sensorTer
       
 
 socPercentage :: Fractional e => Battery e p -> e
-socPercentage Battery{..} = (soc * 100 / totalCapacity)
+socPercentage !Battery{soc, totalCapacity} = (soc * 100 / totalCapacity)
 
 
 
@@ -503,23 +503,23 @@ storageSensors es = SensorVector
   , sensorCurrent =  i + o
   }
   where
-    i = - (es ^. gridToBatteryCurrent + es ^. solarInputCurrent)
-    o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
+    !i = - (es ^. gridToBatteryCurrent + es ^. solarInputCurrent)
+    !o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
 {-# INLINE storageSensors #-}
 
 power :: EnergyState -> PowerNR
-power es = Node
+power !es = Node
            { tx = txIn' - txOut'
            , consumed = cnsm'
            , generated = genP' }
   where
-    txIn' = p batteryVoltage gridToBatteryCurrent
-    txOut' = p batteryVoltage batteryToGridCurrent
-    cnsm' = p batteryVoltage batteryToLoadCurrent
-    genP' = p batteryVoltage solarInputCurrent
-    p v i = toWatts $ (es ^. i) * v'
+    !txIn' = p batteryVoltage gridToBatteryCurrent
+    !txOut' = p batteryVoltage batteryToGridCurrent
+    !cnsm' = p batteryVoltage batteryToLoadCurrent
+    !genP' = p batteryVoltage solarInputCurrent
+    p !v !i = toWatts $ (es ^. i) * v'
       where
-        v' = (es ^. v)
+        !v' = (es ^. v)
 {-# INLINE power #-}
 
 utcTimeES :: EnergyState -> UTCTime

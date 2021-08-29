@@ -9,6 +9,7 @@ LANGUAGE ScopedTypeVariables
 , RankNTypes
 , QuantifiedConstraints
 , CPP
+, Strict
 #-}
 module Chopaan.Node.Folds where
 
@@ -68,7 +69,7 @@ timeFold = FL.foldl' step' begin'
 
 
 powerFold :: forall m. Monad m => FL.Fold m EnergyState (PowerNR)
-powerFold = FL.foldl' (\_ b -> power b) mempty 
+powerFold = FL.foldl' (\_ !b -> power b) mempty 
 {-# INLINE powerFold #-}
 
 energyFold :: forall m. Monad m => FL.Fold m (EnergyState) (EnergyNR)
@@ -77,7 +78,7 @@ energyFold = fmap fst $ FL.foldl' step begin
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
     {-# INLINE step #-}
     step :: (EnergyNR, Maybe UTCTime) -> EnergyState -> (EnergyNR, Maybe UTCTime)
-    step (esPrev, (Just tPrev)) cur =
+    step (!esPrev, (Just tPrev)) cur =
       (esPrev <> eAtT (power cur) (diffUTC tn tPrev), Just tn)
       where
         tn = utcTimeES cur
@@ -106,8 +107,8 @@ batteryFold bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts) $ fmap end 
     step :: (Maybe UTCTime, Maybe (KF R))
       -> EnergyState
       -> (Maybe UTCTime, Maybe (KF R))
-    step (t, pkf) sensorReadings = let
-        (kf, ki) = runEstimator bat (tdiff t) (storageSensors sensorReadings)
+    step (!t, !pkf) sensorReadings = let
+        (!kf, !ki) = runEstimator bat (tdiff t) (storageSensors sensorReadings)
           (guestimateInitialSOC pkf)
       in (Just tnow, Just kf)
       where
@@ -116,14 +117,14 @@ batteryFold bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts) $ fmap end 
           soC = ocvToSoC bat (sensorTerminalV . storageSensors $ sensorReadings)
           })
         tnow = utcTimeES sensorReadings
-        tdiff (Just t') = realToFrac $ diffUTCTime tnow t'
+        tdiff (!Just t') = realToFrac $ diffUTCTime tnow t'
         tdiff Nothing = 0
     {-# INLINE begin #-}
     begin :: (Maybe UTCTime, Maybe (KF R))
     begin = (Nothing, Nothing)
     {-# INLINE end #-}
     end :: (Maybe UTCTime, Maybe (KF R)) -> Battery R R
-    end (_, (Just (KalmanFilter (StateVector{..}) _))) = (emptyB @R @R)
+    end (_, (!Just (KalmanFilter (StateVector{..}) _))) = (emptyB @R @R)
         { soc = clamp 0 99.9 soC
         , totalCapacity = chargeCapacity bat
         }
