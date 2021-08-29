@@ -13,7 +13,9 @@ module Streamly.Binary
     fromBin,
     decodeFile,
     encodeFold,
+    decodeS,
     parseTextLines,
+    prefixWithLength,
     toTxt,
     fromTxt
   )
@@ -115,6 +117,13 @@ instance HasEncoding (Txt a) where
   chunkBytes = parseNewline
   {-# INLINE chunkBytes#-}
 
+prefixWithLength :: (MonadIO m) => Int -> A.Array Word8 -> m (A.Array Word8)
+prefixWithLength l y = do
+  prefix <- A.toArray (SBL.toChunks (B.runPut . B.put $ l))
+  A.toArray $ S.fromList [prefix, y]
+{-# INLINE prefixWithLength #-}
+
+
 prefixLengthArray :: (MonadIO m) => A.Array Word8 -> m (A.Array Word8)
 prefixLengthArray y = do
   let l = A.byteLength y
@@ -152,6 +161,10 @@ parseNewline = P.wordBy nl (A.write)
     nl :: Word8 -> Bool
     nl = (== '\n') . unsafeCoerce
 {-# INLINE parseNewline #-}
+
+decodeS :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch m) => t m Word8 -> t m (Maybe a)
+decodeS = (fmap decodeA) . (S.parseMany (chunkBytes @a))
+
 
 decodeFile :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch m) => FilePath -> t m (Maybe a)
 decodeFile = (fmap decodeA) . (S.parseMany (chunkBytes @a)) . FL.toBytes
