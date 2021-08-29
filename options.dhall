@@ -1,13 +1,12 @@
 
 let BatteryType : Type = < LAFlooded | LASealed | LIon >
-
+let Resolution : Type =  < Year | Month | Week | Day | Hour | Minute | Second >
 
 in
 
 { logVerbose = True
 
-, mqttOpts = { connId = "chopaan-monitor"
-             , mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
+, mqttOpts = { mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
              , certPath = "certs/chopaan.cert.pem"
              , keyPath = "certs/chopaan.private.key.pem"
              , caPath = "certs/ca.cert.pem"
@@ -35,4 +34,20 @@ in
            , user = "chopaan"
            , password = "testPassword" --"3423dssgSSS$%@!!01G"
            }
+, hydrationOpts = { start = { day = Natural/toInteger 21
+                            , month = Natural/toInteger 8
+                            , year = Natural/toInteger 2021
+                            }
+                   , end = { day = Natural/toInteger 29
+                           , month = Natural/toInteger 8
+                           , year = Natural/toInteger 2021
+                           }
+                   , s3BucketName = "dosti-datastream"
+                   , dbSave = True
+                   , resolution = Resolution.Hour
+                   }
+, poolConf = { pNumStripes = Natural/toInteger 8
+             , reaperWait =  5.0
+             , maxConnsPerStripe = Natural/toInteger 128
+             }
 }
