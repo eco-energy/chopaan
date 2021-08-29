@@ -169,8 +169,7 @@ createKbtzWithHydration k ns t t' = do
                      mapM_ (addNodeToKbtz c k) ns
                  )
   b <- s3Bucket <$> ask
-  hydrateKbtz (KbtzC k ns undefined (Just b)) (t, t')
- 
+  hydrateKbtz undefined (KbtzC k ns undefined (Just b))
 
 serveHistoryAPI :: forall t. (IsStream t)
   => DBPools

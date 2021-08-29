@@ -5,6 +5,7 @@ module Chopaan.Types where
 
 import RIO
 import RIO.Process
+import RIO.Time (UTCTime(..), fromGregorian, secondsToDiffTime)
 
 import Dhall
 
@@ -21,8 +22,7 @@ data DBOpts = DBOpts
 instance FromDhall DBOpts
 
 data MQTTOpts = MQTTOpts
-  { connId :: !Text
-  , mqttURI :: !Text
+  { mqttURI :: !Text
   , certPath :: !FilePath
   , keyPath :: !FilePath
   , caPath :: !FilePath
@@ -36,6 +36,45 @@ data KibbutzOpts = KibbutzOpts
 instance FromDhall MQTTOpts
 instance FromDhall KibbutzOpts
 
+data Date = Date
+  { day :: !Integer
+  , month :: !Integer
+  , year :: !Integer
+  } deriving (Generic, Show)
+
+toUTC :: Date -> UTCTime
+toUTC d = UTCTime (fromGregorian
+                   (fromIntegral . year $ d)
+                   (fromIntegral . month $ d)
+                   (fromIntegral . day $ d))
+          (secondsToDiffTime 0)
+
+instance FromDhall Date
+
+data Resolution = Year | Month | Week | Day | Hour | Minute | Second
+  deriving (Generic, Show)
+
+instance FromDhall Resolution
+
+data HydrationOpts = HydrationOpts
+  { start :: !Date
+  , end :: !Date
+  , s3BucketName :: !Text
+  , dbSave :: !Bool
+  , resolution :: !Resolution
+  }
+  deriving (Generic, Show)
+
+instance FromDhall HydrationOpts
+
+data PoolConf = PoolConf
+  { pNumStripes :: !Int
+  , reaperWait :: !Double
+  , maxConnsPerStripe :: !Int
+  } deriving (Generic, Show)
+
+instance FromDhall PoolConf
+
 -- | Command line arguments
 data Options = Options
   { logVerbose :: !Bool
@@ -43,6 +82,8 @@ data Options = Options
   , nodeOpts :: ![NodeConfig]
   , kibbutzOpts :: !KibbutzOpts
   , dbOpts :: !DBOpts
+  , hydrationOpts :: !HydrationOpts
+  , poolConf :: !PoolConf
   } deriving (Generic, Show)
 
 instance FromDhall Options

@@ -179,7 +179,7 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
                 --  $ s
                 S.|$ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
     liveStream g m es rs = (Left <$> (processES g es))
-                 `S.parallel` (Right <$> (processRS m rs))
+                 `S.async` (Right <$> (processRS m rs))
     plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
     status = S.postscan (secondF (txFold (Tx . M.fromList $ [(n, mempty @Stake) | n <- nodes])))
     getLatest ::
@@ -191,17 +191,11 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
       c' = snd <$> (M.lookup n (unTx c))
       in (n, (a', b', c'))
     {-# INLINE getLatest #-}
-    tapCount :: forall m a. (MonadAsync m, Show a) => String -> t m a -> t m a
-    tapCount = S.tap . printCount
-    printCount s = FL.foldlM' (\x a ->
-                                  (liftIO . print $ s <> ": " <> (show x))
-                                  >> (return $ x + (1 :: Int)))
-                   (pure 0)
-    dispatchTxSafe o t = tryJust' t
-      where
-        tryJust' (Just x) = expToBool
-                         =<< (try $ (dispatchTx o x))
-        tryJust' Nothing = pure False
+    -- dispatchTxSafe o t = tryJust' t
+    --   where
+    --     tryJust' (Just x) = expToBool
+    --                      =<< (try $ (dispatchTx o x))
+        -- tryJust' Nothing = pure False
     horizon = 10 * 60
 
 gridSensorR :: (KbtzConn t m n) => [n] -> t m (n, EnergyState) -> t m (n, M.Map n SensorR)

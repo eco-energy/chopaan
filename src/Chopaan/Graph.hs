@@ -41,23 +41,23 @@ import qualified Streamly.Internal.Data.Stream.IsStream as S
 import Shpadoinkle.Widgets.Types (Humanize)
 
 import Chopaan.Graph.G
-
+import Chopaan.Types (PoolConf(..))
 
 #ifndef ghcjs_HOST_OS
 newtype GraphM a = GraphM { runGraphM' :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
                     MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch, MonadUnliftIO)
 
-runGraphM :: MonadIO m => String -> Int -> GraphM ~> m
-runGraphM h p a = liftIO $ runReaderT (runGraphM' a) =<< (mkDBPools h p)
+runGraphM :: MonadIO m => PoolConf -> String -> Int -> GraphM ~> m
+runGraphM pc h p a = liftIO $ runReaderT (runGraphM' a) =<< (mkDBPools pc h p)
 
 runGraphWithDB :: MonadIO m => DBPools -> GraphM ~> m
 runGraphWithDB db = liftIO . (flip runReaderT db) . runGraphM'
 
-mkDBPools :: MonadIO m => String -> Int -> m (DBPools)
-mkDBPools h p = do
+mkDBPools :: MonadIO m => PoolConf -> String -> Int -> m (DBPools)
+mkDBPools pc h p = do
   kp <- liftIO $ kbtzPool h p
-  spools <- liftIO $ mkSpool $ mkConfG (h, p)
+  spools <- liftIO $ mkSpool pc $ mkConfG (h, p)
   return $ DBPools spools kp (BucketName b)
     where
       b = "dosti-datastream"

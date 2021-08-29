@@ -38,7 +38,7 @@ import Chopaan.Graph
 import Chopaan.Graph.Kbtz
 import Chopaan.API.History
 import Chopaan.Kibbutz.KbtzId
-
+import Chopaan.Types (PoolConf(..))
 
 import qualified Data.Text as T
 import qualified Data.Time as Ti
@@ -109,7 +109,8 @@ runWithDBPools :: (TC.MonadDocker m) => m ([NodeMAC], DBPools)
 runWithDBPools = do
   (host, port) <- runJanus "kbtzSpec"
   let c = mkConfG (host, port)
-  sp <- mkDBPools host port
+  let pc = PoolConf 1 20000 1
+  sp <- mkDBPools pc host port
   let kp = gremlinPool sp
   ns <- liftIO $ arbs @NodeMAC nNodes
   liftIO $ withResource kp  (\c -> addKbtz c kId)

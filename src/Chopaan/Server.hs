@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE QuantifiedConstraints, DataKinds, UndecidableInstances #-}
+{-# LANGUAGE QuantifiedConstraints, DataKinds, UndecidableInstances, NamedFieldPuns #-}
 --{-# OPTIONS_GHC -fno-warn-missing-methods #-}
 
 module Chopaan.Server (application, main, TinkerConf(..)) where
@@ -25,6 +25,7 @@ import           Control.Monad.Trans.Control
 import           Control.Monad.IO.Unlift
 
 import           Data.Proxy
+import qualified Data.Text as T
 
 import           Network.Wai               (Application)
 import           Network.Wai.Handler.Warp  (run)
@@ -49,8 +50,9 @@ import           Options.Applicative       (Parser, ParserInfo, auto,
                                             helper, info, long, metavar, option,
                                             progDesc, short, showDefault,
                                             strOption, value, (<**>))
+import qualified Dhall as D
 
-
+import Chopaan.Types
 import Chopaan.UiTypes
 import Chopaan.CRUD
 import Chopaan.API.History
@@ -98,13 +100,14 @@ options = info (parser <**> helper) $
     fullDesc <> progDesc "Chopaan Server"
              <> header "Servers the SPA and the Backend API"
 
-application :: Env -> FilePath -> TinkerConf -> IO Application
-application e f (TinkerConf h p) = do
-  poo <- mkDBPools h p
-  return $ simpleCors $ app e f poo 
+application :: FilePath -> Env -> FilePath -> TinkerConf -> IO Application
+application optsPath e assetsPath (TinkerConf h p) = do
+  Options{hydrationOpts, poolConf} <- D.input D.auto $ T.pack optsPath
+  poo <- mkDBPools poolConf h p
+  return $ simpleCors $ app e assetsPath poo 
 
 
-main :: IO ()
-main = do
+main :: FilePath -> IO ()
+main optionsPath = do
   ServerOpts{..} <- execParser options
-  run port =<< application Prod assets (TinkerConf tinkerHost tinkerPort)
+  run port =<< application optionsPath Prod assets (TinkerConf tinkerHost tinkerPort)

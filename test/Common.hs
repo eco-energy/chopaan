@@ -58,23 +58,20 @@ import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
 
 -- tc = TC.newTracer print
 
--- runC action = do
---   let conf = TC.Config (Just 300) tc
---   let tr = \c -> TC.withLogs c ((\stdout stderr -> liftIO $ do
---                  print =<< hGetLine stdout
---                  print =<< hGetLine stderr
---                  ))
---   runReaderT (runResourceT $ do
---                  c <- (TC.run action)
---                  tr c
---              ) conf
 
+tr :: TC.MonadDocker m => TC.Container -> m ()
+tr = \c -> TC.withLogs c ((\stdout stderr -> liftIO $ do
+                 print =<< hGetLine stdout
+                 print =<< hGetLine stderr
+                 ))
+  
 runJanus :: (TC.MonadDocker m) => T.Text -> m (String, Int)
 runJanus name = do
   c <- ask
   let t = TC.newTracer print
-  let c' = c --{ TC.configTracer = t }
-  jC <- (flip runReaderT $ c') $ TC.run =<< (janus name)
+  let c' = c { TC.configTracer = t }
+  jC <- (flip runReaderT $ c) $ TC.run =<< (janus name)
+  tr jC
   --liftIO . print $ c
   pure ("localhost", TC.containerPort jC 8182)
 
