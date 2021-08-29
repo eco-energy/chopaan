@@ -11,6 +11,8 @@ import Chopaan.Types
 import Chopaan.Graph.Kbtz
 import Chopaan.Graph
 
+import Data.Pool (stats)
+
 import Network.AWS.S3 (BucketName(..))
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
@@ -19,11 +21,16 @@ import Options.Applicative
 import RIO hiding (view, async, withAsync, Async)
 import qualified Data.Time as Ti
 
+
+type KbtzM = ReaderT (MQTTOpts) GraphM
+
 runKbtzim :: forall t.
   (S.IsStream t)
   => MQTTOpts
+  -> HydrationOpts
   -> GraphM (t GraphM Bool)
-runKbtzim mq = do
+runKbtzim mq hydrationOpts = do
+  tNow <- liftIO $ Ti.getCurrentTime
   ks' <- withKbtzPool getKbtzim
   ks <- case length ks' of
     0 -> do
@@ -36,22 +43,23 @@ runKbtzim mq = do
       return ks'
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks
   --qss <- mapM (\(k, ns) -> mqttQs mq k ns) $ zip ks nss
-  let confss = fmap sConf (zip ks nss)-- qss
-      past = S.concatMapWith S.parallel (S.concatM . (flip hydrateKbtz $ (t0, tn))) $ S.fromList confss
-      present = S.concatMapWith S.parallel (S.concatM . runKibbutz @t) $ S.fromList confss
-  return $ (S.map (const True) $ past) `S.parallel`
-    (S.map (const True) $ present)
+  let confss = S.fromList $ fmap sConf (zip ks nss)-- qss
+      past = S.concatMapWith S.parallel
+        (hydrateKbtz' hydrationOpts) confss
+      present = S.concatMapWith S.parallel (S.concatM . runKibbutz @t) confss
+  return $ (S.map (const True) $ past)
+    -- `S.parallel` (S.map (const True) $ present)
   where
-    futPrefix = "runKibbutz :" 
+    futPrefix = "runKibbutz :"
     labKbtz = (KbtzId "Lab_TestGrid")
     labNodes = NodeId <$> [ "7c:9e:bd:f5:ec:74", "c4:4f:33:67:ea:69"
                               , "ac:67:b2:11:e5:c4", "7c:9e:bd:f6:43:88" ]
-    t0 = Ti.UTCTime (Ti.fromGregorian 2021 8 20) (Ti.secondsToDiffTime 0)
-    tn = Ti.UTCTime (Ti.fromGregorian 2021 8 27) (Ti.secondsToDiffTime 0)
+    t0 = toUTC (start hydrationOpts)
+    tn = toUTC (end hydrationOpts)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
                           , nodes = ns
                           , channelOpts = Left mq
-                          , s3Opts = Just (BucketName "dosti-datastream")
+                          , s3Opts = Just (BucketName (s3BucketName hydrationOpts))
                           }
 
 
@@ -63,6 +71,8 @@ run = do
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
   TinkerConf{..} <- liftIO $ execParser tkOptions
-  liftIO $ runGraphM (janusHost) (janusPort) $ do
-    ks <- runKbtzim @S.AsyncT mqttOpts
-    S.drain $ S.fromAsync ks
+  liftIO $ runGraphM poolConf (janusHost) (janusPort) $ do
+    sp <- spools <$> ask
+    ks <- S.tapRate 10 (\_ -> liftIO $ monitorSpool sp)
+      <$> (runKbtzim @S.ParallelT mqttOpts hydrationOpts)
+    S.drain $ S.fromParallel ks
