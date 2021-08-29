@@ -124,14 +124,14 @@ curryTx defA (Tx p) n = fromMaybe defA $ M.lookup n p
 {-# INLINE curryTx #-}
 
 data TxStatus' e = TxStatus'
-  { energyDispatched :: e
-  , energyReceived :: e
-  , energyRemaining :: e
-  , lossPerWattSecond :: e
-  , totalLoss :: e
-  , timeRemaining :: Time.DiffTime
-  , startLag :: Time.DiffTime
-  , endLag :: Time.DiffTime
+  { energyDispatched :: !e
+  , energyReceived :: !e
+  , energyRemaining :: !e
+  , lossPerWattSecond :: !e
+  , totalLoss :: !e
+  , timeRemaining :: !Time.DiffTime
+  , startLag :: !Time.DiffTime
+  , endLag :: !Time.DiffTime
   } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData, Humanize)
 
 
