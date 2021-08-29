@@ -287,6 +287,17 @@ packages:
     git: https://github.com/faezs/testcontainers-hs.git
     commit: 9c83f9d11a1a55d30b6dc75d3f266cf5f275ee40
 - completed:
+    name: resource-pool
+    version: 0.2.3.2
+    git: https://github.com/wrl314/pool.git
+    pantry-tree:
+      size: 361
+      sha256: 48f2e64b253dfa7107cd51a426bc8c2d024c9bfb1107f72cd3c96f63f5f22992
+    commit: ecdfffe5dbaa51fb943c8734cebfc43fbe76583a
+  original:
+    git: https://github.com/wrl314/pool.git
+    commit: ecdfffe5dbaa51fb943c8734cebfc43fbe76583a
+- completed:
     hackage: base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
     pantry-tree:
       size: 2116

@@ -72,6 +72,8 @@ extra-deps:
  - git: https://github.com/faezs/testcontainers-hs.git
    commit: 9c83f9d11a1a55d30b6dc75d3f266cf5f275ee40
    # nix-sha256: 0lbkh1m2y472hkvs0cqcgl6hxxn6anrpk0wd4dkk8v9k0b4k15fy
+ - git: https://github.com/wrl314/pool.git
+   commit: ecdfffe5dbaa51fb943c8734cebfc43fbe76583a
    
  - base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
