@@ -91,6 +91,6 @@ resultIterationBatchSize: 16
 writeBufferLowWaterMark: 32768
 writeBufferHighWaterMark: 131072
 threadPoolWorker: 8
-gremlinPool: 0
+gremlinPool: 8
 idleConnectionTimeout: 200000
 
