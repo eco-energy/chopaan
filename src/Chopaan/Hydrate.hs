@@ -45,17 +45,6 @@ import Chopaan.Graph
 import Chopaan.Kibbutz
 
 
-
-s3Stream' :: (IsStream t, MonadAsync m, MonadCatch m)
-  => Env
-  -> S3Opts
-  -> Resolution
-  -> [(NodeMAC, Maybe ObjectKey)]
-  -> (UTCTime, UTCTime)
-  -> M.Map NodeMAC (t m (Either EnergyState RuntimeStats))
-s3Stream' env b res ns range = M.fromList $ fmap (\(n, o) -> (n, S.fromAhead $ nodeS3 env b res range n o)) ns
-{-# INLINE s3Stream' #-}
-
 hydrateKbtz' :: forall t . (IsStream t)
              => HydrationOpts
              -> KbtzC NodeMAC
@@ -84,57 +73,73 @@ type Hydration = (NodeMAC, Bool)
 
 type Range = (UTCTime, UTCTime)
 
-concatIxFoldableWith :: forall t m n a.
-  (Ord n, IsStream t, MonadAsync m) => (forall b. t m b -> t m b -> t m b) -> M.Map n (t m a) -> t m (n, a)
-concatIxFoldableWith conc = M.foldrWithKey c S.nil
+
+-- concatIxFoldableWith :: forall t m n a.
+--   (Ord n, IsStream t, MonadAsync m) => (forall b. t m b -> t m b -> t m b) -> M.Map n (t m a) -> t m (n, a)
+-- concatIxFoldableWith conc = M.foldrWithKey c S.nil
+--   where
+--     c :: n -> t m a -> t m (n, a) -> t m (n, a)
+--     c k v acc = (fmap (k,) v) `conc` acc 
+-- {-# INLINE concatIxFoldableWith #-}
+
+
+concatMapIxFoldableWith :: forall t m n a x.
+  (Ord n, IsStream t, MonadAsync m)
+  => (forall b. t m b -> t m b -> t m b)
+  -> (n -> x -> t m a)
+  -> M.Map n x
+  -> t m (n, a)
+concatMapIxFoldableWith conc f = M.foldrWithKey c S.nil
   where
-    c :: n -> t m a -> t m (n, a) -> t m (n, a)
-    c k v acc = (fmap (k,) v) `conc` acc 
-{-# INLINE concatIxFoldableWith #-}
+    c :: n -> x -> t m (n, a) -> t m (n, a)
+    c k v acc = (fmap (k,) (f k v)) `conc` acc 
+{-# INLINE concatMapIxFoldableWith #-}
 
 hydrateKbtz :: forall t. (IsStream t) => HydrationOpts -> KbtzC NodeMAC -> GraphM (t GraphM Hydration)
-hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution} KbtzC{name, nodes} = do
-  env <- getAwsEnv s3
-  let
-    lsyncs = zip nodes (repeat Nothing)
-  return $ S.tapRate 10 (liftIO . (print . (prefix <>) . show))
-    $ S.minRate 1000
-    $ concatIxFoldableWith S.parallel --IxFoldable
-    $ grider
-    $ mesher (s3Stream' env (BucketName s3BucketName) resolution lsyncs (toUTC start, toUTC end))
+hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts} KbtzC{name, nodes} =  (\env -> pure $ hydrationRate S.|$ concatMapIxFoldableWith S.parallel (nodeS env) lsyncs)
+  =<< (getAwsEnv s3)
     where
-      mesher :: M.Map NodeMAC (t GraphM (Either EnergyState RuntimeStats))
-        -> M.Map NodeMAC (t GraphM (Either EnergyState (MeshNode, RxSignal)))
-      mesher  = M.mapWithKey (\n s -> S.trace (getSaveM n) $
-                                      S.mapM (pure . mfn) $ s)               
+      hydrationRate = S.tapRate 10 (liftIO . (print . (prefix <>) . show))
+      lsyncs = M.fromList $ zip nodes (repeat Nothing)
+      nodeS :: Env -> NodeMAC -> Maybe ObjectKey -> t GraphM (Bool)
+      nodeS env n ls = grider n
+                   S.|$ mesher n
+                   S.|$ S.fromAhead
+                   $ nodeS3 env buck resolution bufOpts (toUTC start, toUTC end) n ls
+      buck = (BucketName s3BucketName)
+      mesher :: NodeMAC -> (t GraphM (Either EnergyState RuntimeStats))
+        -> t GraphM (Either EnergyState (MeshNode, RxSignal))
+      mesher n s = S.trace (getSaveM)
+        S.|$ S.mapM (pure . mfn)
+        S.|$ s               
         where
           getSaveM = case dbSave of
             True -> saveM
-            False -> pure . pure . (const True)
+            False -> pure . (const True)
           mfn :: (Either x RuntimeStats)
             -> (Either x (MeshNode, RxSignal)) 
           mfn = (fmap ((meshNodeLink (getGridRoot name))))
-          saveM :: NodeMAC -> (Either a (MeshNode, RxSignal)) -> GraphM Bool
-          saveM n x = case x of
+          saveM :: (Either a (MeshNode, RxSignal)) -> GraphM Bool
+          saveM x = case x of
             (Left _) -> return True
-            (Right r) -> do
+            (Right !r) -> do
               withSpider $! pE =<< addMeshN (n, r)
-      grider :: M.Map NodeMAC (t GraphM (Either EnergyState (MeshNode, RxSignal)))
-                 -> M.Map NodeMAC (t GraphM Bool)
-      grider = M.mapWithKey (\n s -> S.mapM (withSpider . (getSaveG n))
-                                     $ S.postscan sensorFold
-                                     $ S.lefts s)
+      grider :: NodeMAC -> t GraphM (Either EnergyState (MeshNode, RxSignal))
+                 -> t GraphM Bool
+      grider n s = S.mapM (withSpider . (getSaveG))
+                   S.|$ S.postscan sensorFold
+                   S.|$ S.lefts s
         where
           getSaveG = case dbSave of
             True -> saveGrid
-            False -> pure . pure . (const True)
+            False -> pure . (const True)
+          saveGrid !x = do
+            !a <- pE =<< addFlow name (n, x)
+            !b <- pE =<< addMon name (n, (x, Nothing))
+            !c <- pE =<< addTx name (n, (x, Nothing, Nothing))
+            return (a && b && c)
+
       prefix = "Hydration Rate: "
-      saveGrid n = (\x -> do
-                       !a <- pE =<< addFlow name (n, x)
-                       !b <- pE =<< addMon name (n, (x, Nothing))
-                       !c <- pE =<< addTx name (n, (x, Nothing, Nothing))
-                       return (a && b && c)
-                     )
       pE :: Either SpiderException Bool -> SpiderM Bool
       pE r = case r of
         (Left e) -> (liftIO . print $ e) >> return False
