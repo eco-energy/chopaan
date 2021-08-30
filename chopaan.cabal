@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b049ef8f557dfbb6906509f1357b9163bd8f0ecfc1b0e84432e874ec5f985163
+-- hash: 5e16ff2b0d320bf862f39388796ae47ab1e4bee49297f5ffd39882f12b1df792
 
 name:           chopaan
 version:        0.1.0.0
@@ -611,7 +611,7 @@ executable kbtzim
       , optparse-simple
     buildable: True
     if flag(prod)
-      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2 -with-rtsopts=-N "-with-rtsopts=-A64m -n4m" -threaded -rtsopts -eventlog
+      ghc-options: -fplugin=ConCat.Plugin -fdicts-strict -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin Fusion.Plugin -O2 -with-rtsopts=-N -threaded -rtsopts -eventlog
     else
       ghc-options: -rtsopts -fdicts-strict -O1 -threaded -eventlog
   else
