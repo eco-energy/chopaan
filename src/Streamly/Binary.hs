@@ -47,7 +47,6 @@ import qualified Streamly.Internal.Data.Binary.Decode as P
 import qualified Streamly.External.ByteString.Lazy as SBL
 import qualified Streamly.External.ByteString as SBS
 import qualified Streamly.Internal.Data.Stream.IsStream as S
-import qualified Streamly.Prelude as S
 import Data.ProtoLens.Encoding (decodeMessage, encodeMessage)
 import Data.ProtoLens.Message (Message)
 
@@ -172,7 +171,7 @@ decodeFile = (fmap decodeA) . (S.parseMany (chunkBytes @a)) . FL.toBytes
 
 encodeFold :: (HasEncoding a, MonadAsync m, MonadCatch m)
   => FilePath -> FL.Fold m a ()
-encodeFold fp = FL.lmapM (encodeA) (FL.writeChunks fp)
+encodeFold fp = FL.lmapM (encodeA) (A.lpackArraysChunksOf A.defaultChunkSize (FL.writeChunks fp))
 {-# INLINE encodeFold #-}
 
 parseMsgS :: (IsStream t, MonadAsync m, Message a, MonadCatch m) => FilePath -> t m (Maybe (PB a))
