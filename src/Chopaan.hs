@@ -73,6 +73,6 @@ run = do
   TinkerConf{..} <- liftIO $ execParser tkOptions
   liftIO $ runGraphM poolConf (janusHost) (janusPort) $ do
     sp <- spools <$> ask
-    ks <- S.tapRate 10 (\_ -> liftIO $ monitorSpool sp)
+    ks <- S.tapRate 30 (\_ -> liftIO $ monitorSpool sp)
       <$> (runKbtzim @S.ParallelT mqttOpts hydrationOpts)
     S.drain $ S.fromParallel ks
