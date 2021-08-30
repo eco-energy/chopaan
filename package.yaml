@@ -410,8 +410,8 @@ executables:
                 - -fspec-constr-recursive=16
                 - -fplugin Fusion.Plugin
                 - -O2
+                #- -with-rtsopts=-N
                 - -with-rtsopts=-N
-                - '"-with-rtsopts=-A64m -n4m"'
                 - -threaded
                 - -rtsopts
                 - -eventlog
