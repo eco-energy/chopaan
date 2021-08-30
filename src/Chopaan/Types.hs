@@ -56,14 +56,23 @@ data Resolution = Year | Month | Week | Day | Hour | Minute | Second
 
 instance FromDhall Resolution
 
+data BufferingOpts = BufferingOpts
+  { prefixBuffer :: !Int
+  , pathBuffer :: !Int
+  , frameBuffer :: !Int
+  , nodeBuffer :: !Int
+  } deriving (Generic, Show)
+
+instance FromDhall BufferingOpts
+
 data HydrationOpts = HydrationOpts
   { start :: !Date
   , end :: !Date
   , s3BucketName :: !Text
   , dbSave :: !Bool
   , resolution :: !Resolution
-  }
-  deriving (Generic, Show)
+  , bufOpts :: !BufferingOpts
+  } deriving (Generic, Show)
 
 instance FromDhall HydrationOpts
 
