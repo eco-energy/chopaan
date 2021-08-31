@@ -159,8 +159,8 @@ when:
         ghc-options:
           - -fplugin=ConCat.Plugin
           - -fdicts-strict
-          - -fmax-worker-args=16
-          - -fspec-constr-recursive=16
+          - -fmax-worker-args=4
+          - -fspec-constr-recursive=4
           - -fplugin Fusion.Plugin
           - -O2
       else:
