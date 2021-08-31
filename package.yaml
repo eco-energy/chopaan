@@ -157,10 +157,9 @@ when:
     - condition: flag(prod)
       then:
         ghc-options:
-          - -fplugin=ConCat.Plugin
           - -fdicts-strict
-          - -fmax-worker-args=4
-          - -fspec-constr-recursive=4
+          - -fmax-worker-args=2
+          - -fspec-constr-recursive=2
           - -fplugin Fusion.Plugin
           - -O2
       else:
@@ -333,8 +332,8 @@ executables:
               ghc-options:
                 - -fplugin=ConCat.Plugin
                 - -fdicts-strict
-                - -fmax-worker-args=4
-                - -fspec-constr-recursive=4
+                - -fmax-worker-args=2
+                - -fspec-constr-recursive=2
                 - -fplugin Fusion.Plugin
                 - -O2
                 - -with-rtsopts=-N
@@ -362,14 +361,9 @@ executables:
           - condition: flag(prod)
             then:
               ghc-options:
-                - -fplugin=ConCat.Plugin
                 - -fdicts-strict
-                - -fmax-worker-args=4
-                - -fspec-constr-recursive=4
-                - -fplugin Fusion.Plugin
-                - -O2
+                - -O1
                 - -threaded
-                - -with-rtsopts=-N
             else:
               ghc-options:
                 - -fdicts-strict
@@ -406,8 +400,8 @@ executables:
               ghc-options:
                 - -fplugin=ConCat.Plugin
                 - -fdicts-strict
-                - -fmax-worker-args=16
-                - -fspec-constr-recursive=16
+                - -fmax-worker-args=2
+                - -fspec-constr-recursive=2
                 - -fplugin Fusion.Plugin
                 - -O2
                 #- -with-rtsopts=-N
