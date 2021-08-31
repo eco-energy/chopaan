@@ -523,7 +523,6 @@ nodeS3 env bucket res BufferingOpts{..} hPrefix mon (startT, endT) n startAfter 
               err1Tag = "downloadError"
               err2Tag = "parsingError"
     {-# INLINE storeAll #-}
-{-# INLINE nodeS3 #-}    
 
 
 validateMF ::
