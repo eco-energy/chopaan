@@ -584,8 +584,6 @@
         "auto-update".revision = (((hackage."auto-update")."0.1.6").revisions).default;
         "libBF".revision = (((hackage."libBF")."0.6.2").revisions).default;
         "libBF".flags.system-libbf = false;
-        "resource-pool".revision = (((hackage."resource-pool")."0.2.3.2").revisions).default;
-        "resource-pool".flags.developer = false;
         "asn1-types".revision = (((hackage."asn1-types")."0.3.4").revisions).default;
         "servant-client-core".revision = (((hackage."servant-client-core")."0.17").revisions).default;
         "network-conduit-tls".revision = (((hackage."network-conduit-tls")."1.3.2").revisions).default;
@@ -717,6 +715,7 @@
         Shpadoinkle-lens = ./.plan.nix/Shpadoinkle-lens.nix;
         Shpadoinkle-backend-static = ./.plan.nix/Shpadoinkle-backend-static.nix;
         concat-plugin = ./.plan.nix/concat-plugin.nix;
+        resource-pool = ./.plan.nix/resource-pool.nix;
         Shpadoinkle-disembodied = ./.plan.nix/Shpadoinkle-disembodied.nix;
         Shpadoinkle-widgets = ./.plan.nix/Shpadoinkle-widgets.nix;
         Shpadoinkle-template = ./.plan.nix/Shpadoinkle-template.nix;
@@ -747,6 +746,9 @@
           "Shpadoinkle-lens" = { flags = {}; };
           "Shpadoinkle-backend-static" = { flags = {}; };
           "concat-plugin" = { flags = {}; };
+          "resource-pool" = {
+            flags = { "developer" = lib.mkOverride 900 false; };
+            };
           "Shpadoinkle-disembodied" = { flags = {}; };
           "Shpadoinkle-widgets" = {
             flags = { "testing" = lib.mkOverride 900 false; };

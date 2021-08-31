@@ -220,7 +220,6 @@
             "Chopaan/Kibbutz"
             "Chopaan/Hydrate"
             "Chopaan/Kibbutz/KbtzId"
-            "Chopaan/Kibbutz/KbtzimT"
             "Chopaan/Kibbutz/Kibbutz"
             "Chopaan/Kibbutz/Transactor"
             "Chopaan/Kibbutz/Allocate"
@@ -271,7 +270,6 @@
             "Chopaan/UiTypes"
             "Chopaan/View"
             "Chopaan/Kibbutz/KbtzId"
-            "Chopaan/Kibbutz/KbtzimT"
             "Chopaan/Kibbutz/Transactor"
             "Chopaan/Monad/Env"
             "Chopaan/Node/Calibration"
@@ -433,6 +431,7 @@
             (hsPkgs."optparse-simple" or (errorHandler.buildDepError "optparse-simple"))
             ];
           buildable = if compiler.isGhcjs && true then false else true;
+          modules = [ "Paths_chopaan" ];
           hsSourceDirs = [ "app" ];
           mainPath = ([ "Dev.hs" ] ++ (if !(compiler.isGhcjs && true)
             then [ "" ] ++ [ "" ]
