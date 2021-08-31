@@ -80,7 +80,7 @@ let
         sha256 = "1ag6lqr74c1ml0vmai7a1b28dyf149pv3mhpg06kp27sawl71sy2";
       };
       
-      streamly =
+      streamlyP =
         pkgs.haskell.packages.${compilerjs}.callCabal2nix "streamly" streamlySrc {};
       
       foundation =
@@ -102,7 +102,7 @@ let
         "concat-plugin" = pkgs.haskell.lib.dontHaddock (concatPkg "plugin");
         "concat-examples" = pkgs.haskell.lib.dontHaddock (pkgs.haskell.lib.dontCheck (concatPkg "examples"));
         "concat-graphics" = pkgs.haskell.lib.dontHaddock (pkgs.haskell.lib.dontCheck (concatPkg "graphics"));
-        "streamly" = pkgs.haskell.lib.dontCheck streamly;
+        "streamly" = pkgs.haskell.lib.dontCheck streamlyP;
         "abstract-dequeue" = pkgs.haskell.lib.dontCheck hsuper.abstract-dequeue;
         "lockfree-queue" = pkgs.haskell.lib.dontCheck hsuper.lockfree-queue;
         "http-date" = pkgs.haskell.lib.dontCheck hsuper.http-date;
