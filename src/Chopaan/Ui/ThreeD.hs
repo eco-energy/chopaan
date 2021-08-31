@@ -377,7 +377,8 @@ threeDM (hoister, updates) objF xs = liftJSM $ do
 onIncoming :: (Ord n) => TVar (ControlModel n a) -> (n, a) -> STM ()
 onIncoming m na = modifyTVar m (\x -> x & _1 . #scene %~ (addToScene na))
 
-#ifndef __GHCJS__
+#if 0
+  -- ifndef __GHCJS__
 deriving instance MonadBase IO JSM
 deriving instance MonadBaseControl IO JSM
 

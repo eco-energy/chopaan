@@ -81,6 +81,9 @@ import qualified Data.Time as Ti
 default (T.Text, [])
 
 
+t0 = Ti.UTCTime (Ti.fromGregorian 2021 1 1) (Ti.secondsToDiffTime 0)
+t1 = Ti.UTCTime (Ti.fromGregorian 2021 8 28) (Ti.secondsToDiffTime 0)
+
 ainit :: (Monad m, CRUDChopaan m) => Route -> m Frontend
 ainit _ = MHomePage . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
 
@@ -312,7 +315,7 @@ gView g = H.div [H.class' $ Css.relative <> Css.flex_grow <> Css.flex_col]
   where
     timeRange :: Html m (GView)
     timeRange = H.div []
-      [ onRecord (lensProduct #_startTime #_endTime) $ t
+      [ onRecord (lensProduct #_startTime #_endTime) $ t (t0, t1)
       ]
       where
         t = timeline (g ^. #_startTime, g ^. #_endTime)
