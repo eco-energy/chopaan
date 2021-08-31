@@ -15,7 +15,8 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch
--- import Control.Concurrent.STM
+import Control.Concurrent.STM
+import Data.IORef
 
 import Streamly.Prelude as S (IsStream, MonadAsync, adapt)
 import qualified Streamly.Prelude as S
@@ -34,7 +35,7 @@ import qualified Data.Map.Lazy as M
 
 import Network.AWS.S3 (s3, ObjectKey, BucketName(..))
 
-import Chopaan.Types (HydrationOpts(..), toUTC, Resolution)
+import Chopaan.Types (HydrationOpts(..), toUTC)
 import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, EnergyState)
 import Chopaan.Kibbutz.AWS.Common (getAwsEnv, Env)
 import Chopaan.Comm.S3
@@ -92,20 +93,34 @@ concatMapIxFoldableWith :: forall t m n a x.
 concatMapIxFoldableWith conc f = M.foldrWithKey c S.nil
   where
     c :: n -> x -> t m (n, a) -> t m (n, a)
-    c k v acc = (fmap (k,) (f k v)) `conc` acc 
+    c k v acc = (fmap (k,) (f k v)) `conc` acc
+    {-# INLINE c #-}
 {-# INLINE concatMapIxFoldableWith #-}
 
 hydrateKbtz :: forall t. (IsStream t) => HydrationOpts -> KbtzC NodeMAC -> GraphM (t GraphM Hydration)
-hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts} KbtzC{name, nodes} =  (\env -> pure $ hydrationRate S.|$ concatMapIxFoldableWith S.parallel (nodeS env) lsyncs)
-  =<< (getAwsEnv s3)
+hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts, hPrefix} KbtzC{name, nodes} = do
+  lsyncs' <- traverse newMon' lsyncs
+  let mons = fmap snd lsyncs'
+      hydrationSummary mons' = do
+        let (_, ms) = unzip $ M.toList mons' 
+        mvs <- liftIO $ mapM readIORef ms
+        liftIO $ printMon "Hydration Summary" (foldl (<>) (pure 0) mvs)
+  env <- getAwsEnv s3
+  return $ hydrationRate
+    S.|$ S.tapRate 60 (\_ -> hydrationSummary mons)
+    S.|$ concatMapIxFoldableWith S.parallel (nodeS env) lsyncs'
     where
+      newMon' :: Maybe (ObjectKey) -> GraphM (Maybe ObjectKey, IORef Monitor)
+      newMon' o = (o,) <$> newMon
       hydrationRate = S.tapRate 10 (liftIO . (print . (prefix <>) . show))
+      {-# INLINE hydrationRate #-}
       lsyncs = M.fromList $ zip nodes (repeat Nothing)
-      nodeS :: Env -> NodeMAC -> Maybe ObjectKey -> t GraphM (Bool)
-      nodeS env n ls = grider n
+      nodeS :: Env -> NodeMAC -> (Maybe ObjectKey, IORef Monitor) -> t GraphM (Bool)
+      nodeS env n (ls, mon) = grider n
                    S.|$ mesher n
                    S.|$ S.fromAhead
-                   $ nodeS3 env buck resolution bufOpts (toUTC start, toUTC end) n ls
+                   $ nodeS3 env buck resolution bufOpts hPrefix mon (toUTC start, toUTC end) n ls
+      {-# INLINE nodeS #-}
       buck = (BucketName s3BucketName)
       mesher :: NodeMAC -> (t GraphM (Either EnergyState RuntimeStats))
         -> t GraphM (Either EnergyState (MeshNode, RxSignal))
@@ -119,11 +134,14 @@ hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts}
           mfn :: (Either x RuntimeStats)
             -> (Either x (MeshNode, RxSignal)) 
           mfn = (fmap ((meshNodeLink (getGridRoot name))))
+          {-# INLINE mfn #-}
           saveM :: (Either a (MeshNode, RxSignal)) -> GraphM Bool
           saveM x = case x of
             (Left _) -> return True
             (Right !r) -> do
               withSpider $! pE =<< addMeshN (n, r)
+          {-# INLINE saveM #-}
+      {-# INLINE mesher #-}
       grider :: NodeMAC -> t GraphM (Either EnergyState (MeshNode, RxSignal))
                  -> t GraphM Bool
       grider n s = S.mapM (withSpider . (getSaveG))
@@ -138,13 +156,11 @@ hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts}
             !b <- pE =<< addMon name (n, (x, Nothing))
             !c <- pE =<< addTx name (n, (x, Nothing, Nothing))
             return (a && b && c)
-
+          {-# INLINE saveGrid #-}
+      {-# INLINE grider #-}
       prefix = "Hydration Rate: "
       pE :: Either SpiderException Bool -> SpiderM Bool
       pE r = case r of
         (Left e) -> (liftIO . print $ e) >> return False
         (Right a) -> return a
-          -- saveGM _ n (Right r) = addMeshN (n, r)
-          -- saveGM k n (Left s) = saveGrid k n s
-          -- flR :: (Monad m) => FL.Fold m a c -> FL.Fold m (Either a b) (c, b)  
-          -- flR rf = FL.partition rf idFold
+      {-# INLINE pE #-}

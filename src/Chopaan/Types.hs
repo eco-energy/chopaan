@@ -72,6 +72,7 @@ data HydrationOpts = HydrationOpts
   , dbSave :: !Bool
   , resolution :: !Resolution
   , bufOpts :: !BufferingOpts
+  , hPrefix :: !Text
   } deriving (Generic, Show)
 
 instance FromDhall HydrationOpts

@@ -62,7 +62,7 @@ getAwsEnv svc = do
     Nothing -> error "AWS CONTEXT NOT AVAILABLE, AWS_CREDS NOT DEFINED"
     Just fp -> newEnv (creds fp)
       <&> set envLogger lgr . set envRegion Singapore
-      <&> set envRetryCheck (retryConnectionFailure 10)
+      <&> set envRetryCheck (retryConnectionFailure 50)
       <&> configure svc
 
 pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)

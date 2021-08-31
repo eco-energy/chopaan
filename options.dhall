@@ -45,14 +45,15 @@ in
                    , s3BucketName = "dosti-datastream"
                    , dbSave = True
                    , resolution = Resolution.Day
-                   , bufOpts = { prefixBuffer = Natural/toInteger 3
-                               , pathBuffer = Natural/toInteger 500
-                               , frameBuffer = Natural/toInteger 10
-                               , nodeBuffer = Natural/toInteger 10
-                               }         
+                   , bufOpts = { prefixBuffer = Natural/toInteger 1
+                               , pathBuffer = Natural/toInteger 1000
+                               , frameBuffer = Natural/toInteger 5000
+                               , nodeBuffer = Natural/toInteger 1000
+                               }
+                   , hPrefix = "3"
                    }
 , poolConf = { pNumStripes = Natural/toInteger 1
-             , reaperWait =  5.0
-             , maxConnsPerStripe = Natural/toInteger 256
+             , reaperWait =  10.0
+             , maxConnsPerStripe = Natural/toInteger 100
              }
 }
