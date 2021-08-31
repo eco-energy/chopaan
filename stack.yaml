@@ -74,7 +74,7 @@ extra-deps:
    # nix-sha256: 0lbkh1m2y472hkvs0cqcgl6hxxn6anrpk0wd4dkk8v9k0b4k15fy
  - git: https://github.com/wrl314/pool.git
    commit: ecdfffe5dbaa51fb943c8734cebfc43fbe76583a
-   
+   # nix-sha256: 09dksahyd0rwvlqkncj12nivmc6x6prqzpj9qjfgc9j9vcbz25s7
  - base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
  - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
  - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
