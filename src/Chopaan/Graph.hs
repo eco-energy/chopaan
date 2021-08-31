@@ -35,13 +35,14 @@ import Chopaan.Graph.Kbtz
 import Network.Greskell.WebSocket (Client)
 import Data.Pool
 import Network.AWS.S3 (BucketName(..))
+import Chopaan.Types (PoolConf(..))
 #endif
 import qualified Streamly as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
 import Shpadoinkle.Widgets.Types (Humanize)
 
 import Chopaan.Graph.G
-import Chopaan.Types (PoolConf(..))
+
 
 #ifndef ghcjs_HOST_OS
 newtype GraphM a = GraphM { runGraphM' :: ReaderT (DBPools) IO a }
