@@ -78,8 +78,9 @@ preResolvingManager = NC.withDNSCache cacheConf cachingManager
     cacheConf = NC.DNSCacheConf
       { NC.resolvConfs = [
           defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8","8.8.4.4"]
-                            , resolvConcurrent = True }]
-      , NC.maxConcurrency = 100
+                            --, resolvConcurrent = True
+                            }]
+      , NC.maxConcurrency = 1000
       , NC.minTTL = 60
       , NC.maxTTL = 300
       , NC.negativeTTL = 300
