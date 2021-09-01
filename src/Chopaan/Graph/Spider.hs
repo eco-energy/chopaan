@@ -77,7 +77,6 @@ spiderPool pc c = liftIO $ createPool mkConn close (pNumStripes pc) (secondsToNo
   where
     mkConn = ((recoverC "retrying kbtz janusgraph connection" 10) (connectWith c))
 
-
 monitorSpool :: SpG'' n -> IO ()
 monitorSpool (G''{meshG, txG, statusG, flowG}) = do
   pwint meshG
@@ -86,6 +85,7 @@ monitorSpool (G''{meshG, txG, statusG, flowG}) = do
   pwint flowG
   where
     pwint s = (print . poolStats) =<< ((flip stats $ True) . unSpool $ s)
+
     
 mkSpool :: forall m n. (MonadIO m, SnapshotId n) => PoolConf -> ConfG n -> m (SpG'' n)
 mkSpool pc (G''{meshG, txG, statusG, flowG}) = G''
@@ -98,6 +98,7 @@ mkSpool pc (G''{meshG, txG, statusG, flowG}) = G''
 
 runSpider :: (MonadIO m) => Spools -> SpiderM ~> m
 runSpider c a = liftIO $ runReaderT (runSpiderM a) c
+{-# INLINE runSpider #-}
 
 newtype SpiderM a = SpiderM { runSpiderM :: ReaderT (Spools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO,
@@ -142,7 +143,7 @@ instance (GreskellC p, Num p, Ord p) => HasDir (Node p) where
     | tx < 0 = LinkToTarget
     | tx == 0 = LinkBidirectional
     | otherwise = LinkUnused
-    
+
 type GrSConn t m n v e = (IsStream t, MonadAsync m, SpiderConn n v e, HasTime v, HasDir e)
 
 type GrS t m n v e = GrSConn t m n v e => t m (n, v, [e])
@@ -214,12 +215,13 @@ addFNMaybe :: forall m n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
            => Pool (Spider n v e) -> Maybe (FoundNode n v e) -> m (Bool)
 addFNMaybe _ Nothing = return True
 addFNMaybe p (Just n) = expToBool =<< withResource p ((flip addFN) n)
+{-# INLINE addFNMaybe #-}
 
 addFNE :: forall m n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
            => Pool (Spider n v e) -> Maybe (FoundNode n v e) -> m (Either SpiderException Bool)
 addFNE _ Nothing = return (Right True)
 addFNE p (Just n) = withResource p ((flip addFN) n)
-
+{-# INLINE addFNE #-}
 
 spiderFold :: forall m a n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
            => Pool (Spider n v e)
@@ -285,9 +287,10 @@ withResourceOnEither pool act = mask_ $ do
     Left failure -> do
       destroyResource pool localPool resource
       return (Left failure)
-
+{-# INLINE withResourceOnEither #-}
 
 fromNSGraphM = (pure . fromNSGraph)
+{-# INLINE fromNSGraphM #-}
 
 gridSnapshotSimple :: forall m n v e. (MonadIO m, SpiderConn n v e)
   => KbtzName
@@ -308,6 +311,7 @@ writeSpiderStream conf f as = S.bracket
   (liftIO . close)
   (\s -> S.mapM (\x -> (liftIO . print $ "writing to spider") >>
                   f s x) as)
+{-# INLINE writeSpiderStream #-}
 
 getSnapshotStream :: (IsStream t, MonadAsync m, MonadCatch m)
   => Config n v e
@@ -317,7 +321,7 @@ getSnapshotStream conf f = S.bracket
   (liftIO $ connectWith conf)
   (liftIO . close)
   (\s -> S.repeatM $ f s)
-
+{-# INLINE getSnapshotStream #-}
 
 
 subscribeSnapshot :: forall t m v e.
@@ -328,13 +332,14 @@ subscribeSnapshot :: forall t m v e.
 subscribeSnapshot k c = getSnapshotStream c (\s ->
                                                liftIO $ fromNSGraphM
                                                =<< (getSnapshotSimple s (getRoot . mkKbtzRoot $ k)))
-
+{-# INLINE subscribeSnapshot #-}
 
 addMeshNode :: (MonadAsync m, MonadCatch m)
   => SpiderM (FL.Fold m (NodeMAC, (MeshNode, RxSignal)) Bool)
 addMeshNode = do
   spool <- ask
   return $ spiderFold (unSpool . meshG $ spool) (pure . Just . sigToFN)
+{-# INLINE addMeshNode #-}
 
 addTxNode :: forall m. (MonadAsync m, MonadCatch m)
   => KbtzName -> SpiderM (FL.Fold m (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus)) Bool)
@@ -351,7 +356,8 @@ addTxNode k = do
     x t n v e = do
       t' <- liftIO getCurrentTime
       pure $ toFN (fromUTCTime . (fromMaybe t') $ t) n v [toLink (getGridRoot k) e]
-
+    {-# INLINE x #-}
+{-# INLINE addTxNode #-}
 
 flowFN :: (MonadAsync m, MonadCatch m) => KbtzName -> NodeMAC -> SensorR -> m (FoundNode NodeMAC BatteryR PowerNR)
 flowFN k n v = do
@@ -359,19 +365,21 @@ flowFN k n v = do
   let t = (fromUTCTime . (fromMaybe t') $ (_time v))
   pure $
     toFN t n (_battery v) [toLink (getGridRoot k) (_powerT v)]
+{-# INLINE flowFN #-}
 
 addFlow :: KbtzName -> (NodeMAC, SensorR) -> SpiderM (Either SpiderException Bool)
 addFlow k (n, v) = do
   spool <- ask
   fn <- flowFN k n v
   addFNE (unSpool . flowG $ spool) (Just fn)
+{-# INLINE addFlow #-}
 
 addMeshN :: (NodeMAC, (MeshNode, RxSignal)) -> SpiderM (Either SpiderException Bool)
 addMeshN (v, l) = do
   spool <- ask
   let fn = sigToFN (v, l)
   addFNE (unSpool . meshG $ spool) (Just $ fn)
-
+{-# INLINE addMeshN #-}
 
 addTx :: KbtzName -> (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus)) -> SpiderM (Either SpiderException Bool)
 addTx k (n, (s, stake, status)) = do
@@ -385,7 +393,8 @@ addTx k (n, (s, stake, status)) = do
     x t n v e = do
       t' <- liftIO getCurrentTime
       pure $ toFN (fromUTCTime . (fromMaybe t') $ t) n v [toLink (getGridRoot k) e]
-
+    {-# INLINE x#-}
+{-# INLINE addTx #-}
 
 addMon :: KbtzName -> (NodeMAC, (SensorR, Maybe Stake)) -> SpiderM (Either SpiderException Bool)
 addMon k (n, (s, st)) = do
@@ -404,6 +413,8 @@ addMon k (n, (s, st)) = do
       t <- liftIO getCurrentTime
       pure . Just $
         toFN (fromUTCTime . (fromMaybe t) .  _time $ v) n v [toLink (getGridRoot k) stake]
+    {-# INLINE x #-}
+{-# INLINE addMon #-}
 
 addFlowNode :: forall m. (MonadAsync m, MonadCatch m)
   => KbtzName -> SpiderM (FL.Fold m (NodeMAC, SensorR) Bool)
@@ -411,7 +422,7 @@ addFlowNode k = do
   spool <- ask
   return $ spiderFold (unSpool . flowG $ spool)
     (\(n, s) -> Just <$> (flowFN k n s))
-
+{-# INLINE addFlowNode #-}
 
 
 gridState :: KbtzName -> NodeStates n -> TxPlan n -> TxState n -> IO (Bool)
@@ -434,7 +445,8 @@ addMonNode k = do
                   t <- liftIO getCurrentTime
                   pure . Just $
                     toFN (fromUTCTime . (fromMaybe t) .  _time $ v) n v [toLink (getGridRoot k) stk]
-
+    {-# INLINE x #-}
+{-# INLINE addMonNode #-}
 
 saveTx ::  forall m. (MonadAsync m, MonadCatch m)
   => KbtzName
@@ -447,6 +459,7 @@ saveTx k = do
   let monF = FL.Tee $ FL.lmap (\(n, (a, s, _)) -> (n, (a, s))) monF'
   let stakeF = FL.Tee $ stakeF'
   return $ FL.toFold $ (\(a, b, c) -> a && b && c) <$> ((,,) <$> stakeF <*> monF <*> flowF)
+{-# INLINE saveTx #-}
 
 
 gridSnapshot :: forall m v e. (SpiderConn NodeMAC v e, MonadIO m)
@@ -459,7 +472,7 @@ gridSnapshot r t t' s = fromNSGraphM
                         =<< (liftIO
                            . (getSnapshot s)
                            . (rangeQuery t t') $ [getGridRoot r])
-
+{-# INLINE gridSnapshot #-}
 
 nodesSnapshot :: forall m n v e. (SnapshotId n, SpiderConn n v e, MonadAsync m)
   => [n]
@@ -479,6 +492,7 @@ statusGridSnapshot :: KbtzName
 statusGridSnapshot k t t' = do
   spool <- ask
   liftIO $ withResource (unSpool . statusG $ spool) (gridSnapshot k t t')
+{-# INLINE statusGridSnapshot #-}
 
 txGridSnapshot :: KbtzName
   -> UTCTime
@@ -487,6 +501,7 @@ txGridSnapshot :: KbtzName
 txGridSnapshot k t t' = do
   spool <- ask
   liftIO $ withResource (unSpool . txG $ spool) (gridSnapshot k t t')
+{-# INLINE txGridSnapshot #-}
 
 meshGridSnapshot :: KbtzName
   -> UTCTime
@@ -495,6 +510,7 @@ meshGridSnapshot :: KbtzName
 meshGridSnapshot k t t' = do
   spool <- ask
   liftIO $ withResource (unSpool . meshG $ spool) (gridSnapshot k t t')
+{-# INLINE meshGridSnapshot #-}
 
 flowGridSnapshot :: KbtzName
   -> UTCTime
@@ -503,43 +519,55 @@ flowGridSnapshot :: KbtzName
 flowGridSnapshot k t t' = do
   spool <- ask
   liftIO $ withResource (unSpool . flowG $ spool) (gridSnapshot k t t')
-
+{-# INLINE flowGridSnapshot #-}
 
 statusNodesSnapshot :: [NodeMAC]
   -> UTCTime
   -> UTCTime
   -> SpiderM (SnapshotGraph NodeMAC SensorR Stake)
 statusNodesSnapshot k t t' = ((nodesSnapshot k t t') . (unSpool . statusG)) =<< ask
+{-# INLINE statusNodesSnapshot #-}
+
 
 txNodesSnapshot :: [NodeMAC]
   -> UTCTime
   -> UTCTime
   -> SpiderM (SnapshotGraph NodeMAC Stake TxStatus)
 txNodesSnapshot k t t' = ((nodesSnapshot k t t') . (unSpool . txG)) =<< ask
+{-# INLINE txNodesSnapshot #-}
 
 meshNodesSnapshot :: [NodeMAC]
   -> UTCTime
   -> UTCTime
   -> SpiderM (SnapshotGraph NodeMAC MeshNode RxSignal)
 meshNodesSnapshot k t t' = ((nodesSnapshot k t t') . (unSpool . meshG)) =<< ask
+{-# INLINE meshNodesSnapshot #-}
+
 
 flowNodesSnapshot :: [NodeMAC]
   -> UTCTime
   -> UTCTime
   -> SpiderM (SnapshotGraph NodeMAC BatteryR PowerNR)
 flowNodesSnapshot k t t' = ((nodesSnapshot k t t') . (unSpool . flowG)) =<< ask
+{-# INLINE flowNodesSnapshot #-}
+
 
 mkConfG :: Opts -> ConfG NodeMAC
 mkConfG o = G'' (CG $ meshConfig o) (CG $ txConfig o) (CG $ statusConfig o) (CG $ flowConfig o) 
+{-# INLINE mkConfG #-}
 
 txConfig :: Opts -> Config NodeMAC Stake TxStatus
 txConfig o = hasConfig o "transactor"
+{-# INLINE txConfig #-}
 
 statusConfig :: Opts -> Config NodeMAC SensorR Stake
 statusConfig o = hasConfig o "status"
+{-# INLINE statusConfig #-}
 
 meshConfig :: Opts -> Config NodeMAC MeshNode RxSignal
 meshConfig o = hasConfig o "mesh"
+{-# INLINE meshConfig #-}
 
 flowConfig :: Opts -> Config NodeMAC BatteryR PowerNR
 flowConfig o = hasConfig o "flow"
+{-# INLINE flowConfig #-}
