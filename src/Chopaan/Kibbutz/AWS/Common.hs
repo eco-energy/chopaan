@@ -22,6 +22,11 @@ import Control.Monad.Trans.Resource
 import Control.Monad.Trans.Resource.Internal
 import Control.Monad.Trans.Control
 import Network.AWS.Env
+import Network.HTTP.Client.Internal (hostAddress)
+import Network.HTTP.Client
+import Network.HTTP.Client.TLS
+import Network.DNS.Resolver
+import qualified Network.DNS.Cache as NC
 
 import qualified Data.Time as Time
 import Lens.Micro
@@ -50,7 +55,7 @@ withAwsEnv env ma = runResourceT . runAWST env $ ma
 frmrl :: Credentials
 frmrl = (FromProfile "chopaanRole")
 
-getAwsEnv :: (MonadIO m, MonadCatch m) => Service -> m Env
+getAwsEnv :: (S.MonadAsync m, MonadCatch m) => Service -> m Env
 getAwsEnv svc = do
   liftIO . print $ "AWS ENV REQUESTED!"
   e <- liftIO $ lookupEnv "AWS_CREDS"
@@ -58,17 +63,45 @@ getAwsEnv svc = do
   let fname = "aws_log_" <> t --(showText . toText . _svcAbbrev $ svc) <> "_" <> t
   lgHandle <- liftIO $ openFile fname WriteMode
   lgr <- newLogger Info lgHandle
+  manager <- preResolvingManager
   case e of
     Nothing -> error "AWS CONTEXT NOT AVAILABLE, AWS_CREDS NOT DEFINED"
-    Just fp -> newEnv (creds fp)
+    Just fp -> newEnvWith (creds fp) Nothing manager
       <&> set envLogger lgr . set envRegion Singapore
       <&> set envRetryCheck (retryConnectionFailure 50)
       <&> configure svc
 
+preResolvingManager :: forall m. (S.MonadAsync m) => m Manager
+preResolvingManager = NC.withDNSCache cacheConf cachingManager
+  where
+    cacheConf :: NC.DNSCacheConf
+    cacheConf = NC.DNSCacheConf
+      { NC.resolvConfs = [
+          defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8","8.8.4.4"]
+                            , resolvConcurrent = True }]
+      , NC.maxConcurrency = 100
+      , NC.minTTL = 60
+      , NC.maxTTL = 300
+      , NC.negativeTTL = 300
+      }
+    cachingManager :: NC.DNSCache -> m Manager
+    cachingManager c = liftIO $ newManager cachingSettings
+      where
+        cachingSettings = tlsManagerSettings
+          { managerConnCount = 100
+          , managerModifyRequest = preResolveReq c  
+          }
+        preResolveReq cache r = do
+          h <- liftIO $ NC.lookup cache (host r)
+          case h of
+            Nothing -> liftIO . print $ "COULD NOT RESOLVE HOST: " <> (show h) 
+          let r' = r { hostAddress = h }
+          return r'
+
 pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)
 pageUF = UF.lmap Just $ UF.unfoldrM step
   where
-    step :: (Maybe a) -> m (Maybe (Rs a, Maybe a)) 
+    step :: (Maybe a) -> m (Maybe (Rs a, Maybe a))
     step Nothing = return Nothing
     step (Just req) = do
       y <- send req
