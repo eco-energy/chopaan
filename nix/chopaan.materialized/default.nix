@@ -327,6 +327,7 @@
         "mono-traversable".revision = (((hackage."mono-traversable")."1.0.15.1").revisions).default;
         "psqueues".revision = (((hackage."psqueues")."0.2.7.2").revisions).default;
         "bytes".revision = (((hackage."bytes")."0.17.1").revisions).default;
+        "dns".revision = (((hackage."dns")."4.0.1").revisions).default;
         "amazonka-s3".revision = (((hackage."amazonka-s3")."1.6.1").revisions).default;
         "vector".revision = (((hackage."vector")."0.12.3.0").revisions).default;
         "vector".flags.unsafechecks = false;
@@ -529,6 +530,7 @@
         "dhall".flags.cross = false;
         "universe-base".revision = (((hackage."universe-base")."1.1.2").revisions).default;
         "terminfo".revision = (((hackage."terminfo")."0.4.1.2").revisions).default;
+        "base16-bytestring".revision = (((hackage."base16-bytestring")."1.0.1.0").revisions).default;
         "vector-algorithms".revision = (((hackage."vector-algorithms")."0.8.0.4").revisions).default;
         "vector-algorithms".flags.unsafechecks = false;
         "vector-algorithms".flags.internalchecks = false;
@@ -619,6 +621,7 @@
         "winery".revision = (((hackage."winery")."1.3.2").revisions).default;
         "circle-packing".revision = (((hackage."circle-packing")."0.1.0.6").revisions).default;
         "generic-lens-core".revision = (((hackage."generic-lens-core")."2.2.0.0").revisions).default;
+        "concurrent-dns-cache".revision = (((hackage."concurrent-dns-cache")."0.1.3").revisions).default;
         "cabal-doctest".revision = (((hackage."cabal-doctest")."1.0.8").revisions).default;
         "Glob".revision = (((hackage."Glob")."0.10.1").revisions).default;
         "proto-lens-runtime".revision = (((hackage."proto-lens-runtime")."0.7.0.0").revisions).default;
