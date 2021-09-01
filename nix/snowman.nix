@@ -80,8 +80,8 @@ let
         sha256 = "1ag6lqr74c1ml0vmai7a1b28dyf149pv3mhpg06kp27sawl71sy2";
       };
       
-      streamlyP =
-        pkgs.haskell.packages.${compilerjs}.callCabal2nix "streamly" streamlySrc {};
+      streamlyP = pkgs.haskell.lib.dontHaddock (
+        pkgs.haskell.lib.dontCheck (pkgs.haskell.packages.${compilerjs}.callCabal2nix "streamly" streamlySrc {}));
       
       foundation =
         pkgs.haskell.packages.${compilerjs}.callCabal2nix "foundation" (fdnSrc + /foundation) {};
@@ -102,7 +102,16 @@ let
         "concat-plugin" = pkgs.haskell.lib.dontHaddock (concatPkg "plugin");
         "concat-examples" = pkgs.haskell.lib.dontHaddock (pkgs.haskell.lib.dontCheck (concatPkg "examples"));
         "concat-graphics" = pkgs.haskell.lib.dontHaddock (pkgs.haskell.lib.dontCheck (concatPkg "graphics"));
-        "streamly" = pkgs.haskell.lib.dontCheck streamlyP;
+        "streamly" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "streamly";
+          ver = "0.8.0";
+          sha256 = "0vy2lkljizlhpbpbybmg9jcmj2g4s1aaqd2dzy5c0y0n4rgwxask";
+        } {});
+        "streamly-bytestring" = pkgs.haskell.lib.dontCheck (hsuper.callHackageDirect {
+          pkg = "streamly-bytestring";
+          ver = "0.1.3";
+          sha256 = "1lhjn6ck3zk9ipg65rdpcg7abbggwqba65ynmf9hsbp8i2bqrda1";
+        } {});
         "abstract-dequeue" = pkgs.haskell.lib.dontCheck hsuper.abstract-dequeue;
         "lockfree-queue" = pkgs.haskell.lib.dontCheck hsuper.lockfree-queue;
         "http-date" = pkgs.haskell.lib.dontCheck hsuper.http-date;
