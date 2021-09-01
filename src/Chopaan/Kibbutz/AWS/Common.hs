@@ -13,6 +13,7 @@ module Chopaan.Kibbutz.AWS.Common
   , Env(..)
   ) where
 
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Base
 import Control.Monad.Catch
@@ -28,6 +29,7 @@ import Network.HTTP.Client.TLS
 import Network.DNS.Resolver
 import qualified Network.DNS.Cache as NC
 
+import Data.Maybe
 import qualified Data.Time as Time
 import Lens.Micro
 import System.IO (stdout, withFile, IOMode(..), openFile)
@@ -94,8 +96,9 @@ preResolvingManager = NC.withDNSCache cacheConf cachingManager
           }
         preResolveReq cache r = do
           h <- liftIO $ NC.lookup cache (host r)
-          case h of
-            Nothing -> liftIO . print $ "COULD NOT RESOLVE HOST: " <> (show h) 
+          _ <- if isNothing h
+                 then liftIO . print $ "COULD NOT RESOLVE HOST: " <> (show h)
+                 else return ()
           let r' = r { hostAddress = h }
           return r'
 
