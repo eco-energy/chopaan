@@ -30,7 +30,7 @@ let
     src = haskell-nix.haskellLib.cleanGit { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
     index-state = "2021-08-01T00:00:00Z";
-    plan-sha256 = "11fsni9rmsv17mvb1hnw0j4s21fikp6f46255y1xzpkilxj4x34h";
+    plan-sha256 = "0hsjjh97l1hr121m0adzv2ncxskia9iqywcbwypmfhgymgc40j90";
     materialized = ./chopaan.materialized;
     #checkMaterialization = true;
     # these extras will provide additional packages
