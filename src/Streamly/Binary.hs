@@ -17,7 +17,8 @@ module Streamly.Binary
     parseTextLines,
     prefixWithLength,
     toTxt,
-    fromTxt
+    fromTxt,
+    parseLPArray
   )
 where
 
@@ -27,22 +28,25 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Newtype.Generics
 import Data.Binary (Binary)
+import Data.Bits ((.|.), unsafeShiftL)
 import qualified Data.Binary as B
 import qualified Data.Binary.Put as B
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
-import Data.Word (Word8)
+import Data.Word (Word8, Word64)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
 import Streamly.Prelude (IsStream, MonadAsync)
 
+import Streamly.Internal.Data.Tuple.Strict (Tuple'(..))
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.FileSystem.File as FL
 import qualified Streamly.Internal.Data.Array.Foreign as A
 import qualified Streamly.Internal.Data.Array.Foreign.Type as A
 import qualified Streamly.Internal.Data.Array.Stream.Foreign as A
-import qualified Streamly.Internal.Data.Parser as P
+import qualified Streamly.Internal.Data.Array.Stream.Fold.Foreign as AF
+import qualified Streamly.Internal.Data.Parser.ParserD as P
 import qualified Streamly.Internal.Data.Binary.Decode as P
 import qualified Streamly.External.ByteString.Lazy as SBL
 import qualified Streamly.External.ByteString as SBS
@@ -58,6 +62,11 @@ class HasEncoding a where
   chunkBytes = parseLengthPrefixed
   {-# INLINE chunkBytes #-}
 
+instance HasEncoding (A.Array Word8) where
+  encodeA = pure
+  {-# INLINE encodeA #-}
+  decodeA = Just
+  {-# INLINE decodeA #-}
 
 data EncT = BinFmt | PBFmt | TxtFmt
 
@@ -141,18 +150,28 @@ encodeLengthPrefixedBL :: (MonadIO m) => (a -> BL.ByteString) -> a -> m (A.Array
 encodeLengthPrefixedBL toBL a =
   prefixLengthArray =<< (A.toArray $ SBL.toChunks (toBL a))
 {-# INLINE encodeLengthPrefixedBL #-}
-  
+
+
+{-# INLINE word64beD #-}
+word64beD :: MonadCatch m => P.Parser m Word8 Word64
+word64beD = P.Parser step initial extract
+    where
+    initial = return $ P.IPartial $ Tuple' 0 56
+    step (Tuple' w sh) a = return $
+        if sh /= 0
+        then
+            let w1 = w .|. (fromIntegral a `unsafeShiftL` sh)
+             in P.Continue 0 (Tuple' w1 (sh - 8))
+        else P.Done 0 (w .|. fromIntegral a)
+    extract _ = throwM $ P.ParseError "word64beD: end of input"
+
 parseLengthPrefixed :: (MonadIO m, MonadCatch m) => P.Parser m Word8 (A.Array Word8)  
-parseLengthPrefixed = do
-  len <- P.word64be
-  let len' = fromIntegral len
-  z <- P.takeEQ len' (A.writeN (len'))
-  -- let deb = unsafePerformIO $ do
-  --       print $ "decoded length: " <> (show len)
-  --       print $ "read into: " <> (show z)
-  -- deb `seq` 
-  (return z)
+parseLengthPrefixed = (\l -> P.takeEQ l (A.writeN l)) =<< (fromIntegral <$> word64beD)
 {-# INLINE parseLengthPrefixed #-}
+
+parseLPArray :: (MonadIO m, MonadCatch m) => AF.Fold m Word8 (A.Array Word8)
+parseLPArray = AF.fromParser parseLengthPrefixed
+{-# INLINE parseLPArray #-}
 
 parseNewline :: (MonadIO m, MonadCatch m) => P.Parser m Word8 (A.Array Word8)
 parseNewline = P.wordBy nl (A.write)
@@ -162,11 +181,11 @@ parseNewline = P.wordBy nl (A.write)
 {-# INLINE parseNewline #-}
 
 decodeS :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch m) => t m Word8 -> t m (Maybe a)
-decodeS = (fmap decodeA) . (S.parseMany (chunkBytes @a))
+decodeS = (fmap decodeA) . (S.parseManyD (chunkBytes @a))
 
 
 decodeFile :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch m) => FilePath -> t m (Maybe a)
-decodeFile = (fmap decodeA) . (S.parseMany (chunkBytes @a)) . FL.toBytes
+decodeFile = (fmap decodeA) . (S.parseManyD (chunkBytes @a)) . FL.toBytes
 {-# INLINE decodeFile #-}
 
 encodeFold :: (HasEncoding a, MonadAsync m, MonadCatch m)
