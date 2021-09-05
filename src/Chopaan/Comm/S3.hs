@@ -26,7 +26,7 @@ import Data.Time.Clock.Compat (nominalDiffTimeToSeconds)
 import Data.Maybe
 import Data.Either
 
-import Data.Conduit.Combinators (sinkLazy)
+import Data.Conduit.Combinators (sinkList)
 
 --import Network.AWS
 import qualified Data.Time as Time
@@ -114,8 +114,8 @@ readObject :: forall m. (MonadIO m, MonadCatch m)
            -> AWST' Env (ResourceT m) (BS.ByteString, Int)
 readObject bucket k = timeout 120 $ do
   !x <- send $ S3.getObject bucket k
-  let byteLen = fromIntegral $ fromMaybe 0 $ x ^. S3.gorsContentLength
-  body <- (BL.toStrict . BL.take byteLen) <$> ((x ^. S3.gorsBody) `sinkBody` sinkLazy)
+  let byteLen = fromMaybe 0 $ x ^. S3.gorsContentLength
+  body <- (BS.concat) <$> ((x ^. S3.gorsBody) `sinkBody` sinkList)
   return $ (body, fromIntegral byteLen) 
 {-# INLINE readObject #-}
 
@@ -265,13 +265,15 @@ prefixRange !r !t !t' = S.mapM (pure . Prefix . glompPrefix) $ S.enumerateFromTo
       -> [n] -- ^ The digits of the number in list form.
       -> n   -- ^ The original number.
     unDigits base = foldl (\ a b -> a * base + b) 0
-{-# INLINE prefixRange #-}
 
 
 
 nodeMACPath :: NodeMAC -> FilePath
 nodeMACPath = T.unpack . unNodeId
 
+
+unfoldNodeHydration :: forall t m. (IsStream t, MonadAsync m, MonadCatch m) => NodeMAC -> FilePath -> FilePath -> FilePath -> m (t m (A.Array Word8), t m S3.ObjectKey)
+unfoldNodeHydration n allPaths failedPaths dataPath = undefined
 
 foldNodeHydration :: forall m a e1 e2.
   (MonadAsync m, MonadCatch m, Message a)
@@ -341,17 +343,17 @@ frameDir time n t = (prefixFetchDir time n t) <> "/frames/"
 type Monitor = Monitor' Double Integer
 
 data Monitor' r i = Monitor
-  { numPrefixes :: i
-  , discoveredPaths :: i
-  , totalDownloadableSize :: i
-  , downloadedSize :: i
-  , downloadSpeed :: r
-  , downloadedFrames :: i
-  , framesStored :: i
-  , downloadErrors :: i
-  , parsingErrors :: i
-  , validated :: i
-  , secondsElapsed :: i
+  { numPrefixes :: !i
+  , discoveredPaths :: !i
+  , totalDownloadableSize :: !i
+  , downloadedSize :: !i
+  , downloadSpeed :: !r
+  , downloadedFrames :: !i
+  , framesStored :: !i
+  , downloadErrors :: !i
+  , parsingErrors :: !i
+  , validated :: !i
+  , secondsElapsed :: !i
   } deriving (Show, Generic, Functor)
 
 class IsoMon a b where
@@ -458,15 +460,14 @@ nodeS3 :: forall m. (MonadAsync m, MonadCatch m)
        -> Maybe S3.ObjectKey
        -> S.AheadT m (Either EnergyState RuntimeStats)
 nodeS3 env bucket res BufferingOpts{..} hPrefix mon (startT, endT) n startAfter = let
-  modMon = liftIO . atomicModifyIORef' mon . (fmap (, ()))
+  modMon = liftIO . modifyIORef mon
   prefixes = S.tapRate 10 (modMon . incPrefixCount)
         S.|$ S.trace (liftIO . createAllDirs)
         S.|$ S.uniq
         S.|$ S.maxBuffer prefixBuffer $  prefixRange res startT endT
   prefixPaths = (s3Paths'' env) (req)
   prefixFrames :: Prefix -> S.AheadT m (S3.ObjectKey, MeshFrame)
-  prefixFrames t = S.maxBuffer frameBuffer
-        S.|$ S.rights
+  prefixFrames t = S.rights
         S.|$ S.rights
         S.|$ S.trace (\x -> if isLeft x
                             then ((modMon incDLError)
@@ -484,10 +485,11 @@ nodeS3 env bucket res BufferingOpts{..} hPrefix mon (startT, endT) n startAfter 
                                   modMon (incDLSize s)
                                   return $ (n, Right a)
                     )
+        S.|$ S.maxThreads frameBuffer 
         S.|$ S.mapM downloadWithErrLog
         S.|$ S.tapRate 10 (modMon . incPathCount)
         S.|$ S.tap (FL.lmap (toTxt . unObject) (encodeFold (pathFile hPrefix n t "paths")))
-        S.|$ S.maxBuffer pathBuffer
+        S.|$ S.maxThreads pathBuffer
         S.|$ S.mapM ((\(p, s) -> (modMon $ incDLSpeed . incDLableSize s) >> return p))
         S.|$ S.unfold prefixPaths t
   in S.tapRate 10 (\_ -> liftIO $ printMon np =<< (readIORef mon))
@@ -522,7 +524,6 @@ nodeS3 env bucket res BufferingOpts{..} hPrefix mon (startT, endT) n startAfter 
               errPath tag = (errorDir hPrefix n t) <> (T.unpack tag)
               err1Tag = "downloadError"
               err2Tag = "parsingError"
-    {-# INLINE storeAll #-}
 
 
 validateMF ::
