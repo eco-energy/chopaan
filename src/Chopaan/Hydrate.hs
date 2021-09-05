@@ -43,7 +43,7 @@ import Chopaan.Node.NodeId
 import Chopaan.Node.Folds
 import Chopaan.Node.Mesh
 import Chopaan.Graph
-import Chopaan.Kibbutz
+import Chopaan.Kibbutz (KbtzC(..))
 
 
 hydrateKbtz' :: forall t . (IsStream t)
