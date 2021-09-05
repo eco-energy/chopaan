@@ -34,26 +34,26 @@ in
            , user = "chopaan"
            , password = "testPassword" --"3423dssgSSS$%@!!01G"
            }
-, hydrationOpts = { start = { day = Natural/toInteger 1
-                            , month = Natural/toInteger 7
-                            , year = Natural/toInteger 2021
+, hydrationOpts = { start = { day = +24
+                            , month = +8
+                            , year = +2021
                             }
-                   , end = { day = Natural/toInteger 1
-                           , month = Natural/toInteger 9
-                           , year = Natural/toInteger 2021
+                   , end = { day = +1
+                           , month = +9
+                           , year = +2021
                            }
                    , s3BucketName = "dosti-datastream"
                    , dbSave = True
-                   , resolution = Resolution.Day
-                   , bufOpts = { prefixBuffer = Natural/toInteger 1
-                               , pathBuffer = Natural/toInteger 1000
-                               , frameBuffer = Natural/toInteger 5000
-                               , nodeBuffer = Natural/toInteger 1000
+                   , resolution = Resolution.Minute
+                   , bufOpts = { prefixBuffer = +100
+                               , pathBuffer = +100
+                               , frameBuffer = +1500
+                               , nodeBuffer = +0
                                }
-                   , hPrefix = "3"
+                   , hPrefix = "deploy"
                    }
-, poolConf = { pNumStripes = Natural/toInteger 1
+, poolConf = { pNumStripes = +10
              , reaperWait =  10.0
-             , maxConnsPerStripe = Natural/toInteger 100
+             , maxConnsPerStripe = Natural/toInteger 15
              }
 }
