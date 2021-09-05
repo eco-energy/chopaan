@@ -48,15 +48,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "release-20.03",
-        "description": "DEPRECATED! This is an obsolete, read-only mirror of the NixOS/nixpkgs repository.",
-        "homepage": "https://github.com/NixOS/nixpkgs",
+        "branch": "nixos-unstable",
+        "description": "Nix Packages collection",
+        "homepage": "",
         "owner": "NixOS",
-        "repo": "nixpkgs-channels",
-        "rev": "75f4ba05c63be3f147bcc2f7bd4ba1f029cedcb1",
-        "sha256": "157c64220lf825ll4c0cxsdwg7cxqdx4z559fdp7kpz0g6p8fhhr",
+        "repo": "nixpkgs",
+        "rev": "8d8a28b47b7c41aeb4ad01a2bd8b7d26986c3512",
+        "sha256": "1s29nc3ppsjdq8kgbh8pc26xislkv01yph58xv2vjklkvsmz5pzm",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs-channels/archive/75f4ba05c63be3f147bcc2f7bd4ba1f029cedcb1.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/8d8a28b47b7c41aeb4ad01a2bd8b7d26986c3512.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "pytorch-world": {
@@ -69,6 +69,18 @@
         "sha256": "0zb0h19aqi31gl4nqhf161wx27v8brf9y2w2psaqqxwbk02f9wp8",
         "type": "tarball",
         "url": "https://github.com/stites/pytorch-world/archive/e40fc2133b169b72eb8d772f98b1484dc1d3903f.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "quickstrom": {
+        "branch": "main",
+        "description": "High-confidence browser testing",
+        "homepage": "https://quickstrom.io",
+        "owner": "quickstrom",
+        "repo": "quickstrom",
+        "rev": "d6db4bc62499dd3a44f35a273c1f5de77c27c89d",
+        "sha256": "0nd1hpsdxf01g3nks47s05l3959gix7wwhc1nn4vm82bmhqmxhq7",
+        "type": "tarball",
+        "url": "https://github.com/quickstrom/quickstrom/archive/d6db4bc62499dd3a44f35a273c1f5de77c27c89d.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "stackage-nix": {
