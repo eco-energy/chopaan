@@ -36,13 +36,6 @@ scriptEngines:
         files:
           - /files/net-spider-index.groovy
 serializers:
-  - className: org.apache.tinkerpop.gremlin.driver.ser.GryoMessageSerializerV3d0
-    config:
-      ioRegistries:
-        - org.janusgraph.graphdb.tinkerpop.JanusGraphIoRegistry
-  - className: org.apache.tinkerpop.gremlin.driver.ser.GryoMessageSerializerV3d0
-    config:
-      serializeResultToString: true
   - className: org.apache.tinkerpop.gremlin.driver.ser.GraphSONMessageSerializerV3d0
     config:
       ioRegistries:
