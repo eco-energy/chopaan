@@ -12,6 +12,7 @@ import Data.Aeson (ToJSON, FromJSON)
 import Data.Function (on)
 import Data.Time (UTCTime)
 import Data.Text (Text)
+
 import qualified Data.Map as M (Map)
 
 import Shpadoinkle (Html, MonadJSM)
@@ -26,10 +27,13 @@ import Chopaan.Node.NodeId
 import Chopaan.Node.NodeT
 import Chopaan.Node.Mesh (MeshNode, RxSignal)
 import Chopaan.Node.Folds (SensorR)
+
+
 #ifndef ghcjs_HOST_OS
 import Chopaan.Hydrate (Hydration)
 #endif
 
+import Chopaan.Types (Resolution(..))
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Graph
 import Data.Time
@@ -43,15 +47,15 @@ type Hydration = ((NodeMAC, Text, Maybe UTCTime)
 class CRUDChopaan m where
   listKibbutzim :: m (KbtzList)
   listNodezim :: KbtzName -> m (NodeList)
-  getGraph :: forall t. IsStream t => KbtzName -> GraphType -> UTCTime -> UTCTime -> t m (SG NodeMAC)
+  getGraph :: forall t. IsStream t => KbtzName -> GraphType -> Resolution -> UTCTime -> UTCTime -> t m (SG NodeMAC)
   createKbtz :: forall t. IsStream t => KbtzName -> [NodeMAC] -> UTCTime -> UTCTime -> t m (Hydration)
   --sensorMonitor :: (IsStream t) => NodeMAC -> t m SensorR
 
 instance (MonadTrans t, Monad m, CRUDChopaan m, Monad (t m)) => CRUDChopaan (t m) where
   listKibbutzim = lift listKibbutzim
   listNodezim = lift . listNodezim
-  getGraph :: forall t'. (IsStream t') => KbtzName -> GraphType -> UTCTime -> UTCTime -> t' (t m) (SG NodeMAC)
-  getGraph k g t0 t1 = adapt . hoist lift $ getGraph k g t0 t1
+  getGraph :: forall t'. (IsStream t') => KbtzName -> GraphType -> Resolution -> UTCTime -> UTCTime -> t' (t m) (SG NodeMAC)
+  getGraph k g r t0 t1 = adapt . hoist lift $ getGraph k g r t0 t1
   createKbtz :: forall t'. IsStream t' => KbtzName -> [NodeMAC] -> UTCTime -> UTCTime -> t' (t m) (Hydration)
   createKbtz k ns t0 t1 = adapt . hoist lift $ createKbtz k ns t0 t1
 

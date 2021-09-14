@@ -69,9 +69,9 @@ runJanus :: (TC.MonadDocker m) => T.Text -> m (String, Int)
 runJanus name = do
   c <- ask
   let t = TC.newTracer print
-  let c' = c { TC.configTracer = t }
+  --let c' = c { TC.configTracer = t }
   jC <- (flip runReaderT $ c) $ TC.run =<< (janus name)
-  tr jC
+  --tr jC
   --liftIO . print $ c
   pure ("localhost", TC.containerPort jC 8182)
 
@@ -84,18 +84,22 @@ janus name = do
   where
     confRel = "./janusgraph-config/config/"
     idxRel = "./janusgraph-config/indexes/net-spider-index.groovy"
-    janus' = TC.fromTag "janusgraph/janusgraph:0.5.3"
+    janus' = TC.fromTag "janusgraph/janusgraph:0.6.0"
     withMounts toImg conf idx = TC.containerRequest toImg
                        & TC.setName ("janus-test-" <> name)          
                        & TC.setVolume vols
                        & TC.setExpose [ 8182 ]
-                       & TC.setWaitingFor -- (TC.waitUntilMappedPortReachable 8182)
-                         (TC.waitForLogLine TC.Stdout (TL.isInfixOf readyLog))
+                       & TC.setWaitingFor waiter
       where
+        waiter = TC.waitUntilTimeout 120 $ TC.waitForLogLine TC.Stdout (TL.isInfixOf readyLog)
         readyLog = "Channel started at port 8182"
+        confF f = T.pack (conf <> f)
         vols =
-          [ ( T.pack conf
-            , "/etc/opt/janusgraph:ro"
+          [ ( confF "janusgraph.properties"
+            , "/etc/opt/janusgraph/janusgraph.properties:ro"
+            )
+          , ( confF "gremlin-server-0.6.yaml"
+            , "/etc/opt/janusgraph/janusgraph-server.yaml:ro"
             )
           , ( T.pack idx
             , "/files/net-spider-index.groovy"

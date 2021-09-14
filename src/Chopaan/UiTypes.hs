@@ -10,13 +10,13 @@ import GHC.Generics
 
 import Control.DeepSeq (NFData)
 
-import Data.Text ()
+
+import Data.Text (Text)
 import Data.Aeson (ToJSON, FromJSON)
 
 import Data.Proxy (Proxy (Proxy))
 
 import Servant.API (Capture, Get, JSON
-                   , Post, Raw
                    , (:<|>) (..), (:>))
 
 
@@ -30,19 +30,23 @@ import Shpadoinkle.Widgets.Types (Input
 
 import Shpadoinkle.Widgets.Table (SortCol(..))
 
+
 import Chopaan.Node.NodeId
 import Chopaan.Node.NodeT
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.CRUD
+import Chopaan.Types (Resolution(..))
 import Chopaan.Graph
 import qualified Data.Time as Ti
 
 type API = "api" :> "kibbutzim" :> Get '[JSON] KbtzList
       :<|> "api" :> "kibbutz" :> Capture "id" KbtzName :> Get '[JSON] NodeList
 
+
 data GView = GView
   { _whichK :: KbtzName
   , _whichG :: GraphType
+  , _resolution :: Resolution
   , _startTime :: Ti.UTCTime
   , _endTime :: Ti.UTCTime
   , _availableHistory :: (Ti.UTCTime, Ti.UTCTime)

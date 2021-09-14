@@ -61,6 +61,13 @@ source-repository-package
   location: https://github.com/wrl314/pool.git
   tag: ecdfffe5dbaa51fb943c8734cebfc43fbe76583a
   --sha256: 09dksahyd0rwvlqkncj12nivmc6x6prqzpj9qjfgc9j9vcbz25s7
+
+source-repository-package
+  type: git
+  location: https://github.com/faezs/net-spider.git
+  tag: 831f10df821a299e6a79331dee8931e517bdffd4
+  subdir: net-spider
+  --sha256: 1dg2vv5ci2s1m6qx37mhgqpjv8xqp9c4w7cv2dvk4db5gnd6svay
   
 constraints:
   mmorph <= 1.1.3,

@@ -36,6 +36,8 @@ import Network.Greskell.WebSocket (Client)
 import Data.Pool
 import Network.AWS.S3 (BucketName(..))
 import Chopaan.Types (PoolConf(..))
+import qualified System.Envy as E
+import Options.Applicative
 #endif
 import qualified Streamly as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
@@ -49,8 +51,9 @@ newtype GraphM a = GraphM { runGraphM' :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
                     MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch, MonadUnliftIO)
 
-runGraphM :: MonadIO m => PoolConf -> String -> Int -> GraphM ~> m
-runGraphM pc h p a = liftIO $ runReaderT (runGraphM' a) =<< (mkDBPools pc h p)
+runGraphM :: MonadIO m => PoolConf -> TinkerConf -> GraphM ~> m
+runGraphM pc (TinkerConf h p) a = liftIO $ runReaderT (runGraphM' a) =<< (mkDBPools pc h p)
+
 
 runGraphWithDB :: MonadIO m => DBPools -> GraphM ~> m
 runGraphWithDB db = liftIO . (flip runReaderT db) . runGraphM'
@@ -79,4 +82,21 @@ withSpider f = (\s -> runSpider s f) =<< (fmap spools ask)
 
 hoistG :: forall t m. (S.IsStream t, S.MonadAsync m) => DBPools -> (t GraphM) ~> (t m) 
 hoistG db = S.adapt . S.hoist (runGraphWithDB db) . S.adapt
+
+data TinkerConf = TinkerConf
+  { janusHost :: String
+  , janusPort :: Int
+  } deriving (Generic, E.FromEnv)
+
+
+tkParser :: Parser TinkerConf
+tkParser = TinkerConf
+  <$> strOption   (long "tinkerHost" <> metavar "TINKERHOST")
+  <*> option auto (long "tinkerPort" <> metavar "TINKERPORT" <> showDefault <> value 8182)
+
+tkOptions :: ParserInfo TinkerConf
+tkOptions = info (tkParser <**> helper) $
+    fullDesc <> progDesc "Chopaan"
+             <> header "Control and Monitor Kbtzim"
+
 #endif

@@ -35,7 +35,7 @@ main = do
 
 getOptions :: IO (Options)
 getOptions = do
-  let optsPath = getDataFileName "options.dhall" 
+  optsPath <- getDataFileName "options.dhall" 
   caCert <- getDataFileName "certs/ca.cert"
   cert <- getDataFileName "certs/chopaan.cert.pem"
   key <- getDataFileName "certs/chopaan.private.key.pem"

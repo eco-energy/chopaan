@@ -110,7 +110,7 @@ pageUF = UF.lmap Just $ UF.unfoldrM step
     step (Just req) = do
       y <- send req
       return $ Just (y, page req y)
-
+{-# INLINE pageUF #-}
 
 pageUFM :: forall m a. (MonadIO m, MonadCatch m, AWSPager a) => Env -> UF.Unfold m a (Rs a)
 pageUFM env = UF.lmap Just $ UF.unfoldrM step
@@ -121,6 +121,7 @@ pageUFM env = UF.lmap Just $ UF.unfoldrM step
       y <- liftIO $ withAwsEnv env
            $ recoverC ("paging retry" :: String) 10 $ timeout 120 $ send req
       return $ Just (y, page req y)
+{-# INLINE pageUFM #-}
 
 pageS :: forall t m a. (S.IsStream t, S.MonadAsync m, MonadCatch m, AWSPager a) => Env -> a -> t m (Rs a)
 pageS env req = S.unfoldrM step start
@@ -131,7 +132,7 @@ pageS env req = S.unfoldrM step start
     step (Just req') = do
       y <- liftIO $ withAwsEnv env $ recoverC ("paging retry" :: String) 10 $ timeout 120 $ send req'
       return $ Just (y, page req' y)
-
+{-# INLINE pageS #-}
 
 
 instance MonadBase b m => MonadBase b (ResourceT m) where

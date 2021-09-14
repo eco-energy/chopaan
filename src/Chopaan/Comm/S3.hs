@@ -1,4 +1,9 @@
-{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies, DeriveGeneric, StandaloneDeriving, DeriveAnyClass, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, TupleSections, DerivingStrategies, DerivingVia, BangPatterns, OverloadedLabels, RecordWildCards, DeriveFunctor, QuantifiedConstraints, InstanceSigs #-}
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies, DeriveGeneric, StandaloneDeriving, DeriveAnyClass, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, TupleSections, DerivingStrategies, DerivingVia, BangPatterns, OverloadedLabels, RecordWildCards, DeriveFunctor, QuantifiedConstraints, InstanceSigs, LambdaCase #-}
+
+{-# OPTIONS_GHC -ddump-simpl #-}
+{-# OPTIONS_GHC -dsuppress-all #-}
+{-# OPTIONS_GHC -ddump-to-file #-}
+
 module Chopaan.Comm.S3 where
 
 import Control.Lens
@@ -9,10 +14,10 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.AWS -- (AWST'(..))
 import Control.Monad.Catch
-import Control.Concurrent.STM
+--import Control.Concurrent.STM
+import Control.Concurrent.MVar
 
-
-import Data.IORef
+--import Data.IORef
 import Data.Generics.Product
 import Data.Generics.Labels
 import qualified Data.Binary as B
@@ -45,7 +50,8 @@ import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.AWS.Things
 import Chopaan.Utils.Time
 import Chopaan.Utils.Retry
-import Chopaan.Types (Resolution(..), BufferingOpts(..))
+import Chopaan.Types (BufferingOpts(..))
+import Chopaan.Types (Resolution(..))
 
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N (cpuTime)
@@ -115,8 +121,8 @@ readObject :: forall m. (MonadIO m, MonadCatch m)
 readObject bucket k = timeout 120 $ do
   !x <- send $ S3.getObject bucket k
   let byteLen = fromMaybe 0 $ x ^. S3.gorsContentLength
-  body <- (BS.concat) <$> ((x ^. S3.gorsBody) `sinkBody` sinkList)
-  return $ (body, fromIntegral byteLen) 
+  !body <- (BS.concat) <$> ((x ^. S3.gorsBody) `sinkBody` sinkList)
+  return $! (body, fromIntegral byteLen) 
 {-# INLINE readObject #-}
 
 -- readObjectUF :: forall m. (MonadIO m, MonadCatch m)
@@ -237,15 +243,19 @@ newtype Prefix = Prefix { unPrefix :: T.Text }
   deriving (Eq, Ord, Show, Generic, B.Binary)
 
 prefixRange :: (MonadAsync m) => Resolution -> UTCTime -> UTCTime -> S.AheadT m Prefix
-prefixRange !r !t !t' = S.mapM (pure . Prefix . glompPrefix) $ S.enumerateFromTo start end
+prefixRange !r !t !t' = S.concatM $ do
+  liftIO . print $ "start! " <> (show start)
+  liftIO . print $ "end! " <> (show end)
+  liftIO . print $ "sigDigs " <> (show sigDigs)
+  return $ S.mapM (pure . Prefix . glompPrefix) $ S.trace (liftIO . print) $ S.enumerateFromTo start end
   where
-    sigBits = (9 -) . (round . (logBase 10)) . resDiff $ r
+    sigDigs = (9 -) . (ceiling . (logBase 10)) . resDiff $ r
     glompPrefix :: Int64 -> T.Text
     glompPrefix !x = T.pack . show $ x
     start :: Int64
-    start = unDigits 10 $ take sigBits $ digits 10 $ utcToSeconds t
-    end = unDigits 10 $ take sigBits $ digits 10 $ utcToSeconds t'
-    utcToSeconds = (round @_ @Int64) . nominalDiffTimeToSeconds
+    start = unDigits 10 $ take sigDigs $ digits 10 $ utcToSeconds t
+    end = unDigits 10 $ take sigDigs $ digits 10 $ utcToSeconds t'
+    utcToSeconds = (ceiling @_ @Int64) . nominalDiffTimeToSeconds
                        . TP.utcTimeToPOSIXSeconds
     digits !n !n' = reverse . fromJust $ mDigitsRev n n' 
     mDigitsRev :: Integral n
@@ -271,6 +281,11 @@ prefixRange !r !t !t' = S.mapM (pure . Prefix . glompPrefix) $ S.enumerateFromTo
 nodeMACPath :: NodeMAC -> FilePath
 nodeMACPath = T.unpack . unNodeId
 
+instance HasEncoding S3.ObjectKey where
+  encodeA = encodeA . (toTxt . unObject)
+  decodeA = (fmap (S3.ObjectKey . fromTxt)) . decodeA
+  chunkBytes = chunkBytes @(Txt S3.ObjectKey)
+  
 
 unfoldNodeHydration :: forall t m. (IsStream t, MonadAsync m, MonadCatch m) => NodeMAC -> FilePath -> FilePath -> FilePath -> m (t m (A.Array Word8), t m S3.ObjectKey)
 unfoldNodeHydration n allPaths failedPaths dataPath = undefined
@@ -278,15 +293,13 @@ unfoldNodeHydration n allPaths failedPaths dataPath = undefined
 foldNodeHydration :: forall m a e1 e2.
   (MonadAsync m, MonadCatch m, Message a)
   => (S3.ObjectKey -> a -> (Txt S3.ObjectKey, PB a))
-  -> (S3.ObjectKey -> e1 -> (Txt S3.ObjectKey))
-  -> (S3.ObjectKey -> e2 -> (Txt S3.ObjectKey))
   -> FilePath
   -> FilePath
   -> (T.Text -> FilePath)
   -> T.Text
   -> T.Text
   -> FL.Fold m (S3.ObjectKey, Either e1 (Either e2 a)) ()
-foldNodeHydration serData serErrA serErrB dataPath dlDonePath errPath err1Tag err2Tag = fmap (const ())
+foldNodeHydration serData dataPath dlDonePath errPath err1Tag err2Tag = fmap (const ())
   (FL.lmap bimapEncode
     (FL.partition
       (encodeFold (errPath err1Tag))
@@ -294,9 +307,8 @@ foldNodeHydration serData serErrA serErrB dataPath dlDonePath errPath err1Tag er
         (encodeFold (errPath err2Tag))
         (FL.unzip (encodeFold (dlDonePath)) (encodeFold (dataPath))))))
   where
-    bimapEncode (p, e) = bimap (serErrA p) (bimap (serErrB p) (serData p)) $ e
+    bimapEncode (p, e) = bimap (const p) (bimap (const p) (serData p)) $ e
     {-# INLINE bimapEncode #-}
-{-# INLINE foldNodeHydration #-}
 
 
 data HydrationC n = RootD FilePath
@@ -310,35 +322,35 @@ data HydrationDirs = HydrationDirs
   , frameDir' :: !FilePath
   }
 
+
 dataDir :: T.Text -> FilePath
-dataDir time = "./data/hydration/" <> (T.unpack time) <> "/"
+dataDir hPrefix = "./data/hydration/" <> (T.unpack hPrefix) <> "/"
 
 fetchDir :: T.Text -> NodeMAC -> FilePath
-fetchDir time n = dataDir time <> nodeMACPath n <> "/fetch/" 
+fetchDir hPrefix n = dataDir hPrefix <> nodeMACPath n <> "/fetch/" 
 
-prefixFile time n = fetchDir time n <> "prefixes"
+prefixFile hPrefix n = fetchDir hPrefix n <> "prefixes"
 
 prefixFetchDir :: T.Text -> NodeMAC -> Prefix -> FilePath
-prefixFetchDir time n (Prefix t)= fetchDir time n <> (T.unpack t)
+prefixFetchDir hPrefix n (Prefix t)= fetchDir hPrefix n <> (T.unpack t)
 
 pathDir :: T.Text -> NodeMAC -> Prefix -> FilePath
-pathDir time n t = (prefixFetchDir time n t) <> "/paths/"
+pathDir hPrefix n t = (prefixFetchDir hPrefix n t) <> "/paths/"
 
 pathFile :: T.Text -> NodeMAC -> Prefix -> T.Text -> FilePath
-pathFile time n t f = pathDir time n t <> (T.unpack f) 
+pathFile hPrefix n t f = pathDir hPrefix n t <> (T.unpack f) 
+
+prefixPathFile hPrefix n t = pathFile hPrefix n t "s3paths"
+
+nodeSavedFile :: T.Text -> NodeMAC -> T.Text -> FilePath
+nodeSavedFile hPrefix n ty = fetchDir hPrefix n <> (T.unpack ty) 
 
 errorDir :: T.Text -> NodeMAC -> Prefix -> FilePath
-errorDir time n t = (prefixFetchDir time n t) <> "/errors/"
+errorDir hPrefix n t = (prefixFetchDir hPrefix n t) <> "/errors/"
 
 frameDir :: T.Text -> NodeMAC -> Prefix -> FilePath
-frameDir time n t = (prefixFetchDir time n t) <> "/frames/"
+frameDir hPrefix n t = (prefixFetchDir hPrefix n t) <> "/frames/"
 
--- nodeFrameFile :: NodeMAC -> Prefix -> FilePath
--- nodeFrameFile = undefined
-
-
--- binaryArray :: (MonadAsync m, B.Binary a) => a -> m (A.Array Word8)
--- binaryArray a = A.toArray (SBL.toChunks . B.encode $ a)
 
 type Monitor = Monitor' Double Integer
 
@@ -390,41 +402,42 @@ instance (forall a. IsoMon r a => IsoMon r a, Num r, RealFrac r) => Applicative 
 instance (IsoMon r a, RealFrac r, Num r, Num a) => Semigroup (Monitor' r a) where
   m <> m' = (+) <$> m <*> m'
 
-newMon :: (MonadIO m) => m (IORef Monitor)
-newMon = liftIO . newIORef . pure $ 0
+newMon :: (MonadIO m) => m (MVar Monitor)
+newMon = liftIO . newMVar . pure $ 0
+{-# NOINLINE newMon #-}
 
 printMon :: String -> Monitor -> IO ()
-printMon !l !m = do
+printMon l m = do
   putStrLn l
   putStrLn $ show m
 
 
 incPrefixCount :: Int -> Monitor -> Monitor
-incPrefixCount i m = m & #numPrefixes %~ (+ (fromIntegral i))
+incPrefixCount !i !m = m & #numPrefixes %~ (+ (fromIntegral i))
 {-# INLINE incPrefixCount #-}
 
 incPathCount :: Int -> Monitor -> Monitor
-incPathCount i m = m & #discoveredPaths %~ (+ (fromIntegral i))
+incPathCount !i !m = m & #discoveredPaths %~ (+ (fromIntegral i))
 {-# INLINE incPathCount #-}
 
 incDLableSize :: Int -> Monitor -> Monitor
-incDLableSize i m = m & #totalDownloadableSize %~ (+ (fromIntegral i))
+incDLableSize !i !m = m & #totalDownloadableSize %~ (+ (fromIntegral i))
 {-# INLINE incDLableSize #-}
 
 incDLSize :: Int -> Monitor -> Monitor
-incDLSize i m = m & #downloadedSize %~ (+ (fromIntegral i))
+incDLSize !i !m = m & #downloadedSize %~ (+ (fromIntegral i))
 {-# INLINE incDLSize #-}
 
 incDLCount :: Int -> Monitor -> Monitor
-incDLCount i m = m & #downloadedFrames %~ (+ (fromIntegral i))
+incDLCount !i !m = m & #downloadedFrames %~ (+ (fromIntegral i))
 {-# INLINE incDLCount #-}
 
 incStoredCount :: Int -> Monitor -> Monitor
-incStoredCount i m = m & #framesStored %~ (+ (fromIntegral i))
+incStoredCount !i !m = m & #framesStored %~ (+ (fromIntegral i))
 {-# INLINE incStoredCount #-}
 
-incSecondsElapsed :: Int -> Monitor -> Monitor
-incSecondsElapsed i m = m & #secondsElapsed %~ (+ (fromIntegral i))
+incSecondsElapsed :: Double -> Monitor -> Monitor
+incSecondsElapsed !i !m = m & #secondsElapsed %~ (+ (round i))
 {-# INLINE incSecondsElapsed #-}
 
 incDLError :: Monitor -> Monitor
@@ -436,87 +449,83 @@ incParsingError m = m & #parsingErrors %~ (+ 1)
 {-# INLINE incParsingError #-}
 
 incValidated :: Int -> Monitor -> Monitor
-incValidated i m = m & #validated %~ (+ (fromIntegral i))
+incValidated !i !m = m & #validated %~ (+ (fromIntegral i))
 {-# INLINE incValidated #-}
 
 incDLSpeed :: Monitor -> Monitor
-incDLSpeed m = m & #downloadSpeed
+incDLSpeed !m = m & #downloadSpeed
                 .~ ((fromIntegral (m ^. #downloadedSize)) / (fromIntegral $ (m ^. #secondsElapsed)))
 {-# INLINE incDLSpeed #-}
--- getHydratedPaths :: (IsStream t, MonadAsync m, MonadCatch m)
---   => NodeMAC -> FilePath -> t m (S3.ObjectKey)
--- getHydratedPaths n f = do
   
+type MonWrite m = (Monitor -> Monitor) -> m ()
+
+-- For each prefix, we want to fetch the paths that haven't been
+-- fetched yet for the prefix
+prefixStartKey :: (MonadAsync m, MonadCatch m)
+  => T.Text -> NodeMAC -> Prefix -> m (Prefix, Maybe (S3.ObjectKey))
+prefixStartKey hPrefix n t = fmap (t,) $
+                             (fmap (join @Maybe)) (S.last $ decodeFile (prefixPathFile hPrefix n t))
+
 
 nodeS3 :: forall m. (MonadAsync m, MonadCatch m)
        => Env
        -> S3.BucketName
-       -> Resolution
        -> BufferingOpts
        -> T.Text
-       -> IORef Monitor
-       -> (UTCTime, UTCTime)
+       -> MVar Monitor
+       -> S.AheadT m (Prefix)
        -> NodeMAC
-       -> Maybe S3.ObjectKey
-       -> S.AheadT m (Either EnergyState RuntimeStats)
-nodeS3 env bucket res BufferingOpts{..} hPrefix mon (startT, endT) n startAfter = let
-  modMon = liftIO . modifyIORef mon
-  prefixes = S.tapRate 10 (modMon . incPrefixCount)
-        S.|$ S.trace (liftIO . createAllDirs)
-        S.|$ S.uniq
-        S.|$ S.maxBuffer prefixBuffer $  prefixRange res startT endT
-  prefixPaths = (s3Paths'' env) (req)
-  prefixFrames :: Prefix -> S.AheadT m (S3.ObjectKey, MeshFrame)
-  prefixFrames t = S.rights
+       -> S.AheadT m (S3.ObjectKey, Either EnergyState RuntimeStats)
+nodeS3 env bucket BufferingOpts{..} hPrefix mon pfs n = let
+  --modMon = liftIO . modifyMVar_ mon . (pure .)
+  prefixes :: S.AheadT m (Prefix, Maybe S3.ObjectKey)
+  prefixes = --S.tapRate tapR (modMon . incPrefixCount) S.|$
+    S.mapM (prefixStartKey hPrefix n) $ pfs
+  prefixPaths :: Prefix -> Maybe S3.ObjectKey -> S.AheadT m S3.ObjectKey
+  prefixPaths t o = S.tap (savePrefixPath t)
+        -- S.|$ S.mapM (addSpeedSize modMon)
+        S.|$ S.map (fst)
+        S.|$ S.unfold (s3Paths'' env (flip req o)) t
+  prefixFrames :: (Prefix, Maybe S3.ObjectKey) -> S.AheadT m (S3.ObjectKey, MeshFrame)
+  prefixFrames (t, o) = S.rights
         S.|$ S.rights
-        S.|$ S.trace (\x -> if isLeft x
-                            then ((modMon incDLError)
-                                  >> (liftIO . print $ x))
-                            else ( if (isLeft . (fromRight undefined) $ x)
-                                   then ((modMon incParsingError)
-                                         >> (liftIO . print $ x))
-                                   else return ()))
+        -- S.|$ S.trace (countErrors modMon)
         S.|$ S.map (\(!k, !e) -> (fmap (k,)) <$> e)
-        S.|$ (S.tap (FL.rmapM (\_ -> modMon $ incStoredCount 360) $ storeAll t))
-        S.|$ S.tapRate 10 (modMon . incDLCount)
-        S.|$ S.mapM (\(n, x) -> case x of
-                                Left l -> return $ (n, Left l)
-                                Right (a, s) -> do
-                                  modMon (incDLSize s)
-                                  return $ (n, Right a)
-                    )
-        S.|$ S.maxThreads frameBuffer 
-        S.|$ S.mapM downloadWithErrLog
-        S.|$ S.tapRate 10 (modMon . incPathCount)
-        S.|$ S.tap (FL.lmap (toTxt . unObject) (encodeFold (pathFile hPrefix n t "paths")))
-        S.|$ S.maxThreads pathBuffer
-        S.|$ S.mapM ((\(p, s) -> (modMon $ incDLSpeed . incDLableSize s) >> return p))
-        S.|$ S.unfold prefixPaths t
-  in S.tapRate 10 (\_ -> liftIO $ printMon np =<< (readIORef mon))
-    S.|$ S.tapRate 10 (\_ -> modMon (incSecondsElapsed 10))
-    S.|$ S.tapRate 10 (modMon . incValidated)
-    S.|$ S.mapMaybe (uncurry validateMF)
+        -- S.|$ S.tapRate tapR (modMon . incStoredCount)
+        S.|$ S.tap (storeAll t)
+        -- S.|$ S.tapRate tapR (modMon . incDLCount)
+        S.|$ S.mapM (downloadWithErrLog)
+        -- S.|$ S.tapRate tapR (modMon . incPathCount)
+        S.|$ prefixPaths t o
+  in S.maxBuffer frameBuffer
+    -- S.|$ S.tapRate tapR (\_ -> liftIO $ printMon np =<< (readMVar mon)) 
+    -- S.|$ S.tapRate tapR (modMon . (\m -> incSecondsElapsed tapR . incValidated m))
+    S.|$ S.map (second fromJust)
+    S.|$ S.filter (isJust . snd)
+    S.|$ S.map (uncurry validateMF)
     S.|$ S.concatMapWith (S.ahead) prefixFrames
     S.|$ prefixes
   where
-    createAllDirs t = do
-      cd (errorDir hPrefix n t)
-      cd (frameDir hPrefix n t)
-      cd (pathDir hPrefix n t)
-        where
-          cd = createDirectoryIfMissing True
+    tapR = 10
+    countErrors io = \case
+      Left _ -> (io incDLError)
+      Right r -> case r of
+        Left _ ->  (io incParsingError)
+        Right _ -> return ()
+    savePrefixPath t = (FL.lmap (toTxt . unObject) (encodeFold (prefixPathFile hPrefix n t)))
+    addSpeedSize io = (\(p, s) -> (io $ incDLSpeed . incDLableSize s) >> return p)
+    addDLSize io = \(n', x) -> case x of
+      Left l -> return $ (n', Left l)
+      Right (a, s) -> do
+        _ <- io (incDLSize s)
+        return $ (n', Right a)
     np = (T.unpack . unNodeId $ n)
-    unObject (S3.ObjectKey k) = k
-    req (Prefix t) = S3.listObjectsV2 bucket
+    req (Prefix t) startAfter = S3.listObjectsV2 bucket
           & S3.lovPrefix .~ (timedPrefix n t)
           & S3.lovStartAfter .~ (fmap unObject startAfter)
-    {-# INLINE req #-}
-    downloadWithErrLog :: S3.ObjectKey -> m (S3.ObjectKey, Either SomeException (Either String MeshFrame, Int)) 
-    downloadWithErrLog !p = (p,) <$> downloadMF env bucket p
-    {-# INLINE downloadWithErrLog #-}
+    downloadWithErrLog :: S3.ObjectKey -> m (S3.ObjectKey, Either SomeException (Either String MeshFrame)) 
+    downloadWithErrLog p = (((p,) . (fmap fst)) <$> downloadMF env bucket p)
     storeAll t = foldNodeHydration @m @MeshFrame (curry (bimap (toTxt . unObject) toPB))
-            (curry ((toTxt . unObject) . fst))
-            (curry ((toTxt . unObject) . fst))
             dataPath dlDonePath errPath err1Tag err2Tag
             where
               dlDonePath = pathFile hPrefix n t "success"
@@ -526,24 +535,36 @@ nodeS3 env bucket res BufferingOpts{..} hPrefix mon (startT, endT) n startAfter 
               err2Tag = "parsingError"
 
 
+createPrefixDirs hPrefix n t = do
+  cd (errorDir hPrefix n t)
+  cd (frameDir hPrefix n t)
+  cd (pathDir hPrefix n t)
+
+cd :: MonadIO m => FilePath -> m () 
+cd = liftIO . createDirectoryIfMissing True
+
+unObject :: S3.ObjectKey -> T.Text
+unObject (S3.ObjectKey k) = k
+{-# INLINE unObject #-}
+
 validateMF ::
   S3.ObjectKey
   -> MeshFrame
-  -> Maybe (Either EnergyState RuntimeStats)
-validateMF !k !m = case accessEnergyState m of
-                     Just !e -> Just . Left $ fixGridTS t e
+  -> (S3.ObjectKey, Maybe (Either EnergyState RuntimeStats))
+validateMF k m = case accessEnergyState m of
+                     Just !e -> (k, Just . Left $ fixGridTS t e)
                      Nothing ->
                        case accessRTS m of
-                         Just !r -> Just . Right $ fixMeshTS t r
-                         Nothing -> Nothing
+                         Just !r -> (k, Just . Right $ fixMeshTS t r)
+                         Nothing -> (k, Nothing)
   where
     t = parseTime k
-    toNodeMAC :: S3.ObjectKey -> Maybe (NodeMAC, Time.UTCTime)
-    toNodeMAC (S3.ObjectKey txt) = do
-      (nodePath, filename) <- cleanMAC txt
-      nodeId <- topicToNodeId "/state/" nodePath
-      ts <- Just . parseUTCTimeMS $ filename
-      return (nodeId, ts)
+    -- toNodeMAC :: S3.ObjectKey -> Maybe (NodeMAC, Time.UTCTime)
+    -- toNodeMAC (S3.ObjectKey txt) = do
+    --   (nodePath, filename) <- cleanMAC txt
+    --   nodeId <- topicToNodeId "/state/" nodePath
+    --   ts <- Just . parseUTCTimeMS $ filename
+    --   return (nodeId, ts)
     parseTime :: S3.ObjectKey -> Maybe Time.UTCTime
     parseTime (S3.ObjectKey k') = (fmap (parseUTCTimeMS . snd)) . cleanMAC $ k'
     cleanMAC :: T.Text -> Maybe (T.Text, T.Text)
@@ -569,49 +590,3 @@ fixMeshTS (Just t) r = case r ^? N.cpuTime of
     (Just t') -> case (t' == 0) of
       True -> r & N.cpuTime .~ (timeToUIntSeconds t)
       False -> r
-
-
-metadataKey :: S3.ObjectKey
-metadataKey = "chopaanMetadata"
-
-
-
--- partitionEither :: (IsStream t, Monad m) => S.SerialT m (Either a b) -> m (t m a, t m b)
--- partitionEither = S.foldr (either left' right') (S.nil, S.nil)
---   where
---     left' a ~(l, r) = (S.cons a l, r)
---     right' a ~(l, r) = (l, S.cons a r)
-
-
--- partitionEither' :: (IsStream t, Monad m) => t m (Either a b) -> (t m a, t m b)
--- partitionEither' s = (S.lefts s, S.rights s)
-
--- createBucketIndex :: IO ()
--- createBucketIndex = do
---   l <- liftIO $ newLogger Info stdout
---   let xs = (\x -> (toNodeMAC x, x))
---         <$> (s3Paths @S.ParallelT l bucketN (Just "/kibbutz/") Nothing)
---   S.fold 
---   return ()
--- -- What would the structure of the metadata be?
--- -- Is there a greskell expression to fetch all nodes and edges in a graph?
--- fetchMetadata = undefined
-
--- writeMetadata = undefined
-
--- sensorS3 :: (IsStream t, MonadAsync m) =>  Logger -> S3.BucketName -> NodeMAC -> t m (EnergyState)
--- sensorS3 l bucket n = S.map ((fromLeft undefined) . snd)
---                   S.|$ S.filter (isLeft . snd)
---                   S.|$ nodeS3 l bucket n Nothing
-
--- rsS3 :: (IsStream t, MonadAsync m) => Logger -> S3.BucketName -> NodeMAC -> t m (RuntimeStats)
--- rsS3 l bucket n = S.map ((fromRight undefined) . snd)
---          $ S.filter (isRight . snd)
---          $ nodeS3 l bucket n Nothing
-
-
--- tapCount' :: forall t m a. (IsStream t, MonadAsync m, Show a) => String -> t m a -> t m a
--- tapCount' n = S.tap (printCount' n)
--- printCount' s = FL.foldlM' (\x a ->
---                               (liftIO . print $ s <> ": " <> (show x))
---                               >> (return $ x + (1 :: Int))) (pure 1)

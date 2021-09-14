@@ -84,16 +84,16 @@ app ev root poo =
 data ServerOpts = ServerOpts
   { assets :: FilePath
   , port :: Int
-  , tinkerHost :: String
-  , tinkerPort :: Int
+  , tinkerOpts :: TinkerConf
   } deriving (Generic)
 
 parser :: Parser ServerOpts
 parser = ServerOpts
   <$> strOption   (long "assets" <> short 'a' <> metavar "FILEPATH")
   <*> option auto (long "port"   <> short 'p' <> metavar "PORT" <> showDefault <> value 8080)
-  <*> strOption   (long "tinkerHost" <> metavar "TINKERHOST")
-  <*> option auto (long "tinkerPort" <> metavar "TINKERPORT" <> showDefault <> value 8182)
+  <*> tkParser
+  -- <*> strOption   (long "tinkerHost" <> metavar "TINKERHOST")
+  -- <*> option auto (long "tinkerPort" <> metavar "TINKERPORT" <> showDefault <> value 8182)
 
 options :: ParserInfo ServerOpts
 options = info (parser <**> helper) $
@@ -110,4 +110,4 @@ application optsPath e assetsPath (TinkerConf h p) = do
 main :: FilePath -> IO ()
 main optionsPath = do
   ServerOpts{..} <- execParser options
-  run port =<< application optionsPath Prod assets (TinkerConf tinkerHost tinkerPort)
+  run port =<< application optionsPath Prod assets tinkerOpts

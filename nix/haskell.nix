@@ -30,7 +30,7 @@ let
     src = haskell-nix.haskellLib.cleanGit { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
     index-state = "2021-08-01T00:00:00Z";
-    plan-sha256 = "0hsjjh97l1hr121m0adzv2ncxskia9iqywcbwypmfhgymgc40j90";
+    plan-sha256 = "1lbriyq0a7jxay8hqb03y5qgbfh41gagckrdi1l5f2yah3ib1r95";
     materialized = ./chopaan.materialized;
     #checkMaterialization = true;
     # these extras will provide additional packages
@@ -54,8 +54,8 @@ let
         packages.chopaan = {
           doCheck = false;
           flags.prod = true;
-          components.exes.kbtzim.dontStrip = false;
-          components.exes.server.dontStrip = false;
+          components.exes.kbtzim.dontStrip = true;
+          components.exes.server.dontStrip = true;
           components.library.build-tools = [ buildPackages.z3 ];
           configureFlags = [
             "--extra-lib-dirs=${buildPackages.z3}/lib"

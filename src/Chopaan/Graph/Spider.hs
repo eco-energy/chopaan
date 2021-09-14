@@ -50,7 +50,9 @@ import Chopaan.Kibbutz.Transactor ( TxStatus
                                   )
 import Chopaan.Graph.Greskell
 
-import NetSpider.Spider (Spider, addFoundNode, getSnapshot, getSnapshotSimple, connectWith, close)
+import qualified Network.Greskell.WebSocket.Client.Options as Gr
+import qualified Network.Greskell.WebSocket.Client as Gr
+import NetSpider.Spider (Spider(..), addFoundNode, getSnapshot, getSnapshotSimple, connectWith, connectWithOpts, close)
 import NetSpider.Spider.Config (Config(..), defConfig, LogLevel(..))
 import NetSpider.Graph (NodeAttributes(..), LinkAttributes(..), VNode)
 import NetSpider.Found (FoundNode(..), FoundLink(..), LinkState(..))

@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances, CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances, CPP, BangPatterns #-}
 module Chopaan.Kibbutz.Transactor--  ( -- runTransactor
 --                                   statePipe
 --                                   , Stake(..)
@@ -165,7 +165,7 @@ instance  (Ord e, RealFrac e) => Monoid (TxStatus' e) where
 
 #ifndef ghcjs_HOST_OS
 planTx :: (MonadAsync m, MonadCatch m,  Ord n, Show n, IsStream t) => Time.DiffTime -> t m (NodeStates n) -> t m (Maybe (TxPlan n))
-planTx horizon k = S.postscan (transactionPlanner horizon) k 
+planTx !horizon k = S.postscan (transactionPlanner horizon) k 
 {-# INLINE planTx #-}
 
 
@@ -220,14 +220,15 @@ txFold = dupF . transactionFold
 
 transactionFold :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
                 => TxPlan n -> FL.Fold m (NodeStates n, Maybe (TxPlan n)) (TxState n)
-transactionFold participants = FL.foldl' incTxState (stakeStatus <$> participants)
+transactionFold !participants = FL.foldl' incTxState (stakeStatus <$> participants)
+{-# INLINE transactionFold #-}
     -- shouldQuit (Tx t) = if (all ((\x -> timeRemaining x <= 0) . snd . snd) (M.toList t))
     --                then ( . Tx $ t)
     --                else ( . Tx $ t)
 
 
 stakeStatus :: Stake -> (Role, TxStatus)
-stakeStatus (Stake (px, w, t)) = (px, mempty{ timeRemaining = t
+stakeStatus !(Stake (!px, !w, !t)) = (px, mempty{ timeRemaining = t
                                        , energyRemaining = (pToE @Double) (realToFrac t) w
                                        , startLag = 0
                                        })
@@ -281,7 +282,6 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
                    }
       in (px, nextTS)
       where
-        {-# INLINE txEnergy #-}
         txEnergy :: WattSeconds
         txEnergy = (pToE @Double) (realToFrac lastTimeDiff) (tx _powerT)
         {-# INLINE hasStarted #-}
@@ -290,7 +290,6 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
         {-# INLINE hasEnded #-}
         hasEnded Source =  shouldHaveEnded && (abs $ tx _powerT) <= eta
         hasEnded Sink = shouldHaveEnded && (abs $ tx _powerT) <= eta
-        {-# INLINE shouldHaveEnded#-}
         shouldHaveEnded = (timeRemaining prevTx) <= 0
         {-# INLINE eta #-}
         eta = 0.5
@@ -342,8 +341,7 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
 
 
 transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
-transactionPlanner timeHorizon = FL.foldlM' (\_ n -> txn timeHorizon n) (pure mempty)
-  
+transactionPlanner !timeHorizon = FL.foldlM' (\_ n -> txn timeHorizon n) (pure mempty)
 {-# INLINE transactionPlanner#-}
 
 
@@ -352,7 +350,7 @@ txn' h t = (pure . (fromMaybe mempty)) =<< txn h t
 
 
 txn :: forall m n. (MonadIO m, MonadCatch m, Ord n, Show n) => Time.DiffTime -> NodeStates n -> m (TxPlan' n)
-txn h (Tx ns) = do
+txn !h !(Tx ns) = do
   -- liftIO . print $ (better mkSources sources)
   -- liftIO . print $ (better mkSinks sinks)
   -- liftIO . print $ d
@@ -366,19 +364,14 @@ txn h (Tx ns) = do
   return $ fmap reindexTx sched
       where
         consumption = M.toAscList $ fmap _demand ns
-        {-# INLINE consumption #-}
         storage = M.toAscList $
                   fmap (\n ->
                           (totalCapacity . _battery $ n) * (soc . _battery $ n))
                   ns
-        {-# INLINE storage #-}
         d = fmap (\(i, (c, s))
                      -> (i, c - s)) $ zip [1..] $ zip (snd <$> consumption) (snd <$> storage)
-        {-# INLINE d #-}
         (sources, sinks) = L.partition (\x -> snd x > 0) d
-        {-# INLINE better #-}
         better f ss = uncurry f $ unzip $ (second fromWattSeconds) <$> ss
-        {-# INLINE schedule #-}
         schedule :: m (TxPlan' Int)
         schedule =  (fmap join) . tryForMaybe $ (solveTP h)
                     (better mkSources sources)
@@ -488,12 +481,11 @@ instance (ToJSON n, FromJSON n) => LinkAttributes (Stake' n) where
              ]
   parseLinkAttributes props = pMapToFail (decodeBin "Stake' Link" $ lookupAs stakeKey props)
 
-
-
 roleLinkDir :: Role -> LinkState
 roleLinkDir r = case r of
   Source -> LinkToTarget
   Sink -> LinkToSubject
+{-# INLINE roleLinkDir #-}
 
 stakeLinkDir :: Stake -> LinkState
 stakeLinkDir (Stake (r, _, _)) = roleLinkDir r
@@ -507,6 +499,7 @@ txStatusLinkDir TxStatus'{energyDispatched, energyReceived} = if energyDispatche
        then LinkToSubject
        else LinkBidirectional
 {-# INLINE txStatusLinkDir #-}
+
 #endif
 
 instance (RealFrac p) => Semigroup (Stake' p) where
@@ -526,7 +519,7 @@ instance (RealFrac p) => Monoid (Stake' p) where
 
 mkStake :: Role -> Double -> Int -> Stake
 mkStake r p t = Stake (r, toWatts p, fromIntegral t)
-
+{-# INLINE mkStake #-}
 
 fromStake :: Stake -> NM.EnergyTransactionRequest
 fromStake (Stake (role, watts, duration)) = defMessage
@@ -538,7 +531,7 @@ fromStake (Stake (role, watts, duration)) = defMessage
     toPDir Sink = NM.Incoming
     timeToWord :: Time.DiffTime -> Word64
     timeToWord = (convert @Int @Word64) . (round @Time.DiffTime @Int)
-
+{-# INLINE fromStake #-}
 
 #ifndef ghcjs_HOST_OS
 txStatusKey :: forall n. Key n BL.ByteString

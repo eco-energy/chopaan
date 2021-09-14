@@ -1,16 +1,42 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE OverloadedStrings, CPP #-}
 module Chopaan.Types where
 
+
+import Data.Aeson (ToJSON, FromJSON)
+import Data.Text (Text)
+import Servant.API (FromHttpApiData(..), ToHttpApiData(..))
+import qualified Data.Text as Text
+#ifndef ghcjs_HOST_OS
 import RIO
+import Prelude (Enum(..), read)
 import RIO.Process
 import RIO.Time (UTCTime(..), fromGregorian, secondsToDiffTime)
-
 import Dhall
-
 import Chopaan.Node.NodeOpts
+#else
+import Prelude
+import Control.DeepSeq (NFData(..))
+import GHC.Generics
+#endif
 
+data Resolution = Year | Month | Week | Day | Hour | Minute | Second
+  deriving (Eq, Ord, Show, Generic, Bounded, Enum, NFData, ToJSON, FromJSON)
+
+toUrlPieceViaEnum :: Enum a => a -> Text
+toUrlPieceViaEnum = Text.pack . show . fromEnum
+
+parseUrlPieceViaEnum :: Enum a => Text -> Either Text a
+parseUrlPieceViaEnum = Right . toEnum . read . Text.unpack
+
+instance ToHttpApiData Resolution where
+  toUrlPiece = toUrlPieceViaEnum
+
+instance FromHttpApiData Resolution where
+  parseUrlPiece = parseUrlPieceViaEnum
+
+#ifndef ghcjs_HOST_OS
 data DBOpts = DBOpts
   { host :: !Text
   , port :: !Integer
@@ -51,8 +77,6 @@ toUTC d = UTCTime (fromGregorian
 
 instance FromDhall Date
 
-data Resolution = Year | Month | Week | Day | Hour | Minute | Second
-  deriving (Generic, Show)
 
 instance FromDhall Resolution
 
@@ -109,3 +133,4 @@ instance HasLogFunc App where
   logFuncL = lens appLogFunc (\x y -> x { appLogFunc = y })
 instance HasProcessContext App where
   processContextL = lens appProcessContext (\x y -> x { appProcessContext = y })
+#endif

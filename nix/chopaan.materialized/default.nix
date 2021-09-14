@@ -21,6 +21,7 @@
         "barbies".revision = (((hackage."barbies")."2.0.3.0").revisions).default;
         "fast-builder".revision = (((hackage."fast-builder")."0.1.2.1").revisions).default;
         "diagrams-lib".revision = (((hackage."diagrams-lib")."1.4.4").revisions).default;
+        "io-streams-haproxy".revision = (((hackage."io-streams-haproxy")."1.0.1.0").revisions).default;
         "foreign-store".revision = (((hackage."foreign-store")."0.2").revisions).default;
         "wai-websockets".revision = (((hackage."wai-websockets")."3.0.1.2").revisions).default;
         "wai-websockets".flags.example = true;
@@ -59,6 +60,7 @@
         "hashtables".flags.debug = false;
         "hashtables".flags.bounds-checking = false;
         "hashtables".flags.unsafe-tricks = true;
+        "ghc-paths".revision = (((hackage."ghc-paths")."0.1.0.12").revisions).default;
         "binary".revision = (((hackage."binary")."0.8.6.0").revisions).default;
         "monad-parallel".revision = (((hackage."monad-parallel")."0.7.2.5").revisions).default;
         "ghc-boot".revision = (((hackage."ghc-boot")."8.6.5").revisions).default;
@@ -166,6 +168,8 @@
         "optparse-simple".flags.build-example = false;
         "th-expand-syns".revision = (((hackage."th-expand-syns")."0.4.7.0").revisions).default;
         "compensated".revision = (((hackage."compensated")."0.8.3").revisions).default;
+        "regex-posix".revision = (((hackage."regex-posix")."0.96.0.1").revisions).default;
+        "regex-posix".flags._regex-posix-clib = false;
         "cubicbezier".revision = (((hackage."cubicbezier")."0.6.0.6").revisions).default;
         "cubicbezier".flags.debug = false;
         "cryptonite".revision = (((hackage."cryptonite")."0.29").revisions).default;
@@ -245,8 +249,6 @@
         "string-conversions".revision = (((hackage."string-conversions")."0.4.0.1").revisions).default;
         "optparse-applicative".revision = (((hackage."optparse-applicative")."0.16.1.0").revisions).default;
         "optparse-applicative".flags.process = true;
-        "net-spider".revision = (((hackage."net-spider")."0.4.3.6").revisions).default;
-        "net-spider".flags.server-test = false;
         "network".revision = (((hackage."network")."3.1.2.2").revisions).default;
         "network".flags.devel = false;
         "word8".revision = (((hackage."word8")."0.1.3").revisions).default;
@@ -269,6 +271,7 @@
         "ghc-typelits-knownnat".flags.deverror = false;
         "interpolatedstring-perl6".revision = (((hackage."interpolatedstring-perl6")."1.0.2").revisions).default;
         "dlist".revision = (((hackage."dlist")."0.8.0.8").revisions).default;
+        "doctest".revision = (((hackage."doctest")."0.18.1").revisions).default;
         "ghcjs-dom".revision = (((hackage."ghcjs-dom")."0.9.4.0").revisions).default;
         "ghcjs-dom".flags.debug = false;
         "ghcjs-dom".flags.jsffi = true;
@@ -351,7 +354,17 @@
         "math-functions".flags.system-erf = true;
         "time-compat".revision = (((hackage."time-compat")."1.9.2.2").revisions).default;
         "time-compat".flags.old-locale = false;
+        "io-streams".revision = (((hackage."io-streams")."1.5.2.1").revisions).default;
+        "io-streams".flags.network = true;
+        "io-streams".flags.nointeractivetests = false;
+        "io-streams".flags.zlib = true;
         "numtype-dk".revision = (((hackage."numtype-dk")."0.5.0.3").revisions).default;
+        "snap-server".revision = (((hackage."snap-server")."1.1.2.0").revisions).default;
+        "snap-server".flags.openssl = false;
+        "snap-server".flags.portable = false;
+        "snap-server".flags.debug = false;
+        "snap-server".flags.build-pong = false;
+        "snap-server".flags.build-testserver = false;
         "x509-system".revision = (((hackage."x509-system")."1.6.6").revisions).default;
         "keys".revision = (((hackage."keys")."3.12.3").revisions).default;
         "intervals".revision = (((hackage."intervals")."0.9.2").revisions).default;
@@ -392,6 +405,7 @@
         "containers".revision = (((hackage."containers")."0.6.0.1").revisions).default;
         "some".revision = (((hackage."some")."1.0.2").revisions).default;
         "some".flags.newtype-unsafe = true;
+        "ekg-json".revision = (((hackage."ekg-json")."0.1.0.6").revisions).default;
         "safecopy".revision = (((hackage."safecopy")."0.10.4.2").revisions).default;
         "integer-logarithms".revision = (((hackage."integer-logarithms")."1.0.3.1").revisions).default;
         "integer-logarithms".flags.check-bounds = false;
@@ -406,6 +420,7 @@
         "dependent-sum".revision = (((hackage."dependent-sum")."0.7.1.0").revisions).default;
         "socks".revision = (((hackage."socks")."0.6.1").revisions).default;
         "wai-cors".revision = (((hackage."wai-cors")."0.2.7").revisions).default;
+        "ekg-core".revision = (((hackage."ekg-core")."0.1.1.7").revisions).default;
         "dual-tree".revision = (((hackage."dual-tree")."0.2.3.0").revisions).default;
         "streaming-commons".revision = (((hackage."streaming-commons")."0.2.2.1").revisions).default;
         "streaming-commons".flags.use-bytestring-builder = false;
@@ -453,6 +468,7 @@
         "servant-foreign".revision = (((hackage."servant-foreign")."0.15.1").revisions).default;
         "mime-types".revision = (((hackage."mime-types")."0.1.0.9").revisions).default;
         "ieee754".revision = (((hackage."ieee754")."0.8.0").revisions).default;
+        "zlib-bindings".revision = (((hackage."zlib-bindings")."0.1.1.5").revisions).default;
         "text-manipulate".revision = (((hackage."text-manipulate")."0.3.0.0").revisions).default;
         "charset".revision = (((hackage."charset")."0.3.8").revisions).default;
         "raw-strings-qq".revision = (((hackage."raw-strings-qq")."1.1").revisions).default;
@@ -471,6 +487,10 @@
         "data-interval".revision = (((hackage."data-interval")."2.0.1").revisions).default;
         "jsaddle-dom".revision = (((hackage."jsaddle-dom")."0.9.4.1").revisions).default;
         "data-default-instances-dlist".revision = (((hackage."data-default-instances-dlist")."0.0.1").revisions).default;
+        "snap-core".revision = (((hackage."snap-core")."1.0.4.2").revisions).default;
+        "snap-core".flags.portable = false;
+        "snap-core".flags.debug = false;
+        "snap-core".flags.network-uri = true;
         "hinotify".revision = (((hackage."hinotify")."0.4.1").revisions).default;
         "type-equality".revision = (((hackage."type-equality")."1").revisions).default;
         "pointed".revision = (((hackage."pointed")."5.0.2").revisions).default;
@@ -538,12 +558,14 @@
         "vector-algorithms".flags.boundschecks = true;
         "vector-algorithms".flags.bench = true;
         "vector-algorithms".flags.properties = true;
+        "doctest-discover".revision = (((hackage."doctest-discover")."0.2.0.0").revisions).default;
         "prettyprinter".revision = (((hackage."prettyprinter")."1.7.0").revisions).default;
         "prettyprinter".flags.buildreadme = false;
         "iproute".revision = (((hackage."iproute")."1.7.11").revisions).default;
         "diagrams-core".revision = (((hackage."diagrams-core")."1.5.0").revisions).default;
         "regex-applicative".revision = (((hackage."regex-applicative")."0.3.4").revisions).default;
         "tasty-hunit".revision = (((hackage."tasty-hunit")."0.10.0.3").revisions).default;
+        "readable".revision = (((hackage."readable")."0.3.1").revisions).default;
         "monad-logger".revision = (((hackage."monad-logger")."0.3.36").revisions).default;
         "monad-logger".flags.template_haskell = true;
         "transformers".revision = (((hackage."transformers")."0.5.6.2").revisions).default;
@@ -584,6 +606,7 @@
         "dotgen".revision = (((hackage."dotgen")."0.4.3").revisions).default;
         "dotgen".flags.devel = false;
         "auto-update".revision = (((hackage."auto-update")."0.1.6").revisions).default;
+        "code-page".revision = (((hackage."code-page")."0.2.1").revisions).default;
         "libBF".revision = (((hackage."libBF")."0.6.2").revisions).default;
         "libBF".flags.system-libbf = false;
         "asn1-types".revision = (((hackage."asn1-types")."0.3.4").revisions).default;
@@ -662,6 +685,7 @@
         "twee-lib".revision = (((hackage."twee-lib")."2.2").revisions).default;
         "twee-lib".flags.llvm = false;
         "twee-lib".flags.bounds-checks = false;
+        "ekg".revision = (((hackage."ekg")."0.4.0.15").revisions).default;
         "ghc-typelits-natnormalise".revision = (((hackage."ghc-typelits-natnormalise")."0.7.6").revisions).default;
         "ghc-typelits-natnormalise".flags.deverror = false;
         "conduit-extra".revision = (((hackage."conduit-extra")."1.3.5").revisions).default;
@@ -729,6 +753,7 @@
         Shpadoinkle-router = ./.plan.nix/Shpadoinkle-router.nix;
         concat-satisfy = ./.plan.nix/concat-satisfy.nix;
         concat-inline = ./.plan.nix/concat-inline.nix;
+        net-spider = ./.plan.nix/net-spider.nix;
         Shpadoinkle-backend-pardiff = ./.plan.nix/Shpadoinkle-backend-pardiff.nix;
         ghcjs-three = ./.plan.nix/ghcjs-three.nix;
         Shpadoinkle-console = ./.plan.nix/Shpadoinkle-console.nix;
@@ -764,6 +789,9 @@
           "Shpadoinkle-router" = { flags = {}; };
           "concat-satisfy" = { flags = {}; };
           "concat-inline" = { flags = {}; };
+          "net-spider" = {
+            flags = { "server-test" = lib.mkOverride 900 false; };
+            };
           "Shpadoinkle-backend-pardiff" = { flags = {}; };
           "ghcjs-three" = { flags = {}; };
           "Shpadoinkle-console" = { flags = {}; };

@@ -119,6 +119,7 @@ when:
   condition: "!impl(ghcjs)"
   then:
     dependencies:
+      - ekg
       - concat-classes
       - concat-examples
       - concat-plugin
@@ -137,33 +138,33 @@ when:
       - wai
       - warp
       - wai-cors
+      - wai-extra
       - connection
       - conduit
       - tls
       - x509-store
       - x509-validation
       - greskell-websocket >= 0.1.2.5
-      - suavemente
+      - influxdb >= 1.9.2
       - dhall >= 1.33.0
       - sbv
       - http-client
       - http-client-tls
       - dns
-      - fusion-plugin
+      - fusion-plugin >= 0.2.3
       - servant-client
-      - blaze-markup
-      - servant-blaze
       - servant-js
       - katip
       - directory-tree
+      - unix
     when:
     - condition: flag(prod)
       then:
         ghc-options:
           - -fdicts-strict
-          - -fmax-worker-args=2
-          - -fspec-constr-recursive=2
-          - -fplugin Fusion.Plugin
+          #- -fplugin Fusion.Plugin
+          #- -fplugin-opt=Fusion.Plugin:verbose=1
+          #- -fplugin-opt=Fusion.Plugin:dump-core
           - -O2
       else:
         ghc-options:
@@ -253,6 +254,9 @@ library:
         - Chopaan.Utils.Streamly
         - Chopaan.Utils.StreamsInterop
         - Chopaan.Utils.Time
+        - Data.Selectors
+        - Data.Influxable
+        - Data.HList
         - Kbtz
         - Proto.NodeMessageSchema.NodeMessages
         - Proto.NodeMessageSchema.NodeMessages_Fields
@@ -265,6 +269,7 @@ library:
     else:
       source-dirs: src
       exposed-modules:
+        - Chopaan.Types
         - Chopaan.Client
         - Chopaan.API.History
         - Chopaan.Graph.Greskell
@@ -307,6 +312,7 @@ library:
         - Chopaan.Utils.Retry
         - Chopaan.Utils.Streamly
         - Chopaan.Utils.Time
+        - Data.Selectors
         - Servant.Streamly
         - Proto.NodeMessageSchema.NodeMessages
         - Proto.NodeMessageSchema.NodeMessages_Fields
@@ -333,11 +339,9 @@ executables:
           - condition: flag(prod)
             then:
               ghc-options:
-                - -fplugin=ConCat.Plugin
+                #- -fplugin=ConCat.Plugin
                 - -fdicts-strict
-                - -fmax-worker-args=2
-                - -fspec-constr-recursive=2
-                - -fplugin Fusion.Plugin
+                #- -fplugin Fusion.Plugin
                 - -O2
                 - -with-rtsopts=-N
                 - -threaded 
@@ -384,6 +388,26 @@ executables:
       - -threaded
       - -O1
 
+  dashgen:
+    main:                DashGen.hs
+    other-modules: []
+    source-dirs:         app
+    when:
+      condition: "impl(ghcjs)"
+      then:
+        buildable: false
+      else:
+        dependencies:
+          - grafana
+          - optparse-simple
+          - text
+          - bytestring
+          - chopaan
+          - base
+        ghc-options:
+          - -threaded
+          - -O1
+    
   kbtzim:
     main:                Main.hs
     other-modules:
@@ -401,11 +425,9 @@ executables:
           - condition: flag(prod)
             then:
               ghc-options:
-                - -fplugin=ConCat.Plugin
+                #- -fplugin=ConCat.Plugin
                 - -fdicts-strict
-                - -fmax-worker-args=2
-                - -fspec-constr-recursive=2
-                - -fplugin Fusion.Plugin
+                #- -fplugin Fusion.Plugin
                 - -O2
                 #- -with-rtsopts=-N
                 - -with-rtsopts=-N

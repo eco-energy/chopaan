@@ -13,8 +13,9 @@ import Test.QuickCheck.Instances.Text
 import Control.Monad.IO.Class
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
-import Chopaan.Types (Resolution(..))
+import Chopaan.UiTypes (Resolution(..))
 import Chopaan.Comm.S3
+import Chopaan.Hydration
 import Streamly.Binary
 import Streamly.Internal.Data.Array.Foreign as A
 

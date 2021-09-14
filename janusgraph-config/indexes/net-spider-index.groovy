@@ -104,7 +104,7 @@ if(mg.getGraphIndex("byNodeId") == null) {
     mg.buildIndex("byKbtzId", Vertex.class).addKey(kbtz_id).buildCompositeIndex();
     mg.buildIndex("byHHId", Vertex.class).addKey(hh_id).buildCompositeIndex();
     mg.buildIndex("byType", Vertex.class).addKey(ntype).buildCompositeIndex();
-
+    mg.buildIndex("byTimestamp", Vertex.class).addKey(ts).buildMixedIndex("search");
 
     println("--- commit");
     mg.commit();

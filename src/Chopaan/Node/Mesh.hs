@@ -31,6 +31,7 @@ import qualified Proto.NodeMessageSchema.NodeMessages as N
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N
 import GHC.Generics
 
+import Data.Selectors
 import Data.Monoid (Last(..))
 import Data.Int
 import Data.Text as T
@@ -69,6 +70,9 @@ data RxSignal = RxSignal
   --deriving (Semigroup, Monoid) via (Last Double)
   deriving anyclass (Humanize)
 
+instance Selectors (RxSignal) where
+  selectors = selectorsRep @(RxSignal)
+
 noSignal = RxSignal Nothing Nothing
 
 #ifndef ghcjs_HOST_OS
@@ -86,10 +90,15 @@ instance LinkAttributes RxSignal where
 data MeshLink = MeshLink
   deriving (Eq, Show, Ord, Generic, ToJSON, FromJSON, NFData)
 
+instance Selectors (MeshLink) where
+  selectors = selectorsRep @(MeshLink)
+
 newtype NodeVersion = NodeVersion (Text)
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (ToJSON, FromJSON, NFData, FromGraphSON, Humanize)
 
+instance Selectors (NodeVersion) where
+  selectors = selectorsRep @NodeVersion
 
 data MeshNode = MeshNode
   { isRoot :: !(Maybe Bool)
@@ -100,6 +109,8 @@ data MeshNode = MeshNode
   }
   deriving (Eq, Ord, Show, Generic, NFData, Humanize)
 
+instance Selectors (MeshNode) where
+  selectors = selectorsRep @(MeshNode)
 
 instance ToJSON MeshNode where
   
@@ -144,7 +155,7 @@ meshNodeLink !kn !rts = (parseRTSToNode rts, rx')
 
 meshF :: forall m. (Monad m) => NodeMAC -> FL.Fold m (N.RuntimeStats) (MeshNode, RxSignal)
 meshF n = FL.mkFold_ (\_ r -> FL.Partial $ meshNodeLink n $ r) (FL.Partial (initMeshNode, noSignal))
-{-# INLINE meshF #-}
+--{-# INLINE meshF #-}
 
 
 

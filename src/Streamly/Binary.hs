@@ -54,19 +54,20 @@ import qualified Streamly.Internal.Data.Stream.IsStream as S
 import Data.ProtoLens.Encoding (decodeMessage, encodeMessage)
 import Data.ProtoLens.Message (Message)
 
+import System.Directory (doesFileExist)
+
+
 class HasEncoding a where
   encodeA :: forall m. MonadIO m => a -> m (A.Array Word8)
   decodeA :: A.Array Word8 -> Maybe a 
   chunkBytes ::  (MonadAsync m, MonadCatch m) => P.Parser m Word8 (A.Array Word8)
-  default chunkBytes :: (MonadAsync m, MonadCatch m) => P.Parser m Word8 (A.Array Word8)
-  chunkBytes = parseLengthPrefixed
-  {-# INLINE chunkBytes #-}
 
 instance HasEncoding (A.Array Word8) where
   encodeA = pure
   {-# INLINE encodeA #-}
   decodeA = Just
   {-# INLINE decodeA #-}
+  chunkBytes = parseLengthPrefixed
 
 data EncT = BinFmt | PBFmt | TxtFmt
 
@@ -110,12 +111,14 @@ instance (Binary a) => HasEncoding (Bin a) where
   {-# INLINE encodeA #-}
   decodeA = B.decode . BL.fromStrict . SBS.fromArray
   {-# INLINE decodeA #-}
+  chunkBytes = parseLengthPrefixed
   
 instance Message a => HasEncoding (PB a) where
   encodeA = encodeLengthPrefixedBS (encodeMessage . unPB)
   {-# INLINE encodeA #-}
   decodeA = (either (const Nothing) (Just .  PB)) . decodeMessage . SBS.fromArray
   {-# INLINE decodeA #-}
+  chunkBytes = parseLengthPrefixed
   
 instance HasEncoding (Txt a) where
   encodeA = pure . SBS.toArray . T.encodeUtf8 . (T.unlines . pure) . unTxt
@@ -142,13 +145,11 @@ prefixLengthArray y = do
 -- | Encode stream of elements using 'Put' from 'Binary'.
 -- Resulting bytestrings are not guaranteed to be aligned in any way.
 encodeLengthPrefixedBS :: (MonadIO m) => (a -> BS.ByteString) -> a -> m (A.Array Word8)
-encodeLengthPrefixedBS toBS =
-  prefixLengthArray . SBS.toArray . toBS --SBL.toChunks (runPut . p $ a))
+encodeLengthPrefixedBS toBS = prefixLengthArray . SBS.toArray . toBS
 {-# INLINE encodeLengthPrefixedBS #-}
 
 encodeLengthPrefixedBL :: (MonadIO m) => (a -> BL.ByteString) -> a -> m (A.Array Word8)
-encodeLengthPrefixedBL toBL a =
-  prefixLengthArray =<< (A.toArray $ SBL.toChunks (toBL a))
+encodeLengthPrefixedBL toBL a = prefixLengthArray =<< (A.toArray $ SBL.toChunks (toBL a))
 {-# INLINE encodeLengthPrefixedBL #-}
 
 
@@ -185,16 +186,21 @@ decodeS = (fmap decodeA) . (S.parseManyD (chunkBytes @a))
 
 
 decodeFile :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch m) => FilePath -> t m (Maybe a)
-decodeFile = (fmap decodeA) . (S.parseManyD (chunkBytes @a)) . FL.toBytes
+decodeFile f = S.concatM $ do
+  exists <- liftIO $ doesFileExist f
+  case exists of
+    True -> return $ (fmap decodeA) . (S.parseManyD (chunkBytes @a)) . FL.toBytes $ f
+    False -> return $ S.fromPure (Nothing)
 {-# INLINE decodeFile #-}
 
 encodeFold :: (HasEncoding a, MonadAsync m, MonadCatch m)
   => FilePath -> FL.Fold m a ()
-encodeFold fp = FL.lmapM (encodeA) (A.lpackArraysChunksOf A.defaultChunkSize (FL.writeChunks fp))
+encodeFold fp = FL.lmapM encodeA ((FL.writeChunks fp))
 {-# INLINE encodeFold #-}
 
 parseMsgS :: (IsStream t, MonadAsync m, Message a, MonadCatch m) => FilePath -> t m (Maybe (PB a))
 parseMsgS = decodeFile
+{-# INLINE parseMsgS #-}
 
 parseBinS :: (IsStream t, MonadAsync m, Binary a, MonadCatch m) => FilePath -> t m (Maybe (Bin a))
 parseBinS = decodeFile

@@ -6,6 +6,9 @@ import GHC.Generics hiding (R)
 import Control.Applicative
 import Control.DeepSeq (NFData)
 import Control.Lens
+
+import Data.Typeable
+import Data.Selectors
 import Data.Binary (Binary)
 import qualified Data.Binary as B
 import qualified "base64" Data.ByteString.Base64 as B64
@@ -72,14 +75,22 @@ headerOrder = Csv.headerOrder
 
 
 newtype WattSeconds = WS { unWs :: Compensated Double }
-  deriving stock (Eq, Ord, Generic)
+  deriving stock (Eq, Ord, Generic, Typeable)
   deriving newtype (Num, Fractional, Binary, Real, RealFrac, NFData)
   deriving anyclass (Humanize)
 
+instance Selectors WattSeconds where
+  selectors = selectorsRep @(WattSeconds)
+
+
 newtype Watts = W { unW :: Compensated Double }
-  deriving stock (Eq, Ord, Generic)
+  deriving stock (Eq, Ord, Generic, Typeable)
   deriving newtype (Num, Fractional, Real, Binary, RealFrac, NFData)
   deriving anyclass (Humanize)
+
+instance Selectors Watts where
+  selectors = selectorsRep @(Watts)
+
 
 instance Show WattSeconds where
   show = (printf ("%.2g")) . fromWattSeconds
@@ -95,13 +106,13 @@ fromWattSeconds :: WattSeconds -> Double
 fromWattSeconds = uncompensated . unWs
 
 toWatts :: Double -> Watts
-toWatts a = W $ add a 0 compensated
+toWatts !a = W $ add a 0 compensated
 
 toWattSeconds :: Double -> WattSeconds
-toWattSeconds a = WS $ add a 0 compensated
+toWattSeconds !a = WS $ add a 0 compensated
 
 pToE :: (Real t) => t -> Watts -> WattSeconds
-pToE t (W p') = WS $ (*^) (realToFrac t) p'
+pToE !t (W !p') = WS $ (*^) (realToFrac t) p'
 
 instance Csv.ToField (Watts) where
   toField = toField . uncompensated . unW
@@ -130,11 +141,14 @@ instance FromGraphSON Watts where
 -- Episodic Metrics
 
 data Node a = Node
-  { tx :: {-# UNPACK #-} !a
-  , consumed :: {-# UNPACK #-} !a
-  , generated :: {-# UNPACK #-} !a
+  { tx :: !a
+  , consumed :: !a
+  , generated :: !a
   } deriving (Eq, Ord, Show, Binary, Generic, Functor, NFData, ToJSON, FromJSON, Humanize)
   
+
+instance (Typeable a) => Selectors (Node a) where
+  selectors = selectorsRep @(Node a)
 
 instance (Csv.ToField a) => Csv.ToNamedRecord (Node a)
 
@@ -191,14 +205,17 @@ instance (GreskellC a) => FromGraphSON (Node a) where
 
 
 data SensorMetrics e p = SensorMetrics
-  { _time :: {-# UNPACK #-} !(Maybe UTCTime)
-  , lastTimeDiff :: {-# UNPACK #-} !DiffTime
-  , _powerT :: {-# UNPACK #-} !(Node p)
-  , _energyT :: {-# UNPACK #-} !(Node e)
-  , _battery :: {-# UNPACK #-} !(Battery e p)
-  , _demand :: {-# UNPACK #-} !e
-  , _sensors :: {-# UNPACK #-} !EnergyState
+  { _time :: !(Maybe UTCTime)
+  , lastTimeDiff :: !DiffTime
+  , _powerT :: !(Node p)
+  , _energyT :: !(Node e)
+  , _battery :: !(Battery e p)
+  , _demand :: !e
+  , _sensors :: !EnergyState
   } deriving (Eq, Ord, Generic, Show, NFData, ToJSON, FromJSON, Humanize)
+
+instance (Typeable e, Typeable p) => Selectors (SensorMetrics e p) where
+  selectors = selectorsRep @(SensorMetrics e p)
 
 initSM :: (Fractional e, Fractional p) => SensorMetrics e p
 initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0 zeroMsg 
@@ -263,6 +280,9 @@ instance ToJSON (StreamState) where
 
 instance FromJSON (StreamState) where
   parseJSON a = toEnum <$> (parseJSON a)
+
+--instance Selectors (EnergyState) where
+--  selectors = selectorsRep @(EnergyState)
 
 instance ToJSON (EnergyState) where
   toJSON a = object $ [
@@ -418,11 +438,14 @@ type Timestamp = (Maybe UTCTime, DiffTime)
 type BatteryR = Battery WattSeconds Watts
 
 data Battery e p = Battery
-  { soc :: {-# UNPACK #-} !e
-  , chargeLim :: {-# UNPACK #-} !p
-  , dischargeLim :: {-# UNPACK #-} !p
-  , totalCapacity :: {-# UNPACK #-} !e
+  { soc :: !e
+  , chargeLim :: !p
+  , dischargeLim :: !p
+  , totalCapacity :: !e
   } deriving (Eq, Ord, Show, Binary, Generic, NFData, Functor, Humanize)
+
+instance (Typeable e, Typeable p) => Selectors (Battery e p) where
+  selectors = selectorsRep @(Battery e p)
 
 instance Bifunctor Battery where
   bimap f g Battery{soc, chargeLim, dischargeLim, totalCapacity} = Battery

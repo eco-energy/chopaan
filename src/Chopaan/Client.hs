@@ -75,11 +75,11 @@ instance CRUDChopaan AppC where
   listNodezim k = do
     env <- ask
     liftJSM $ runXHR' (listNodezimM k) env
-  getGraph k g t0 t1 = adapt . S.concatM $ do
+  getGraph k g r t0 t1 = adapt . S.concatM $ do
     env <- ask
-    (S.hoist (AppC . liftIO) . adapt) <$> (liftJSM $ runXHR' r env)
+    (S.hoist (AppC . liftIO) . adapt) <$> (liftJSM $ runXHR' req env)
     where
-      r = historyAPI k g t0 t1
+      req = historyAPI k g r t0 t1
 
 
 getClientEnv :: String -> Int -> ClientEnv

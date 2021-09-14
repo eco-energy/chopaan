@@ -5,6 +5,7 @@ let
   accessKeyId = "default";
   ui = (import ./nix/snowman.nix).build { isJS = true; };
   staticUi = (import ./nix/website.nix) {};
+  dashes = (import ./nix/dashboard.nix) {};
 in
 {
   network.description = "Chopaan and DB.";
@@ -19,6 +20,7 @@ in
       tinkerHost = "localhost";
       janusConf = ./janusgraph-config;
       dnsName = "dosti.ecoenergy.global";
+      cacheDir = "/kbtzim/data";
     in
      {
       deployment = {
@@ -27,8 +29,8 @@ in
         ec2 = {
           inherit accessKeyId region;
 
-          instanceType = "t3.medium";
-
+          instanceType = "m6i.large";
+          spotInstancePrice = 04;
           ebsBoot = true;
           ebsInitialRootDiskSize = 100;
 
@@ -44,68 +46,147 @@ in
 
         route53 = {
           inherit accessKeyId region;
-          hostName = dnsName;
+          hostName = config.services.grafana.domain;
+          #hostName = dnsName;
           usePublicDNSName = true;
         };
 
-        keys.aws-creds = { text = builtins.readFile ./key;
-                   };
+        keys = { aws-creds = { text = builtins.readFile ./key; };
+               };
       };
-      
+
+      environment.systemPackages = [ pkgs.z3 ];
+      # nix.binaryCaches = lib.mkForce [
+      #   "https://cache.nixos.org"
+      #   "s3://ee-nixcache?region=ap-southeast-1"
+      #   "https://pytorch-world.cachix.org"
+      #   "https://hydra.iohk.io"
+      #   "https://iohk.cachix.org"
+      #   "https://nixcache.reflex-frp.org"
+      #   "https://hasktorch.cachix.org"
+      #   "https://shpadoinkle.cachix.org"
+      # ];
+      nix.trustedUsers = lib.mkForce ["root"];
+      # nix.binaryCachePublicKeys = lib.mkForce [
+      #   "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+      #   "ee-nixcache:qydUr3bm5mYfgWQDJn6S0VZGzGDZ5uwvzhEFlQVshDk="
+      #   "pytorch-world.cachix.org-1:JCRxRpQ0JsP+a/GvSTmFDROLLd6rTmOpnm/gYqzS0KM="
+      #   "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
+      #   "iohk.cachix.org-1:DpRUyj7h7V830dp/i6Nti+NEO2/nhblbov/8MW7Rqoo="
+      #   "ryantrinkle.com-1:JJiAKaRv9mWgpVAz8dwewnZe0AzzEAzPkagE9SP5NWI="
+      #   "hasktorch.cachix.org-1:wLjNS6HuFVpmzbmv01lxwjdCOtWRD8pQVR3Zr/wVoQc="
+      #   "shpadoinkle.cachix.org-1:aRltE7Yto3ArhZyVjsyqWh1hmcCf27pYSmO1dPaadZ8="
+      # ];
       boot.loader.grub.device = lib.mkForce "/dev/nvme0n1";
       networking.firewall.enable = true;
       networking.firewall.allowedTCPPorts = [ 80 443 ];
-      environment.systemPackages = [ pkgs.z3 ];
-      environment.variables = { SERVER_HOST = dnsName;
-                                SERVER_PORT = "443";
-                                REGION = region;
-                              };
-
-      docker-containers."janusgraph" = {
-           image = "docker.io/janusgraph/janusgraph:latest";
-           ports = [ "${toString janusPort}:${toString janusPort}" ];
-           volumes = [
-             "janusgraph-default-data:/var/lib/janusgraph"
-             "${janusConf}/config:/etc/opt/janusgraph:ro"
-             "${janusConf}/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
-                     ];
-      };
+      environment.variables = { REGION = region; };
+      security.pam.loginLimits = [
+        { domain = "@root";
+          item = "nproc";
+          type = "soft";
+          value = 128000;
+        }
+        { domain = "@root";
+          item = "nofile";
+          type = "soft";
+          value = 6400000;
+        }
+        
+        
+      ];
       
-      systemd.services.chopaan = {
-        wantedBy = [ "multi-user.target" ];
+    #   docker-containers."janusgraph" = {
+    #        image = "docker.io/janusgraph/janusgraph:0.6.0";
+    #        ports = [ "${toString janusPort}:${toString janusPort}" ];
+    #        volumes = [
+    #          "janusgraph-default-data:/var/lib/janusgraph"
+    #          "${janusConf}/config/januskeyspaces.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
+    #          "${janusConf}/config/gremlin-server-0.6.yaml:/etc/opt/janusgraph/janusgraph-server.yaml:ro"
+    #          "${janusConf}/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
+    #          "${janusConf}/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
+    #                  ];
+    #   };
 
-        after = [ "network.target" "docker-janusgraph.service" ];
-        environment = {
-          AWS_CREDS = "/run/keys/aws-creds";
+    #   systemd.extraConfig = "DefaultLimitNOFILE=6400000";
+    #   systemd.services.chopaan = {
+    #     wantedBy = [ "multi-user.target" ];
+
+    #     after = [ "network.target" "docker-janusgraph.service" ];
+    #     environment = {
+    #       AWS_CREDS = "/run/keys/aws-creds";
+          
+    #     };
+    #     path = [ pkgs.z3 ];
+    #     #preStart = "mkdir -p ${cacheDir}";
+    #     serviceConfig = {
+    #       LimitNOFILE = 6400000;
+    #       StateDirectory=cacheDir;
+    #     };
+    #     script =
+    #       let
+    #         chopaan = app.kbtzim;
+    #       in
+    #         ''
+    #         ${chopaan}/bin/kbtzim --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort} +RTS -A32m -n4m -N
+    #         '';
+    #   };
+
+      
+    #   systemd.services.server = {
+    #     wantedBy = [ "multi-user.target" ];
+
+    #     after = [ "docker-janusgraph.service" ];
+
+    #     script =
+    #       let
+    #         server = app.server;
+    #       in
+    #         ''
+    #         ${server}/bin/server --assets ${staticUi} --port ${toString serverPort} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
+    # #         '';
+    #   };
+      services.influxdb = {
+        enable = true;
+        extraConfig = {
+          collectd = [{ enabled = false; }];
+          udp = [{ enabled = true; }]
+        }
+        
+      };
+      services.grafana = {
+        enable = true;
+        domain = "dosti-monitor.ecoenergy.global";
+        port = 2342;
+        addr = "127.0.0.1";
+        provision = {
+          enable = true;
+          dashboards = [
+            { name = "Chopaan Dash";
+              orgId = 1;
+              type = "file";
+              folder = "Chopaan"
+              disableDeletion = false;
+              updateIntervalSeconds = 30;
+              options.path = dashes;
+            }
+          ];
+          datasources = [
+            { name = "InfluxDB";
+              type = "influxdb";
+              access = "proxy";
+              orgId = 1;
+              url = "http://localhost:8086";
+              editable = false;
+            };
+          ];
+          
         };
-        serviceConfig.LimitNOFILE = 64000;
-        script =
-          let
-            chopaan = app.kbtzim;
-          in
-            ''
-            ${chopaan}/bin/kbtzim --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
-            '';
       };
-
-      
-      systemd.services.server = {
-        wantedBy = [ "multi-user.target" ];
-
-        after = [ "docker-janusgraph.service" ];
-
-        script =
-          let
-            server = app.server;
-          in
-            ''
-            ${server}/bin/server --assets ${staticUi} --port ${toString serverPort} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
-            '';
-      };
-
       users.users.nginx.extraGroups = [ "acme" ];
       security.acme.acceptTerms = true;
       security.acme.email = "faez@ecoenergy.global";
+      security.acme.server = "https://acme-staging-v02.api.letsencrypt.org/directory";
       services.nginx = {
         enable = true;
         logError = "stdout info";
@@ -124,21 +205,35 @@ in
         }
         access_log logs/access.log;
       '';
-        
-        virtualHosts.${dnsName} = {
+
+        virtualHosts.${config.services.grafana.domain} = {
           forceSSL = true;
-          enableACME = true;
+          enableACME = true; 
           locations."/" = {
-            proxyPass = "http://127.0.0.1:${toString serverPort}";
-            root = staticUi;
-          };
-          #extraConfig = ""
-          locations."~* .(jpe?g|svg|png|gif|ico|css|js|webmanifest|json|fbx)$" = {
-            root = staticUi;
-            extraConfig = "proxy_cache chop-cache;";
-            tryFiles = "$uri uri/ =404";
+            proxyPass = "http://127.0.0.1:${toString config.services.grafana.port}";
+            proxyWebsockets = true;
+            extraConfig =
+              # required when the target is also TLS server with multiple hosts
+              "proxy_ssl_server_name on;" +
+              # required when the server wants to use HTTP Authentication
+              "proxy_pass_header Authorization;"
+            ;
           };
         };
+        # virtualHosts.${dnsName} = {
+        #   forceSSL = true;
+        #   enableACME = true;
+        #   locations."/" = {
+        #     proxyPass = "http://127.0.0.1:${toString serverPort}";
+        #     root = staticUi;
+        #   };
+        #   #extraConfig = ""
+        #   locations."~* .(jpe?g|svg|png|gif|ico|css|js|webmanifest|json|fbx)$" = {
+        #     root = staticUi;
+        #     extraConfig = "proxy_cache chop-cache;";
+        #     tryFiles = "$uri uri/ =404";
+        #   };
+        # };
       };
     };
 
@@ -175,6 +270,21 @@ in
 
       iamRoles.chopaan-role = { inherit region accessKeyId;
                                 name = "chopaanRole";
+                                assumeRolePolicy = ''
+                                {
+                                  "Version": "2012-10-17",
+                                  "Statement": [
+                                      {
+                                        "Sid": "",
+                                        "Effect": "Allow",
+                                        "Principal": {
+                                          "Service": "ec2.amazonaws.com"
+                                        },
+                                        "Action": "sts:AssumeRole"
+                                      }
+                                  ]
+                                }
+                                '';
                                 policy = ''
                                 {
                                    "Version": "2012-10-17",
@@ -193,8 +303,12 @@ in
                                        },
                                        {
                                            "Effect": "Allow",
-                                           "Action": "ec2:*",
-                                           "Resource": "*"
+                                           "Action": [
+                                               "cassandra:*"
+                                           ],
+                                           "Resource": [
+                                               "*"
+                                           ]
                                        }
                                    ]
                                 }

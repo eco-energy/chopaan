@@ -52,7 +52,8 @@ processors:
   - className: org.apache.tinkerpop.gremlin.server.op.standard.StandardOpProcessor
     config:
       maxParameters: 512
-      evaluationTimeout: 300000
+      evaluationTimeout: 1500000
+
 metrics:
   consoleReporter:
     enabled: true

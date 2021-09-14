@@ -29,31 +29,31 @@ in
   ]
 , kibbutzOpts = { name = "kibbutz-pilot-node" }
 , dbOpts = { host = "timescale"
-           , port = Natural/toInteger 5432
+           , port = +5432
            , database = "chopaan"
            , user = "chopaan"
            , password = "testPassword" --"3423dssgSSS$%@!!01G"
            }
-, hydrationOpts = { start = { day = +24
-                            , month = +8
+, hydrationOpts = { start = { day = +1
+                            , month = +5
                             , year = +2021
                             }
-                   , end = { day = +1
+                   , end = { day = +12
                            , month = +9
                            , year = +2021
                            }
                    , s3BucketName = "dosti-datastream"
                    , dbSave = True
-                   , resolution = Resolution.Minute
-                   , bufOpts = { prefixBuffer = +100
-                               , pathBuffer = +100
-                               , frameBuffer = +1500
+                   , resolution = Resolution.Day
+                   , bufOpts = { prefixBuffer = +0
+                               , pathBuffer = +0
+                               , frameBuffer = +0
                                , nodeBuffer = +0
                                }
-                   , hPrefix = "deploy"
+                   , hPrefix = "test1"
                    }
-, poolConf = { pNumStripes = +10
+, poolConf = { pNumStripes = +50
              , reaperWait =  10.0
-             , maxConnsPerStripe = Natural/toInteger 15
+             , maxConnsPerStripe = Natural/toInteger 25
              }
 }

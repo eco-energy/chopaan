@@ -54,6 +54,9 @@ import Data.Pool
 
 type KbtzPool = (Pool Client)
 
+--newtype KbtzM m = KbtzM { runKbtzM :: ReaderT KbtzPool IO }
+
+
 getKbtzim :: MonadIO m => Client -> m [KbtzName]
 getKbtzim c = (fmap (fmap akId)) $ fetchResult c (allKbtzim)
 

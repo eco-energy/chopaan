@@ -75,26 +75,24 @@ import Chopaan.Node.Components
 import Chopaan.Ui.FormCommon
 import Chopaan.Ui.GraphView
 import Chopaan.Ui.Timeline
+import Chopaan.Types (Resolution(..))
 import qualified Chopaan.Ui.Style as Css
 import qualified Data.Time as Ti
 
 default (T.Text, [])
 
 
-t0 = Ti.UTCTime (Ti.fromGregorian 2021 1 1) (Ti.secondsToDiffTime 0)
-t1 = Ti.UTCTime (Ti.fromGregorian 2021 8 28) (Ti.secondsToDiffTime 0)
-
 ainit :: (Monad m, CRUDChopaan m) => Route -> m Frontend
 ainit _ = MHomePage . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
 
 defGView :: GView
-defGView = GView (KbtzId "Lab_TestGrid") StatusG t0 t1 (t0, t1) Nothing
+defGView = GView (KbtzId "Lab_TestGrid") StatusG Day t0 t1 (t0, t1) Nothing
   where
     t0 = Ti.UTCTime (Ti.fromGregorian 2021 7 11) (Ti.secondsToDiffTime 0)
     t1 = Ti.UTCTime (Ti.fromGregorian 2021 10 11) (Ti.secondsToDiffTime 0)
 
 requestGView :: forall m. (CRUDChopaan m, Monad m) => GView -> m (SG NodeMAC) 
-requestGView (GView k g t0 t1 _ _) = case g of
+requestGView (GView k g r t0 t1 _ _) = case g of
   MeshG -> getL Mesh getMesh
   PlanG -> getL Transactor getTransactor
   StatusG -> getL Status getStatus
@@ -107,10 +105,10 @@ requestGView (GView k g t0 t1 _ _) = case g of
                              $ S.map (fromJust)
                                    $ S.filter (isJust)
                                    $ S.map p
-                                   $ getGraph k g t0 t1)
+                                   $ getGraph k g r t0 t1)
 
-mkGView :: KbtzName -> GraphType -> Ti.UTCTime -> Ti.UTCTime -> GView 
-mkGView k g t0 t1 = GView k g t0 t1 (t0, t1) Nothing
+mkGView :: KbtzName -> GraphType -> Resolution -> Ti.UTCTime -> Ti.UTCTime -> GView 
+mkGView k g r t0 t1 = GView k g r t0 t1 (t0, t1) Nothing
 
 ginitM :: (MonadIO m, CRUDChopaan m) => Route -> m Frontend
 ginitM _ = do
@@ -319,6 +317,8 @@ gView g = H.div [H.class' $ Css.relative <> Css.flex_grow <> Css.flex_col]
       ]
       where
         t = timeline (g ^. #_startTime, g ^. #_endTime)
+        t0 = Ti.UTCTime (Ti.fromGregorian 2021 1 1) (Ti.secondsToDiffTime 0)
+        t1 = Ti.UTCTime (Ti.fromGregorian 2022 1 1) (Ti.secondsToDiffTime 0)
     graphSelectButtons :: Html m (GView)
     graphSelectButtons = H.div [H.class' $ Css.flex
                                  <> Css.flex_row

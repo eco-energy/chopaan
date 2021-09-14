@@ -9,7 +9,7 @@ LANGUAGE ScopedTypeVariables
 , RankNTypes
 , QuantifiedConstraints
 , CPP
-, Strict
+, StrictData
 #-}
 module Chopaan.Node.Folds where
 
@@ -78,20 +78,20 @@ energyFold = fmap fst $ FL.foldl' step begin
     -- forall s. Fold (s -> a -> m s) (m s) (s -> m b)
     {-# INLINE step #-}
     step :: (EnergyNR, Maybe UTCTime) -> EnergyState -> (EnergyNR, Maybe UTCTime)
-    step (!esPrev, (Just tPrev)) cur =
+    step (!esPrev, (Just !tPrev)) cur =
       (esPrev <> eAtT (power cur) (diffUTC tn tPrev), Just tn)
       where
-        tn = utcTimeES cur
-    step (esPrev, Nothing) cur =
+        !tn = utcTimeES cur
+    step (!esPrev, Nothing) cur =
       (esPrev <> (eAtT (power cur) 0), Just tn)
       where
-        tn = utcTimeES cur
+        !tn = utcTimeES cur
     {-# INLINE begin #-}
     begin :: (EnergyNR, Maybe UTCTime)
     begin = (mempty, Nothing)
     {-# INLINE eAtT #-}
     eAtT :: PowerNR -> DiffTime -> (EnergyNR)
-    eAtT p t = Node { tx = (pToE t tx)
+    eAtT !p !t = Node { tx = (pToE t tx)
                     , consumed = (pToE t consumed)
                     , generated = (pToE t generated)
                     }
@@ -101,22 +101,22 @@ energyFold = fmap fst $ FL.foldl' step begin
 
 batteryFold :: forall m e p. (Monad m)
   => BatteryParams R -> FL.Fold m EnergyState (Battery WattSeconds Watts)
-batteryFold bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts) $ fmap end $ FL.foldl' step begin
+batteryFold !bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts) $ fmap end $ FL.foldl' step begin
   where
     {-# INLINE step #-}
     step :: (Maybe UTCTime, Maybe (KF R))
       -> EnergyState
       -> (Maybe UTCTime, Maybe (KF R))
-    step (!t, !pkf) sensorReadings = let
-        (!kf, !ki) = runEstimator bat (tdiff t) (storageSensors sensorReadings)
+    step (!t, !pkf) !sensorReadings = let
+        (!kf, _) = runEstimator bat (tdiff t) (storageSensors sensorReadings)
           (guestimateInitialSOC pkf)
       in (Just tnow, Just kf)
       where
-        guestimateInitialSOC (Just k) = k
+        guestimateInitialSOC (Just !k) = k
         guestimateInitialSOC Nothing = initKF (initDynamic {
           soC = ocvToSoC bat (sensorTerminalV . storageSensors $ sensorReadings)
           })
-        tnow = utcTimeES sensorReadings
+        !tnow = utcTimeES sensorReadings
         tdiff (!Just t') = realToFrac $ diffUTCTime tnow t'
         tdiff Nothing = 0
     {-# INLINE begin #-}
@@ -147,15 +147,17 @@ demandFold :: (Monad m) => FL.Fold m (EnergyState) WattSeconds
 demandFold = FL.foldl' (\_ nes -> (d $ power nes)) 0
   where
     {-# INLINE d #-}
-    d (Node{..}) = pToE horizon consumed
+    d (!Node{..}) = pToE horizon consumed
     horizon = (60 * 10)
 {-# INLINE demandFold #-}
 
 
 sensors :: (Monad m) => FL.Fold m EnergyState EnergyState
 sensors = FL.foldl' (flip const) zeroMsg 
+{-# INLINE sensors #-}
 
 type SensorR = SensorMetrics WattSeconds Watts 
 
 defSensorR :: SensorR
 defSensorR = SensorMetrics Nothing 0 mempty mempty mempty 0 zeroMsg
+{-# INLINE defSensorR #-}
