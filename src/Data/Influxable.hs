@@ -12,6 +12,7 @@ module Data.Influxable (asKbtzNode
                        , KbtzNode
                        , nodeName
                        , kbtzName
+                       , showText
                        ) where
 
 import Prelude hiding ((.))
@@ -57,7 +58,7 @@ data Agg = Mean | Count deriving (Eq)
 
 
 renderQuery :: Query -> Text
-renderQuery = T.decodeUtf8 . F.fromQuery
+renderQuery (Query q) = q
 
 -- $ Measurement Construction depends on the ability to construct
 -- $ a Tagset and a Fieldset for a datatype
@@ -71,6 +72,7 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
     (getTags tag)
     (getInfluxFields a)
     (getTime a)
+  {-# INLINE mkLine #-}
   seriesQueries :: tag -> [Query]
   default seriesQueries :: tag -> [Query]
   seriesQueries tag = seriesQuery <$> (getInfluxKeys @a)
@@ -79,21 +81,21 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
                                        . F.key
                                        . " FROM "
                                        . F.measurement
-                                       . F.key
-                                     ) f (measurementName @tag @a)) whereClause
+                                       . F.text
+                                     ) f (measurementName @tag @a)) whereC
         where
-          whereClause :: Key
-          whereClause = foldl (\p (predicate, match) ->
-                                 F.formatKey (F.key
-                                              . " AND "
-                                              . F.key) p (eqOn predicate match))
-                        (" WHERE ")
-                        (M.toList (getTags tag))
+          whereC :: Text
+          whereC = " WHERE " <>
+            (T.intercalate " AND " (eqOn <$> (M.toList $ getTags tag)))
             where
-              eqOn :: Key -> Key -> Key
-              eqOn t v = F.formatKey (F.key
+              eqOn :: (Key, Key) -> Text
+              eqOn (t, v) = unKey $ F.formatKey (F.key
                                   . " = "
                                   . F.key) t v
+                where
+                  unKey (Key a) = a
+  {-# INLINE seriesQueries #-}
+
 
 type KbtzNode = HList '[KbtzName, NodeMAC]
 
@@ -141,15 +143,16 @@ lineMesh k n m = [ lineNow m ]
       t = nodeTime . fst $ m 
 
 instance ToMeasurement (KbtzNode) (PowerNR)  where
-  measurementName = "powerNode"
+  measurementName = "power"
 
 instance ToMeasurement (KbtzNode) (EnergyNR) where
-  measurementName = "energyNode"
+  measurementName = "energy"
 
 instance ToMeasurement (KbtzNode) (BatteryR) where
   measurementName = "battery"
 
-instance ToMeasurement (KbtzNode) (MeshNode, RxSignal)
+instance ToMeasurement (KbtzNode) (MeshNode, RxSignal) where
+  measurementName = "mesh"
 
 -- $ Tags Construction
 class IsTag i where

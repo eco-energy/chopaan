@@ -7,43 +7,53 @@ import qualified Data.Text as T
 import qualified Data.ByteString as BS
 import Data.Bifunctor
 
+import System.Directory
 import qualified System.Envy as E
 import Options.Applicative
 
 import Chopaan.Types
-import Chopaan.Graph
+import Chopaan.Graph hiding (GraphType, Mesh)
 import Chopaan.Graph.Kbtz
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId
-import Data.Influxable
+import Data.Influxable hiding (Query)
+
 
 
 -- nodes :: [T.Text]
 -- nodes = (T.pack . pure) <$> ['A'..'Z']
 
-data DashType = Power | Energy | Battery | Mesh
+data GraphType = Power | Energy | Battery | Mesh
+  deriving (Eq, Ord, Show, Generic, Enum, Bounded)
 
-getQ :: NodeQueries -> DashType -> [Query]
-getQ qs d = case d of
-  Power -> powerQ qs
-  Energy -> energyQ qs
-  Battery -> batteryQ qs
-  Mesh -> meshQ qs
-  
+getQ :: NodeQueries -> GraphType -> [Query]
+getQ qs d = (Influx . InfluxQuery . renderQuery) <$> q
+  where
+    q = case d of
+      Power -> powerQ qs
+      Energy -> energyQ qs
+      Battery -> batteryQ qs
+      Mesh -> meshQ qs
 
-nodeGraph :: [Query] -> KbtzNode -> Graph
-nodeGraph qs n = defaultGraph
-  { graphTitle = nodeName n
-  , graphQueries = serializeQuery <$> qs
+getUnit :: GraphType -> UnitFormat
+getUnit d = let
+  t = case d of
+    Power -> "watts"
+    Energy -> "watt seconds"
+    Battery -> "watt seconds"
+    Mesh -> "dB (RSSI)"
+  in OtherFormat t
+
+dashName :: GraphType -> T.Text
+dashName = showText
+
+nodeGraph :: NodeMAC -> GraphType -> [Query] -> Graph
+nodeGraph n g qs = defaultGraph
+  { graphTitle = (showText n) <> " " <> (showText g)
+  , graphQueries = qs
   , graphNullPointMode = Connected
-  , graphUnit = Just . OtherFormat $ "watts"
+  , graphUnit = Just (getUnit g)
   }
-
-nodeGraphs :: KbtzNode -> [Graph]
-nodeGraphs = k nodeQueries
-
-nodePanel :: T.Text -> GridPos -> Panel
-nodePanel = graphPanel . nodeGraph
 
 moveGridPos :: Int -> Int -> GridPos -> GridPos
 moveGridPos dx dy p = p
@@ -62,31 +72,61 @@ gridLayout numberOfPanels numberOfRows = let
      | i <- [0..numberOfPanels]
      ]
 
-kbtzDash :: DashType -> [KbtzNode] -> Dashboard
-kbtzDash k ns = defaultDashboard
-  { dashboardIdentifier = Just 1
-  , dashboardTitle = k <> " Dashboard"
-  , dashboardPanels = nodePanel <$> ns <*> (gridLayout (length ns) nRows)
-  , dashboardTime = TimeRange (Interval 360 Days) Nothing
-  , dashboardRefresh = Interval 5 Seconds
-  , dashboardVersion = 1
-  }
+nodePanel :: GraphType -> (NodeMAC -> NodeQueries) -> NodeMAC -> GridPos -> Panel
+nodePanel g qs n = graphPanel (nodeGraph n g (getQ (qs n) g))
+
+kbtzMeasurementDash :: KbtzName -> [NodeMAC] -> GraphType -> KbtzDash
+kbtzMeasurementDash k ns g = KbtzDash g k d
   where
+    d = defaultDashboard
+      { dashboardIdentifier = Just (fromEnum g)
+      , dashboardTitle = (unKbtzId k) <> " " <> (showText g) <> " Dashboard"
+      , dashboardPanels = nodePanel g nq <$> ns <*> (gridLayout (length ns) nRows)
+      , dashboardTime = TimeRange (Interval 360 Days) Nothing
+      , dashboardRefresh = Interval 5 Seconds
+      , dashboardVersion = 1
+      }
+    nq n = nodeQueries (asKbtzNode k n) 
     nRows = 3
 
-chopaanDash :: [(KbtzName, [NodeMAC])] -> [Dashboard]
-chopaanDash = fmap (uncurry kbtzDash . bimap unKbtzId (fmap unNodeId))
+data KbtzDash = KbtzDash
+  { graphType :: GraphType
+  , kbtz :: KbtzName
+  , dashConfig :: Dashboard
+  }
 
-
-writeDash :: FilePath -> Dashboard -> IO ()
-writeDash base dash = BS.writeFile (base <> dashPath) $ getDashboardJSON dash
+kbtzDir :: FilePath -> KbtzName -> FilePath
+kbtzDir base k = base <> (T.unpack $ prefix
+           <> (safe . unKbtzId $ k)
+           <> "/")
   where
-    dashPath = T.unpack $ prefix
-               <> (T.toLower . T.replace " " "_" $ dashboardTitle dash)
-               <> ".json"
+    safe = T.toLower . T.replace " " "_"
     prefix = case (last base) of
       '/' -> ""
       _ -> "/"
+
+dashPath :: FilePath -> KbtzDash -> FilePath
+dashPath base k = base <> (T.unpack $ prefix
+           <> (safe . unKbtzId . kbtz $ k)
+           <> "/"
+           <> (safe . showText . graphType $ k)
+           <> ".json")
+  where
+    safe = T.toLower . T.replace " " "_"
+    prefix = case (last base) of
+      '/' -> ""
+      _ -> "/"
+
+
+chopaanDashes :: [(KbtzName, [NodeMAC])] -> [KbtzDash]
+chopaanDashes kns = (((uncurry kbtzMeasurementDash) <$> kns) <*> [minBound..maxBound])
+
+writeDashes :: FilePath -> [KbtzDash] -> IO ()
+writeDashes base dashes = mapM_
+  (\d -> do
+      BS.writeFile (dashPath base d) $ getDashboardJSON  $ dashConfig d)
+  dashes
+  
       
 data DashOpts = DashOpts
   { dbOpts :: TinkerConf
@@ -112,6 +152,10 @@ main = do
     ks <- getKbtzim c
     ns <- mapM (getKbtzNodes c) ks
     return $ zip ks ns
-  sequence_ $ writeDash output <$> (chopaanDash kns) 
+  mapM_ (\k -> cd (kbtzDir output k)) (fst <$> kns)
+  print $ "Total Kbtzim: " <> (show $ length kns)
+  let dashes = chopaanDashes kns
+  writeDashes output dashes
   where
     defPoolConf = PoolConf 1 1 1
+    cd = createDirectoryIfMissing True
