@@ -59,7 +59,7 @@ import qualified NetSpider.Spider as NS
   (withSpider, clearAll)
 import Control.Monad.Catch
 import Data.Pool
-    
+
 spec :: Spec
 spec = do
   foldSpec

@@ -57,7 +57,7 @@ import Chopaan.Node.Mesh (MeshNode, RxSignal, meshNodeLink)
 
 
 
-import Chopaan.Comm.Mqtt (runMqtt)
+import Chopaan.Comm.Mqtt (runKibbutzGateway)
 import Chopaan.Comm.Comm (MessageQs(..)
                          , Address(..)
                          , mkCallback
@@ -106,9 +106,9 @@ qSrc (MessageQs{stateChan, statsChan, outbox}) = do
 
 mqttQs :: (MonadIO m) => (MessageQs NodeMAC) -> MQTTOpts -> KbtzName -> [NodeMAC] -> m ()
 mqttQs qs opts name ns = do
-  lg <- liftIO $ newLogger Info stdout
+  lg <- liftIO $ newLogger Debug stdout
   (liftIO $ withMqttAuth lg name
-    (runMqtt name ns qs mkCallback opts))
+    (runKibbutzGateway name ns qs mkCallback opts))
 {-# INLINE mqttQs #-}
 
 mqttStreams :: (IsStream t, MonadAsync m, MonadUnliftIO m, Address n)
@@ -121,7 +121,7 @@ mqttStreams qs opts name ns = do
   (cb, (es, rs))<- mkCallback'
   lg <- liftIO $ newLogger Info stdout
   let c () = (liftIO $ withMqttAuth lg name
-              (runMqtt name ns qs (const cb) opts))
+              (runKibbutzGateway name ns qs (const cb) opts))
   return (c, (es, rs))
 {-# INLINE mqttStreams #-}
 
@@ -166,12 +166,10 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
                 S.|$ plan
                 S.|$ S.mapM (pure . second Tx)
                 S.|$ gridSensorR nodes
-                --  $ s
                 S.|$ S.tapRate 30 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
     processRS meshFold s = S.tapRate 30 (\x -> liftIO . print $ "Mesh Processed Rate: " <> show x)
                 S.|$ S.tap meshFold
                 S.|$ S.mapM (pure . second (meshNodeLink $ getGridRoot name))
-                --  $ s
                 S.|$ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
     liveStream g m es rs = (Left <$> (processES g es))
                  `S.async` (Right <$> (processRS m rs))

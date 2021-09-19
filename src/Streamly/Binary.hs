@@ -1,9 +1,10 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, TypeApplications, UndecidableInstances, QuantifiedConstraints, DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, AllowAmbiguousTypes, DefaultSignatures, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts, TypeApplications, UndecidableInstances, QuantifiedConstraints, DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, AllowAmbiguousTypes, DefaultSignatures, ScopedTypeVariables, RankNTypes #-}
 module Streamly.Binary
   ( HasEncoding(..),
     Bin,
     PB,
     Txt,
+    Wino,
     EncT(..),
     parseMsgS,
     parseBinS,
@@ -11,6 +12,8 @@ module Streamly.Binary
     fromPB,
     toBin,
     fromBin,
+    toWino,
+    fromWino,
     decodeFile,
     encodeFold,
     decodeS,
@@ -27,6 +30,7 @@ import GHC.Generics
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Newtype.Generics
+import Data.Bifunctor
 import Data.Binary (Binary)
 import Data.Bits ((.|.), unsafeShiftL)
 import qualified Data.Binary as B
@@ -54,18 +58,51 @@ import qualified Streamly.Internal.Data.Stream.IsStream as S
 import Data.ProtoLens.Encoding (decodeMessage, encodeMessage)
 import Data.ProtoLens.Message (Message)
 
+import qualified Codec.Winery as W
+
 import System.Directory (doesFileExist)
 
 
+data DecodeException = WinoExp W.WineryException
+                     | BinExp
+                     | PBExp String
+                     | TxtExp
+                     | NoFile
+                     deriving (Generic)
+                     deriving (Show)
+
 class HasEncoding a where
   encodeA :: forall m. MonadIO m => a -> m (A.Array Word8)
-  decodeA :: A.Array Word8 -> Maybe a 
+  decodeA :: A.Array Word8 -> Either DecodeException a 
   chunkBytes ::  (MonadAsync m, MonadCatch m) => P.Parser m Word8 (A.Array Word8)
 
-instance HasEncoding (A.Array Word8) where
-  encodeA = pure
+
+--instance HasEncoding ()
+
+newtype Wino w = Wino { unWino :: w }
+  deriving (Generic)
+  deriving newtype (W.Serialise, Show)
+  deriving anyclass (Newtype)
+
+toWino :: (W.Serialise a) => a -> Wino a
+toWino = Wino
+
+fromWino :: (W.Serialise a) => Wino a -> a
+fromWino = unWino
+
+instance (W.Serialise a) => HasEncoding (Wino a) where
+  encodeA = encodeLengthPrefixedBS W.serialise
   {-# INLINE encodeA #-}
-  decodeA = Just
+  decodeA = (bimap WinoExp id) . W.deserialise . SBS.fromArray
+  {-# INLINE decodeA #-}
+  chunkBytes = parseLengthPrefixed
+
+
+
+instance HasEncoding (A.Array Word8) where
+  encodeA = prefixLengthArray
+  {-# INLINE encodeA #-}
+  decodeA = Right
   {-# INLINE decodeA #-}
   chunkBytes = parseLengthPrefixed
 
@@ -109,21 +146,21 @@ toTxtViaS = Txt . T.pack . show
 instance (Binary a) => HasEncoding (Bin a) where
   encodeA = encodeLengthPrefixedBL (B.runPut . B.put)
   {-# INLINE encodeA #-}
-  decodeA = B.decode . BL.fromStrict . SBS.fromArray
+  decodeA = Right . B.decode . BL.fromStrict . SBS.fromArray
   {-# INLINE decodeA #-}
   chunkBytes = parseLengthPrefixed
   
 instance Message a => HasEncoding (PB a) where
   encodeA = encodeLengthPrefixedBS (encodeMessage . unPB)
   {-# INLINE encodeA #-}
-  decodeA = (either (const Nothing) (Just .  PB)) . decodeMessage . SBS.fromArray
+  decodeA = (bimap (PBExp) (PB)) . decodeMessage . SBS.fromArray
   {-# INLINE decodeA #-}
   chunkBytes = parseLengthPrefixed
   
 instance HasEncoding (Txt a) where
   encodeA = pure . SBS.toArray . T.encodeUtf8 . (T.unlines . pure) . unTxt
   {-# INLINE encodeA #-}
-  decodeA = Just . Txt . T.decodeUtf8 . SBS.fromArray
+  decodeA = Right . Txt . T.decodeUtf8 . SBS.fromArray
   {-# INLINE decodeA #-}
   chunkBytes = parseNewline
   {-# INLINE chunkBytes#-}
@@ -181,29 +218,36 @@ parseNewline = P.wordBy nl (A.write)
     nl = (== '\n') . unsafeCoerce
 {-# INLINE parseNewline #-}
 
-decodeS :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch m) => t m Word8 -> t m (Maybe a)
+decodeS :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch m)
+  => t m Word8 -> t m (Either DecodeException a)
 decodeS = (fmap decodeA) . (S.parseManyD (chunkBytes @a))
+{-# INLINE decodeS #-}
 
-
-decodeFile :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch m) => FilePath -> t m (Maybe a)
+decodeFile :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch m)
+  => FilePath -> t m (Either DecodeException a)
 decodeFile f = S.concatM $ do
   exists <- liftIO $ doesFileExist f
   case exists of
     True -> return $ (fmap decodeA) . (S.parseManyD (chunkBytes @a)) . FL.toBytes $ f
-    False -> return $ S.fromPure (Nothing)
+    False -> return $ S.fromPure (Left NoFile)
 {-# INLINE decodeFile #-}
 
 encodeFold :: (HasEncoding a, MonadAsync m, MonadCatch m)
   => FilePath -> FL.Fold m a ()
-encodeFold fp = FL.lmapM encodeA ((FL.writeChunks fp))
+encodeFold fp = FL.lmapM encodeA (FL.writeChunks fp)
 {-# INLINE encodeFold #-}
 
-parseMsgS :: (IsStream t, MonadAsync m, Message a, MonadCatch m) => FilePath -> t m (Maybe (PB a))
+parseMsgS :: (IsStream t, MonadAsync m, Message a, MonadCatch m)
+  => FilePath -> t m (Either DecodeException (PB a))
 parseMsgS = decodeFile
 {-# INLINE parseMsgS #-}
 
-parseBinS :: (IsStream t, MonadAsync m, Binary a, MonadCatch m) => FilePath -> t m (Maybe (Bin a))
+parseBinS :: (IsStream t, MonadAsync m, Binary a, MonadCatch m)
+  => FilePath -> t m (Either DecodeException (Bin a))
 parseBinS = decodeFile
+{-# INLINE parseBinS #-}
 
-parseTextLines :: (IsStream t, MonadAsync m, MonadCatch m) => FilePath -> t m (Maybe (Txt a))
-parseTextLines = decodeFile
+parseTextLines :: (IsStream t, MonadAsync m, MonadCatch m)
+  => FilePath -> t m (Either DecodeException T.Text)
+parseTextLines = (fmap (second fromTxt)) . decodeFile
+{-# INLINE parseTextLines #-}

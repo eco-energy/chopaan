@@ -35,25 +35,25 @@ in
            , password = "testPassword" --"3423dssgSSS$%@!!01G"
            }
 , hydrationOpts = { start = { day = +1
-                            , month = +5
+                            , month = +9
                             , year = +2021
                             }
-                   , end = { day = +12
+                   , end = { day = +15
                            , month = +9
                            , year = +2021
                            }
                    , s3BucketName = "dosti-datastream"
-                   , dbSave = True
-                   , resolution = Resolution.Day
-                   , bufOpts = { prefixBuffer = +0
-                               , pathBuffer = +0
-                               , frameBuffer = +0
-                               , nodeBuffer = +0
+                   , dbSave = False
+                   , resolution = Resolution.Hour
+                   , bufOpts = { prefixBuffer = +10
+                               , pathBuffer = +100
+                               , frameBuffer = +100
+                               , nodeBuffer = +10
                                }
-                   , hPrefix = "test1"
+                   , hPrefix = "test2"
                    }
-, poolConf = { pNumStripes = +50
-             , reaperWait =  10.0
+, poolConf = { pNumStripes = +5
+             , reaperWait =  5.0
              , maxConnsPerStripe = Natural/toInteger 25
              }
 }

@@ -13,14 +13,15 @@ in
   
   chopaan = { config, pkgs, resources, lib, ... }:
     let
-      uijs = "${staticUi}/bin/ui.jsexe";
+      #uijs = "${staticUi}/bin/ui.jsexe";
       janusPort = 8182;
       serverPort = 8080;
       mqttPort = 8883;
+      awskey = "/run/keys/aws-creds";
       tinkerHost = "localhost";
       janusConf = ./janusgraph-config;
       dnsName = "dosti.ecoenergy.global";
-      cacheDir = "/kbtzim/data";
+      chopaanDir = "/home/chopaan";
     in
      {
       deployment = {
@@ -52,6 +53,7 @@ in
         };
 
         keys = { aws-creds = { text = builtins.readFile ./key; };
+                 dosti-datastream = { text = builtins.readFile ./bucket-key; };
                };
       };
 
@@ -67,6 +69,13 @@ in
       #   "https://shpadoinkle.cachix.org"
       # ];
       nix.trustedUsers = lib.mkForce ["root"];
+      users.users = {
+        chopaan = {
+          createHome = true;
+          group = "users";
+          home = chopaanDir;
+        };
+      };
       # nix.binaryCachePublicKeys = lib.mkForce [
       #   "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
       #   "ee-nixcache:qydUr3bm5mYfgWQDJn6S0VZGzGDZ5uwvzhEFlQVshDk="
@@ -79,13 +88,13 @@ in
       # ];
       boot.loader.grub.device = lib.mkForce "/dev/nvme0n1";
       networking.firewall.enable = true;
-      networking.firewall.allowedTCPPorts = [ 80 443 ];
+      networking.firewall.allowedTCPPorts = [ 80 443 8883 ];
       environment.variables = { REGION = region; };
       security.pam.loginLimits = [
         { domain = "@root";
           item = "nproc";
           type = "soft";
-          value = 128000;
+          value = 1280000;
         }
         { domain = "@root";
           item = "nofile";
@@ -95,64 +104,86 @@ in
         
         
       ];
+
+      # imports = 
+      #   [ (
+      #     (import ./nix/s3fs.nix { inherit pkgs lib; })
+      #       { mount = "/mnt/dosti";
+      #         bucket = "dosti-datastream";
+      #       }
+      #   )
+      #   ];
+
       
-    #   docker-containers."janusgraph" = {
-    #        image = "docker.io/janusgraph/janusgraph:0.6.0";
-    #        ports = [ "${toString janusPort}:${toString janusPort}" ];
-    #        volumes = [
-    #          "janusgraph-default-data:/var/lib/janusgraph"
-    #          "${janusConf}/config/januskeyspaces.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
-    #          "${janusConf}/config/gremlin-server-0.6.yaml:/etc/opt/janusgraph/janusgraph-server.yaml:ro"
-    #          "${janusConf}/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
-    #          "${janusConf}/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
-    #                  ];
-    #   };
+      docker-containers."janusgraph" = {
+           image = "docker.io/janusgraph/janusgraph:0.6.0";
+           ports = [ "${toString janusPort}:${toString janusPort}" ];
+           volumes = [
+             "janusgraph-default-data:/var/lib/janusgraph"
+             "${janusConf}/config/januskeyspaces.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
+             "${janusConf}/config/gremlin-server-0.6.yaml:/etc/opt/janusgraph/janusgraph-server.yaml:ro"
+             "${janusConf}/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
+             "${janusConf}/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
+                     ];
+      };
 
-    #   systemd.extraConfig = "DefaultLimitNOFILE=6400000";
-    #   systemd.services.chopaan = {
-    #     wantedBy = [ "multi-user.target" ];
+      systemd.extraConfig = "DefaultLimitNOFILE=6400000";
 
-    #     after = [ "network.target" "docker-janusgraph.service" ];
-    #     environment = {
-    #       AWS_CREDS = "/run/keys/aws-creds";
+      systemd.services.chopaan = {
+        
+        wantedBy = [ "multi-user.target" ];
+
+        after = [ "network.target" "docker-janusgraph.service" ];
+        environment = {
+          AWS_CREDS = awskey;
           
-    #     };
-    #     path = [ pkgs.z3 ];
-    #     #preStart = "mkdir -p ${cacheDir}";
-    #     serviceConfig = {
-    #       LimitNOFILE = 6400000;
-    #       StateDirectory=cacheDir;
-    #     };
-    #     script =
-    #       let
-    #         chopaan = app.kbtzim;
-    #       in
-    #         ''
-    #         ${chopaan}/bin/kbtzim --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort} +RTS -A32m -n4m -N
-    #         '';
-    #   };
+        };
+        path = [ pkgs.z3 ];
+        #preStart = "mkdir -p ${cacheDir}";
+        serviceConfig = {
+          LimitNOFILE = 6400000;
+          StateDirectory=chopaanDir;
+          RuntimeDirectory=chopaanDir;
+        };
+        script =
+          let
+            chopaan = app.kbtzim;
+          in
+            ''
+            ${chopaan}/bin/kbtzim --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort} +RTS -A32m -n4m -N
+            '';
+      };
 
-      
-    #   systemd.services.server = {
-    #     wantedBy = [ "multi-user.target" ];
+      systemd.services.dashgen = {
+        wantedBy = [ "grafana.service" ];
+        after = [ "docker-janusgraph.service" "chopaan.service" ];
+        script =
+          let
+            dashgen = app.dashgen;
+          in
+            ''
+            ${dashgen}/bin/dashgen --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort} --outpath ${chopaanDir}
+            '';
+      };
+      # systemd.services.server = {
+      #   wantedBy = [ "multi-user.target" ];
 
-    #     after = [ "docker-janusgraph.service" ];
+      #   after = [ "docker-janusgraph.service" ];
 
-    #     script =
-    #       let
-    #         server = app.server;
-    #       in
-    #         ''
-    #         ${server}/bin/server --assets ${staticUi} --port ${toString serverPort} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
-    # #         '';
-    #   };
+      #   script =
+      #     let
+      #       server = app.server;
+      #     in
+      #       ''
+      #       ${server}/bin/server --assets ${staticUi} --port ${toString serverPort} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}
+      #       '';
+      # };
       services.influxdb = {
         enable = true;
         extraConfig = {
           collectd = [{ enabled = false; }];
-          udp = [{ enabled = true; }]
-        }
-        
+          udp = [{ enabled = true; }];
+        };
       };
       services.grafana = {
         enable = true;
@@ -165,7 +196,7 @@ in
             { name = "Chopaan Dash";
               orgId = 1;
               type = "file";
-              folder = "Chopaan"
+              folder = "Chopaan";
               disableDeletion = false;
               updateIntervalSeconds = 30;
               options.path = dashes;
@@ -178,7 +209,7 @@ in
               orgId = 1;
               url = "http://localhost:8086";
               editable = false;
-            };
+            }
           ];
           
         };
@@ -262,6 +293,13 @@ in
 
           rules = [
             { fromPort = 22; toPort = 22; sourceIp = "0.0.0.0/0"; }
+          ];
+        };
+        "mqtt" = {
+          inherit accessKeyId region;
+
+          rules = [
+            { fromPort = 8883; toPort = 8883; sourceIp = "0.0.0.0/0"; }
           ];
         };
       };

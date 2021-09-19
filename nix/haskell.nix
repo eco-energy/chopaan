@@ -24,13 +24,19 @@
 }:
 
 let
+
+  cleanGitHaskell = {src, name } :
+    let
+      clean = haskell-nix.haskellLib.cleanGit { inherit name src; };
+    in
+      haskell-nix.cleanSourceHaskell { inherit name src; };
   # This creates the Haskell package set.
   # https://input-output-hk.github.io/haskell.nix/user-guide/projects/
   pkgSet = haskell-nix.cabalProject  {
-    src = haskell-nix.haskellLib.cleanGit { name = "chopaan"; src = ../.; };
+    src = cleanGitHaskell { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
     index-state = "2021-08-01T00:00:00Z";
-    plan-sha256 = "1lbriyq0a7jxay8hqb03y5qgbfh41gagckrdi1l5f2yah3ib1r95";
+    plan-sha256 = "1dv6h38dvdwfqkkgia6jjyfc1cd3qymgzd5dm85zp7mj0vin4vsa";
     materialized = ./chopaan.materialized;
     #checkMaterialization = true;
     # these extras will provide additional packages
@@ -53,9 +59,9 @@ let
         
         packages.chopaan = {
           doCheck = false;
-          flags.prod = true;
-          components.exes.kbtzim.dontStrip = true;
-          components.exes.server.dontStrip = true;
+          flags.prod = false;
+          components.exes.kbtzim.dontStrip = false;
+          components.exes.server.dontStrip = false;
           components.library.build-tools = [ buildPackages.z3 ];
           configureFlags = [
             "--extra-lib-dirs=${buildPackages.z3}/lib"

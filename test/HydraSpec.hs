@@ -13,16 +13,17 @@ import Test.QuickCheck.Instances.Text
 import Control.Monad.IO.Class
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
-import Chopaan.UiTypes (Resolution(..))
+import Chopaan.Types (Resolution(..))
 import Chopaan.Comm.S3
-import Chopaan.Hydration
+import Chopaan.Hydrate
 import Streamly.Binary
-import Streamly.Internal.Data.Array.Foreign as A
+--import Streamly.Internal.Data.Array.Foreign as A
 
 spec :: Spec
 spec = describe "S3 Hydration Checks" $ do
   it "length corresponds to time units" $ do
-    sec' <- S.length xs
+    let
+      sec' = length xs
     -- m' <- S.length ms
     -- h' <- S.length hs
     -- d' <- S.length ds
@@ -33,15 +34,17 @@ spec = describe "S3 Hydration Checks" $ do
     -- d' `shouldBe` 1
     -- w' `shouldBe` 1
   it "prefix length is sane" $ do
-    sec' <- S.the $ fmap (T.length . unPrefix) xs
-    m' <- S.the $ fmap (T.length . unPrefix) ms
-    h' <- S.the $ fmap (T.length . unPrefix) hs
-    d' <- S.the $ fmap (T.length . unPrefix) ds
-    w' <- S.the $ fmap (T.length . unPrefix) ws
-    sec' `shouldBe` (Just 9)
-    m' `shouldBe` (Just 7)
-    h' `shouldBe` (Just 5) 
-    w' `shouldBe` (Just 3)
+    let
+      match x = foldl (\a b -> if b /= x then b else a) x
+      sec' = match 9 $ fmap (T.length . unPrefix) xs
+      m' = match 9 $ fmap (T.length . unPrefix) ms
+      h' = match 7 $ fmap (T.length . unPrefix) hs
+      d' = match 5 $ fmap (T.length . unPrefix) ds
+      w' = match 3 $ fmap (T.length . unPrefix) ws
+    sec' `shouldBe` 9
+    m' `shouldBe` 7
+    h' `shouldBe` 5 
+    w' `shouldBe` 3
   --it "length prefix encoding decoding" $ property prop_enc_dec_roundtrip
 
 -- arbS :: Int -> (S.SerialT IO T.Text)
@@ -58,10 +61,10 @@ unM (MilliSecond64 w') = w'
 w = unM worldStart
 s = posixSecondsToUTCTime . fromIntegral $ (div w  1000)
 e = posixSecondsToUTCTime . fromIntegral $ (div w  1000) + 86400
-xs = S.fromAhead $ prefixRange Second s e
-ms = S.fromAhead $ prefixRange Minute s e
-hs = S.fromAhead $ prefixRange Hour s e
-ds = S.fromAhead $ prefixRange Day s e
-ws = S.fromAhead $ prefixRange Week s e
+xs = prefixRange Second s e
+ms = prefixRange Minute s e
+hs = prefixRange Hour s e
+ds = prefixRange Day s e
+ws = prefixRange Week s e
 
 --x' <- S.length xs

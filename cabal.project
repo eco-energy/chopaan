@@ -68,6 +68,12 @@ source-repository-package
   tag: 831f10df821a299e6a79331dee8931e517bdffd4
   subdir: net-spider
   --sha256: 1dg2vv5ci2s1m6qx37mhgqpjv8xqp9c4w7cv2dvk4db5gnd6svay
+
+source-repository-package
+  type: git
+  location: https://github.com/faezs/grafana.git
+  tag: 66609295378e382dc4a7afd4888e4736e39b2454
+  --sha256: 10yai9f3qixlp0dzsvhm8gxm9an9p8h94a70x2mnhidchw68hyql
   
 constraints:
   mmorph <= 1.1.3,

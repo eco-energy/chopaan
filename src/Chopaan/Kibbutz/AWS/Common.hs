@@ -11,6 +11,7 @@ module Chopaan.Kibbutz.AWS.Common
   , withAwsEnv
   , getAwsEnv
   , Env(..)
+  , preResolvingManager
   ) where
 
 import Control.Monad
@@ -25,9 +26,10 @@ import Control.Monad.Trans.Control
 import Network.AWS.Env
 import Network.HTTP.Client.Internal (hostAddress)
 import Network.HTTP.Client
-import Network.HTTP.Client.TLS
 import Network.DNS.Resolver
 import qualified Network.DNS.Cache as NC
+import Network.HTTP.Client.TLS (tlsManagerSettings)
+
 
 import Data.Maybe
 import qualified Data.Time as Time
@@ -61,46 +63,48 @@ getAwsEnv :: (S.MonadAsync m, MonadCatch m) => Service -> m Env
 getAwsEnv svc = do
   liftIO . print $ "AWS ENV REQUESTED!"
   e <- liftIO $ lookupEnv "AWS_CREDS"
-  t <- liftIO $ (Time.formatTime Time.defaultTimeLocale "%y-%m-%d-%R-%Q") <$> Time.getCurrentTime
-  let fname = "aws_log_" <> t --(showText . toText . _svcAbbrev $ svc) <> "_" <> t
-  lgHandle <- liftIO $ openFile fname WriteMode
-  lgr <- newLogger Info lgHandle
-  manager <- preResolvingManager
   case e of
     Nothing -> error "AWS CONTEXT NOT AVAILABLE, AWS_CREDS NOT DEFINED"
-    Just fp -> newEnvWith (creds fp) Nothing manager
-      <&> set envLogger lgr . set envRegion Singapore
-      <&> set envRetryCheck (retryConnectionFailure 50)
-      <&> configure svc
+    Just fp -> do
+      manager <- preResolvingManager
+      t <- liftIO $ (Time.formatTime Time.defaultTimeLocale "%y-%m-%d-%R-%Q") <$> Time.getCurrentTime
+      let fname = "aws_log_" <> t --(showText . toText . _svcAbbrev $ svc) <> "_" <> t
+      lgHandle <- liftIO $ openFile fname WriteMode
+      lgr <- newLogger Info lgHandle
+      newEnvWith (creds fp) Nothing manager
+      --env --Nothing -- manager
+        <&> set envLogger lgr . set envRegion Singapore
+        <&> set envRetryCheck (retryConnectionFailure 10)
+        <&> configure svc
 
 preResolvingManager :: forall m. (S.MonadAsync m) => m Manager
 preResolvingManager = NC.withDNSCache cacheConf cachingManager
   where
-    cacheConf :: NC.DNSCacheConf
-    cacheConf = NC.DNSCacheConf
-      { NC.resolvConfs = [
-          defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8","8.8.4.4"]
-                            --, resolvConcurrent = True
-                            }]
-      , NC.maxConcurrency = 1000000
-      , NC.minTTL = 60
-      , NC.maxTTL = 300
-      , NC.negativeTTL = 300
-      }
     cachingManager :: NC.DNSCache -> m Manager
     cachingManager c = liftIO $ newManager cachingSettings
       where
         cachingSettings = tlsManagerSettings
           { managerConnCount = 100
+          , managerIdleConnectionCount = 100
           , managerModifyRequest = preResolveReq c  
           }
         preResolveReq cache r = do
           h <- liftIO $ NC.lookup cache (host r)
-          _ <- if isNothing h
-                 then liftIO . print $ "COULD NOT RESOLVE HOST: " <> (show h)
-                 else return ()
           let r' = r { hostAddress = h }
           return r'
+
+
+cacheConf :: NC.DNSCacheConf
+cacheConf = NC.DNSCacheConf
+  { NC.resolvConfs = [
+      defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8","8.8.4.4"]
+                        , resolvConcurrent = True
+                        }]
+  , NC.maxConcurrency = 1000
+  , NC.minTTL = 60
+  , NC.maxTTL = 300
+  , NC.negativeTTL = 60
+  }
 
 pageUF :: forall m a r. (AWSPager a, AWSConstraint r m) => UF.Unfold m a (Rs a)
 pageUF = UF.lmap Just $ UF.unfoldrM step

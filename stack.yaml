@@ -77,13 +77,19 @@ extra-deps:
    # nix-sha256: 09dksahyd0rwvlqkncj12nivmc6x6prqzpj9qjfgc9j9vcbz25s7
  - git: https://github.com/faezs/grafana.git
    commit: 66609295378e382dc4a7afd4888e4736e39b2454
+   # nix-sha256: 10yai9f3qixlp0dzsvhm8gxm9an9p8h94a70x2mnhidchw68hyql
  - git: https://github.com/Lysxia/generic-recursion-schemes.git
    commit: 692505969c5774ab5f6c26be3c9b53c2d19d46c3
+ - git: https://github.com/brendanhay/amazonka.git
+   commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+   subdirs:
+     - amazonka
+     - amazonka-iot
+     - core
+     - amazonka-s3
+   
  - base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
- - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
- - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
- - amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135
- - amazonka-s3-1.6.1@sha256:9d07240fca59ad5197fb614ce3051e701e4951e6d4625a2dab4a9c17a1900194,6317
+
  - net-mqtt-0.7.0.1
  - ulid-0.2.0.0@sha256:ac415298b0272479909ca576f4444862ae942ed85c7849fa0675e3bf496be6f3,2485
  - crockford-0.2@sha256:6ec593711a20bd4b81a0fc13f3d850d2d890690941d777230fbf980c483e434a,553
@@ -182,6 +188,9 @@ extra-deps:
  - statistics-linreg-0.3@sha256:95c6efe6c7f6b26bc6e9ada90ab2d18216371cf59a6ef2b517b4a6fd35d9a76f,2544
  - trie-simple-0.4.1.1@sha256:f5a377053f869f34196178475932732242f73351a7f52c81df2f1d340e6f070a,2581
  - influxdb-1.9.2
+ - composite-ekg-0.7.5.0@sha256:f211845509635f614f18a4b10e96701649c2ea098033099e0c1c2a97b10619fe,1375
+ - composite-base-0.7.5.0@sha256:3c754bca3a1a673e1f0ba9fa88850dd8c650b5a7140dc5afca09bb86e4843c17,2955
+
 
 
  # Override default flag values for local packages and extra-deps

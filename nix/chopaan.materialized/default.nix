@@ -3,6 +3,7 @@
     {
       packages = {
         "envy".revision = (((hackage."envy")."2.1.0.0").revisions).default;
+        "optional-args".revision = (((hackage."optional-args")."1.0.2").revisions).default;
         "optics-core".revision = (((hackage."optics-core")."0.3.0.1").revisions).default;
         "warp".revision = (((hackage."warp")."3.3.17").revisions).default;
         "warp".flags.allow-sendfilefd = true;
@@ -29,7 +30,6 @@
         "void".revision = (((hackage."void")."0.7.3").revisions).default;
         "void".flags.safe = false;
         "amazonka".revision = (((hackage."amazonka")."1.6.1").revisions).default;
-        "streaming".revision = (((hackage."streaming")."0.2.3.0").revisions).default;
         "semigroupoids".revision = (((hackage."semigroupoids")."5.3.4").revisions).default;
         "semigroupoids".flags.comonad = true;
         "semigroupoids".flags.doctests = true;
@@ -139,6 +139,7 @@
         "regex-base".revision = (((hackage."regex-base")."0.94.0.1").revisions).default;
         "convertible".revision = (((hackage."convertible")."1.1.1.0").revisions).default;
         "convertible".flags.buildtests = false;
+        "foldl".revision = (((hackage."foldl")."1.4.11").revisions).default;
         "servant-rawm-server".revision = (((hackage."servant-rawm-server")."1.0.0.1").revisions).default;
         "pretty-simple".revision = (((hackage."pretty-simple")."4.0.0.0").revisions).default;
         "pretty-simple".flags.buildexample = false;
@@ -235,7 +236,6 @@
         "indexed-profunctors".revision = (((hackage."indexed-profunctors")."0.1.1").revisions).default;
         "deepseq".revision = (((hackage."deepseq")."1.4.4.0").revisions).default;
         "greskell-core".revision = (((hackage."greskell-core")."0.1.3.6").revisions).default;
-        "suavemente".revision = (((hackage."suavemente")."0.2.0.0").revisions).default;
         "haskell-src-meta".revision = (((hackage."haskell-src-meta")."0.8.7").revisions).default;
         "random".revision = (((hackage."random")."1.1").revisions).default;
         "temporary".revision = (((hackage."temporary")."1.3").revisions).default;
@@ -348,6 +348,7 @@
         "blaze-builder".revision = (((hackage."blaze-builder")."0.4.2.1").revisions).default;
         "Boolean".revision = (((hackage."Boolean")."0.2.4").revisions).default;
         "base-compat".revision = (((hackage."base-compat")."0.11.2").revisions).default;
+        "vinyl".revision = (((hackage."vinyl")."0.13.3").revisions).default;
         "active".revision = (((hackage."active")."0.2.0.15").revisions).default;
         "math-functions".revision = (((hackage."math-functions")."0.3.4.2").revisions).default;
         "math-functions".flags.system-expm1 = true;
@@ -400,7 +401,6 @@
         "lens".flags.dump-splices = false;
         "lens".flags.test-hunit = true;
         "lens".flags.safe = false;
-        "servant-blaze".revision = (((hackage."servant-blaze")."0.9.1").revisions).default;
         "unliftio-core".revision = (((hackage."unliftio-core")."0.1.2.0").revisions).default;
         "containers".revision = (((hackage."containers")."0.6.0.1").revisions).default;
         "some".revision = (((hackage."some")."1.0.2").revisions).default;
@@ -503,6 +503,7 @@
         "pointed".flags.tagged = true;
         "pointed".flags.containers = true;
         "pointed".flags.transformers = true;
+        "composite-base".revision = (((hackage."composite-base")."0.7.5.0").revisions).default;
         "indexed-traversable".revision = (((hackage."indexed-traversable")."0.1.1").revisions).default;
         "optics-extra".revision = (((hackage."optics-extra")."0.3").revisions).default;
         "parser-combinators".revision = (((hackage."parser-combinators")."1.3.0").revisions).default;
@@ -635,6 +636,8 @@
         "wai-logger".revision = (((hackage."wai-logger")."2.3.6").revisions).default;
         "th-lift".revision = (((hackage."th-lift")."0.8.2").revisions).default;
         "microlens-mtl".revision = (((hackage."microlens-mtl")."0.2.0.1").revisions).default;
+        "influxdb".revision = (((hackage."influxdb")."1.9.1.2").revisions).default;
+        "influxdb".flags.examples = false;
         "proto-lens-arbitrary".revision = (((hackage."proto-lens-arbitrary")."0.1.2.9").revisions).default;
         "resourcet".revision = (((hackage."resourcet")."1.2.4.2").revisions).default;
         "cpu".revision = (((hackage."cpu")."0.1.2").revisions).default;
@@ -688,6 +691,7 @@
         "ekg".revision = (((hackage."ekg")."0.4.0.15").revisions).default;
         "ghc-typelits-natnormalise".revision = (((hackage."ghc-typelits-natnormalise")."0.7.6").revisions).default;
         "ghc-typelits-natnormalise".flags.deverror = false;
+        "composite-ekg".revision = (((hackage."composite-ekg")."0.7.5.0").revisions).default;
         "conduit-extra".revision = (((hackage."conduit-extra")."1.3.5").revisions).default;
         "erf".revision = (((hackage."erf")."2.0.0.0").revisions).default;
         "lens-family-core".revision = (((hackage."lens-family-core")."2.0.0").revisions).default;
@@ -736,6 +740,7 @@
     {
       packages = {
         Shpadoinkle-html = ./.plan.nix/Shpadoinkle-html.nix;
+        grafana = ./.plan.nix/grafana.nix;
         concat-examples = ./.plan.nix/concat-examples.nix;
         concat-known = ./.plan.nix/concat-known.nix;
         testcontainers = ./.plan.nix/testcontainers.nix;
@@ -766,6 +771,7 @@
       {
         packages = {
           "Shpadoinkle-html" = { flags = {}; };
+          "grafana" = { flags = {}; };
           "concat-examples" = {
             flags = { "smt" = lib.mkOverride 900 false; };
             };

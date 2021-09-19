@@ -54,7 +54,7 @@ let
       withHoogle = true;
     };
 
-    website = import ./nix/website.nix {};
+    #website = import ./nix/website.nix {};
     # Attrset of PDF builds of LaTeX documentation.
     #docs = pkgs.callPackage ./docs/default.nix {};
   };

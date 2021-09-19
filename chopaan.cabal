@@ -3,8 +3,6 @@ cabal-version: 1.12
 -- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: 0a63c1e197a3876658e2593886f8f7282fafd60792a729126957d746514de8e0
 
 name:           chopaan
 version:        0.1.0.0
@@ -31,6 +29,7 @@ extra-source-files:
     js/periodic.html
 data-files:
     options.dhall
+    hydration.dhall
 
 source-repository head
   type: git
@@ -141,6 +140,7 @@ library
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , composite-ekg
       , concat-classes
       , concat-examples
       , concat-graphics
@@ -152,11 +152,13 @@ library
       , directory-tree
       , dns
       , ekg
+      , ekg-core
       , fusion-plugin >=0.2.3
       , greskell-websocket >=0.1.2.5
       , http-client
       , http-client-tls
-      , influxdb >=1.9.2
+      , http-types
+      , influxdb >=1.9.0
       , katip
       , net-mqtt ==0.7.0.1
       , net-spider
@@ -168,6 +170,7 @@ library
       , servant-websockets
       , tls
       , unix
+      , vinyl
       , wai
       , wai-cors
       , wai-extra
@@ -177,7 +180,7 @@ library
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -O2
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -234,6 +237,7 @@ library
         Chopaan.Comm.Mqtt.AWS
         Chopaan.Comm.Queues
         Chopaan.Comm.S3
+        Chopaan.Comm.Monitor
         Chopaan.Comm.Socket
         Chopaan.Graph.Kbtz
         Chopaan.Graph.Spider
@@ -423,6 +427,7 @@ executable dashgen
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , composite-ekg
       , concat-classes
       , concat-examples
       , concat-graphics
@@ -434,11 +439,13 @@ executable dashgen
       , directory-tree
       , dns
       , ekg
+      , ekg-core
       , fusion-plugin >=0.2.3
       , greskell-websocket >=0.1.2.5
       , http-client
       , http-client-tls
-      , influxdb >=1.9.2
+      , http-types
+      , influxdb >=1.9.0
       , katip
       , net-mqtt ==0.7.0.1
       , net-spider
@@ -450,6 +457,7 @@ executable dashgen
       , servant-websockets
       , tls
       , unix
+      , vinyl
       , wai
       , wai-cors
       , wai-extra
@@ -459,7 +467,7 @@ executable dashgen
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -O2
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -468,7 +476,6 @@ executable dashgen
   if impl(ghcjs)
     buildable: False
   else
-    ghc-options: -threaded -O1
     build-depends:
         base
       , bytestring
@@ -577,6 +584,7 @@ executable dev
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , composite-ekg
       , concat-classes
       , concat-examples
       , concat-graphics
@@ -588,11 +596,13 @@ executable dev
       , directory-tree
       , dns
       , ekg
+      , ekg-core
       , fusion-plugin >=0.2.3
       , greskell-websocket >=0.1.2.5
       , http-client
       , http-client-tls
-      , influxdb >=1.9.2
+      , http-types
+      , influxdb >=1.9.0
       , katip
       , net-mqtt ==0.7.0.1
       , net-spider
@@ -604,6 +614,7 @@ executable dev
       , servant-websockets
       , tls
       , unix
+      , vinyl
       , wai
       , wai-cors
       , wai-extra
@@ -613,7 +624,7 @@ executable dev
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -O2
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -630,6 +641,165 @@ executable dev
       ghc-options: -fdicts-strict -O1 -threaded
     else
       ghc-options: -fdicts-strict -O1 -threaded
+  default-language: Haskell2010
+
+executable hydrate
+  main-is: Hydrate.hs
+  other-modules:
+      Paths_chopaan
+  hs-source-dirs:
+      app
+  build-depends:
+      Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-template
+    , Shpadoinkle-widgets
+    , ad
+    , adjunctions
+    , aeson
+    , algebraic-graphs >=0.5
+    , async
+    , base >=4.11 && <10
+    , base64
+    , binary
+    , bytestring
+    , cassava
+    , clay
+    , colour
+    , comonad
+    , compensated
+    , constraints-extras
+    , containers
+    , convertible
+    , data-default-class
+    , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib >=1.4.4
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , envy
+    , estimator
+    , exceptions
+    , file-embed
+    , filepath
+    , generic-lens
+    , ghc-prim
+    , ghcjs-dom
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
+    , hashable
+    , haxl
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
+    , keys
+    , lens
+    , linear >=1.21.6
+    , microlens
+    , monad-bayes
+    , monad-control
+    , mtl
+    , network >=3.1.2.1
+    , newtype-generics
+    , optparse-applicative
+    , pointed
+    , proto-lens
+    , proto-lens-runtime
+    , raw-strings-qq
+    , regex-applicative
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , servant
+    , servant-client-js
+    , stm
+    , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , transformers
+    , transformers-base
+    , ulid
+    , unagi-chan
+    , unliftio
+    , unliftio-core
+    , unordered-containers
+    , vector
+    , vector-sized
+  if !impl(ghcjs)
+    build-depends:
+        amazonka
+      , amazonka-iot
+      , amazonka-s3
+      , composite-ekg
+      , concat-classes
+      , concat-examples
+      , concat-graphics
+      , concat-plugin
+      , concurrent-dns-cache >=0.1.3
+      , conduit
+      , connection
+      , dhall >=1.33.0
+      , directory-tree
+      , dns
+      , ekg
+      , ekg-core
+      , fusion-plugin >=0.2.3
+      , greskell-websocket >=0.1.2.5
+      , http-client
+      , http-client-tls
+      , http-types
+      , influxdb >=1.9.0
+      , katip
+      , net-mqtt ==0.7.0.1
+      , net-spider
+      , network-uri
+      , sbv
+      , servant-client
+      , servant-js
+      , servant-server
+      , servant-websockets
+      , tls
+      , unix
+      , vinyl
+      , wai
+      , wai-cors
+      , wai-extra
+      , warp
+      , websockets
+      , winery >=1.3.2
+      , x509-store
+      , x509-validation
+    if flag(prod)
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    else
+      ghc-options: -fdicts-strict -O1
+  else
+    build-depends:
+        ghcjs-base
+  if !impl(ghcjs)
+    build-depends:
+        base
+      , chopaan
+      , optparse-simple
+    buildable: True
+    if flag(prod)
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -O2 -fmax-worker-args=16 -fspec-constr-recursive=16 -with-rtsopts=-N -threaded -rtsopts -eventlog
+    else
+      ghc-options: -rtsopts -fdicts-strict -O1 -threaded -eventlog
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable kbtzim
@@ -731,6 +901,7 @@ executable kbtzim
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , composite-ekg
       , concat-classes
       , concat-examples
       , concat-graphics
@@ -742,11 +913,13 @@ executable kbtzim
       , directory-tree
       , dns
       , ekg
+      , ekg-core
       , fusion-plugin >=0.2.3
       , greskell-websocket >=0.1.2.5
       , http-client
       , http-client-tls
-      , influxdb >=1.9.2
+      , http-types
+      , influxdb >=1.9.0
       , katip
       , net-mqtt ==0.7.0.1
       , net-spider
@@ -758,6 +931,7 @@ executable kbtzim
       , servant-websockets
       , tls
       , unix
+      , vinyl
       , wai
       , wai-cors
       , wai-extra
@@ -767,7 +941,7 @@ executable kbtzim
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -O2
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -884,6 +1058,7 @@ executable server
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , composite-ekg
       , concat-classes
       , concat-examples
       , concat-graphics
@@ -895,11 +1070,13 @@ executable server
       , directory-tree
       , dns
       , ekg
+      , ekg-core
       , fusion-plugin >=0.2.3
       , greskell-websocket >=0.1.2.5
       , http-client
       , http-client-tls
-      , influxdb >=1.9.2
+      , http-types
+      , influxdb >=1.9.0
       , katip
       , net-mqtt ==0.7.0.1
       , net-spider
@@ -911,6 +1088,7 @@ executable server
       , servant-websockets
       , tls
       , unix
+      , vinyl
       , wai
       , wai-cors
       , wai-extra
@@ -920,7 +1098,7 @@ executable server
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -O2
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -1041,6 +1219,7 @@ executable ui
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , composite-ekg
       , concat-classes
       , concat-examples
       , concat-graphics
@@ -1052,11 +1231,13 @@ executable ui
       , directory-tree
       , dns
       , ekg
+      , ekg-core
       , fusion-plugin >=0.2.3
       , greskell-websocket >=0.1.2.5
       , http-client
       , http-client-tls
-      , influxdb >=1.9.2
+      , http-types
+      , influxdb >=1.9.0
       , katip
       , net-mqtt ==0.7.0.1
       , net-spider
@@ -1068,6 +1249,7 @@ executable ui
       , servant-websockets
       , tls
       , unix
+      , vinyl
       , wai
       , wai-cors
       , wai-extra
@@ -1077,7 +1259,7 @@ executable ui
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -O2
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
     else
       ghc-options: -fdicts-strict -O1
   else
@@ -1091,6 +1273,7 @@ test-suite chopaan-test
   other-modules:
       APISpec
       Common
+      DNSCacheSpec
       GraphSpec
       HydraSpec
       KbtzSpec
@@ -1195,6 +1378,7 @@ test-suite chopaan-test
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , composite-ekg
       , concat-classes
       , concat-examples
       , concat-graphics
@@ -1206,11 +1390,13 @@ test-suite chopaan-test
       , directory-tree
       , dns
       , ekg
+      , ekg-core
       , fusion-plugin >=0.2.3
       , greskell-websocket >=0.1.2.5
       , http-client
       , http-client-tls
-      , influxdb >=1.9.2
+      , http-types
+      , influxdb >=1.9.0
       , katip
       , net-mqtt ==0.7.0.1
       , net-spider
@@ -1222,6 +1408,7 @@ test-suite chopaan-test
       , servant-websockets
       , tls
       , unix
+      , vinyl
       , wai
       , wai-cors
       , wai-extra
@@ -1231,7 +1418,7 @@ test-suite chopaan-test
       , x509-store
       , x509-validation
     if flag(prod)
-      ghc-options: -fdicts-strict -O2
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
     else
       ghc-options: -fdicts-strict -O1
   else

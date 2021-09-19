@@ -5,16 +5,17 @@
 {-# LANGUAGE TypeApplications, RankNTypes #-}
 {-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeOperators #-}
 
-module Chopaan.Comm.Mqtt (runMqtt, client, pub, MQ.Topic, MonadMQ, runMQ, pubQ) where
+module Chopaan.Comm.Mqtt (runKibbutzGateway, MQ.Topic) where
 
 -- Different string modules should be unified under one interface
-import qualified Data.Text as Text 
+import qualified Data.Text as Text
+import Data.Either
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString as B
 
 import Control.Monad.Trans.Reader
-
+import Control.Monad.Catch
 
 import qualified Network.MQTT.Client as MQ
 import qualified Network.MQTT.Topic as MQ ()
@@ -83,8 +84,18 @@ mkTLSSettingsFromDisk cert key caPath hostName name = do
   return (TLSSettings clientParams)
 
 
-runMqtt ::
-  forall m n. (MonadIO m, Address n)
+withClient :: (MonadIO m)
+  => MQ.MQTTConfig
+  -> URI
+  -> MonadMQ m ()
+  -> m ()
+withClient conf uri f = do
+  c <- liftIO $ MQ.connectURI conf uri
+  runMQ c f
+  liftIO $ MQ.waitForClient c
+
+runKibbutzGateway ::
+  forall m n. (MonadIO m, Address n, MonadMask m)
   => KbtzName
   -> [n]
   -> MessageQs n
@@ -92,51 +103,50 @@ runMqtt ::
   -> MQTTOpts
   -> MQTTCreds
   -> m ()
-runMqtt kbtz ns qs@MessageQs{..} msgCB opts creds = do
-  c <- liftIO $ client kbtz opts (msgCB qs) creds
-  liftIO $ print ("Obtained Client!")
-  _ <- liftIO . forkIO $ runMQ c (forever $ pubQ outbox)
-  liftIO . (recoverC "waiting for client" 1000) . runMQ c $ (runMqtt' ns outbox)
+runKibbutzGateway kbtz ns qs@MessageQs{..} msgCB opts creds = do
+  let (conf, uri) = clientConf kbtz opts (msgCB qs) creds
+  recoverC "Retrying runKibbutzGateway: " 100 $
+    withClient conf uri (pubsub ns outbox)
 
--- need reader for creds and logs
-runMqtt' :: forall m a. (MonadIO m, Address a) => [a] -> PubQueue -> MonadMQ m ()
-runMqtt' ts outbox = do
-  -- liftIO . forkIO $ forever $ catches (runReaderT mc) [(Handler errorHandler)]
-  connStatus <- resub ts
-  liftIO $ print "Connection Status!"
+pubsub  :: forall m a. (MonadIO m, Address a) => [a] -> PubQueue -> MonadMQ m ()
+pubsub ns outbox = do 
+  liftIO $ print ("Starting MQTT Pub Sub")
+  _ <- do
+    c <- ask
+    liftIO . forkIO $ (runMQ c $ forever $ pubQ outbox)
+  connStatus <- resub ns
+  liftIO $ print $ "Subscribed to " <> (show $ length ns) <> " nodes"
   liftIO $ print connStatus
-  (liftIO . MQ.waitForClient) =<< ask
 
 
-client ::
+clientConf ::
   KbtzName
   -> MQTTOpts
   -> MQ.MessageCallback
   -> MQTTCreds
-  -> IO (MQ.MQTTClient)
-client (KbtzId k) fileOpts msgCB awsCreds = do
-  --liftIO . print $ (fileOpts, awsCreds)
-  tlsConf <- return $ mkTLSSettingsFromMemory (cert awsCreds) (privateKey awsCreds) undefined (mqttURI fileOpts) k
-  let
+  -> (MQ.MQTTConfig, URI)
+clientConf (KbtzId k) fileOpts msgCB awsCreds = let
     (Just uri) = parseURI $ Text.unpack $ (mqttURI fileOpts) <> "#" <> k
-    conf = MQ.mqttConfig
-           { MQ._protocol=MQ.Protocol311
-           , MQ._connID=Text.unpack $ k
-           --, MQ._port=8883
-           , MQ._msgCB=msgCB
-           , MQ._connectTimeout=20000000
-           , MQ._tlsSettings=tlsConf}
-  --print $ show conf
-  recoverC "connectURI Attempting" 100000 $ MQ.connectURI conf uri
+    tlsConf = mkTLSSettingsFromMemory (cert awsCreds) (privateKey awsCreds) undefined (mqttURI fileOpts) k
+   in (MQ.mqttConfig
+      { MQ._protocol=MQ.Protocol311
+      , MQ._connID=Text.unpack $ k
+      , MQ._port=8883
+      , MQ._msgCB=msgCB
+      , MQ._connectTimeout=20000000
+      , MQ._tlsSettings=tlsConf
+      }, uri)
 
-resub :: (MonadIO m, Address n) => [n] -> MonadMQ m [(Either MQTy.SubErr MQ.QoS)]
-resub ns = (\c -> liftIO $ (subscribe c ns)) =<< ask
+resub :: (MonadIO m, Address n) => [n] -> MonadMQ m [Either MQTy.SubErr MQ.QoS]
+resub ns = ask >>= \c -> liftIO $ mapM (\n -> retryEither n (subscribe c)) ns
 
-subscribe :: (Address n) => MQ.MQTTClient -> [n] -> IO [(Either MQTy.SubErr MQ.QoS)]
-subscribe c ns = fst <$> (MQ.subscribe c (subTopic <$> ns) [])
+subscribe :: (Address n) => MQ.MQTTClient -> n -> IO (Either MQTy.SubErr MQ.QoS)
+subscribe c n = head <$> fst <$> (MQ.subscribe c [subTopic n] [])
+{-# INLINE subscribe #-}
 
 subTopic :: (Address n) => n -> (MQ.Topic, MQ.SubOptions)
 subTopic n = (stateTopic n, MQ.subOptions { MQ._subQoS = MQ.QoS1 })
+{-# INLINE subTopic #-}
 
 -- The pub queue is a concurrent friendly data structure. We also probably want to put the client in one. But clients are
     -- not stateful.

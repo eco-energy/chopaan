@@ -326,40 +326,64 @@ packages:
     name: generic-recursion-schemes
     commit: 692505969c5774ab5f6c26be3c9b53c2d19d46c3
 - original:
+    subdir: amazonka
+    git: https://github.com/brendanhay/amazonka.git
+    commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+  completed:
+    pantry-tree:
+      sha256: 59c7840fe6c9609d1d5022149010e72db5778e4978b9384b6dee8a4a207c96b3
+      size: 1038
+    subdir: amazonka
+    version: 1.6.1
+    git: https://github.com/brendanhay/amazonka.git
+    name: amazonka
+    commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+- original:
+    subdir: amazonka-iot
+    git: https://github.com/brendanhay/amazonka.git
+    commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+  completed:
+    pantry-tree:
+      sha256: 0e1e03a4280af3046e9b26eaf1dd3ccf661e39f2df6d30c66697a6751dce2bb3
+      size: 28623
+    subdir: amazonka-iot
+    version: 1.6.1
+    git: https://github.com/brendanhay/amazonka.git
+    name: amazonka-iot
+    commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+- original:
+    subdir: core
+    git: https://github.com/brendanhay/amazonka.git
+    commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+  completed:
+    pantry-tree:
+      sha256: dbd45ae65d2df195ac670bed949d98ab3764bf5c691594c861337d8228ccc9fb
+      size: 3484
+    subdir: core
+    version: 1.6.1
+    git: https://github.com/brendanhay/amazonka.git
+    name: amazonka-core
+    commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+- original:
+    subdir: amazonka-s3
+    git: https://github.com/brendanhay/amazonka.git
+    commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+  completed:
+    pantry-tree:
+      sha256: a19d02da301bbcad502e6092d7418a59543747c8bb6f12932bcbc4606f7814ab
+      size: 18431
+    subdir: amazonka-s3
+    version: 1.6.1
+    git: https://github.com/brendanhay/amazonka.git
+    name: amazonka-s3
+    commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+- original:
     hackage: base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
   completed:
     pantry-tree:
       sha256: 52ea810635517dd6c2c39a4b04d50bb4be6925026873f5bdb1c2e4846325d6ef
       size: 2116
     hackage: base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
-- original:
-    hackage: amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
-  completed:
-    pantry-tree:
-      sha256: 55747f9b56063ea1be73a962e1ce44528b9856e119e2d9f1238397b3112b6e70
-      size: 992
-    hackage: amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
-- original:
-    hackage: amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
-  completed:
-    pantry-tree:
-      sha256: 0c1fcf106fe18315888db330a380afbb841f2a769c3df75b89a3efefb95cd45b
-      size: 28895
-    hackage: amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
-- original:
-    hackage: amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135
-  completed:
-    pantry-tree:
-      sha256: c13e643176308771491ec0e06390e269047bb1b28be4535992842f7426a95eb4
-      size: 3438
-    hackage: amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135
-- original:
-    hackage: amazonka-s3-1.6.1@sha256:9d07240fca59ad5197fb614ce3051e701e4951e6d4625a2dab4a9c17a1900194,6317
-  completed:
-    pantry-tree:
-      sha256: 5cab233d241615764d9fd6927bc397f02887154450a9932c38c2e17ea86d79bc
-      size: 18385
-    hackage: amazonka-s3-1.6.1@sha256:9d07240fca59ad5197fb614ce3051e701e4951e6d4625a2dab4a9c17a1900194,6317
 - original:
     hackage: net-mqtt-0.7.0.1
   completed:
@@ -1032,3 +1056,17 @@ packages:
       sha256: dfa5376e9935dd784dcaad095b884a9f4064eac3ea67d708515c96a036cd789f
       size: 1340
     hackage: influxdb-1.9.2@sha256:ff3a197b20450373b2988c61452ceb4428237d795d85c260859fa57aedc3a11a,3590
+- original:
+    hackage: composite-ekg-0.7.5.0@sha256:f211845509635f614f18a4b10e96701649c2ea098033099e0c1c2a97b10619fe,1375
+  completed:
+    pantry-tree:
+      sha256: e4a95b3e95df37afa8ed70eec1a0ae23aa1d0944b7f85db97fb40b6dda4ee61b
+      size: 171
+    hackage: composite-ekg-0.7.5.0@sha256:f211845509635f614f18a4b10e96701649c2ea098033099e0c1c2a97b10619fe,1375
+- original:
+    hackage: composite-base-0.7.5.0@sha256:3c754bca3a1a673e1f0ba9fa88850dd8c650b5a7140dc5afca09bb86e4843c17,2955
+  completed:
+    pantry-tree:
+      sha256: 504ed3870d3ee32a008f24ac6e1cc5686c201900008499c294fb1b7cdcef9648
+      size: 604
+    hackage: composite-base-0.7.5.0@sha256:3c754bca3a1a673e1f0ba9fa88850dd8c650b5a7140dc5afca09bb86e4843c17,2955

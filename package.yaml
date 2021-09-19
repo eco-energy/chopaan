@@ -16,6 +16,7 @@ extra-source-files:
 
 data-files:
  - options.dhall
+ - hydration.dhall
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -120,6 +121,8 @@ when:
   then:
     dependencies:
       - ekg
+      - ekg-core
+      - composite-ekg
       - concat-classes
       - concat-examples
       - concat-plugin
@@ -145,7 +148,7 @@ when:
       - x509-store
       - x509-validation
       - greskell-websocket >= 0.1.2.5
-      - influxdb >= 1.9.2
+      - influxdb >= 1.9.0
       - dhall >= 1.33.0
       - sbv
       - http-client
@@ -157,12 +160,16 @@ when:
       - katip
       - directory-tree
       - unix
+      - vinyl
+      - http-types
     when:
     - condition: flag(prod)
       then:
         ghc-options:
           - -fdicts-strict
-          #- -fplugin Fusion.Plugin
+          - -fplugin Fusion.Plugin
+          - -fmax-worker-args=12
+          - -fspec-constr-recursive=2
           #- -fplugin-opt=Fusion.Plugin:verbose=1
           #- -fplugin-opt=Fusion.Plugin:dump-core
           - -O2
@@ -229,6 +236,7 @@ library:
         - Chopaan.Comm.Mqtt.AWS
         - Chopaan.Comm.Queues
         - Chopaan.Comm.S3
+        - Chopaan.Comm.Monitor
         - Chopaan.Comm.Socket
         - Chopaan.Graph.Kbtz
         - Chopaan.Graph.Spider
@@ -404,10 +412,6 @@ executables:
           - bytestring
           - chopaan
           - base
-        ghc-options:
-          - -threaded
-          - -O1
-    
   kbtzim:
     main:                Main.hs
     other-modules:
@@ -429,6 +433,43 @@ executables:
                 - -fdicts-strict
                 #- -fplugin Fusion.Plugin
                 - -O2
+                #- -with-rtsopts=-N
+                - -with-rtsopts=-N
+                - -threaded
+                - -rtsopts
+                - -eventlog
+            else:
+              ghc-options:
+                - -rtsopts
+                - -fdicts-strict
+                - -O1
+                - -threaded
+                - -eventlog
+      else:
+        buildable: false
+  hydrate:
+    main:                Hydrate.hs
+    other-modules:
+      - Paths_chopaan
+    source-dirs:         app
+    when:
+      condition: "!impl(ghcjs)"
+      then:
+        buildable: true
+        dependencies:
+          - chopaan
+          - optparse-simple
+          - base
+        when:
+          - condition: flag(prod)
+            then:
+              ghc-options:
+                #- -fplugin=ConCat.Plugin
+                - -fdicts-strict
+                - -fplugin Fusion.Plugin
+                - -O2
+                - -fmax-worker-args=16
+                - -fspec-constr-recursive=16
                 #- -with-rtsopts=-N
                 - -with-rtsopts=-N
                 - -threaded

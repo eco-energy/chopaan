@@ -49,7 +49,8 @@ import Chopaan.Graph.G
 #ifndef ghcjs_HOST_OS
 newtype GraphM a = GraphM { runGraphM' :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
-                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch, MonadUnliftIO)
+                    MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch,
+                    MonadMask, MonadUnliftIO)
 
 runGraphM :: MonadIO m => PoolConf -> TinkerConf -> GraphM ~> m
 runGraphM pc (TinkerConf h p) a = liftIO $ runReaderT (runGraphM' a) =<< (mkDBPools pc h p)

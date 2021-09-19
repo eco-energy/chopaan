@@ -6,6 +6,7 @@ import Grafana
 import qualified Data.Text as T
 import qualified Data.ByteString as BS
 import Data.Bifunctor
+import Data.List
 
 import System.Directory
 import qualified System.Envy as E
@@ -17,7 +18,7 @@ import Chopaan.Graph.Kbtz
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId
 import Data.Influxable hiding (Query)
-
+import qualified Streamly.Prelude as S
 
 
 -- nodes :: [T.Text]
@@ -81,7 +82,7 @@ kbtzMeasurementDash k ns g = KbtzDash g k d
     d = defaultDashboard
       { dashboardIdentifier = Just (fromEnum g)
       , dashboardTitle = (unKbtzId k) <> " " <> (showText g) <> " Dashboard"
-      , dashboardPanels = nodePanel g nq <$> ns <*> (gridLayout (length ns) nRows)
+      , dashboardPanels = (uncurry (nodePanel g nq)) <$> (zip ns (gridLayout (length ns) nRows))
       , dashboardTime = TimeRange (Interval 360 Days) Nothing
       , dashboardRefresh = Interval 5 Seconds
       , dashboardVersion = 1
@@ -148,14 +149,25 @@ dashOpts = info (dashParser <**> helper) $
 main :: IO ()
 main = do
   (DashOpts db output) <- execParser dashOpts
-  kns <- runGraphM defPoolConf db $ withKbtzPool $ \c -> do
-    ks <- getKbtzim c
-    ns <- mapM (getKbtzNodes c) ks
-    return $ zip ks ns
-  mapM_ (\k -> cd (kbtzDir output k)) (fst <$> kns)
-  print $ "Total Kbtzim: " <> (show $ length kns)
-  let dashes = chopaanDashes kns
-  writeDashes output dashes
+  let pollDBForStructure prevStruct = do
+        kns <- runGraphM defPoolConf db $ withKbtzPool $ \c -> do
+          ks <- sort <$> getKbtzim c
+          ns <- mapM (fmap sort . getKbtzNodes c) ks
+          return $ zip ks ns
+        case (structByLen kns == prevStruct) of
+          False -> do
+            print $ "Going to Sleep, nothing changed"
+            return prevStruct
+          True -> do
+            mapM_ (\k -> cd (kbtzDir output k)) (fst <$> kns)
+            print $ "Writing Kbtzim: " <> (show $ length kns)
+            let dashes = chopaanDashes kns
+            writeDashes output dashes
+            return $ (length kns, fmap length kns)
+  S.drain $ S.delay (pollEveryMin 30) $ S.iterateM pollDBForStructure (pure (0, []))
   where
     defPoolConf = PoolConf 1 1 1
     cd = createDirectoryIfMissing True
+    structByLen :: [(KbtzName, [NodeMAC])] -> (Int, [Int])
+    structByLen kns = (length kns, fmap length kns)
+    pollEveryMin m = 60 * m

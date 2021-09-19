@@ -15,9 +15,8 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.AWS -- (AWST'(..))
 import Control.Monad.Catch
 --import Control.Concurrent.STM
-import Control.Concurrent.MVar
+--import Control.Concurrent.MVar
 
---import Data.IORef
 import Data.Generics.Product
 import Data.Generics.Labels
 import qualified Data.Binary as B
@@ -72,12 +71,15 @@ import qualified Streamly.Internal.Data.Stream.IsStream.Generate as S
 import qualified Streamly.External.ByteString as SBS
 import qualified Streamly.External.ByteString.Lazy as SBL
 import System.Directory
+import qualified System.Remote.Gauge as G
+import qualified System.Remote.Counter as C
 import Streamly.Binary
 
 --import qualified Streamly.Internal.Data.Stream.IsStream  as S
 import Control.Monad.Trans.Resource
 import Chopaan.Comm.Address
 import Chopaan.Comm.Dispatch
+import Chopaan.Comm.Monitor
 
 
 data HydrationError = DownloadError T.Text | ParsingError T.Text
@@ -95,7 +97,7 @@ downloadMF :: forall m. (MonadIO m, MonadCatch m)
                 -> m (Either SomeException (Either String (MeshFrame), Int))
 downloadMF !env !bucket !n = do
   obj <- liftIO $ handleAll (pure . Left)
-                            (Right <$> (recoverC ("downloadRetry: " <> (show n)) 100 $ withAwsEnv env (readObject bucket n)))
+                            (Right <$> (withAwsEnv env (readObject bucket n)))
   let mf = (first decodeMessage) <$> obj
   return $! mf
 {-# INLINE downloadMF #-}
@@ -242,12 +244,8 @@ resDiff r = case r of
 newtype Prefix = Prefix { unPrefix :: T.Text }
   deriving (Eq, Ord, Show, Generic, B.Binary)
 
-prefixRange :: (MonadAsync m) => Resolution -> UTCTime -> UTCTime -> S.AheadT m Prefix
-prefixRange !r !t !t' = S.concatM $ do
-  liftIO . print $ "start! " <> (show start)
-  liftIO . print $ "end! " <> (show end)
-  liftIO . print $ "sigDigs " <> (show sigDigs)
-  return $ S.mapM (pure . Prefix . glompPrefix) $ S.trace (liftIO . print) $ S.enumerateFromTo start end
+prefixRange :: Resolution -> UTCTime -> UTCTime -> [Prefix]
+prefixRange !r !t !t' = (Prefix . glompPrefix) <$> [start..end]
   where
     sigDigs = (9 -) . (ceiling . (logBase 10)) . resDiff $ r
     glompPrefix :: Int64 -> T.Text
@@ -352,179 +350,76 @@ frameDir :: T.Text -> NodeMAC -> Prefix -> FilePath
 frameDir hPrefix n t = (prefixFetchDir hPrefix n t) <> "/frames/"
 
 
-type Monitor = Monitor' Double Integer
-
-data Monitor' r i = Monitor
-  { numPrefixes :: !i
-  , discoveredPaths :: !i
-  , totalDownloadableSize :: !i
-  , downloadedSize :: !i
-  , downloadSpeed :: !r
-  , downloadedFrames :: !i
-  , framesStored :: !i
-  , downloadErrors :: !i
-  , parsingErrors :: !i
-  , validated :: !i
-  , secondsElapsed :: !i
-  } deriving (Show, Generic, Functor)
-
-class IsoMon a b where
-  fwd :: a -> b
-  rev :: b -> a
-
-instance IsoMon Double Integer where
-  fwd = round
-  rev = fromIntegral
-
-instance IsoMon Double Int where
-  fwd = round
-  rev = fromIntegral
-
-instance (forall a. IsoMon r a => IsoMon r a, Num r, RealFrac r) => Applicative (Monitor' r) where
-  pure :: forall a. IsoMon r a => a -> Monitor' r a
-  pure a = Monitor a a a a (rev a) a a a a a a
-  liftA2 :: forall x y z. (IsoMon r x, IsoMon r y, IsoMon r z) => (x -> y -> z) -> (Monitor' r x) -> Monitor' r y -> Monitor' r z 
-  liftA2 f x y = Monitor
-    { numPrefixes = numPrefixes x `f` numPrefixes y
-    , discoveredPaths = discoveredPaths x `f` discoveredPaths y
-    , totalDownloadableSize = totalDownloadableSize x `f` totalDownloadableSize y
-    , downloadedSize = downloadedSize x `f` downloadedSize y
-    , downloadSpeed = rev $
-                      (fwd . downloadSpeed $ x) `f` (fwd . downloadSpeed $ y)
-    , downloadedFrames = downloadedFrames x `f` downloadedFrames y
-    , framesStored = framesStored x `f` framesStored y
-    , secondsElapsed = secondsElapsed x `f` secondsElapsed y
-    , downloadErrors = downloadErrors x `f` downloadErrors y
-    , parsingErrors = parsingErrors x `f` parsingErrors y
-    , validated = validated x `f` validated y
-    }
-  
-instance (IsoMon r a, RealFrac r, Num r, Num a) => Semigroup (Monitor' r a) where
-  m <> m' = (+) <$> m <*> m'
-
-newMon :: (MonadIO m) => m (MVar Monitor)
-newMon = liftIO . newMVar . pure $ 0
-{-# NOINLINE newMon #-}
-
-printMon :: String -> Monitor -> IO ()
-printMon l m = do
-  putStrLn l
-  putStrLn $ show m
-
-
-incPrefixCount :: Int -> Monitor -> Monitor
-incPrefixCount !i !m = m & #numPrefixes %~ (+ (fromIntegral i))
-{-# INLINE incPrefixCount #-}
-
-incPathCount :: Int -> Monitor -> Monitor
-incPathCount !i !m = m & #discoveredPaths %~ (+ (fromIntegral i))
-{-# INLINE incPathCount #-}
-
-incDLableSize :: Int -> Monitor -> Monitor
-incDLableSize !i !m = m & #totalDownloadableSize %~ (+ (fromIntegral i))
-{-# INLINE incDLableSize #-}
-
-incDLSize :: Int -> Monitor -> Monitor
-incDLSize !i !m = m & #downloadedSize %~ (+ (fromIntegral i))
-{-# INLINE incDLSize #-}
-
-incDLCount :: Int -> Monitor -> Monitor
-incDLCount !i !m = m & #downloadedFrames %~ (+ (fromIntegral i))
-{-# INLINE incDLCount #-}
-
-incStoredCount :: Int -> Monitor -> Monitor
-incStoredCount !i !m = m & #framesStored %~ (+ (fromIntegral i))
-{-# INLINE incStoredCount #-}
-
-incSecondsElapsed :: Double -> Monitor -> Monitor
-incSecondsElapsed !i !m = m & #secondsElapsed %~ (+ (round i))
-{-# INLINE incSecondsElapsed #-}
-
-incDLError :: Monitor -> Monitor
-incDLError m = m & #downloadErrors %~ (+ 1)
-{-# INLINE incDLError #-}
-
-incParsingError :: Monitor -> Monitor
-incParsingError m = m & #parsingErrors %~ (+ 1)
-{-# INLINE incParsingError #-}
-
-incValidated :: Int -> Monitor -> Monitor
-incValidated !i !m = m & #validated %~ (+ (fromIntegral i))
-{-# INLINE incValidated #-}
-
-incDLSpeed :: Monitor -> Monitor
-incDLSpeed !m = m & #downloadSpeed
-                .~ ((fromIntegral (m ^. #downloadedSize)) / (fromIntegral $ (m ^. #secondsElapsed)))
-{-# INLINE incDLSpeed #-}
-  
-type MonWrite m = (Monitor -> Monitor) -> m ()
 
 -- For each prefix, we want to fetch the paths that haven't been
 -- fetched yet for the prefix
 prefixStartKey :: (MonadAsync m, MonadCatch m)
   => T.Text -> NodeMAC -> Prefix -> m (Prefix, Maybe (S3.ObjectKey))
-prefixStartKey hPrefix n t = fmap (t,) $
-                             (fmap (join @Maybe)) (S.last $ decodeFile (prefixPathFile hPrefix n t))
+prefixStartKey hPrefix n t = pure (t, Nothing)
+  -- fmap (t,) $
+  -- (fmap (join @Maybe)) (S.last $ decodeFile (prefixPathFile hPrefix n t))
 
+addC :: (MonadIO m) => C.Counter -> Int -> m ()
+addC c = liftIO . C.add c . fromIntegral
 
 nodeS3 :: forall m. (MonadAsync m, MonadCatch m)
        => Env
        -> S3.BucketName
        -> BufferingOpts
        -> T.Text
-       -> MVar Monitor
+       -> Monitor
        -> S.AheadT m (Prefix)
        -> NodeMAC
        -> S.AheadT m (S3.ObjectKey, Either EnergyState RuntimeStats)
-nodeS3 env bucket BufferingOpts{..} hPrefix mon pfs n = let
-  --modMon = liftIO . modifyMVar_ mon . (pure .)
+nodeS3 env bucket BufferingOpts{..} hPrefix Monitor{..} pfs n = let
   prefixes :: S.AheadT m (Prefix, Maybe S3.ObjectKey)
-  prefixes = --S.tapRate tapR (modMon . incPrefixCount) S.|$
-    S.mapM (prefixStartKey hPrefix n) $ pfs
+  prefixes = S.tapRate (tapR + 1) (addC numPrefixes)
+    S.|$ S.mapM (prefixStartKey hPrefix n)
+    $ pfs
   prefixPaths :: Prefix -> Maybe S3.ObjectKey -> S.AheadT m S3.ObjectKey
   prefixPaths t o = S.tap (savePrefixPath t)
-        -- S.|$ S.mapM (addSpeedSize modMon)
-        S.|$ S.map (fst)
+        S.|$ S.mapM (\(x, y) -> (addC totalDownloadableSize y) >> return x)
         S.|$ S.unfold (s3Paths'' env (flip req o)) t
   prefixFrames :: (Prefix, Maybe S3.ObjectKey) -> S.AheadT m (S3.ObjectKey, MeshFrame)
   prefixFrames (t, o) = S.rights
         S.|$ S.rights
-        -- S.|$ S.trace (countErrors modMon)
-        S.|$ S.map (\(!k, !e) -> (fmap (k,)) <$> e)
-        -- S.|$ S.tapRate tapR (modMon . incStoredCount)
-        S.|$ S.tap (storeAll t)
-        -- S.|$ S.tapRate tapR (modMon . incDLCount)
+        S.|$ S.trace (countErrors)
+        $ S.map (\(!k, !e) -> (fmap (k,)) <$> e)
+        S.|$ S.tapRate (tapR) (addC framesStored)
+        S.|$ S.tapAsync (storeAll t)
+        S.|$ S.tapRate (tapR) (addC downloadedFrames)
+        S.|$ S.fromAhead
+        S.|$ S.mapM addDLSize
         S.|$ S.mapM (downloadWithErrLog)
-        -- S.|$ S.tapRate tapR (modMon . incPathCount)
-        S.|$ prefixPaths t o
+        S.|$ S.tapRate (tapR - 2) (addC discoveredPaths)
+        $ prefixPaths t o
   in S.maxBuffer frameBuffer
-    -- S.|$ S.tapRate tapR (\_ -> liftIO $ printMon np =<< (readMVar mon)) 
-    -- S.|$ S.tapRate tapR (modMon . (\m -> incSecondsElapsed tapR . incValidated m))
-    S.|$ S.map (second fromJust)
-    S.|$ S.filter (isJust . snd)
-    S.|$ S.map (uncurry validateMF)
+    $ S.tapRate tapR (\x -> addC secondsElapsed (round tapR) >> addC validated x)
+    $ S.map (second fromJust)
+    $ S.filter (isJust . snd)
+    $ S.map (uncurry validateMF)
     S.|$ S.concatMapWith (S.ahead) prefixFrames
-    S.|$ prefixes
+    $ prefixes
   where
-    tapR = 10
-    countErrors io = \case
-      Left _ -> (io incDLError)
+    tapR = 30
+    countErrors = \case
+      Left _ -> (liftIO $ C.inc downloadErrors)
       Right r -> case r of
-        Left _ ->  (io incParsingError)
+        Left _ ->  (liftIO $ C.inc parsingErrors)
         Right _ -> return ()
     savePrefixPath t = (FL.lmap (toTxt . unObject) (encodeFold (prefixPathFile hPrefix n t)))
-    addSpeedSize io = (\(p, s) -> (io $ incDLSpeed . incDLableSize s) >> return p)
-    addDLSize io = \(n', x) -> case x of
+    addDLSize = \(n', x) -> case x of
       Left l -> return $ (n', Left l)
       Right (a, s) -> do
-        _ <- io (incDLSize s)
+        _ <- (addC downloadedSize s)
         return $ (n', Right a)
     np = (T.unpack . unNodeId $ n)
     req (Prefix t) startAfter = S3.listObjectsV2 bucket
           & S3.lovPrefix .~ (timedPrefix n t)
           & S3.lovStartAfter .~ (fmap unObject startAfter)
-    downloadWithErrLog :: S3.ObjectKey -> m (S3.ObjectKey, Either SomeException (Either String MeshFrame)) 
-    downloadWithErrLog p = (((p,) . (fmap fst)) <$> downloadMF env bucket p)
+    downloadWithErrLog :: S3.ObjectKey
+      -> m (S3.ObjectKey, Either SomeException (Either String MeshFrame, Int)) 
+    downloadWithErrLog p = (((p,)) <$> downloadMF env bucket p)
     storeAll t = foldNodeHydration @m @MeshFrame (curry (bimap (toTxt . unObject) toPB))
             dataPath dlDonePath errPath err1Tag err2Tag
             where

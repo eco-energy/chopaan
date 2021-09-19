@@ -19,8 +19,8 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch
-import Control.Concurrent.MVar
---import Data.IORef
+import Control.Concurrent (throwTo, ThreadId)
+import Control.Concurrent.Async
 
 import Streamly.Prelude as S (IsStream, MonadAsync, adapt)
 import qualified Streamly.Prelude as S
@@ -35,6 +35,8 @@ import Chopaan.Utils.Streamly (idFold)
 
 import System.IO (Handle, IOMode(..), openFile, hClose)
 import System.Posix.Files
+import System.Metrics (newStore)
+import System.Remote.Monitoring
 import Data.Time
 import Data.Either
 import Data.ByteString.Char8 (hPutStrLn)
@@ -54,7 +56,7 @@ import Chopaan.Node.Folds
 import Chopaan.Node.Mesh
 import Chopaan.Graph
 import Chopaan.Kibbutz (KbtzC(..))
-
+import Chopaan.Comm.Monitor
 
 hydrateKbtz' :: forall t . (IsStream t)
              => HydrationOpts
@@ -107,56 +109,58 @@ concatMapIxFoldableWith conc f = M.foldrWithKey c S.nil
     {-# INLINE c #-}
 {-# INLINE concatMapIxFoldableWith #-}
 
-dup a = (a, a)
-
+cancelServer :: (MonadIO m) => ThreadId -> m ()
+cancelServer tid = liftIO $ throwTo tid AsyncCancelled
 
 hydrateKbtz :: forall t. (IsStream t) => HydrationOpts -> KbtzC NodeMAC -> GraphM (t GraphM Hydration)
 hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts, hPrefix} KbtzC{name, nodes} = do
-  _ <- traverse (cd . fetchDir hPrefix) nodes 
-  lsyncs' <- traverse dc $ M.fromList (dup <$> nodes)
+  store <- liftIO $ newStore
+  server <- liftIO $ forkServerWith store "localhost" 8112
+  _ <- traverse (cd . fetchDir hPrefix) nodes
+  monitors <- mapM (liftIO . nodeMon store . unNodeId) nodes
   env <- getAwsEnv s3
-  return $ hydrationRate
-    S.|$ S.maxBuffer (nodeBuffer bufOpts)
+  return $ S.finally (cancelServer (serverThreadId server))
+    $ hydrationRate
+    $ S.maxBuffer (nodeBuffer bufOpts)
     -- S.|$ S.tapRate 60 (\_ -> hydrationSummary mons)
-    S.|$ concatMapIxFoldableWith S.parallel (nodeS env) lsyncs'
+    $ concatMapIxFoldableWith S.async (nodeS env) (M.fromList (zip nodes monitors))
     where
       prefixes = prefixRange resolution (toUTC start) (toUTC end)
-      dc n' = liftIO $ do
-        m <- newMon
-        gh <- appendHandleFromPath "grid"
-        mh <- appendHandleFromPath "mesh"
-        return $ (gh, mh, m)
-        where
-          appendHandleFromPath k = do
-            e <- fileExist fp
-            case e of
-              True -> openFile fp AppendMode
-              False -> openFile fp WriteMode
-            where
-              fp = (nodeSavedFile hPrefix n' k)
+        -- m <- newMon
+        -- --gh <- appendHandleFromPath "grid"
+        -- --mh <- appendHandleFromPath "mesh"
+        -- return $ (gh, mh, m)
+        -- where
+        --   appendHandleFromPath k = do
+        --     e <- fileExist fp
+        --     case e of
+        --       True -> openFile fp AppendMode
+        --       False -> openFile fp WriteMode
+        --     where
+        --       fp = (nodeSavedFile hPrefix n' k)
       hydrationRate = S.tapRate 10 (liftIO . (print . (prefix <>) . show))
       {-# INLINE hydrationRate #-}
-      nodeS :: Env -> NodeMAC -> (Handle, Handle, MVar Monitor) -> t GraphM (Bool)
-      nodeS env n (gh, mh, mon) = S.after cleanup $ grider n gh
-                   S.|$ mesher n mh
+      nodeS :: Env -> NodeMAC -> Monitor -> t GraphM (Bool)
+      nodeS env n mon = grider n
+                   S.|$ mesher n
                    S.|$ S.fromAhead
                    $ nodeS3 env buck bufOpts hPrefix mon ps n
         where
-          ps = S.trace (liftIO . createPrefixDirs hPrefix n) $ prefixes
-          cleanup :: GraphM Bool
-          cleanup = do
-            !gc <- liftIO $ hClose gh
-            !mc <- liftIO $ hClose mh
-            return $ True
+          ps = S.trace (liftIO . createPrefixDirs hPrefix n) $ S.fromList prefixes
+          -- cleanup :: GraphM Bool
+          -- cleanup = do
+          --   !gc <- liftIO $ hClose gh
+          --   !mc <- liftIO $ hClose mh
+          --   return $ True
       {-# INLINE nodeS #-}
       buck = (BucketName s3BucketName)
       mesher :: NodeMAC
-             -> Handle
+             --- -> Handle
              -> t GraphM (ObjectKey, Either EnergyState RuntimeStats)
              -> t GraphM (ObjectKey, Either EnergyState (MeshNode, RxSignal))
-      mesher n h s = S.trace (getSaveM)
-        S.|$ S.mapM (pure . mfn)
-        S.|$ s
+      mesher n s = S.trace (getSaveM)
+        $ S.map (mfn)
+        $ s
         where
           getSaveM = case dbSave of
             True -> saveM
@@ -168,30 +172,32 @@ hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts,
           saveM (!k, x) = case x of
             (Left _) -> return True
             (Right !r) -> do
-              (liftIO . writeToHandle h k) =<< (withSpider $! pE =<< addMeshN (n, r))
+              --(liftIO . writeToHandle h k) =<<
+              (withSpider $! pE =<< addMeshN (n, r))
       grider :: NodeMAC
-             -> Handle
+             -- -> Handle
              -> t GraphM (ObjectKey, Either EnergyState (MeshNode, RxSignal))
              -> t GraphM Bool
-      grider n gh s = S.mapM (withSpider . (getSaveG))
-                   S.|$ S.postscan (FL.unzip idFold sensorFold)
-                   S.|$ S.map (fmap (fromLeft undefined))
-                   S.|$ S.filter (isLeft . snd)
-                   S.|$ s
+      grider n s = S.mapM (withSpider . (getSaveG))
+                   $ S.postscan (FL.unzip idFold sensorFold)
+                   $ S.map (fmap (fromLeft undefined))
+                   $ S.filter (isLeft . snd)
+                   $ s
         where 
           getSaveG = case dbSave of
             True -> saveGrid
             False -> \(_, _) -> pure True
           saveGrid (!k, !x) = do
-            (liftIO . writeToHandle gh k) =<< pE =<< addFlow name (n, x)
+            -- (liftIO . writeToHandle gh k) =<<
+            pE =<< addFlow name (n, x)
             -- !b <- pE =<< addMon name (n, (x, Nothing))
-            -- !c <- pE =<< addTx name (n, (x, Nothing, Nothing))
-      writeToHandle :: Handle -> ObjectKey -> Bool -> IO Bool
-      writeToHandle h o c = case c of
-        True -> hPutStrLn h o' >> return True 
-        False -> return False
-        where
-          o' = T.encodeUtf8 (unObject o)
+      --       -- !c <- pE =<< addTx name (n, (x, Nothing, Nothing))
+      -- writeToHandle :: Handle -> ObjectKey -> Bool -> IO Bool
+      -- writeToHandle h o c = case c of
+      --   True -> hPutStrLn h o' >> return True 
+      --   False -> return False
+      --   where
+      --     o' = T.encodeUtf8 (unObject o)
       prefix = "Hydration Rate: "
       pE :: Either SpiderException Bool -> SpiderM Bool
       pE r = case r of
