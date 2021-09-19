@@ -465,7 +465,8 @@ validateMF k m = case accessEnergyState m of
     cleanMAC :: T.Text -> Maybe (T.Text, T.Text)
     cleanMAC = Just . (T.breakOnEnd ("/")) . (T.replace " " "")
 {-# INLINE validateMF #-}
-      
+
+
 fixGridTS :: Maybe UTCTime
           -> EnergyState
           -> EnergyState
@@ -475,6 +476,7 @@ fixGridTS (Just t) r = case r ^? N.cpuTime of
     (Just t') -> case (t' == 0) of
       True -> r & N.cpuTime .~ (timeToUIntSeconds t)
       False -> r
+{-# INLINE fixGridTS #-}
 
 fixMeshTS :: Maybe UTCTime
           -> RuntimeStats
@@ -485,3 +487,4 @@ fixMeshTS (Just t) r = case r ^? N.cpuTime of
     (Just t') -> case (t' == 0) of
       True -> r & N.cpuTime .~ (timeToUIntSeconds t)
       False -> r
+{-# INLINE fixMeshTS #-}

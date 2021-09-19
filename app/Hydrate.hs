@@ -1,14 +1,20 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeApplications, ScopedTypeVariables, ExplicitForAll, NamedFieldPuns, TupleSections #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeApplications, ScopedTypeVariables, ExplicitForAll, NamedFieldPuns, TupleSections, BangPatterns, OverloadedLists #-}
 module Main where
 
 import Chopaan.Node.NodeId
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Comm.S3 hiding (pathFile)
 import Chopaan.Types
 import Streamly.Binary
 import Chopaan.Kibbutz.AWS.Common hiding (preResolvingManager)
 import Chopaan.Utils.Retry (recoverC, recoverOrNothing)
+import Chopaan.Comm.Dispatch (accessEnergyState, accessRTS)
+import Chopaan.Node.Folds (sensorFold, meshFold)
+import Data.Influxable (asKbtzNode, lineSensorR, lineMesh, lineFoldHttp)
+
 
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
+import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N (cpuTime)
 
 import Control.Monad
 import Control.Monad.Catch
@@ -16,6 +22,9 @@ import Control.Monad.IO.Class
 import Control.Lens
 import Data.Bifunctor
 import Data.Word
+import Data.Int
+import Data.Maybe
+
 import qualified Data.Text as T
 import qualified Data.Time as Time
 import qualified Data.ByteString as BS
@@ -30,6 +39,11 @@ import qualified Network.HTTP.Types as NC
 import qualified Network.HTTP.Client as NC
 import qualified Network.HTTP.Client.Internal as NC (hostAddress)
 
+import Database.InfluxDB.Line (Line)
+import qualified Database.InfluxDB.Write.UDP as UDP
+import qualified Database.InfluxDB.Write as Http
+import qualified Database.InfluxDB.Format as F
+import qualified Database.InfluxDB.Manage as DB
 
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Fold as FL
@@ -40,6 +54,8 @@ import qualified Streamly.Internal.Data.Array.Foreign as A
 import qualified Streamly.Internal.Data.Array.Foreign.Type as A
 import qualified Streamly.Internal.Data.Array.Stream.Foreign as A
 import Dhall
+
+
 --import Paths_chopaan
 
 getOpts = input auto $ "./hydration.dhall"
@@ -62,18 +78,24 @@ main = do
   mapM_ (\n -> cd ("./data/paths/" <> (nodeMACPath n))) labNodes
   mapM_ (\n -> cd ("./data/signed-paths/" <> (nodeMACPath n))) labNodes
   mapM_ (\n -> cd ("./data/frames/" <> (nodeMACPath n))) labNodes
+  let p = DB.queryParams defaultDatabase
+  DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) defaultDatabase
   --ps <- S.length . S.fromParallel
   --      $ S.tapRate 10 (\r -> print $ "Signing Rate: " <> (show r))
   --      $ signSavedPaths t0 h aws labNodes
         -- S.|$ signedPaths t0 h aws labNodes
-  _ <- downloadAllPrefixes t0 aws h labNodes 
+  --_ <- downloadAllPrefixes t0 aws h labNodes
+  ps <- S.length . S.fromAsync $ loadFrames (KbtzId "Lab_TestGrid") labNodes h
   t1 <- Time.getCurrentTime
   --print $ "Paths Signed: " <> (show ps)
   print $ "Start time: " <> (show t0)
   print $ "End time: " <> (show t1)
   let delT = Time.diffUTCTime t1 t0
   print $ "Total time taken: " <> (show delT)
-  --print $ "Time per signing: " <> (show $ delT / fromIntegral ps)
+  print $ "Time per Node: " <> (show $ delT / fromIntegral ps)
+
+
+defaultDatabase = F.formatDatabase "InfluxDB"
 
 pathFile :: NodeMAC -> Prefix -> FilePath
 pathFile n (Prefix pref) = "./data/paths/" <> (nodeMACPath n) <> "/" <> (T.unpack pref) 
@@ -100,14 +122,66 @@ downloadAllPrefixes time env HydrationOpts{start, end, resolution, s3BucketName}
 
 
 loadPrefixFrames :: forall t m. (S.IsStream t, S.MonadAsync m, MonadCatch m)
-  => NodeMAC -> Prefix -> t m (BS.ByteString)
-loadPrefixFrames = S.map fromPB
-                   $ S.rights
-                   $ (decodeFile @t @m @(PB (MeshFrame)) (signedPathFile n prefix))
+  => NodeMAC -> Prefix -> t m (MeshFrame)
+loadPrefixFrames n prefix = S.map (fromPB)
+  $ S.rights
+  $ S.trace (liftIO . printLeft)
+  $ S.map (decodeA @(PB MeshFrame))
+  $ S.rights
+  $ S.tapRate 1 (\r -> liftIO . print $ "ReadRate: " <> (show n)
+                       <> "_" <> (show prefix) <> ": " <> (show r))
+  $ S.trace (liftIO . printLeft)
+  $ (decodeFile @t @m @(A.Array Word8) (frameFile n prefix))
 
 
-processPrefix :: forall m. (S.MonadAsync m, MonadCatch m) => NodeMAC -> Prefix -> m ()
-processPrefix = undefined
+validateMF' :: MeshFrame -> Maybe (Either EnergyState RuntimeStats)
+validateMF' m = case accessEnergyState m of
+                  Just e -> Just $ Left e -- (fixGridTS e)
+                  Nothing ->
+                    case accessRTS m of
+                      Just ((r :: RuntimeStats)) -> Just $ Right r -- (fixMeshTS r)
+                      Nothing -> Nothing
+  where
+    fixGridTS :: EnergyState -> Maybe EnergyState
+    fixGridTS r = case r ^? N.cpuTime of
+      Nothing -> Nothing
+      (Just t') -> Just r
+    {-# INLINE fixGridTS #-}
+    fixMeshTS :: RuntimeStats -> Maybe RuntimeStats
+    fixMeshTS r = case r ^? N.cpuTime of
+      Nothing -> Nothing
+      (Just t') -> Just r
+    {-# INLINE fixMeshTS #-}
+
+
+
+loadFrames :: (S.IsStream t, S.MonadAsync m, MonadCatch m)
+  => KbtzName -> [NodeMAC] -> HydrationOpts -> t m ()
+loadFrames k ns HydrationOpts{resolution, start, end} =
+  S.mapM (processNode fl prefixes k) (S.fromList ns)
+  where
+    fl = lineFoldHttp 32 (Http.writeParams defaultDatabase)
+    prefixes = prefixRange resolution (toUTC start) (toUTC end)
+
+processNode :: forall m. (S.MonadAsync m, MonadCatch m)
+  => FL.Fold m [Line Time.UTCTime] () ->  [Prefix] -> KbtzName -> NodeMAC -> m ()
+processNode lnFold prefixes k n = S.fold lnFold
+  $ S.fromAhead
+  $ S.maxThreads 3000
+  $ S.tapRate 10 (\r -> liftIO $ print $ "Ingest Rate for " <> (show n) <> " : " <> (show r))
+  $ S.map (\(a, b) -> a <> b)
+  $ S.map (bimap (lineSensorR tag) (lineMesh tag))
+  $ S.postscan (FL.partition sensorFold (meshFold n))
+  --  $ S.map fromJust
+  --  $ S.filter isJust
+  $ S.catMaybes
+  $ S.trace (\x -> if (isNothing x) then (liftIO $ print x) else (return ()))
+  $ S.map (validateMF')
+  $ S.concatMapWith S.ahead (\p -> loadPrefixFrames n p) $ S.fromList prefixes
+  where
+    tag = asKbtzNode k n
+
+
 
 prefixDownload :: forall m. (S.MonadAsync m, MonadCatch m, MonadThrow m)
   => Env
@@ -155,6 +229,10 @@ prefixDownload env time bucket cache man n p = S.fold (saveDL n p)
     -- host = "s3-ap-southeast-1.amazonaws.com"
     saveDL n t = (encodeFold (frameFile n t))
 
+
+printLeft x = case x of
+  Left a -> liftIO $ print a
+  Right _ -> return ()
 
 signedPaths :: forall m. (S.MonadAsync m, MonadCatch m)
   => Time.UTCTime -> HydrationOpts -> Env -> [NodeMAC] -> S.ParallelT m (BS.ByteString)

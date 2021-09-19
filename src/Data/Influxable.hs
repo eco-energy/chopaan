@@ -13,11 +13,17 @@ module Data.Influxable (asKbtzNode
                        , nodeName
                        , kbtzName
                        , showText
+                       , lineFoldUdp
+                       , lineFoldHttp
                        ) where
 
 import Prelude hiding ((.))
 import Control.Category
+import Control.Lens
+import Control.Monad.IO.Class
 
+import Debug.Trace
+import Data.Maybe
 import Data.Int
 import Data.Bifunctor
 import Data.HList
@@ -33,6 +39,13 @@ import qualified Database.InfluxDB.Format as F
 import Database.InfluxDB.Types
 import Database.InfluxDB.Line
 import Database.InfluxDB.Query
+import qualified Database.InfluxDB.Write.UDP as UDP
+
+import qualified Database.InfluxDB.Write as Http
+
+import qualified Streamly.Internal.Data.Sink as Sink
+
+import qualified Streamly.Internal.Data.Fold as FL
 
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
@@ -56,6 +69,16 @@ data Agg = Mean | Count deriving (Eq)
 --              | Where ![(Key, Key, WhereOp)]
 --              | GroupBy Grouping
 
+
+lineFoldUdp :: forall m. (MonadIO m) => Int -> UDP.WriteParams -> FL.Fold m [Line UTCTime] ()
+lineFoldUdp batchSize wp = FL.many (FL.take batchSize FL.mconcat) lineFold'
+  where
+    lineFold' = Sink.toFold $ Sink.drainM (liftIO . UDP.writeBatch wp)
+
+lineFoldHttp :: forall m. (MonadIO m) => Int -> Http.WriteParams -> FL.Fold m [Line UTCTime] ()
+lineFoldHttp batchSize wp = FL.many (FL.take batchSize FL.mconcat) lineFold'
+  where
+    lineFold' = Sink.toFold $ Sink.drainM (liftIO . Http.writeBatch wp)
 
 renderQuery :: Query -> Text
 renderQuery (Query q) = q
@@ -123,23 +146,21 @@ nodeQueries kn = NodeQueries (these @PowerNR) (these @EnergyNR) (these @BatteryR
     these = seriesQueries @KbtzNode @a kn
 
 
-lineSensorR :: KbtzName -> NodeMAC -> SensorR -> [Line UTCTime]
-lineSensorR k n s = [ lineNow . _powerT $ s
+lineSensorR :: KbtzNode -> SensorR -> [Line UTCTime]
+lineSensorR tag s = [ lineNow . _powerT $ s
                     , lineNow . _energyT $ s
                     , lineNow . _battery $ s
                     ]
     where
       lineNow :: forall a. (HasInfluxFields a, ToMeasurement KbtzNode a) => a -> Line UTCTime
-      lineNow = mkLine (const t) tag 
-      tag = asKbtzNode k n
+      lineNow = mkLine (const t) tag
       t = _time s 
 
-lineMesh :: KbtzName -> NodeMAC -> (MeshNode, RxSignal) -> [Line UTCTime]
-lineMesh k n m = [ lineNow m ]
+lineMesh :: KbtzNode -> (MeshNode, RxSignal) -> [Line UTCTime]
+lineMesh tag m = [ lineNow m ]
     where
       lineNow :: forall a. (HasInfluxFields a, ToMeasurement KbtzNode a) => a -> Line UTCTime
       lineNow = mkLine (const (Just t)) tag
-      tag = asKbtzNode k n
       t = nodeTime . fst $ m 
 
 instance ToMeasurement (KbtzNode) (PowerNR)  where
@@ -181,58 +202,64 @@ instance (HasInfluxFields a, HasInfluxFields b) => HasInfluxFields (a, b) where
 
 instance (FieldType a) => HasInfluxFields (Node a) where
   getInfluxKeys = ["tx", "consumed", "generated"]
-  getInfluxFields n = M.fromList $ (second (fromJust . getField))
-    <$> [ ("tx", tx n)
-        , ("consumed", consumed n)
-        , ("generated", generated n)
-        ] 
+  getInfluxFields n = toSafeMap (M.fromList $ [ ("tx", getField $ tx n)
+                                              , ("consumed", getField $ consumed n)
+                                              , ("generated", getField $ generated n)
+                                              ])
 
 
 instance (FieldType e, FieldType p) => HasInfluxFields (Battery e p) where
   getInfluxKeys = ["soc", "chargeLim", "dischargeLim", "totalCapacity"]
-  getInfluxFields n = M.fromList $ [("soc", getFieldUnsafe $ soc n)
-                                   , ("chargeLim", getFieldUnsafe $ chargeLim n)
-                                   , ("dischargeLim", getFieldUnsafe $ dischargeLim n)
-                                   , ("totalCapacity", getFieldUnsafe $ totalCapacity n)
-                                   ] 
+  getInfluxFields n = toSafeMap (M.fromList $ [("soc", getField $ soc n)
+                                              , ("chargeLim", getField $ chargeLim n)
+                                              , ("dischargeLim", getField $ dischargeLim n)
+                                              , ("totalCapacity", getField $ totalCapacity n)
+                                              ]) 
 
 instance HasInfluxFields (RxSignal) where
   getInfluxKeys = ["strength", "parent"] 
-  getInfluxFields n = M.fromList $ [ ("strength", getFieldUnsafe $ strength n)
-                                   , ("parent", getFieldUnsafe $ parent n)
-                                   ] 
+  getInfluxFields n = toSafeMap (M.fromList $ [ ("strength", getField $ strength n)
+                                              , ("parent", getField $ parent n)
+                                              ]) 
 
 instance HasInfluxFields (MeshNode) where
   getInfluxKeys = ["isRoot", "uptime", "routerRSSI"]
-  getInfluxFields n = M.fromList $ [ ("isRoot", getFieldUnsafe $ isRoot n)
-                                   , ("uptime", getFieldUnsafe $ uptime n)
-                                   , ("routerRSSI", getFieldUnsafe $ routerRSSI n)
-                                   ] 
+  getInfluxFields n = toSafeMap
+                      (M.fromList $ [ ("isRoot", getField $ isRoot n)
+                                    , ("uptime", getField $ uptime n)
+                                    , ("routerRSSI", getField $ routerRSSI n)
+                                    ])
 
+toSafeMap = M.map (fromJust) . M.filter (isJust) --  . trace (show m) $ m
 
 showText :: (Show a) => a -> Text
 showText = T.replace "\"" "" . T.pack . show
 
-
-getFieldUnsafe :: (FieldType a) => a -> Field n
-getFieldUnsafe = fromJust . getField
 
 
 class FieldType f where
   getField :: f -> Maybe (Field n)
 
 
-instance FieldType a where
-  getField = const Nothing
+-- instance FieldType a where
+--   getField = const Nothing
 
 instance {-# OVERLAPPING #-} FieldType Int64 where
   getField = Just . fromInt
+
+instance {-# OVERLAPPING #-} FieldType Int where
+  getField = Just . fromInt . fromIntegral
+
+
 
 instance {-# OVERLAPPING #-} FieldType Double where
   getField = Just . fromDouble
 
 instance {-# OVERLAPPING #-} FieldType Bool where
   getField = Just . fromBool
+
+instance {-# OVERLAPPING #-} FieldType NodeMAC where
+  getField = Just . fromText . unNodeId
 
 instance {-# OVERLAPPING #-} FieldType Text where
   getField = Just . fromText

@@ -61,7 +61,7 @@ import Data.ProtoLens.Message (Message)
 import qualified Codec.Winery as W
 
 import System.Directory (doesFileExist)
-
+import System.Posix.Files (getFileStatus, fileSize)
 
 data DecodeException = WinoExp W.WineryException
                      | BinExp
@@ -227,7 +227,8 @@ decodeFile :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch
   => FilePath -> t m (Either DecodeException a)
 decodeFile f = S.concatM $ do
   exists <- liftIO $ doesFileExist f
-  case exists of
+  fSize <- liftIO $ fileSize <$> (getFileStatus f)
+  case (exists) of
     True -> return $ (fmap decodeA) . (S.parseManyD (chunkBytes @a)) . FL.toBytes $ f
     False -> return $ S.fromPure (Left NoFile)
 {-# INLINE decodeFile #-}

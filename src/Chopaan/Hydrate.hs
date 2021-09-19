@@ -55,6 +55,7 @@ import Chopaan.Node.NodeId
 import Chopaan.Node.Folds
 import Chopaan.Node.Mesh
 import Chopaan.Graph
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz (KbtzC(..))
 import Chopaan.Comm.Monitor
 
@@ -141,8 +142,8 @@ hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts,
       hydrationRate = S.tapRate 10 (liftIO . (print . (prefix <>) . show))
       {-# INLINE hydrationRate #-}
       nodeS :: Env -> NodeMAC -> Monitor -> t GraphM (Bool)
-      nodeS env n mon = grider n
-                   S.|$ mesher n
+      nodeS env n mon = grider dbSave name n
+                   S.|$ mesher dbSave name n
                    S.|$ S.fromAhead
                    $ nodeS3 env buck bufOpts hPrefix mon ps n
         where
@@ -154,42 +155,7 @@ hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts,
           --   return $ True
       {-# INLINE nodeS #-}
       buck = (BucketName s3BucketName)
-      mesher :: NodeMAC
-             --- -> Handle
-             -> t GraphM (ObjectKey, Either EnergyState RuntimeStats)
-             -> t GraphM (ObjectKey, Either EnergyState (MeshNode, RxSignal))
-      mesher n s = S.trace (getSaveM)
-        $ S.map (mfn)
-        $ s
-        where
-          getSaveM = case dbSave of
-            True -> saveM
-            False -> pure . (const True)
-          mfn :: (ObjectKey, Either x RuntimeStats)
-            -> (ObjectKey, Either x (MeshNode, RxSignal)) 
-          mfn = fmap (fmap ((meshNodeLink (getGridRoot name))))
-          saveM :: (ObjectKey, Either a (MeshNode, RxSignal)) -> GraphM Bool
-          saveM (!k, x) = case x of
-            (Left _) -> return True
-            (Right !r) -> do
-              --(liftIO . writeToHandle h k) =<<
-              (withSpider $! pE =<< addMeshN (n, r))
-      grider :: NodeMAC
-             -- -> Handle
-             -> t GraphM (ObjectKey, Either EnergyState (MeshNode, RxSignal))
-             -> t GraphM Bool
-      grider n s = S.mapM (withSpider . (getSaveG))
-                   $ S.postscan (FL.unzip idFold sensorFold)
-                   $ S.map (fmap (fromLeft undefined))
-                   $ S.filter (isLeft . snd)
-                   $ s
-        where 
-          getSaveG = case dbSave of
-            True -> saveGrid
-            False -> \(_, _) -> pure True
-          saveGrid (!k, !x) = do
-            -- (liftIO . writeToHandle gh k) =<<
-            pE =<< addFlow name (n, x)
+      
             -- !b <- pE =<< addMon name (n, (x, Nothing))
       --       -- !c <- pE =<< addTx name (n, (x, Nothing, Nothing))
       -- writeToHandle :: Handle -> ObjectKey -> Bool -> IO Bool
@@ -204,3 +170,52 @@ hydrateKbtz HydrationOpts{dbSave, start, end, s3BucketName, resolution, bufOpts,
         (Left e) -> (liftIO . print $ e) >> return False
         (Right a) -> return a
 
+pE r = case r of
+        (Left e) -> (liftIO . print $ e) >> return False
+        (Right a) -> return a
+
+mesher :: forall t. (IsStream t)
+  => Bool
+  -> KbtzName
+  -> NodeMAC
+  -> t GraphM (ObjectKey, Either EnergyState RuntimeStats)
+  -> t GraphM (ObjectKey, Either EnergyState (MeshNode, RxSignal))
+mesher dbSave name n s = S.fromAhead
+  $ S.trace (getSaveM)
+  $ S.map (mfn)
+  $ S.adapt
+  $ s
+  where
+    getSaveM = case dbSave of
+      True -> saveM
+      False -> pure . (const True)
+    mfn :: (ObjectKey, Either x RuntimeStats)
+        -> (ObjectKey, Either x (MeshNode, RxSignal)) 
+    mfn = fmap (fmap ((meshNodeLink (getGridRoot name))))
+    saveM :: (ObjectKey, Either a (MeshNode, RxSignal)) -> GraphM Bool
+    saveM (!k, x) = case x of
+      (Left _) -> return True
+      (Right !r) -> do
+              --(liftIO . writeToHandle h k) =<<
+        (withSpider $! pE =<< addMeshN (n, r))
+{-# INLINE mesher #-}
+
+grider :: forall t. (IsStream t)
+  => Bool
+  -> KbtzName
+  -> NodeMAC
+  -> t GraphM (ObjectKey, Either EnergyState (MeshNode, RxSignal))
+  -> t GraphM Bool
+grider dbSave name n s = S.fromAhead
+  $ S.mapM (withSpider . (getSaveG))
+  $ S.postscan (FL.unzip idFold sensorFold)
+  $ S.map (fmap (fromLeft undefined))
+  $ S.filter (isLeft . snd)
+  $ S.adapt
+  $ s
+  where 
+    getSaveG = case dbSave of
+      True -> saveGrid
+      False -> \(_, _) -> pure True
+    saveGrid (!k, !x) = pE =<< addFlow name (n, x)
+{-# INLINE grider #-}
