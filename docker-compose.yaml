@@ -1,22 +1,28 @@
 version: '3'
 
 services:
-  db:
-    image: janusgraph/janusgraph:0.6.0
-    container_name: janusgraph
-    ports:
-      - "8182:8182"
-    # The mounted volume only makes sense if JanusGraph is being run with the BerekeleyDB storage.
-    volumes:
-      - "janusgraph-default-data:/var/lib/janusgraph"
-      - "./janusgraph-config/config/janusgraph.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
-      - "./janusgraph-config/config/gremlin-server-0.6.yaml:/etc/opt/janusgraph/janusgraph-server.yaml:ro"
-      - "./janusgraph-config/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
-      - "./janusgraph-config/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
+  # db:
+  #   image: janusgraph/janusgraph:0.6.0
+  #   container_name: janusgraph
+  #   ports:
+  #     - "8182:8182"
+  #   # The mounted volume only makes sense if JanusGraph is being run with the BerekeleyDB storage.
+  #   volumes:
+  #     - "janusgraph-default-data:/var/lib/janusgraph"
+  #     - "./janusgraph-config/config/janusgraph.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
+  #     - "./janusgraph-config/config/gremlin-server-0.6.yaml:/etc/opt/janusgraph/janusgraph-server.yaml:ro"
+  #     - "./janusgraph-config/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
+  #     - "./janusgraph-config/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
   influx:
     image: influxdb:1.8
     container_name: influxdb
     ports:
       - "8086:8086"
+  grafana:
+    depends_on: influx
+    image: grafana/grafana:7.3
+    container_name: grafana
+    ports:
+      - "3000:3000"
 volumes:
   janusgraph-default-data:

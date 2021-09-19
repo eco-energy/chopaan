@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeApplications, ScopedTypeVariables, ExplicitForAll, NamedFieldPuns, TupleSections, BangPatterns, OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeApplications, ScopedTypeVariables, ExplicitForAll, NamedFieldPuns, TupleSections, BangPatterns, OverloadedLists, PolyKinds #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, DeriveFunctor #-}
 module Main where
 
 import Chopaan.Node.NodeId
@@ -16,6 +17,7 @@ import Data.Influxable (asKbtzNode, lineSensorR, lineMesh, lineFoldHttp)
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N (cpuTime)
 
+import Control.Arrow ((&&&))
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class
@@ -45,6 +47,9 @@ import qualified Database.InfluxDB.Write as Http
 import qualified Database.InfluxDB.Format as F
 import qualified Database.InfluxDB.Manage as DB
 
+import qualified Codec.Winery as W
+import Data.ProtoLens
+
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Stream.IsStream.Transform as S
@@ -53,6 +58,8 @@ import qualified Streamly.External.ByteString as SBS
 import qualified Streamly.Internal.Data.Array.Foreign as A
 import qualified Streamly.Internal.Data.Array.Foreign.Type as A
 import qualified Streamly.Internal.Data.Array.Stream.Foreign as A
+import qualified Streamly.Internal.Data.Time.Units as ST
+import Streamly.Internal.Data.IORef.Prim (Prim(..))
 import Dhall
 
 
@@ -80,11 +87,11 @@ main = do
   mapM_ (\n -> cd ("./data/frames/" <> (nodeMACPath n))) labNodes
   let p = DB.queryParams defaultDatabase
   DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) defaultDatabase
-  --ps <- S.length . S.fromParallel
-  --      $ S.tapRate 10 (\r -> print $ "Signing Rate: " <> (show r))
-  --      $ signSavedPaths t0 h aws labNodes
-        -- S.|$ signedPaths t0 h aws labNodes
-  --_ <- downloadAllPrefixes t0 aws h labNodes
+  -- ps <- S.length . S.fromParallel
+  --       $ S.tapRate 10 (\r -> print $ "Signing Rate: " <> (show r))
+  --       $ signSavedPaths t0 h aws labNodes
+  --       S.|$ signedPaths t0 h aws labNodes
+  _ <- downloadAllPrefixes t0 aws h labNodes
   ps <- S.length . S.fromAsync $ loadFrames (KbtzId "Lab_TestGrid") labNodes h
   t1 <- Time.getCurrentTime
   --print $ "Paths Signed: " <> (show ps)
@@ -112,7 +119,7 @@ downloadAllPrefixes :: forall m. (S.MonadAsync m, MonadCatch m, MonadThrow m)
 downloadAllPrefixes time env HydrationOpts{start, end, resolution, s3BucketName} ns =
   NC.withDNSCache cacheConf' $ \c -> do
     man <- cachingManager c
-    S.drain $ S.fromSerial -- $ S.maxThreads 4
+    S.drain $ S.maxThreads (length ns) $ S.fromAsync
       $ S.mapM (uncurry (prefixDownload env time bucket c man)) $ nps  
   where
     nps = S.fromList $ (,) <$> ns <*> prefixes
@@ -152,7 +159,7 @@ validateMF' m = case accessEnergyState m of
       Nothing -> Nothing
       (Just t') -> Just r
     {-# INLINE fixMeshTS #-}
-
+{-# INLINE validateMF' #-}
 
 
 loadFrames :: (S.IsStream t, S.MonadAsync m, MonadCatch m)
@@ -193,7 +200,7 @@ prefixDownload :: forall m. (S.MonadAsync m, MonadCatch m, MonadThrow m)
   -> Prefix
   -> m ()
 prefixDownload env time bucket cache man n p = S.fold (saveDL n p)
-  $ A.compact A.defaultChunkSize
+  --  $ A.compact A.defaultChunkSize
   $ S.rights
   $ S.catMaybes
   $ S.trace (printLeft)
@@ -234,20 +241,45 @@ printLeft x = case x of
   Left a -> liftIO $ print a
   Right _ -> return ()
 
+newtype S3Id = S3Id ST.MilliSecond64
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype (Bounded, Enum, Integral, Num, Real)
+  deriving anyclass (Prim, W.Serialise)
+
+deriving instance W.Serialise S3.ObjectKey
+
+toS3Id :: S3.ObjectKey -> S3Id
+toS3Id = S3Id . read . T.unpack . snd . (T.breakOnEnd ("/")) . (T.replace " " "") . unObject
+
+fork :: (a -> b) -> (a -> c) -> (a -> (b, c))
+fork = (&&&)
+
+type S3TimeIdx a = (S3Id, a)
+
+newtype S3TimeIdxSized a = S3TimeIdxSized { unS3TimeIdxSized :: (S3TimeIdx (a, Int)) }
+  deriving (Eq, Ord, Show, Generic, Functor, Prim)
+
+type S3Path = S3TimeIdxSized S3.ObjectKey
+
+type S3Req = S3TimeIdxSized BS.ByteString
+
+
+
 signedPaths :: forall m. (S.MonadAsync m, MonadCatch m)
-  => Time.UTCTime -> HydrationOpts -> Env -> [NodeMAC] -> S.ParallelT m (BS.ByteString)
+  => Time.UTCTime -> HydrationOpts -> Env -> [NodeMAC] -> S.ParallelT m (S3Req)
 signedPaths startTime HydrationOpts{resolution, start, end, s3BucketName, bufOpts} env ns =
   S.concatMapWith S.parallel nodePaths $ S.fromList ns
   where
     prefixes = S.fromList $ prefixRange resolution (toUTC start) (toUTC end)
-    savePrefix n t = (FL.lmap (toWino . (first unObject)) (encodeFold (pathFile n t)))
-    nodePaths :: NodeMAC -> S.ParallelT m (BS.ByteString)
+    savePrefix :: NodeMAC -> Prefix -> FL.Fold m S3Path ()
+    savePrefix n t = FL.lmap (toWino . unS3TimeIdxSized) (encodeFold (pathFile n t))
+    nodePaths :: NodeMAC -> S.ParallelT m (S3Req)
     nodePaths n = S.concatMapWith S.parallel (S.fromAhead . prefixPaths n) prefixes 
-    prefixPaths :: NodeMAC -> Prefix -> S.AheadT m (BS.ByteString)
+    prefixPaths :: NodeMAC -> Prefix -> S.AheadT m S3Req
     prefixPaths n t = S.tap (saveSigned n t)
-        $ S.mapM (signPath bucket env startTime)
+        $ S.sequence (fmap (signPath bucket env startTime))
         $ S.tap (savePrefix n t)
-        $ S.maxBuffer 0
+        $ S.map (S3TimeIdxSized . (fork (toS3Id . fst) id))
         $ S.unfold (s3Paths'' env (req n)) t
     req n (Prefix t) = S3.listObjectsV2 bucket
           & S3.lovPrefix .~ (timedPrefix n t)
@@ -255,12 +287,11 @@ signedPaths startTime HydrationOpts{resolution, start, end, s3BucketName, bufOpt
     bucket = S3.BucketName s3BucketName
 
     
-signPath :: (MonadIO m) => S3.BucketName -> Env -> Time.UTCTime -> (S3.ObjectKey, Int) -> m (BS.ByteString)
+signPath :: (MonadIO m) => S3.BucketName -> Env -> Time.UTCTime -> S3.ObjectKey -> m (BS.ByteString)
 signPath bucket env = sign 
     where
       sign t w = liftIO $ withAwsEnv env (liftAWS . presignURL t (oneHour) . toReq $ w)
-      readObjReq k = S3.getObject bucket k
-      toReq = readObjReq . fst
+      toReq k = S3.getObject bucket k 
       oneMin = 60
       oneHour = 60 * oneMin
 
@@ -274,6 +305,7 @@ loadSignedPaths :: forall t m. (S.IsStream t, S.MonadAsync m, MonadCatch m)
 loadSignedPaths n prefix = S.map fromWino
                            $ S.rights
                            $ (decodeFile @t @m @(Wino (BS.ByteString)) (signedPathFile n prefix))
+
 
 loadPrefixPaths :: forall t m. (S.IsStream t, S.MonadAsync m, MonadCatch m)
                 => NodeMAC -> Prefix -> t m (S3.ObjectKey, Int)

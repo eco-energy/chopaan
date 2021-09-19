@@ -154,6 +154,31 @@ in
             '';
       };
 
+      systemd.services.hydrate = {
+        
+        wantedBy = [ "multi-user.target" ];
+
+        after = [ "network.target" "docker-janusgraph.service" ];
+        environment = {
+          AWS_CREDS = awskey;
+          
+        };
+        path = [ pkgs.z3 ];
+        #preStart = "mkdir -p ${cacheDir}";
+        serviceConfig = {
+          LimitNOFILE = 6400000;
+          StateDirectory=chopaanDir;
+          RuntimeDirectory=chopaanDir;
+        };
+        script =
+          let
+            chopaan = app.hydrate;
+          in
+            ''
+            ${chopaan}/bin/hydrate --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort} +RTS -A32m -n4m -N
+            '';
+      };
+      
       systemd.services.dashgen = {
         wantedBy = [ "grafana.service" ];
         after = [ "docker-janusgraph.service" "chopaan.service" ];

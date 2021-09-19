@@ -49,8 +49,9 @@ runKbtzim mq hydrationOpts = do
       past = S.concatMapWith S.async
         (hydrateKbtz' hydrationOpts) confss
       present = S.concatMapWith S.async (S.concatM . runKibbutz @t) confss
-  return $ (fmap snd past)
-    `S.async` (fmap (const True) present)
+  return $ S.mapM (pure . const True) $ present
+  --return $ (fmap snd past)
+  --  `S.async` (fmap (const True) present)
   where
     futPrefix = "runKibbutz :"
     labKbtz = (KbtzId "Lab_TestGrid")
