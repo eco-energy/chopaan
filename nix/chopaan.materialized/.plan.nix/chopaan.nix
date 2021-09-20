@@ -25,7 +25,7 @@
       detailLevel = "FullDetails";
       licenseFiles = [];
       dataDir = ".";
-      dataFiles = [ "options.dhall" ];
+      dataFiles = [ "options.dhall" "hydration.dhall" ];
       extraSrcFiles = [ "README.md" "ChangeLog.md" ];
       extraTmpFiles = [];
       extraDocFiles = [];
@@ -142,6 +142,7 @@
             (hsPkgs."greskell-websocket" or (errorHandler.buildDepError "greskell-websocket"))
             (hsPkgs."http-client" or (errorHandler.buildDepError "http-client"))
             (hsPkgs."http-client-tls" or (errorHandler.buildDepError "http-client-tls"))
+            (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
             (hsPkgs."influxdb" or (errorHandler.buildDepError "influxdb"))
             (hsPkgs."katip" or (errorHandler.buildDepError "katip"))
             (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
@@ -421,6 +422,7 @@
               (hsPkgs."greskell-websocket" or (errorHandler.buildDepError "greskell-websocket"))
               (hsPkgs."http-client" or (errorHandler.buildDepError "http-client"))
               (hsPkgs."http-client-tls" or (errorHandler.buildDepError "http-client-tls"))
+              (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
               (hsPkgs."influxdb" or (errorHandler.buildDepError "influxdb"))
               (hsPkgs."katip" or (errorHandler.buildDepError "katip"))
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
@@ -570,6 +572,7 @@
               (hsPkgs."greskell-websocket" or (errorHandler.buildDepError "greskell-websocket"))
               (hsPkgs."http-client" or (errorHandler.buildDepError "http-client"))
               (hsPkgs."http-client-tls" or (errorHandler.buildDepError "http-client-tls"))
+              (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
               (hsPkgs."influxdb" or (errorHandler.buildDepError "influxdb"))
               (hsPkgs."katip" or (errorHandler.buildDepError "katip"))
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
@@ -719,6 +722,7 @@
               (hsPkgs."greskell-websocket" or (errorHandler.buildDepError "greskell-websocket"))
               (hsPkgs."http-client" or (errorHandler.buildDepError "http-client"))
               (hsPkgs."http-client-tls" or (errorHandler.buildDepError "http-client-tls"))
+              (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
               (hsPkgs."influxdb" or (errorHandler.buildDepError "influxdb"))
               (hsPkgs."katip" or (errorHandler.buildDepError "katip"))
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
@@ -868,6 +872,7 @@
               (hsPkgs."greskell-websocket" or (errorHandler.buildDepError "greskell-websocket"))
               (hsPkgs."http-client" or (errorHandler.buildDepError "http-client"))
               (hsPkgs."http-client-tls" or (errorHandler.buildDepError "http-client-tls"))
+              (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
               (hsPkgs."influxdb" or (errorHandler.buildDepError "influxdb"))
               (hsPkgs."katip" or (errorHandler.buildDepError "katip"))
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
@@ -1017,6 +1022,7 @@
               (hsPkgs."greskell-websocket" or (errorHandler.buildDepError "greskell-websocket"))
               (hsPkgs."http-client" or (errorHandler.buildDepError "http-client"))
               (hsPkgs."http-client-tls" or (errorHandler.buildDepError "http-client-tls"))
+              (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
               (hsPkgs."influxdb" or (errorHandler.buildDepError "influxdb"))
               (hsPkgs."katip" or (errorHandler.buildDepError "katip"))
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
@@ -1168,6 +1174,7 @@
               (hsPkgs."greskell-websocket" or (errorHandler.buildDepError "greskell-websocket"))
               (hsPkgs."http-client" or (errorHandler.buildDepError "http-client"))
               (hsPkgs."http-client-tls" or (errorHandler.buildDepError "http-client-tls"))
+              (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
               (hsPkgs."influxdb" or (errorHandler.buildDepError "influxdb"))
               (hsPkgs."katip" or (errorHandler.buildDepError "katip"))
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
@@ -1312,6 +1319,7 @@
               (hsPkgs."greskell-websocket" or (errorHandler.buildDepError "greskell-websocket"))
               (hsPkgs."http-client" or (errorHandler.buildDepError "http-client"))
               (hsPkgs."http-client-tls" or (errorHandler.buildDepError "http-client-tls"))
+              (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
               (hsPkgs."influxdb" or (errorHandler.buildDepError "influxdb"))
               (hsPkgs."katip" or (errorHandler.buildDepError "katip"))
               (hsPkgs."net-mqtt" or (errorHandler.buildDepError "net-mqtt"))
