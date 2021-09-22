@@ -68,9 +68,7 @@ getAwsEnv svc = do
     Just fp -> do
       manager <- preResolvingManager
       t <- liftIO $ (Time.formatTime Time.defaultTimeLocale "%y-%m-%d-%R-%Q") <$> Time.getCurrentTime
-      let fname = "aws_log_" <> t --(showText . toText . _svcAbbrev $ svc) <> "_" <> t
-      lgHandle <- liftIO $ openFile fname WriteMode
-      lgr <- newLogger Info lgHandle
+      lgr <- newLogger Info stdout
       newEnvWith (creds fp) Nothing manager
       --env --Nothing -- manager
         <&> set envLogger lgr . set envRegion Singapore

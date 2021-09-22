@@ -265,6 +265,8 @@ library:
         - Data.Selectors
         - Data.Influxable
         - Data.HList
+        - Data.BTreeIndex
+        - Data.BTreeIndex.Types
         - Kbtz
         - Proto.NodeMessageSchema.NodeMessages
         - Proto.NodeMessageSchema.NodeMessages_Fields

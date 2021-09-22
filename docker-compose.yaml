@@ -18,11 +18,11 @@ services:
     container_name: influxdb
     ports:
       - "8086:8086"
-  grafana:
-    depends_on: influx
-    image: grafana/grafana:7.3
-    container_name: grafana
-    ports:
-      - "3000:3000"
+  # grafana:
+  #   depends_on: influx
+  #   image: grafana/grafana:7.3
+  #   container_name: grafana
+  #   ports:
+  #     - "3000:3000"
 volumes:
   janusgraph-default-data:

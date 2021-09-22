@@ -45,12 +45,15 @@ import Streamly.Prelude (IsStream, MonadAsync)
 
 import Streamly.Internal.Data.Tuple.Strict (Tuple'(..))
 import qualified Streamly.Internal.Data.Fold as FL
-import qualified Streamly.Internal.FileSystem.File as FL
+import qualified Streamly.Internal.Data.Unfold as UF
+import qualified Streamly.Internal.FileSystem.File as File
 import qualified Streamly.Internal.Data.Array.Foreign as A
 import qualified Streamly.Internal.Data.Array.Foreign.Type as A
 import qualified Streamly.Internal.Data.Array.Stream.Foreign as A
 import qualified Streamly.Internal.Data.Array.Stream.Fold.Foreign as AF
 import qualified Streamly.Internal.Data.Parser.ParserD as P
+import qualified Streamly.Internal.Data.Producer as P
+import qualified Streamly.Internal.Data.Producer.Source as P
 import qualified Streamly.Internal.Data.Binary.Decode as P
 import qualified Streamly.External.ByteString.Lazy as SBL
 import qualified Streamly.External.ByteString as SBS
@@ -76,9 +79,7 @@ class HasEncoding a where
   decodeA :: A.Array Word8 -> Either DecodeException a 
   chunkBytes ::  (MonadAsync m, MonadCatch m) => P.Parser m Word8 (A.Array Word8)
 
-
---instance HasEncoding ()
-
+    
 newtype Wino w = Wino { unWino :: w }
   deriving (Generic)
   deriving newtype (W.Serialise, Show)
@@ -97,10 +98,14 @@ instance (W.Serialise a) => HasEncoding (Wino a) where
   {-# INLINE decodeA #-}
   chunkBytes = parseLengthPrefixed
 
+winoArray :: W.Serialise a => a -> (A.Array Word8)
+winoArray = SBS.toArray . W.serialise
+
+
 
 
 instance HasEncoding (A.Array Word8) where
-  encodeA = prefixLengthArray
+  encodeA = pure
   {-# INLINE encodeA #-}
   decodeA = Right
   {-# INLINE decodeA #-}
@@ -229,13 +234,21 @@ decodeFile f = S.concatM $ do
   exists <- liftIO $ doesFileExist f
   fSize <- liftIO $ fileSize <$> (getFileStatus f)
   case (exists) of
-    True -> return $ (fmap decodeA) . (S.parseManyD (chunkBytes @a)) . FL.toBytes $ f
+    True -> return $ S.mapM (pure . decodeA) . (S.parseManyD (chunkBytes @a)) . File.toBytes $ f
     False -> return $ S.fromPure (Left NoFile)
 {-# INLINE decodeFile #-}
 
+type FileSource a = (P.Source FilePath a)
+
+decodeProducer :: forall m a. (HasEncoding a, MonadAsync m, MonadCatch m)
+  => P.Producer m (FileSource Word8) Word8
+  -> P.Producer m (FileSource Word8) (Either DecodeException a)
+decodeProducer = (fmap decodeA) . P.parseManyD (chunkBytes @a)
+
+
 encodeFold :: (HasEncoding a, MonadAsync m, MonadCatch m)
   => FilePath -> FL.Fold m a ()
-encodeFold fp = FL.lmapM encodeA (FL.writeChunks fp)
+encodeFold fp = FL.lmapM encodeA (File.writeChunks fp)
 {-# INLINE encodeFold #-}
 
 parseMsgS :: (IsStream t, MonadAsync m, Message a, MonadCatch m)

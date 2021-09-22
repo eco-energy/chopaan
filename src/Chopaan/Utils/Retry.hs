@@ -18,6 +18,9 @@ recoverC msg n action = recovering (chopaanPolicy n) [logDef] (\_ -> action)
 recoverOrNothing :: forall m a e. (MonadIO m, C.MonadMask m, C.MonadCatch m, Show e) => e -> Int -> m a -> m (Maybe a)
 recoverOrNothing msg n act = C.catchAll ((pure . Just) =<< (recoverC msg n act)) (\e -> (liftIO . print $ ("Failed After Retries: " <> show e))  >> return Nothing) 
 
+recoverWith :: forall m a e. (MonadIO m, C.MonadMask m, C.MonadCatch m, Show e) => e -> Int -> a -> m a -> m a
+recoverWith msg n c act = C.catchAll (recoverC msg n act) (\e -> (liftIO . print $ ("Failed After Retries: " <> show e))  >> (return c)) 
+
 retryEither :: (MonadIO m) => n -> (n -> m (Either a b)) -> m (Either a b)
 retryEither n f = retrying (chopaanPolicy 10) shouldRetryEither (\retryStatus ->  (liftIO $ print retryStatus) >> f n)
 
