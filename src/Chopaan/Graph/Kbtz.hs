@@ -27,8 +27,9 @@ import Data.Greskell.Graph (AVertex, AEdge, ElementData, Element, Vertex, Edge, 
 import Data.Greskell.GraphSON (FromGraphSON(..), GValue)
 import Data.Greskell.Binder
 import Data.Greskell.GTraversal
-  ( GTraversal, Walk, Transform, SideEffect, Filter, gAddV, gAddE, gOut, gOutE, gId, gIn, gInV, gInE, gHasLabel, gProperty,
-    source, sV, sV', gV, ($.), (&.), unsafeCastStart, unsafeCastEnd, (<*.>), sAddV, gHas2, liftWalk, gFrom, gTo, gSideEffect, gValueMap )
+  ( GTraversal, Walk, WalkType, Transform, SideEffect, Filter, gAddV, gAddE, gOut, gOutE, gId, gIn', gIn, gInV, gInE, gHasLabel, gProperty,
+    source, sV, sV', gV, ($.), (&.), unsafeCastStart, unsafeCastEnd, (<*.>), sAddV, gHas2, liftWalk, gFrom, gTo, gSideEffect, gValueMap
+  , gFilter, gIs, gCoalesce, toGTraversal, gUnfold, gFold, gWhereP1, gWhereP2)
 import Data.Greskell.Extra (writeKeyValues, (<=:>), gWhenEmptyInput)
 import Data.Greskell.PMap
   ( PMap, Multi, Single, PMapLookupException,
@@ -122,7 +123,7 @@ parseAKbtz :: PMap Multi GValue -> Either PMapLookupException AKbtz
 parseAKbtz pm = AKbtz <$> (lookupAs akKey pm)
   where
     akKey :: Key VKbtz KbtzName
-    akKey = "@kbtz_id"
+    akKey = kbtzId
 
 instance FromGraphSON AKbtz where
   parseGraphSON gv = (pMapToFail . parseAKbtz) =<< parseGraphSON gv
@@ -142,35 +143,86 @@ instance FromGraphSON ANode where
   parseGraphSON gv = (pMapToFail . parseANode) =<< parseGraphSON gv
 
 
+upsertNodeIncomingEdge :: (Vertex v, Edge e)
+  => (Greskell n -> GTraversal Transform () v)
+  -> (Walk SideEffect [v] v)
+  -> (Greskell n -> Walk SideEffect v e)
+  -> Greskell n
+  -> GTraversal SideEffect () v
+upsertNodeIncomingEdge checkEx insert' mkEdge n = (liftWalk (checkEx n))
+                                    &. gWhenEmptyInput ((liftWalk gInV)
+                                                        <<< (mkEdge n)
+                                                        <<< insert'
+                                                       )
+
 addKbtz' :: AKbtz -> Binder (GTraversal SideEffect () VKbtz)
 addKbtz' k = do
   kid <- newBind $ akId k
+  --get <- getKbtzVById' (akId k)
   let
     addId :: Binder (Walk SideEffect VKbtz VKbtz)
     addId = return $ gProperty "@kbtz_id" kid
     addType :: Binder (Walk SideEffect VKbtz VKbtz)
     addType = return $ gProperty "@node_type" (string ("k" :: T.Text))
   addType <*.> addId <*.> (pure $ sAddV "kbtz" $ source "g")
+  --   addId :: Walk SideEffect VKbtz VKbtz
+  --   addId = gProperty kbtzId kid
+  --   addType :: Walk SideEffect VKbtz VKbtz
+  --   addType = gProperty "@node_type" (string ("k" :: T.Text))
+  --   --upsert i = liftWalk get &. gWhenEmptyInput i
+  --   ins = (sAddV "kbtz" $ source "g") &. (addType <<< addId) 
+  -- return $ ins --upsert ins
 
+hhId :: Key VHH NodeMAC
+hhId = "@hh_id"
 
+nodeType :: Key VHH T.Text
+nodeType = "@node_type"
+
+hhV :: Greskell T.Text
+hhV = "hh"
+
+kbtzV = "kbtz"
+
+kbtzId :: Key VKbtz KbtzName
+kbtzId = kbtzId
+
+isThisHH n = gHas2 hhId n
 
 addHH' :: ANode -> Binder (GTraversal SideEffect () VHH)
 addHH' nx = do
   n <- newBind $ anId nx
-  let addId = return $ gProperty "@hh_id" n
-      addType = return $ gProperty "@node_type" (string ("h" :: T.Text))
-  addType <*.> addId <*.> (pure $ sAddV "hh" $ source "g")
+  let get = getVHHById n
+      addId = gProperty hhId n
+      addType = gProperty nodeType (string ("h" :: T.Text))
+      ins = (gAddV hhV) >>> (addType <<< addId)
+      upsert i = liftWalk get &. gWhenEmptyInput i
+  return $ upsert ins
 
+-- gUpsertNodeEdge :: (WalkType w, Vertex v, Vertex v2, Element id) => g w [v] v -> Greskell T.Text -> Key v2 id -> Greskell id -> Greskell T.Text -> _ -> Walk SideEffect v e
+-- gUpsertNodeEdge mkV edgeLabel srcIdP srcId edgeT addE = (gCoalesce
+--                                                     [ gIn [edgeLabel] >>> gHas2 srcIdP srcId
+--                                                     , liftWalk (addE)
+--                                                     ])
+--                                                     <<< (gCoalesce
+--                                                          [ liftWalk $ toGTraversal gUnfold
+--                                                          , toGTraversal mkV
+--                                                          ])
+--                                                     <<< liftWalk gFold
 
 addHHToKbtz' :: KbtzName -> ANode -> Binder (GTraversal SideEffect () EKbtzIncludes) 
-addHHToKbtz' k n = (addBelongsToE k) <*.> (addHH' n)
-  where
-    addBelongsToE :: KbtzName -> Binder (Walk SideEffect VHH EKbtzIncludes)
-    addBelongsToE (KbtzId x) = do
-      k' <- newBind x
-      return $
-        gAddE "kbtzIncludes" (gFrom (gV @VHH [] >>> gHas2 "@kbtz_id" k'))
-
+addHHToKbtz' k n = do
+  k' <- newBind k
+  addN <- addHH' n
+  let
+    ins :: GTraversal SideEffect () EKbtzIncludes
+    ins = addN &. addBelongsToE
+    addBelongsToE :: (Walk SideEffect VHH EKbtzIncludes)
+    addBelongsToE = gCoalesce
+                    [ liftWalk (gInE (pure "kbtzIncludes"))
+                    , gAddE "kbtzIncludes" (gFrom (kbtzIncludesSrc >>> (gHas2 kbtzId k')))
+                    ]
+  return $ ins ---liftWalk getHH &. gWhenEmptyInput (ins)
 
 
 allV :: GTraversal Transform () AVertex
@@ -211,7 +263,7 @@ allKbtzim = pure $ allKbtz &. (liftWalk toAKbtz)
 getKbtzById'' :: KbtzName -> Binder (Walk Filter VKbtz VKbtz)
 getKbtzById'' k = do
   k' <- newBind k
-  return $ gHas2 "@kbtz_id" k'
+  return $ gHas2 kbtzId k'
 
 getKbtzVById' :: KbtzName -> Binder (GTraversal Transform () VKbtz)
 getKbtzVById' k = do
@@ -255,8 +307,6 @@ addHW' hw = (addProps hw) <*.> (pure $ sAddV "hwConfig" $ source "g")
       , generatioKey <=:> (generation hw')
       , loaKey <=:> (loads hw')
       ]
-    textS :: ToJSON a => a -> T.Text
-    textS = decodeUtf8 . toStrict . encode . toJSON
 
 --storageKey :: (Num a) => Key VHW (BatteryTop a)
 storagKey = "hw_storage"
@@ -292,9 +342,7 @@ addLastSyncToHH' n ls = do
   return $ (upsert n') &. (gProperty "lastSynced" l')
   where
     upsert :: Greskell NodeMAC -> GTraversal SideEffect () VLastSync 
-    upsert n = (liftWalk (getNodeLSWalk n) &. gWhenEmptyInput ((liftWalk gInV)
-                                                               <<< (hhEdge n)
-                                                               <<< insert))
+    upsert = upsertNodeIncomingEdge getNodeLSWalk insert hhEdge
     insert :: Walk SideEffect [VLastSync] VLastSync
     insert = (gAddV "hhLastSync")
     hhEdge :: Greskell NodeMAC -> Walk SideEffect VLastSync HHLastSynced
@@ -356,32 +404,3 @@ getNodeHW' :: NodeMAC -> Binder (GTraversal Transform () (HW Double))
 getNodeHW' n = do
   n' <- newBind n
   return $ getVHHById n' &. (toHW <<< hhHasHW)
-
-
-
-
-{--
-
-newtype VPerson = VPerson AVertex
-  deriving (Eq, Show)
-  deriving newtype (FromGraphSON, ElementData, Element, Vertex)
-
-newtype EOwnsHW = EOwnsHW AEdge
-  deriving (Eq, Show)
-  deriving newtype (FromGraphSON, ElementData, Element, Edge)
-
-gOutHasHW :: Walk Transform VHH VHW
-gOutHasHW = gOut ["hasHW"]
-
-gInOwnsHW :: Walk Transform VHW VPerson
-gInOwnsHW = gIn ["ownsHW"]
-
-
-
-
-addHWConfig :: KbtzName -> NodeMAC -> (HW Double) -> Binder (GTraversal SideEffect () VHW)
-addHWConfig k n s = (writeHWConfig s)
-  <*.> (pure $ sAddV "hwConfig" $ source "g")
-
-
---}
