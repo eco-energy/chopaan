@@ -7,7 +7,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NamedFieldPuns, RecordWildCards #-}
+{-# LANGUAGE GADTs #-}
 module Chopaan.Node.NodeSensors (power) where
 
 import qualified Prelude as P
@@ -21,6 +22,9 @@ import GHC.Generics hiding (C, R)
 
 import Numeric.Units.Dimensional.Prelude
 
+import Control.Monad
+import Control.Monad.State
+import Algebra.Graph.Labelled as G
 -- Conversions and Accessors
 import Data.Time
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
@@ -39,12 +43,16 @@ type R = Double
 type Sec s = Quantity DTime s
 type I s = ElectricCurrent s
 type V s = ElectricPotential s
+type Res s = ElectricResistance s 
 
 v :: (Num s) => s -> V s
 v = (*~ volt)
 
 i :: (Num s) => s -> I s
 i = (*~ ampere)
+
+r :: (Num s) => s -> Res s
+r = (*~ ohm)
 
 s :: (Num s) => s -> Sec s
 s = (*~ second)
@@ -94,12 +102,39 @@ power i v = S.zipWith p i v
 newtype Voltage s = Voltage (V s) deriving (Eq, Ord, Show, Generic)
 newtype Current s = Current (I s) deriving (Eq, Ord, Show, Generic)
 
+
+data Bus = GenBus | StorageBus | TxBus | LoadBus | Join Bus Bus | EmptyBus
+  deriving (Eq, Ord, Show, Generic)
+
+
+instance Semigroup Bus where
+  a <> b = Join a b
+
+instance Monoid Bus where
+  mempty = EmptyBus
+
+newtype Circuit s = Circuit { runCircuit :: G.Graph (Bus, I s) (Bus, V s) }
+
+type CircuitM s = State Int (Circuit s)
+
+
+fromSensors :: forall s. (Num s) => NodeSensors s -> Circuit s
+fromSensors NodeSensors{..} = Circuit $ G.edges es
+  where
+    es = [((GenBus, genCurrent), (GenBus, genVoltage), sv)
+         , ((TxBus, gridCurrent), sv, (TxBus, gridVoltage))
+         , ((LoadBus, loadCurrent), sv, (LoadBus, v 0))
+         ]
+      where
+        sv = (StorageBus, batteryVoltage)
+
 data NodeSensors s = NodeSensors
   { batteryVoltage :: !(V s)
   , gridVoltage :: !(V s)
   , loadCurrent :: !(I s)
   , gridCurrent :: !(I s)
   , genCurrent :: !(I s)
+  , genVoltage :: !(V s)
   , temperature :: !s
   } deriving (Eq, Ord, Show, Generic)
 
@@ -119,8 +154,12 @@ fromNodeMessage nm = NodeAt (nodeTimeToUTC nm, NodeSensors
                        , gridCurrent = cOut + cIn
                        , genCurrent = i $ nm ^. NM.solarInputCurrent
                        , temperature = nm ^. NM.temperature
+                       , genVoltage = genV
                        })
   where
+    genV = ((i (nm ^. NM.solarInputCurrent)) * solarRes) + (v (nm ^. NM.batteryVoltage))
+    solarRes :: Res R
+    solarRes = r 1
     cOut :: I R
     cOut = i $ nm ^.  NM.batteryToGridCurrent
     cIn :: I R
@@ -141,11 +180,13 @@ diffUTC a b = s . realToFrac $ diffUTCTime a b
 
 newtype Terminal s = Terminal (Voltage s, Current s) deriving (Eq, Ord, Show, Generic)
 
+
 data BusP s = Gen (Terminal s)
             | Storage (Terminal s)
             | Tx (Terminal s)
             | Load (Terminal s)
             deriving (Eq, Ord, Show, Generic) 
+
 
 
 

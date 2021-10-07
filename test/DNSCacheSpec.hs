@@ -56,7 +56,7 @@ spec = describe "withDnsCache" $ do
         let dom = "192.0.2.1"
             addr = 16908480
         resolve      cache dom `shouldReturn` Right (Numeric addr)
-    it "resolves aws requests conncurrently" $ withDNSCache cacheConf $ \cache -> do
+    xit "resolves aws requests conncurrently" $ withDNSCache cacheConf $ \cache -> do
       let
         aws = ("https://s3.ap-southeast-1.amazonaws.com/")
         x = S.replicate 1000 aws

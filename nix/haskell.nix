@@ -36,7 +36,7 @@ let
     src = cleanGitHaskell { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
     index-state = "2021-08-01T00:00:00Z";
-    plan-sha256 = "15czhryyhah29yqlnpys8ck4s2slkwdb1fj6g500mwf440mvp1ch";
+    plan-sha256 = "1fh28qafpwg4m1imdgixbz8inmm8jry6jaxm05ncip3b5yday85j";
     materialized = ./chopaan.materialized;
     #checkMaterialization = true;
     # these extras will provide additional packages

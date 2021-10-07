@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving
-, DerivingStrategies, StandaloneDeriving, DeriveFunctor #-}
+, DerivingStrategies, StandaloneDeriving, DeriveFunctor, DerivingVia #-}
 module Chopaan.Kibbutz.KbtzId where
 
 import Servant.API
@@ -13,13 +13,14 @@ import Data.Aeson
 import Control.DeepSeq (NFData)
 import Shpadoinkle.Widgets.Types (Humanize (..))
 import Data.Greskell (FromGraphSON)
+import qualified Codec.Winery as W
 
 type KbtzName = KbtzId Text.Text
 
 newtype KbtzId a = KbtzId { unKbtzId :: a }
   deriving (Eq, Ord, Generic, Typeable, Functor)
   deriving newtype (NFData, FromJSON, ToJSON, FromGraphSON)
-
+  deriving (W.Serialise) via (W.WineryRecord (KbtzId a))
 
 instance (Show a) => Show (KbtzId a) where
   show (KbtzId a) = show a

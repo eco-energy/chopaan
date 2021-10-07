@@ -15,12 +15,20 @@ module Data.Influxable (asKbtzNode
                        , showText
                        , lineFoldUdp
                        , lineFoldHttp
+                       , chopaanDB
+                       , wp
+                       , qp
+                       , mkNodeQs
+                       , chkNodeQs
+                       , createDB
                        ) where
 
 import Prelude hiding ((.))
 import Control.Category
 import Control.Lens
 import Control.Monad.IO.Class
+
+import Network.HTTP.Client
 
 import Debug.Trace
 import Data.Maybe
@@ -39,6 +47,8 @@ import qualified Database.InfluxDB.Format as F
 import Database.InfluxDB.Types
 import Database.InfluxDB.Line
 import Database.InfluxDB.Query
+import qualified Database.InfluxDB.Manage as DB
+import qualified Database.InfluxDB.JSON as DJ
 import qualified Database.InfluxDB.Write.UDP as UDP
 
 import qualified Database.InfluxDB.Write as Http
@@ -47,11 +57,18 @@ import qualified Streamly.Internal.Data.Sink as Sink
 
 import qualified Streamly.Internal.Data.Fold as FL
 
+import qualified Data.HashMap.Strict as HM
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Types as A
+import qualified Data.Vector as V
+import Data.Vector (Vector)
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 import Chopaan.Node.Metrics hiding (Timestamp)
 import Chopaan.Node.Folds
 import Chopaan.Node.Mesh
+import Debug.Trace
+import System.IO.Unsafe
 
 data Grouping = GroupTime | GroupTag Key deriving (Eq)
 
@@ -69,6 +86,17 @@ data Agg = Mean | Count deriving (Eq)
 --              | Where ![(Key, Key, WhereOp)]
 --              | GroupBy Grouping
 
+chopaanDB :: Database
+chopaanDB = F.formatDatabase "chopaan"
+
+createDB :: IO ()
+createDB = DB.manage qp $ F.formatQuery ("CREATE DATABASE "F.%F.database) chopaanDB
+
+wp :: Http.WriteParams
+wp = Http.writeParams chopaanDB
+
+qp :: QueryParams
+qp = queryParams chopaanDB
 
 lineFoldUdp :: forall m. (MonadIO m) => Int -> UDP.WriteParams -> FL.Fold m [Line UTCTime] ()
 lineFoldUdp batchSize wp = FL.many (FL.take batchSize FL.mconcat) lineFold'
@@ -85,7 +113,6 @@ renderQuery (Query q) = q
 
 -- $ Measurement Construction depends on the ability to construct
 -- $ a Tagset and a Fieldset for a datatype
-
 class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
   measurementName :: Measurement
   mkLine :: Timestamp time => (a -> Maybe time) -> tag -> a -> Line time
@@ -100,12 +127,14 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
   default seriesQueries :: tag -> [Query]
   seriesQueries tag = seriesQuery <$> (getInfluxKeys @a)
     where
-      seriesQuery f = (F.formatQuery ( "SELECT "
+      seriesQuery f = F.formatQuery ( "SELECT "
                                        . F.key
                                        . " FROM "
+                                       . F.database
+                                       . "."
                                        . F.measurement
                                        . F.text
-                                     ) f (measurementName @tag @a)) whereC
+                                     ) f chopaanDB (measurementName @tag @a) whereC
         where
           whereC :: Text
           whereC = " WHERE " <>
@@ -119,6 +148,21 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
                   unKey (Key a) = a
   {-# INLINE seriesQueries #-}
 
+-- pqr :: forall tag a. (IsTag tag, HasInfluxFields a)
+--     => Precision 'QueryRequest
+--     -> Maybe Text
+--     -> HM.HashMap Text Text
+--     -> Vector Text
+--     -> A.Array
+--     -> A.Parser a
+-- pqr prec _name _tags columns fields = do
+--   let ks = getInfluxKeys @a
+--       a = gf <$> ks
+--       --getField
+--   return a
+--   where
+--     gf :: forall x. (A.FromJSON x) => Key -> A.Parser x
+--     gf (Key f) = DJ.getField f columns fields >>= A.parseJSON 
 
 type KbtzNode = HList '[KbtzName, NodeMAC]
 
@@ -139,6 +183,47 @@ data NodeQueries = NodeQueries
   }
 
 
+instance QueryResults Watts where
+  parseMeasurement p s t f a = (fmap toWatts) $ do
+    let deb = ((show (p, s, t, f, a)))
+    trace deb (A.parseJSON $ V.head a)
+    
+instance QueryResults WattSeconds where
+  parseMeasurement p s t f a = (fmap toWattSeconds) $ do
+    let deb = ((show (p, s, t, f, a)))
+    trace deb (A.parseJSON $ V.head a)
+
+--instance (QueryResults e, QueryResults p) => QueryResults (Battery e p)
+
+chkNodeQs :: forall m. (MonadIO m) => NodeQueries -> m ()
+chkNodeQs nq = do
+  mapM_ mkQ (powerQ nq)
+  mapM_ mkQ (energyQ nq)
+  mapM_ mkQ (batteryQ nq)
+  mapM_ mkQ (meshQ nq)
+  where
+    pwinte req resp = do
+      --print req
+      --print (responseHeaders resp)
+      print =<< (brConsume $ responseBody resp)
+    mkQ q = liftIO $ withQueryResponse qp Nothing q pwinte
+
+mkNodeQs :: forall m. (MonadIO m) => QueryParams -> NodeQueries -> m (Vector (PowerNR), Vector (EnergyNR))
+mkNodeQs qp nq = (,) <$> pows <*> es
+  where
+    toNode [a, b, c] = Node a b c
+    --toBattery = undefined
+    pows :: m (Vector (Node Watts))
+    pows = (fmap sequence) $ (fmap toNode) $ mapM (q @Watts) (powerQ nq)
+    es :: m (Vector (Node WattSeconds))
+    es = (fmap sequence) $ (fmap toNode) $ mapM (q @WattSeconds) (energyQ nq)
+    --ms :: m (Vector (MeshNode, RxSignal))
+    --ms = undefined
+    --bs :: m (Vector (Battery WattSeconds Watts))
+    --bs = (fmap sequence) $ (fmap toBattery) $ mapM (q @WattSeconds) (energyQ nq)
+    q :: forall x. (QueryResults x) => Query -> m (Vector x)
+    q = liftIO . (query qp)
+    
 nodeQueries :: KbtzNode -> NodeQueries
 nodeQueries kn = NodeQueries (these @PowerNR) (these @EnergyNR) (these @BatteryR) (these @(MeshNode, RxSignal))
   where
@@ -240,16 +325,11 @@ showText = T.replace "\"" "" . T.pack . show
 class FieldType f where
   getField :: f -> Maybe (Field n)
 
-
--- instance FieldType a where
---   getField = const Nothing
-
 instance {-# OVERLAPPING #-} FieldType Int64 where
   getField = Just . fromInt
 
 instance {-# OVERLAPPING #-} FieldType Int where
   getField = Just . fromInt . fromIntegral
-
 
 
 instance {-# OVERLAPPING #-} FieldType Double where
@@ -284,22 +364,3 @@ fromBool = FieldBool
 
 fromText :: Text -> Field n
 fromText = FieldString
-
-
--- class IsFieldType a where
---   isFieldType :: Bool
-
--- instance IsFieldType a where
---   isFieldType = False
-
--- instance {-# OVERLAPPING #-} IsFieldType Int64 where
---   isFieldType = True
-
--- instance {-# OVERLAPPING #-} IsFieldType Double where
---   isFieldType = True
-
--- instance {-# OVERLAPPING #-} IsFieldType Bool where
---   isFieldType = True
-
--- instance {-# OVERLAPPING #-} IsFieldType Text where
---   isFieldType = True

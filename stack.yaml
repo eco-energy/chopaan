@@ -76,8 +76,8 @@ extra-deps:
    commit: ecdfffe5dbaa51fb943c8734cebfc43fbe76583a
    # nix-sha256: 09dksahyd0rwvlqkncj12nivmc6x6prqzpj9qjfgc9j9vcbz25s7
  - git: https://github.com/faezs/grafana.git
-   commit: 66609295378e382dc4a7afd4888e4736e39b2454
-   # nix-sha256: 10yai9f3qixlp0dzsvhm8gxm9an9p8h94a70x2mnhidchw68hyql
+   commit: 5589a62c3a54638446a93d18c703ba5f7e2e22b3
+   # nix-sha256: 1cb0vpwy8pk2r57ikxpq4yavkjqd3wm7xdf730pbmszybb02jk3l
  - git: https://github.com/Lysxia/generic-recursion-schemes.git
    commit: 692505969c5774ab5f6c26be3c9b53c2d19d46c3
  - git: https://github.com/brendanhay/amazonka.git
@@ -89,7 +89,6 @@ extra-deps:
      - amazonka-s3
    
  - base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
-
  - net-mqtt-0.7.0.1
  - ulid-0.2.0.0@sha256:ac415298b0272479909ca576f4444862ae942ed85c7849fa0675e3bf496be6f3,2485
  - crockford-0.2@sha256:6ec593711a20bd4b81a0fc13f3d850d2d890690941d777230fbf980c483e434a,553
@@ -190,8 +189,13 @@ extra-deps:
  - influxdb-1.9.2
  - composite-ekg-0.7.5.0@sha256:f211845509635f614f18a4b10e96701649c2ea098033099e0c1c2a97b10619fe,1375
  - composite-base-0.7.5.0@sha256:3c754bca3a1a673e1f0ba9fa88850dd8c650b5a7140dc5afca09bb86e4843c17,2955
-
-
+ - cas-store-1.1.0@sha256:00175fd67f55582c593a57673f2c02d30b63ed9716a6fe415c6fbe3c9fd996d9,2752
+ - cas-hashable-1.0.1@sha256:fa10169aa9c58566eb3bfcda3fb62d76390ea43d8cdcc0878ab0dae2c93ba325,1548
+ - store-0.7.12
+ - one-liner-1.0
+ - higgledy-0.4.1.1@sha256:103701c8080ec345a21edd3ef149b4d3b8ec66a12a82d3d0b5c5e4a0d7d6ac26,2238
+ - generic-lens-2.2.0.0@sha256:4008a39f464e377130346e46062e2ac1211f9d2e256bbb1857216e889c7196be,3867
+ - generic-lens-core-2.2.0.0@sha256:b6b69e992f15fa80001de737f41f2123059011a1163d6c8941ce2e3ab44f8c03,2913
 
  # Override default flag values for local packages and extra-deps
 

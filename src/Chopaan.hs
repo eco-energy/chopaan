@@ -44,11 +44,10 @@ runKbtzim mq hydrationOpts = do
       liftIO . print $ "Kibbutzim: " <> (show ks')
       return ks'
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks
-  --qss <- mapM (\(k, ns) -> mqttQs mq k ns) $ zip ks nss
-  let confss = S.fromList $ fmap sConf (zip ks nss)-- qss
-      past = S.concatMapWith S.async
-        (hydrateKbtz' hydrationOpts) confss
-      present = S.concatMapWith S.async (S.concatM . runKibbutz @t) confss
+  let confss = S.fromList $ fmap sConf (zip ks nss)
+      -- past = S.concatMapWith S.wAsync
+      --   (hydrateKbtz' hydrationOpts) confss
+      present = S.concatMapWith S.wAsync (S.concatM . runKibbutz @t) confss
   return $ S.mapM (pure . const True) $ present
   --return $ (fmap snd past)
   --  `S.async` (fmap (const True) present)
@@ -57,15 +56,25 @@ runKbtzim mq hydrationOpts = do
     labKbtz = (KbtzId "Lab_TestGrid")
     -- labNodes = NodeId <$> [ "7c:9e:bd:f5:ec:74", "c4:4f:33:67:ea:69"
     --                           , "ac:67:b2:11:e5:c4", "7c:9e:bd:f6:43:88" ]
-    labNodes = NodeId <$> [ "8c:aa:b5:97:69:48"
-                          , "ac:67:b2:11:f2:30"
-                          , "8c:aa:b5:95:97:c8"
-                          , "ac:67:b2:1c:ec:d8"
-                          , "c4:4f:33:67:ea:69"
-                          , "7c:9e:bd:f5:ec:74"
-                          , "ac:67:b2:11:f0:28"
-                          , "7c:9e:bd:f6:48:88"
-                          ]
+    -- labNodes = NodeId <$> [ "8c:aa:b5:97:69:48"
+    --                       , "ac:67:b2:11:f2:30"
+    --                       , "8c:aa:b5:95:97:c8"
+    --                       , "ac:67:b2:1c:ec:d8"
+    --                       , "c4:4f:33:67:ea:69"
+    --                       , "7c:9e:bd:f5:ec:74"
+    --                       , "ac:67:b2:11:f0:28"
+    --                       , "7c:9e:bd:f6:48:88"
+    --                       ]
+    labNodes = NodeId <$> [ "ac:67:b2:11:f3:20",
+                         "ac:67:b2:1d:e7:f4",
+                         "8c:aa:b5:97:69:48",
+                         "8c:aa:b5:95:97:c8",
+                         "8c:aa:b5:95:8f:9c",
+                         "ac:67:b2:1c:ec:d8",
+                         "7c:9e:bd:f5:ec:74",
+                         "ac:67:b2:11:f0:28"
+                      ]
+
     t0 = toUTC (start hydrationOpts)
     tn = toUTC (end hydrationOpts)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k

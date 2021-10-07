@@ -36,11 +36,11 @@ spec = describe "S3 Hydration Checks" $ do
   it "prefix length is sane" $ do
     let
       match x = foldl (\a b -> if b /= x then b else a) x
-      sec' = match 9 $ fmap (T.length . unPrefix) xs
-      m' = match 9 $ fmap (T.length . unPrefix) ms
-      h' = match 7 $ fmap (T.length . unPrefix) hs
-      d' = match 5 $ fmap (T.length . unPrefix) ds
-      w' = match 3 $ fmap (T.length . unPrefix) ws
+      sec' = match 9 $ fmap (digs . unPrefix) xs
+      m' = match 9 $ fmap (digs . unPrefix) ms
+      h' = match 7 $ fmap (digs . unPrefix) hs
+      d' = match 5 $ fmap (digs . unPrefix) ds
+      w' = match 3 $ fmap (digs . unPrefix) ws
     sec' `shouldBe` 9
     m' `shouldBe` 7
     h' `shouldBe` 5 
@@ -56,6 +56,7 @@ spec = describe "S3 Hydration Checks" $ do
 --                                                        in S.all ((==)) 
 --                                                        )
 
+digs = ceiling . (logBase 10) . realToFrac 
 
 unM (MilliSecond64 w') = w'
 w = unM worldStart

@@ -25,6 +25,7 @@ import Chopaan.Graph.Kbtz
 import Chopaan.Node.HW
 import Chopaan.Node.Components
 
+import qualified Streamly.Prelude as S
 
 
 spec :: Spec
@@ -48,7 +49,7 @@ gremlinSpec = do
         writeKbtz = runBinder $ addKbtz' kb
       toGremlin (fst writeKbtz)
         `shouldBe`
-        "g.addV(\"kbtz\").property(\"@kbtz_id\",__v0).property(\"@node_type\",\"k\")"
+        "g.V().has(\"@node_type\",\"k\").hasLabel(\"kbtz\").has(\"@kbtz_id\",__v0).fold().coalesce(__.unfold(),__.addV(\"kbtz\").property(\"@kbtz_id\",__v1).property(\"@node_type\",__v2).identity())"
 
     it "reading a kibbutz by id works" $ do
       let readKbtz = runBinder $ getKbtzById' k
@@ -61,7 +62,7 @@ gremlinSpec = do
         writeHH = runBinder $ addHH' an
       toGremlin (fst writeHH)
         `shouldBe`
-        "g.addV(\"hh\").property(\"@hh_id\",__v0).property(\"@node_type\",\"h\")"
+        "g.V().has(\"@node_type\",\"h\").hasLabel(\"hh\").has(\"@hh_id\",__v0).fold().coalesce(__.unfold(),__.addV(\"hh\").property(\"@hh_id\",__v1).property(\"@node_type\",__v2).identity())"
 
     it "reading a node by id works" $ do
       let readHH = runBinder $ getHHById n
@@ -80,6 +81,20 @@ integrationSpec = do
                   (submitPair client (runBinder $ getKbtzById' k))
         got_k1 `shouldBe` [kb]
 
+    it "multiple inserts are idempotent" $ \(host, port) -> do
+      bracket (connect host port) close $ \client -> do
+        drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
+        S.mapM_ (\_ -> (addKbtz client k)) $ S.enumerateFromTo (0 :: Int) 10
+        S.mapM_ (\_ -> (addHHToKbtz client k an)) $ S.enumerateFromTo (0 :: Int) 10
+        got_k1 <- fmap toList $ slurpResults =<<
+                  (submitPair client (runBinder $ getKbtzById' k))
+        got_e1 <- getKbtzNodes client k
+        got_n1 <- fmap toList $ slurpResults =<<
+                  (submitPair client (runBinder $ getHHById n))
+        got_n1 `shouldBe` [an]
+        got_k1 `shouldBe` [kb]
+        got_e1 `shouldBe` [n]
+        
     it "round-tripping a HH works" $ \(host, port) -> do
       bracket (connect host port) close $ \client -> do
         drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing

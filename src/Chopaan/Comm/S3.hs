@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies, DeriveGeneric, StandaloneDeriving, DeriveAnyClass, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, TupleSections, DerivingStrategies, DerivingVia, BangPatterns, OverloadedLabels, RecordWildCards, DeriveFunctor, QuantifiedConstraints, InstanceSigs, LambdaCase #-}
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies, DeriveGeneric, StandaloneDeriving, DeriveAnyClass, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, TupleSections, DerivingStrategies, DerivingVia, BangPatterns, OverloadedLabels, RecordWildCards, DeriveFunctor, QuantifiedConstraints, InstanceSigs, LambdaCase, GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -ddump-simpl #-}
 {-# OPTIONS_GHC -dsuppress-all #-}
@@ -19,7 +19,7 @@ import Control.Monad.Catch
 
 import Data.Generics.Product
 import Data.Generics.Labels
-import qualified Data.Binary as B
+import qualified Codec.Winery as W
 import Data.Bifunctor (bimap, first)
 import Data.Bitraversable (bisequence)
 import Data.List (genericTake)
@@ -84,11 +84,8 @@ import Chopaan.Comm.Monitor
 
 data HydrationError = DownloadError T.Text | ParsingError T.Text
   deriving (Show, Generic)
-  deriving anyclass (B.Binary)
+  deriving (W.Serialise) via (W.WineryVariant (HydrationError))
 
-deriving anyclass instance B.Binary (S3.ObjectKey)
-
---deriving anyclass instance B.Binary (SomeException)
 
 downloadMF :: forall m. (MonadIO m, MonadCatch m)
                 => Env
@@ -220,11 +217,11 @@ s3Paths' env req = let
   in S.concatMapWith (S.ahead) S.fromList plist
 {-# INLINE s3Paths' #-}
 
-s3Prefix :: (Address n) => n -> Maybe T.Text
-s3Prefix = Just . stateTopic
+nodeS3Prefix :: (Address n) => n -> Maybe T.Text
+nodeS3Prefix = Just . stateTopic
 
-timedPrefix :: Address n => n -> T.Text -> Maybe T.Text
-timedPrefix n t = (<> ("/" <> t)) <$> (s3Prefix n)
+timedPrefix :: Address n => n -> Prefix -> Maybe T.Text
+timedPrefix n t = (<> ("/" <> (asFileName t))) <$> (nodeS3Prefix n)
 
 worldStart :: MilliSecond64
 worldStart = MilliSecond64 1607478885000
@@ -241,15 +238,19 @@ resDiff r = case r of
 {-# INLINE resDiff #-}
 
 
-newtype Prefix = Prefix { unPrefix :: T.Text }
-  deriving (Eq, Ord, Show, Generic, B.Binary)
+newtype Prefix = Prefix { unPrefix :: Int64 }
+  deriving (Eq, Ord, Show, Generic)
+  deriving newtype (Enum, Bounded, Num, Real, Integral)
+  deriving (W.Serialise) via (W.WineryRecord (Prefix))
+
+asFileName :: Prefix -> T.Text
+asFileName = T.pack . show . unPrefix
+
 
 prefixRange :: Resolution -> UTCTime -> UTCTime -> [Prefix]
-prefixRange !r !t !t' = (Prefix . glompPrefix) <$> [start..end]
+prefixRange !r !t !t' = Prefix <$> [start..end]
   where
     sigDigs = (9 -) . (ceiling . (logBase 10)) . resDiff $ r
-    glompPrefix :: Int64 -> T.Text
-    glompPrefix !x = T.pack . show $ x
     start :: Int64
     start = unDigits 10 $ take sigDigs $ digits 10 $ utcToSeconds t
     end = unDigits 10 $ take sigDigs $ digits 10 $ utcToSeconds t'
@@ -330,7 +331,7 @@ fetchDir hPrefix n = dataDir hPrefix <> nodeMACPath n <> "/fetch/"
 prefixFile hPrefix n = fetchDir hPrefix n <> "prefixes"
 
 prefixFetchDir :: T.Text -> NodeMAC -> Prefix -> FilePath
-prefixFetchDir hPrefix n (Prefix t)= fetchDir hPrefix n <> (T.unpack t)
+prefixFetchDir hPrefix n p = fetchDir hPrefix n <> (T.unpack . asFileName $ p)
 
 pathDir :: T.Text -> NodeMAC -> Prefix -> FilePath
 pathDir hPrefix n t = (prefixFetchDir hPrefix n t) <> "/paths/"
@@ -414,8 +415,8 @@ nodeS3 env bucket BufferingOpts{..} hPrefix Monitor{..} pfs n = let
         _ <- (addC downloadedSize s)
         return $ (n', Right a)
     np = (T.unpack . unNodeId $ n)
-    req (Prefix t) startAfter = S3.listObjectsV2 bucket
-          & S3.lovPrefix .~ (timedPrefix n t)
+    req prefix startAfter = S3.listObjectsV2 bucket
+          & S3.lovPrefix .~ (timedPrefix n prefix)
           & S3.lovStartAfter .~ (fmap unObject startAfter)
     downloadWithErrLog :: S3.ObjectKey
       -> m (S3.ObjectKey, Either SomeException (Either String MeshFrame, Int)) 

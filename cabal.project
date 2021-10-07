@@ -72,8 +72,8 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/faezs/grafana.git
-  tag: 66609295378e382dc4a7afd4888e4736e39b2454
-  --sha256: 10yai9f3qixlp0dzsvhm8gxm9an9p8h94a70x2mnhidchw68hyql
+  tag: 5589a62c3a54638446a93d18c703ba5f7e2e22b3
+  --sha256: 1cb0vpwy8pk2r57ikxpq4yavkjqd3wm7xdf730pbmszybb02jk3l
   
 constraints:
   mmorph <= 1.1.3,

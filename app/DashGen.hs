@@ -12,6 +12,7 @@ import System.Directory
 import qualified System.Envy as E
 import Options.Applicative
 
+import Control.Monad.IO.Class
 import Chopaan.Types
 import Chopaan.Graph hiding (GraphType, Mesh)
 import Chopaan.Graph.Kbtz
@@ -152,19 +153,24 @@ main = do
   let pollDBForStructure prevStruct = do
         kns <- runGraphM defPoolConf db $ withKbtzPool $ \c -> do
           ks <- sort <$> getKbtzim c
+          liftIO $ print $ "found kbtzim: " <> (show ks)
           ns <- mapM (fmap sort . getKbtzNodes c) ks
           return $ zip ks ns
-        case (structByLen kns == prevStruct) of
-          False -> do
+        liftIO $ print $ "found kbtzim: " <> (show kns)
+        case (kns == prevStruct) of
+          True -> do
             print $ "Going to Sleep, nothing changed"
             return prevStruct
-          True -> do
+          False -> do
+            print ("Creating Directories")
             mapM_ (\k -> cd (kbtzDir output k)) (fst <$> kns)
             print $ "Writing Kbtzim: " <> (show $ length kns)
             let dashes = chopaanDashes kns
             writeDashes output dashes
-            return $ (length kns, fmap length kns)
-  S.drain $ S.delay (pollEveryMin 30) $ S.iterateM pollDBForStructure (pure (0, []))
+            return $ kns
+  S.drain $ S.delay (pollEveryMin 1)
+    $ S.trace (liftIO . print)
+    $ S.iterateM pollDBForStructure (pure [])
   where
     defPoolConf = PoolConf 1 1 1
     cd = createDirectoryIfMissing True

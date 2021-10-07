@@ -21,6 +21,7 @@ import Control.Concurrent.STM.TVar
 import Control.Concurrent (forkIO)
 import Control.Lens
 
+import Data.Influxable
 import qualified Data.Map as M
 import Data.Time
 import Data.Text (pack)
@@ -72,7 +73,6 @@ import Chopaan.Graph
 
 
 type S3Opts = BucketName
-type ChannelOpts = (MessageQs NodeMAC)
 
 instance Eq (MessageQs n) where
   (==) = const (const False)
@@ -89,6 +89,10 @@ data KbtzC n = KbtzC
   , channelOpts :: Either MQTTOpts (MessageQs n)
   , s3Opts :: Maybe S3Opts
   } deriving (Eq, Ord, Show, Generic)
+
+
+newtype Kbtzim = Kbtzim { unKbtzim :: S.SerialT GraphM (Either KbtzName (KbtzName, NodeMAC)) }
+  deriving (Generic)
 
 
 mkKbtzConf :: KbtzName -> [n] -> Either MQTTOpts (MessageQs n) -> Maybe S3Opts -> KbtzC n
@@ -162,17 +166,16 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
                 S.|$ S.map snd
                 S.|$ S.tap (FL.lmap getLatest gridFold)
                 S.|$ status
-                --S.|$ S.trace (dispatchTxSafe outbox . snd . snd)
                 S.|$ plan
                 S.|$ S.mapM (pure . second Tx)
                 S.|$ gridSensorR nodes
                 S.|$ S.tapRate 30 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
     processRS meshFold s = S.tapRate 30 (\x -> liftIO . print $ "Mesh Processed Rate: " <> show x)
-                S.|$ S.tap meshFold
+                S.|$ S.tap (FL.tee mLineF meshFold)
                 S.|$ S.mapM (pure . second (meshNodeLink $ getGridRoot name))
                 S.|$ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
     liveStream g m es rs = (Left <$> (processES g es))
-                 `S.async` (Right <$> (processRS m rs))
+                 `S.wAsync` (Right <$> (processRS m rs))
   case channelOpts of
     (Left mqopts) -> do
       qs <- liftIO initMessageQs
@@ -183,6 +186,11 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
       (es, rs, outbox) <- qSrc qs
       return $ liveStream gridFold meshFold es rs
   where
+    sLineF :: NodeMAC -> FL.Fold GraphM (SensorR) ()
+    sLineF n = FL.lmap (lineSensorR (asKbtzNode name n)) (lineFoldHttp 10 wp)
+    sf n = FL.many sensorFold (sLineF n)
+    mLineF :: FL.Fold GraphM (NodeMAC, (MeshNode, RxSignal)) ()
+    mLineF = FL.lmap (\(n, x) -> lineMesh (asKbtzNode name n) x) (lineFoldHttp 10 wp)
       -- Stream Processors that run Folds
     getLatest ::
       (NodeMAC, ((NodeStates NodeMAC, Maybe (TxPlan NodeMAC)), (TxState NodeMAC)))
@@ -193,20 +201,14 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
       c' = snd <$> (M.lookup n (unTx c))
       in (n, (a', b', c'))
     {-# INLINE getLatest #-}
-    -- dispatchTxSafe o t = tryJust' t
-    --   where
-    --     tryJust' (Just x) = expToBool
-    --                      =<< (try $ (dispatchTx o x))
-        -- tryJust' Nothing = pure False
     horizon = 10 * 60
     {-# INLINE horizon #-}
-
-gridSensorR :: (KbtzConn t m n) => [n] -> t m (n, EnergyState) -> t m (n, M.Map n SensorR)
-gridSensorR ns s = S.map (first fromJust)
-                   . S.filter (isJust . fst)
-                   . S.postscan (FL.tee (FL.foldl' ((const (Just . fst))) Nothing)
-                                 (FL.demux $ M.fromList $ (, sensorFold) <$> ns)) $ s
-{-# INLINE gridSensorR #-}
+    gridSensorR :: (KbtzConn t m n) => [n] -> t m (n, EnergyState) -> t m (n, M.Map n SensorR)
+    gridSensorR ns s = S.map (first fromJust)
+                       . S.filter (isJust . fst)
+                       . S.postscan (FL.tee (FL.foldl' ((const (Just . fst))) Nothing)
+                                     (FL.demux $ M.fromList $ (, sensorFold) <$> ns)) $ s
+    {-# INLINE gridSensorR #-}
 
 -- bothUnfold :: forall m a b c d. (Monad m) => FL.Fold m a b -> FL.Fold m c d -> UF.Unfold m (a, c) (b, d)
 -- bothUnfold f g = UF.zipWith (,) (foldUF fst f) (foldUF snd g)

@@ -144,7 +144,7 @@ data Node a = Node
   { tx :: !a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Ord, Show, Binary, Generic, Functor, NFData, ToJSON, FromJSON, Humanize)
+  } deriving (Eq, Ord, Show, Binary, Generic, Functor, NFData, ToJSON, FromJSON, Humanize, Foldable, Traversable)
   
 
 instance (Typeable a) => Selectors (Node a) where

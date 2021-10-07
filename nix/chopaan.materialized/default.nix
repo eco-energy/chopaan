@@ -68,6 +68,9 @@
         "attoparsec-iso8601".flags.fast = false;
         "attoparsec-iso8601".flags.developer = false;
         "exact-pi".revision = (((hackage."exact-pi")."0.5.0.1").revisions).default;
+        "tar".revision = (((hackage."tar")."0.5.1.1").revisions).default;
+        "tar".flags.old-time = false;
+        "tar".flags.old-bytestring = false;
         "base64".revision = (((hackage."base64")."0.4.2.3").revisions).default;
         "ghc-prim".revision = (((hackage."ghc-prim")."0.5.3").revisions).default;
         "proto-lens".revision = (((hackage."proto-lens")."0.7.0.0").revisions).default;
@@ -81,6 +84,10 @@
         "bifunctors".revision = (((hackage."bifunctors")."5.5.7").revisions).default;
         "bifunctors".flags.semigroups = true;
         "bifunctors".flags.tagged = true;
+        "store".revision = (((hackage."store")."0.7.11").revisions).default;
+        "store".flags.small-bench = false;
+        "store".flags.integer-simple = false;
+        "store".flags.comparison-bench = false;
         "haskeline".revision = (((hackage."haskeline")."0.8.1.2").revisions).default;
         "haskeline".flags.terminfo = true;
         "haskeline".flags.examples = true;
@@ -208,6 +215,10 @@
         "megaparsec".revision = (((hackage."megaparsec")."9.0.1").revisions).default;
         "megaparsec".flags.dev = false;
         "syb".revision = (((hackage."syb")."0.7.2.1").revisions).default;
+        "blaze-textual".revision = (((hackage."blaze-textual")."0.2.1.0").revisions).default;
+        "blaze-textual".flags.native = true;
+        "blaze-textual".flags.integer-simple = false;
+        "blaze-textual".flags.developer = false;
         "distributive".revision = (((hackage."distributive")."0.6.2.1").revisions).default;
         "distributive".flags.semigroups = true;
         "distributive".flags.tagged = true;
@@ -231,6 +242,7 @@
         "tasty".flags.clock = true;
         "newtype-generics".revision = (((hackage."newtype-generics")."0.6").revisions).default;
         "hspec-discover".revision = (((hackage."hspec-discover")."2.8.2").revisions).default;
+        "cas-store".revision = (((hackage."cas-store")."1.1.0").revisions).default;
         "half".revision = (((hackage."half")."0.3.1").revisions).default;
         "parallel".revision = (((hackage."parallel")."3.2.2.0").revisions).default;
         "indexed-profunctors".revision = (((hackage."indexed-profunctors")."0.1.1").revisions).default;
@@ -246,6 +258,7 @@
         "semirings".revision = (((hackage."semirings")."0.6").revisions).default;
         "semirings".flags.unordered-containers = true;
         "semirings".flags.containers = true;
+        "named".revision = (((hackage."named")."0.3.0.1").revisions).default;
         "string-conversions".revision = (((hackage."string-conversions")."0.4.0.1").revisions).default;
         "optparse-applicative".revision = (((hackage."optparse-applicative")."0.16.1.0").revisions).default;
         "optparse-applicative".flags.process = true;
@@ -282,6 +295,12 @@
         "x509-store".revision = (((hackage."x509-store")."1.6.7").revisions).default;
         "estimator".revision = (((hackage."estimator")."1.2.0.0").revisions).default;
         "constraints".revision = (((hackage."constraints")."0.13").revisions).default;
+        "direct-sqlite".revision = (((hackage."direct-sqlite")."2.3.26").revisions).default;
+        "direct-sqlite".flags.urifilenames = true;
+        "direct-sqlite".flags.systemlib = false;
+        "direct-sqlite".flags.haveusleep = true;
+        "direct-sqlite".flags.json1 = true;
+        "direct-sqlite".flags.fulltextsearch = true;
         "monad-coroutine".revision = (((hackage."monad-coroutine")."0.9.1.3").revisions).default;
         "semigroups".revision = (((hackage."semigroups")."0.19.1").revisions).default;
         "semigroups".flags.bytestring = true;
@@ -342,6 +361,10 @@
         "jsaddle".flags.check-unchecked = false;
         "jsaddle".flags.call-stacks = false;
         "primitive".revision = (((hackage."primitive")."0.7.1.0").revisions).default;
+        "cryptohash".revision = (((hackage."cryptohash")."0.11.9").revisions).default;
+        "hspec-smallcheck".revision = (((hackage."hspec-smallcheck")."0.5.2").revisions).default;
+        "store-core".revision = (((hackage."store-core")."0.4.4.4").revisions).default;
+        "store-core".flags.force-alignment = false;
         "profunctors".revision = (((hackage."profunctors")."5.5.2").revisions).default;
         "safe".revision = (((hackage."safe")."0.3.19").revisions).default;
         "aeson-optics".revision = (((hackage."aeson-optics")."1.1.0.1").revisions).default;
@@ -350,6 +373,7 @@
         "base-compat".revision = (((hackage."base-compat")."0.11.2").revisions).default;
         "vinyl".revision = (((hackage."vinyl")."0.13.3").revisions).default;
         "active".revision = (((hackage."active")."0.2.0.15").revisions).default;
+        "cas-hashable".revision = (((hackage."cas-hashable")."1.0.1").revisions).default;
         "math-functions".revision = (((hackage."math-functions")."0.3.4.2").revisions).default;
         "math-functions".flags.system-expm1 = true;
         "math-functions".flags.system-erf = true;
@@ -445,6 +469,7 @@
         "JuicyPixels".flags.mmap = false;
         "mwc-random".revision = (((hackage."mwc-random")."0.14.0.0").revisions).default;
         "wai".revision = (((hackage."wai")."3.2.3").revisions).default;
+        "th-utilities".revision = (((hackage."th-utilities")."0.2.4.1").revisions).default;
         "basement".revision = (((hackage."basement")."0.0.12").revisions).default;
         "clay".revision = (((hackage."clay")."0.13.3").revisions).default;
         "setenv".revision = (((hackage."setenv")."0.1.1.3").revisions).default;
@@ -492,6 +517,7 @@
         "snap-core".flags.debug = false;
         "snap-core".flags.network-uri = true;
         "hinotify".revision = (((hackage."hinotify")."0.4.1").revisions).default;
+        "higgledy".revision = (((hackage."higgledy")."0.4.1.1").revisions).default;
         "type-equality".revision = (((hackage."type-equality")."1").revisions).default;
         "pointed".revision = (((hackage."pointed")."5.0.2").revisions).default;
         "pointed".flags.semigroupoids = true;
@@ -509,6 +535,9 @@
         "parser-combinators".revision = (((hackage."parser-combinators")."1.3.0").revisions).default;
         "parser-combinators".flags.dev = false;
         "blaze-markup".revision = (((hackage."blaze-markup")."0.8.2.8").revisions).default;
+        "path".revision = (((hackage."path")."0.8.0").revisions).default;
+        "path".flags.dev = false;
+        "sqlite-simple".revision = (((hackage."sqlite-simple")."0.4.18.0").revisions).default;
         "tasty-golden".revision = (((hackage."tasty-golden")."2.3.4").revisions).default;
         "tasty-golden".flags.build-example = false;
         "uuid".revision = (((hackage."uuid")."1.3.15").revisions).default;
@@ -549,6 +578,7 @@
         "dhall".flags.use-http-client-tls = true;
         "dhall".flags.with-http = true;
         "dhall".flags.cross = false;
+        "one-liner".revision = (((hackage."one-liner")."1.0").revisions).default;
         "universe-base".revision = (((hackage."universe-base")."1.1.2").revisions).default;
         "terminfo".revision = (((hackage."terminfo")."0.4.1.2").revisions).default;
         "base16-bytestring".revision = (((hackage."base16-bytestring")."1.0.1.0").revisions).default;
@@ -597,6 +627,7 @@
         "transformers-base".flags.orphaninstances = true;
         "happy".revision = (((hackage."happy")."1.20.0").revisions).default;
         "file-embed".revision = (((hackage."file-embed")."0.0.14.0").revisions).default;
+        "byteable".revision = (((hackage."byteable")."0.1.1").revisions).default;
         "tasty-hspec".revision = (((hackage."tasty-hspec")."1.2").revisions).default;
         "language-glsl".revision = (((hackage."language-glsl")."0.3.0").revisions).default;
         "hpc".revision = (((hackage."hpc")."0.6.0.3").revisions).default;
@@ -633,6 +664,8 @@
         "tls".flags.hans = false;
         "kan-extensions".revision = (((hackage."kan-extensions")."5.2.3").revisions).default;
         "svg-builder".revision = (((hackage."svg-builder")."0.1.1").revisions).default;
+        "path-io".revision = (((hackage."path-io")."1.6.2").revisions).default;
+        "path-io".flags.dev = false;
         "wai-logger".revision = (((hackage."wai-logger")."2.3.6").revisions).default;
         "th-lift".revision = (((hackage."th-lift")."0.8.2").revisions).default;
         "microlens-mtl".revision = (((hackage."microlens-mtl")."0.2.0.1").revisions).default;

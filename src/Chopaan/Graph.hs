@@ -27,6 +27,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader hiding (ask)
 import Control.Monad.Reader.Class
 import Control.Monad.Catch
+import Control.Monad.Error
 import Control.Monad.Base
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Unlift
@@ -38,6 +39,7 @@ import Network.AWS.S3 (BucketName(..))
 import Chopaan.Types (PoolConf(..))
 import qualified System.Envy as E
 import Options.Applicative
+--import Servant.Server (ServerError)
 #endif
 import qualified Streamly as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
@@ -50,7 +52,7 @@ import Chopaan.Graph.G
 newtype GraphM a = GraphM { runGraphM' :: ReaderT (DBPools) IO a }
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (DBPools),
                     MonadBase IO, MonadBaseControl IO, MonadThrow, MonadCatch,
-                    MonadMask, MonadUnliftIO)
+                    MonadMask, MonadUnliftIO) --, MonadError ServantError)
 
 runGraphM :: MonadIO m => PoolConf -> TinkerConf -> GraphM ~> m
 runGraphM pc (TinkerConf h p) a = liftIO $ runReaderT (runGraphM' a) =<< (mkDBPools pc h p)

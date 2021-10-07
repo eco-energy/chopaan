@@ -42,7 +42,9 @@ flag prod
 
 library
   exposed-modules:
+      Chopaan.API.Kbtz
       Chopaan.Graph.Algebraic
+      Chopaan.Kibbutz.DataSource
   other-modules:
       Paths_chopaan
   hs-source-dirs:
@@ -62,6 +64,7 @@ library
     , aeson
     , algebraic-graphs >=0.5
     , async
+    , barbies
     , base >=4.11 && <10
     , base64
     , binary
@@ -90,6 +93,7 @@ library
     , exceptions
     , file-embed
     , filepath
+    , generic-data
     , generic-lens
     , ghc-prim
     , ghcjs-dom
@@ -97,6 +101,7 @@ library
     , greskell-core >=0.1.3.5
     , hashable
     , haxl
+    , higgledy
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , keys
@@ -108,6 +113,7 @@ library
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , one-liner
     , optparse-applicative
     , pointed
     , proto-lens
@@ -118,6 +124,7 @@ library
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe-exceptions
     , servant
     , servant-client-js
     , stm
@@ -140,6 +147,8 @@ library
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
       , composite-ekg
       , concat-classes
       , concat-examples
@@ -165,6 +174,7 @@ library
       , network-uri
       , sbv
       , servant-client
+      , servant-client-core
       , servant-js
       , servant-server
       , servant-websockets
@@ -351,6 +361,7 @@ executable dashgen
     , aeson
     , algebraic-graphs >=0.5
     , async
+    , barbies
     , base >=4.11 && <10
     , base64
     , binary
@@ -379,6 +390,7 @@ executable dashgen
     , exceptions
     , file-embed
     , filepath
+    , generic-data
     , generic-lens
     , ghc-prim
     , ghcjs-dom
@@ -386,6 +398,7 @@ executable dashgen
     , greskell-core >=0.1.3.5
     , hashable
     , haxl
+    , higgledy
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , keys
@@ -397,6 +410,7 @@ executable dashgen
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , one-liner
     , optparse-applicative
     , pointed
     , proto-lens
@@ -407,6 +421,7 @@ executable dashgen
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe-exceptions
     , servant
     , servant-client-js
     , stm
@@ -429,6 +444,8 @@ executable dashgen
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
       , composite-ekg
       , concat-classes
       , concat-examples
@@ -454,6 +471,7 @@ executable dashgen
       , network-uri
       , sbv
       , servant-client
+      , servant-client-core
       , servant-js
       , servant-server
       , servant-websockets
@@ -508,6 +526,7 @@ executable dev
     , aeson
     , algebraic-graphs >=0.5
     , async
+    , barbies
     , base >=4.11 && <10
     , base64
     , binary
@@ -536,6 +555,7 @@ executable dev
     , exceptions
     , file-embed
     , filepath
+    , generic-data
     , generic-lens
     , ghc-prim
     , ghcjs-dom
@@ -543,6 +563,7 @@ executable dev
     , greskell-core >=0.1.3.5
     , hashable
     , haxl
+    , higgledy
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , keys
@@ -554,6 +575,7 @@ executable dev
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , one-liner
     , optparse-applicative
     , pointed
     , proto-lens
@@ -564,6 +586,7 @@ executable dev
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe-exceptions
     , servant
     , servant-client-js
     , stm
@@ -586,6 +609,8 @@ executable dev
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
       , composite-ekg
       , concat-classes
       , concat-examples
@@ -611,6 +636,7 @@ executable dev
       , network-uri
       , sbv
       , servant-client
+      , servant-client-core
       , servant-js
       , servant-server
       , servant-websockets
@@ -666,6 +692,7 @@ executable hydrate
     , aeson
     , algebraic-graphs >=0.5
     , async
+    , barbies
     , base >=4.11 && <10
     , base64
     , binary
@@ -694,6 +721,7 @@ executable hydrate
     , exceptions
     , file-embed
     , filepath
+    , generic-data
     , generic-lens
     , ghc-prim
     , ghcjs-dom
@@ -701,6 +729,7 @@ executable hydrate
     , greskell-core >=0.1.3.5
     , hashable
     , haxl
+    , higgledy
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , keys
@@ -712,6 +741,7 @@ executable hydrate
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , one-liner
     , optparse-applicative
     , pointed
     , proto-lens
@@ -722,6 +752,7 @@ executable hydrate
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe-exceptions
     , servant
     , servant-client-js
     , stm
@@ -744,6 +775,8 @@ executable hydrate
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
       , composite-ekg
       , concat-classes
       , concat-examples
@@ -769,6 +802,7 @@ executable hydrate
       , network-uri
       , sbv
       , servant-client
+      , servant-client-core
       , servant-js
       , servant-server
       , servant-websockets
@@ -825,6 +859,7 @@ executable kbtzim
     , aeson
     , algebraic-graphs >=0.5
     , async
+    , barbies
     , base >=4.11 && <10
     , base64
     , binary
@@ -853,6 +888,7 @@ executable kbtzim
     , exceptions
     , file-embed
     , filepath
+    , generic-data
     , generic-lens
     , ghc-prim
     , ghcjs-dom
@@ -860,6 +896,7 @@ executable kbtzim
     , greskell-core >=0.1.3.5
     , hashable
     , haxl
+    , higgledy
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , keys
@@ -871,6 +908,7 @@ executable kbtzim
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , one-liner
     , optparse-applicative
     , pointed
     , proto-lens
@@ -881,6 +919,7 @@ executable kbtzim
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe-exceptions
     , servant
     , servant-client-js
     , stm
@@ -903,6 +942,8 @@ executable kbtzim
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
       , composite-ekg
       , concat-classes
       , concat-examples
@@ -928,6 +969,7 @@ executable kbtzim
       , network-uri
       , sbv
       , servant-client
+      , servant-client-core
       , servant-js
       , servant-server
       , servant-websockets
@@ -982,6 +1024,7 @@ executable server
     , aeson
     , algebraic-graphs >=0.5
     , async
+    , barbies
     , base >=4.11 && <10
     , base64
     , binary
@@ -1010,6 +1053,7 @@ executable server
     , exceptions
     , file-embed
     , filepath
+    , generic-data
     , generic-lens
     , ghc-prim
     , ghcjs-dom
@@ -1017,6 +1061,7 @@ executable server
     , greskell-core >=0.1.3.5
     , hashable
     , haxl
+    , higgledy
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , keys
@@ -1028,6 +1073,7 @@ executable server
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , one-liner
     , optparse-applicative
     , pointed
     , proto-lens
@@ -1038,6 +1084,7 @@ executable server
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe-exceptions
     , servant
     , servant-client-js
     , stm
@@ -1060,6 +1107,8 @@ executable server
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
       , composite-ekg
       , concat-classes
       , concat-examples
@@ -1085,6 +1134,7 @@ executable server
       , network-uri
       , sbv
       , servant-client
+      , servant-client-core
       , servant-js
       , servant-server
       , servant-websockets
@@ -1141,6 +1191,7 @@ executable ui
     , aeson
     , algebraic-graphs >=0.5
     , async
+    , barbies
     , base
     , base64
     , binary
@@ -1170,6 +1221,7 @@ executable ui
     , exceptions
     , file-embed
     , filepath
+    , generic-data
     , generic-lens
     , ghc-prim
     , ghcjs-dom
@@ -1177,6 +1229,7 @@ executable ui
     , greskell-core >=0.1.3.5
     , hashable
     , haxl
+    , higgledy
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , keys
@@ -1188,6 +1241,7 @@ executable ui
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , one-liner
     , optparse-applicative
     , optparse-simple
     , pointed
@@ -1199,6 +1253,7 @@ executable ui
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe-exceptions
     , servant
     , servant-client-js
     , stm
@@ -1221,6 +1276,8 @@ executable ui
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
       , composite-ekg
       , concat-classes
       , concat-examples
@@ -1246,6 +1303,7 @@ executable ui
       , network-uri
       , sbv
       , servant-client
+      , servant-client-core
       , servant-js
       , servant-server
       , servant-websockets
@@ -1302,6 +1360,7 @@ test-suite chopaan-test
     , aeson
     , algebraic-graphs >=0.5
     , async
+    , barbies
     , base >=4.11 && <10
     , base64
     , binary
@@ -1330,6 +1389,7 @@ test-suite chopaan-test
     , exceptions
     , file-embed
     , filepath
+    , generic-data
     , generic-lens
     , ghc-prim
     , ghcjs-dom
@@ -1337,6 +1397,7 @@ test-suite chopaan-test
     , greskell-core >=0.1.3.5
     , hashable
     , haxl
+    , higgledy
     , interpolatedstring-perl6
     , jsaddle >=0.9.7.1
     , keys
@@ -1348,6 +1409,7 @@ test-suite chopaan-test
     , mtl
     , network >=3.1.2.1
     , newtype-generics
+    , one-liner
     , optparse-applicative
     , pointed
     , proto-lens
@@ -1358,6 +1420,7 @@ test-suite chopaan-test
     , resourcet
     , retry
     , rio >=0.1.8.0
+    , safe-exceptions
     , servant
     , servant-client-js
     , stm
@@ -1380,6 +1443,8 @@ test-suite chopaan-test
         amazonka
       , amazonka-iot
       , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
       , composite-ekg
       , concat-classes
       , concat-examples
@@ -1405,6 +1470,7 @@ test-suite chopaan-test
       , network-uri
       , sbv
       , servant-client
+      , servant-client-core
       , servant-js
       , servant-server
       , servant-websockets

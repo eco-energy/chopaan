@@ -21,8 +21,8 @@ in
       #dashes = (import ./nix/dashboard.nix) {};
       withJanus = p: "${p} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}";
       withRTSOpts = p: "${p} +RTS -A32m -n4m -N";
-      dashboardDir = "${config.users.users.chopaan.home}/dash";
-      chopaanDir = "${config.users.users.chopaan.home}/hydration";
+      dashboardDir = "/dash";
+      chopaanDir = "${config.users.users.chopaan.home}";
     in
      {
       deployment = {
@@ -48,9 +48,7 @@ in
 
         route53 = {
           inherit accessKeyId region;
-          hostName = config.services.grafana.domain;
-                     #  dnsName
-                     #];
+          hostName = dnsName;
           usePublicDNSName = true;
         };
 
@@ -60,12 +58,13 @@ in
       };
 
       environment.systemPackages = [ pkgs.z3 ];
-      nix.trustedUsers = lib.mkForce ["root"];
+      nix.trustedUsers = lib.mkForce ["root" ];
       users = {
         users = {
           chopaan = {
             createHome = true;
             group = "chopaan";
+            extraGroups = ["keys" "root"];
             home = "/chopaan";
             useDefaultShell = true;
           };
@@ -96,14 +95,21 @@ in
         ports = [ "${toString janusPort}:${toString janusPort}" ];
         volumes = [
           "janusgraph-default-data:/var/lib/janusgraph"
-          "${janusConf}/config/januskeyspaces.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
+          "${janusConf}/config/janusgraph.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
           "${janusConf}/config/gremlin-server-0.6.yaml:/etc/opt/janusgraph/janusgraph-server.yaml:ro"
           "${janusConf}/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
-          "${janusConf}/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
+          # "${janusConf}/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
         ];
       };
 
-      systemd.extraConfig = "DefaultLimitNOFILE=6400000";
+      docker-containers.chronograf = {
+        image = "docker.io/chronograf:1.9.0-alpine";
+        ports = [ "8888:8888" ];
+        cmd = [ "--influxdb-url=http://localhost:8086" ];
+        extraDockerOptions = [ "--network=host" ];
+      };
+      
+      systemd.extraConfig = "DefaultLimitNOFILE=6400000\nDefaultStandardError='journal'\nDefaultStandardOut='journal'";
  
       systemd.services.chopaan = {
         after = [ "network.target" "docker-janusgraph.service" ];        
@@ -117,12 +123,12 @@ in
         path = [ pkgs.z3 ];
 
         serviceConfig = {
-          #WorkingDirectory = chopaanDir;
-          User = "chopaan";
-          Group = "chopaan";
+          # WorkingDirectory = "~";
+          # User = "chopaan";
+          # Group = "chopaan";
           LimitNOFILE = 6400000;
-          CacheDirectory = "chopaan";
-          CacheDirectoryMode = "0770";
+          # CacheDirectory = "chopaan";
+          # CacheDirectoryMode = "0770";
         };
         
         unitConfig.RequiresMountsFor = chopaanDir;
@@ -141,12 +147,12 @@ in
         };
 
         serviceConfig = {
-          #WorkingDirectory = chopaanDir;
-          User = "chopaan";
-          Group = "chopaan";
+          # WorkingDirectory = "~";
+          # User = "";
+          # Group = "chopaan";
           LimitNOFILE = 6400000;
-          CacheDirectory = "hydrate";
-          CacheDirectoryMode = "0770";
+          # CacheDirectory = "hydrate";
+          # CacheDirectoryMode = "0770";
         };
         unitConfig.RequiresMountsFor = chopaanDir;
         
@@ -156,18 +162,19 @@ in
       systemd.services.dashgen = {
         wantedBy = [ "grafana.service" ];
         after = [ "docker-janusgraph.service" "chopaan.service" ];
-        environment = {
-          XDG_ROOT_DIR = chopaanDir;
-        };
-        serviceConfig = {
-          #WorkingDirectory = chopaanDir;
-          User = "chopaan";
-          Group = "chopaan";
-          CacheDirectory = "dash";
-          CacheDirectoryMode = "0770";
-        };
-        unitConfig.RequiresMountsFor = chopaanDir;
-        script = (withJanus "${app.dashgen}/bin/dashgen --outpath $(pwd)");
+        # serviceConfig = {
+        #   WorkingDirectory = "~";
+        #   User = "chopaan";
+        #   Group = "chopaan";
+        #   CacheDirectory = "dash";
+        #   CacheDirectoryMode = "0770";
+        # };
+        preStart = ''
+        mkdir -p ${dashboardDir}
+        chmod -R 644 ${dashboardDir}
+        '';
+        unitConfig.RequiresMountsFor = dashboardDir;
+        script = (withJanus "${app.dashgen}/bin/dashgen --outpath ${dashboardDir}");
       };
       
       # systemd.services.server = {
@@ -188,9 +195,11 @@ in
       
       services.grafana = {
         enable = true;
-        domain = "dosti-monitor.ecoenergy.global";
+        domain = dnsName;
+        #rootUrl = "https://dosti.ecoenergy.global";
         port = 2342;
         addr = "127.0.0.1";
+        #extraOptions = { SERVE_FROM_SUB_PATH= "true"; };
         provision = {
           enable = true;
           dashboards = [
@@ -209,7 +218,7 @@ in
               access = "proxy";
               orgId = 1;
               url = "http://localhost:8086";
-              editable = false;
+              editable = true;
             }
           ];  
         };
@@ -238,7 +247,7 @@ in
         access_log logs/access.log;
       '';
 
-        virtualHosts.${config.services.grafana.domain} = {
+        virtualHosts.${dnsName} = {
           forceSSL = true;
           enableACME = true; 
           locations."/" = {
@@ -251,6 +260,18 @@ in
               "proxy_pass_header Authorization;"
             ;
           };
+          # locations."/chronograf" = {
+          #   proxyPass = "http://127.0.0.1:${toString 8888}/";
+          #   #proxyWebsockets = true;
+          #   extraConfig =
+          #     # required when the target is also TLS server with multiple hosts
+          #     "proxy_ssl_server_name on;" +
+          #     # required when the server wants to use HTTP Authentication
+          #     #"proxy_pass_header Authorization;" +
+          #     #"proxy_set_header Host $host;" +
+          #     "proxy_ignore_client_abort on;"
+          #   ;
+          # };
         };
         
         # virtualHosts.${dnsName} = {

@@ -116,6 +116,11 @@ dependencies:
 - generic-lens
 - unliftio-core
 - streamly-bytestring >= 0.1.3
+- safe-exceptions
+- one-liner
+- generic-data
+- barbies
+- higgledy
 when:
   condition: "!impl(ghcjs)"
   then:
@@ -133,6 +138,7 @@ when:
       - concurrent-dns-cache >= 0.1.3
       - websockets
       - servant-server
+      - servant-client-core
       - servant-websockets
       - amazonka
       - amazonka-iot
@@ -162,6 +168,8 @@ when:
       - unix
       - vinyl
       - http-types
+      - cas-store >= 1.1.0
+      - cas-hashable
     when:
     - condition: flag(prod)
       then:

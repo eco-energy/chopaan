@@ -72,10 +72,10 @@ type Static = Raw
 app :: Env -> FilePath -> DBPools -> Application
 app ev root poo =
   serve (Proxy @ ((HistoryAPI AheadT) :<|> SPA Noop :<|> Static))
-  ((serveHistoryAPI poo) :<|> (serveSPA poo) :<|> (serveDirectoryWebApp root))
+  ((serveHistoryAPI poo) :<|> (serveSPA) :<|> (serveDirectoryWebApp root))
   where
-    serveSPA :: DBPools -> Server (SPA GraphM)
-    serveSPA poo = serveUI @ (SPA GraphM) root
+    serveSPA :: Server (SPA GraphM)
+    serveSPA = serveUI @ (SPA GraphM) root
       (\r -> runGraphWithDB poo $ do
           i <- onRouteChange r
           return . template ev i $ view @ Noop i) routes

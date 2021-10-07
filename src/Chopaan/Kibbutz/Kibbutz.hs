@@ -50,6 +50,18 @@ import System.IO
 
 type KbtzConn t m n = (IsStream t, MonadAsync m, Ord n, Show n, Address n)
 
+
+data KbtzActions n = CreateKbtz [n]
+                   | AddNode n
+                   | RemoveNode n
+                   deriving (Eq, Ord, Show, Generic)
+
+randomActs :: (KbtzConn t m n) => t m (KbtzActions n)
+randomActs = S.fromList []
+
+
+
+
 instance KbtzConn t m n => LScan (Kbtz t m n) where
   lscan :: forall a. (Monoid a) => Kbtz t m n a -> (Kbtz t m n a :* a)
   lscan f = (f, mempty)

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveFunctor, DerivingStrategies, DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveFunctor, DerivingStrategies, DeriveAnyClass, DerivingVia #-}
 module Chopaan.Node.NodeId where
 
 import Servant.API
@@ -14,6 +14,8 @@ import Control.DeepSeq (NFData)
 import Shpadoinkle.Widgets.Types (Humanize (..), Present)
 import Data.Greskell (FromGraphSON)
 import Data.Binary
+import qualified Codec.Winery as W
+
 
 type ThingName = Text.Text
 
@@ -23,6 +25,7 @@ newtype NodeId a = NodeId { unNodeId :: a }
   deriving stock (Generic, Functor)
   deriving newtype (Eq, Ord, Show, Read, IsString, Typeable, FromJSON, ToJSON, Humanize, Semigroup, Monoid, FromGraphSON, ToJSONKey)
   deriving anyclass (Present, NFData, Binary)
+  deriving (W.Serialise) via (W.WineryRecord (NodeId a))
 {--
 instance (Show a) => Show (NodeId a) where
   show (NodeId a) = show a
