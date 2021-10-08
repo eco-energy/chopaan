@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeApplications, ScopedTypeVariables, ExplicitForAll, NamedFieldPuns, TupleSections, BangPatterns, OverloadedLists, PolyKinds, DataKinds, UnboxedTuples #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeApplications, ScopedTypeVariables, ExplicitForAll, NamedFieldPuns, TupleSections, BangPatterns, PolyKinds, DataKinds, UnboxedTuples #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, DeriveFunctor, DeriveFoldable, DeriveTraversable, DerivingVia, CPP, LambdaCase, RecordWildCards, RankNTypes, ConstraintKinds, GADTs #-}
 module Main where
 
@@ -26,6 +26,11 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Lens
+import Control.Concurrent
+import Control.Concurrent.Async
+import Control.Concurrent.STM
+import Control.Concurrent.STM.TVar
+import Control.Concurrent.STM.TQueue
 import Data.Bifunctor
 import Data.Word
 import qualified Data.Map.Strict as M
@@ -78,7 +83,7 @@ import qualified Streamly.Internal.Data.Array.Foreign.Type as A
 import qualified Streamly.Internal.Data.Array.Stream.Foreign as A
 import qualified Streamly.Internal.Data.Time.Units as ST
 import Streamly.Internal.Data.IORef.Prim (Prim(..))
-import Dhall hiding (newManager)
+import Dhall hiding (newManager, void)
 import System.Directory
 
 #if 1
@@ -92,25 +97,16 @@ getOpts = do
   input auto $ T.pack path
 
 labNodes :: [NodeMAC]
-labNodes = NodeId <$> [ "ac:67:b2:11:f3:20",
-                         "ac:67:b2:1d:e7:f4",
-                         "8c:aa:b5:97:69:48",
-                         "8c:aa:b5:95:97:c8",
-                         "8c:aa:b5:95:8f:9c",
-                         "ac:67:b2:1c:ec:d8",
-                         "7c:9e:bd:f5:ec:74",
-                         "ac:67:b2:11:f0:28"
-                      ]
-
--- labNodes = NodeId <$> [ "8c:aa:b5:97:69:48"
---                       , "ac:67:b2:11:f2:30"
---                       , "8c:aa:b5:95:97:c8"
---                       , "ac:67:b2:1c:ec:d8"
---                       , "c4:4f:33:67:ea:69"
---                       , "7c:9e:bd:f5:ec:74"
---                       , "ac:67:b2:11:f0:28"
---                       , "7c:9e:bd:f6:48:88"
---                       ]
+labNodes = NodeId <$>
+  [ "ac:67:b2:11:f3:20",
+    "ac:67:b2:1d:e7:f4",
+    "8c:aa:b5:97:69:48",
+    "8c:aa:b5:95:97:c8",
+    "8c:aa:b5:95:8f:9c",
+    "ac:67:b2:1c:ec:d8",
+    "7c:9e:bd:f5:ec:74",
+    "ac:67:b2:11:f0:28"
+  ]
 
 type HConM m = (S.MonadAsync m, MonadCatch m, MonadThrow m)
 
@@ -127,27 +123,117 @@ data DLConf m = DLConf
 
 
 main :: IO ()
-main = do
-  hOpts <- getOpts
+main = runHydration
+
+
+type TNodes = TVar (Set NodeMAC)
+
+type TKbtzim = TVar (M.Map KbtzName TNodes)
+
+getNodes :: KbtzName -> TKbtzim -> STM (Maybe (Set NodeMAC))
+getNodes k tv = do
+  m <- readTVar tv
+  case M.lookup k m of
+    Nothing -> return Nothing
+    Just s' -> Just <$> readTVar s'
+
+readKbtzim :: TKbtzim -> STM (M.Map KbtzName (Set NodeMAC))
+readKbtzim k = do
+    v <- readTVar k
+    let xx = M.toList v
+    v' <- mapM (\(k', v') -> do
+                   v'' <- readTVar v'
+                   return (k', v'')
+               ) xx
+    return $ M.fromList v'
+
+data Control = Control
+  { command :: TQueue (Command)
+  , kbtzNodes :: TKbtzim
+  }
+
+
+
+runHydration :: IO ()
+runHydration = do
+  kbtzim <- atomically $ do
+    ns <- newTVar (Set.fromList labNodes)
+    newTVar (M.fromList [(kbtzId, ns)])
+  let control = S.mapM (atomically . onCommand kbtzim) parseCmd
   tNow <- Time.getCurrentTime
+  hOpts <- getOpts
   aws <- getAwsEnv S3.s3
   let p = DB.queryParams chopaanDB
       basePath = "./data/hydration"
   DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) chopaanDB
-  hydrateKbtz hOpts basePath aws chopaanDB kbtzId
+  let h = S.fromEffect (hydrateKbtz hOpts basePath aws chopaanDB kbtzId kbtzim)
+  S.drain $ h `S.wAsync` control
   where
     kbtzId = KbtzId "Lab_TestGrid"
 
+data Command = StartKbtz KbtzName [NodeMAC]
+             | StopKbtz KbtzName
+             | StartNode KbtzName NodeMAC
+             | StopNode KbtzName NodeMAC
+             | ShowState
+             deriving (Eq, Ord, Show, Generic)
 
-getKbtzNodes :: (Monad m) => UF.Unfold m KbtzName NodeMAC
-getKbtzNodes = UF.many (UF.function lookList) (UF.fromList)
+
+parseCmd :: (HConS t m) => t m Command
+parseCmd = S.delayPre 1 $ S.repeat ShowState
+
+onCommand :: TKbtzim -> Command -> STM ()
+onCommand tv (StartKbtz k ns) = do
+  m <- readTVar tv
+  let s = M.lookup k m
+  case s of
+    Nothing -> do
+      v <- newTVar (Set.fromList ns)
+      modifyTVar' tv (M.insert k v)
+    Just s' -> modifyTVar' s' (\s'' -> s'' <> (Set.fromList ns))
+onCommand tv (StopKbtz k) = modifyTVar' tv (M.delete k)
+onCommand tv (StartNode k n) = do
+  m <- readTVar tv
+  let s = M.lookup k m
+  case s of
+    Nothing -> return ()
+    (Just s') -> modifyTVar s' ((Set.insert n))
+onCommand tv (StopNode k n) = do
+  m <- readTVar tv
+  let s = M.lookup k m
+  case s of
+    Nothing -> return ()
+    (Just s') -> modifyTVar s' (Set.delete n)
+onCommand tv ShowState = void $ readKbtzim tv
+--getKbtzim :: UF.Unfold m TKbtzim KbtzName
+--getKbtzim = UF.unfoldrM ()
+
+
+getKbtzNodes :: forall m. (HConM m) => TKbtzim -> UF.Unfold m KbtzName NodeMAC
+getKbtzNodes tv = UF.many (UF.mkUnfoldM step inject) UF.fromList
   where
-    kbtzim :: M.Map KbtzName [NodeMAC]
-    kbtzim = M.fromList [(KbtzId "Lab_TestGrid", labNodes)]
-    lookList k = case (M.lookup k kbtzim) of
-      Nothing -> []
-      Just v -> v
-
+    step :: (KbtzName, Set NodeMAC) -> m (UF.Step (KbtzName, Set NodeMAC) [NodeMAC])
+    step (k, oldSet) = liftIO . atomically $ do
+      newSet <- getNodes k tv
+      case newSet of
+        Nothing -> do
+          --print $ "No New Set, Stopping: " <> (show k)
+          --print (oldSet)
+          return $ UF.Stop
+        Just s -> do
+          --print $ "New Set Exists for: " <> (show k) <> " " <> (show s)
+          let diff = Set.difference s oldSet
+          --print $ "Diff Is: " <> (show diff)
+          case (null diff) of
+            True -> do
+              retry
+              --print $ "Skipping " <> (show k)
+              --return $ UF.Skip (k, s)
+            False -> do
+              --print $ "Yielding " <> (show k)
+              return $ UF.Yield (Set.toList diff) (k, s)
+    inject :: KbtzName -> m (KbtzName, Set NodeMAC)
+    inject k = return (k, mempty)
 
 hydrateKbtz :: forall m. (HConM m)
   => HydrationOpts
@@ -155,12 +241,17 @@ hydrateKbtz :: forall m. (HConM m)
   -> Env
   -> DB.Database
   -> KbtzName
---  -> UF.Unfold m KbtzName (Set NodeMAC)
---  -> UF.Unfold m NodeMAC Prefix
+  -> TKbtzim
   -> m ()
-hydrateKbtz hOpts basePath aws chopaanDB kbtzId = do
+hydrateKbtz hOpts basePath aws chopaanDB kbtzId kbtzim = do
   t0 <- liftIO $ Time.getCurrentTime
-  store <- initKbtzStore kbtzId basePath getKbtzNodes (pfs hOpts)
+  let ns = getKbtzNodes kbtzim
+  nodeSet <- liftIO . atomically $ do
+    nodeSet' <- (M.lookup kbtzId) <$> readTVar kbtzim
+    case nodeSet' of
+      Nothing -> retry
+      Just s -> return s
+  store <- initKbtzStore kbtzId basePath ns (prefs nodeSet t0 hOpts)
   dlPaths <- (flip runReaderT) (DLConf aws bucket store kbtzId) $ do
     keyPaths <- S.trace (pr . keyLog) <$> getKeysFS @S.AheadT
     S.trace (pr . frameLog) <$> dlFramesParFS keyPaths
@@ -172,22 +263,26 @@ hydrateKbtz hOpts basePath aws chopaanDB kbtzId = do
       frameLog (n, p) = "Frames Downloaded for Node :" <> (show n) <> " and Prefix :" <> (show p)
       ingestLog = const "Frames Ingested"
       bucket = S3.BucketName $ s3BucketName hOpts
-      prefs = pfs hOpts
-      pfs HydrationOpts{start, end, resolution} =
-        UF.many
-        (UF.function (const (prefixGen @m resolution (toUTC start) t0))) UF.fromStream
-  --   existingKeyFiles = getKbtzFolder store Keys
-  --   existingFrameFiles = getKbtzFolder store Frames
-  --   prefixesIngested = getKbtzFolder store Ingested
+      prefs nodeSet to HydrationOpts{start, resolution} =
+        UF.many (UF.function (prefixGen @m nodeSet resolution (toUTC start) to)) UF.fromStream
 
-prefixGen :: (S.MonadAsync m) => Resolution -> Time.UTCTime -> Time.UTCTime -> S.SerialT m Prefix 
-prefixGen r start now = past `S.ahead` future
+
+prefixGen :: (S.MonadAsync m, Ord a)
+  => TVar (Set a) -> Resolution -> Time.UTCTime -> Time.UTCTime -> a -> S.SerialT m Prefix 
+prefixGen tv r start now n = past <> future
   where
+    inSet = liftIO . atomically $ do
+      s <- readTVar tv
+      return $ Set.member n s
+    {-# INLINE inSet #-}
     past = S.fromList p'
-    future = S.delayPre (fromIntegral delP)
-      (S.unfold UF.enumerateFromStepIntegral (last p', (Prefix delP)))
-    p' = (prefixRange r start now)
-    delP = ceiling . (10 **) . realToFrac . (ceiling . logBase 10 . resDiff) $ r
+    {-# INLINE past #-}
+    future = S.takeWhileM (\_ -> inSet) $ S.delayPre (fromIntegral delF)
+      (S.unfold UF.enumerateFromStepIntegral (last p', (Prefix delF)))
+    {-# INLINE future #-}
+    p' = prefixRange Minute start now
+    delF = ceiling . (10 **) . realToFrac . (ceiling . logBase 10 . resDiff) $ Minute
+    {-# INLINE delF #-}
 {-# INLINE prefixGen #-}
 
 deriving newtype instance W.Serialise ST.MilliSecond64
@@ -270,12 +365,12 @@ traceUF :: (Monad m) => (a -> m b) -> UF.Unfold m x a -> UF.Unfold m x a
 traceUF f = UF.mapM (\a -> f a >> (pure a))
 
 initKbtzStore :: forall m. (MonadIO m) => KbtzName -> FilePath -> UF.Unfold m KbtzName NodeMAC -> UF.Unfold m NodeMAC Prefix -> m (KbtzStore m)
-initKbtzStore kbtz base ns ps = do
+initKbtzStore kbtz base kns ps = do
   return $ KbtzStore (traceUF mkNodeDirs ns) ps
     (hFolder Keys) (hFolder Frames) (hFolder Errors) (hFolder Ingested)
     (hFile Keys) (hFile Frames) (hFile Errors) (hFile Ingested) (asKbtzNode kbtz)
   where
-    ns = UF.supply kbtz ns
+    ns = UF.supply kbtz kns
     root = base </> (T.unpack . showText $ kbtz)
     nodeDirHere here n =  root </> here </> (nodeMACPath n)
     mkNodeDirHere p n = liftIO $ cd (nodeDirHere p n)
@@ -343,7 +438,7 @@ ingestFrames source lnFold tag n = do
     . S.postscan (nodeFold)
     . S.catMaybes
     . S.trace (logNothing)
-    . S.map (validateMF')
+    . S.mapM (pure . validateMF')
     . S.rights
     . S.trace (logEither)
     . S.map parsePB
@@ -521,7 +616,6 @@ getKeysUF :: forall t m r. (HConS t m)
   -> (NodeMAC -> Prefix -> FL.Fold m S3Key r)
   -> t m r
 getKeysUF env bucket ns ps prefixFold = S.mapM (uncurry prefixKeys)
-                        $ S.trace (logPrefGen)
                         $ S.unfoldManyRoundRobin (UF.mapMWithInput (\a b -> pure (a,b)) ps)
                         $ S.unfold0 ns
   where
@@ -638,3 +732,46 @@ mkMetadata s n p = Metadata
                    <*> (fileLen $ loadPrefixErrors s n p)
   where
     fileLen = S.fold FL.length
+
+
+
+testComm :: IO (Bool)
+testComm = do
+  let ks = (KbtzId . T.pack . (pure @[])) <$> ['a'..'d']
+  let ns = (NodeId . T.pack . show) <$> [1..12]
+  let kns = fst $ foldr zop ([], ns) ks
+        where
+          zop :: k -> ([(k, [n])], [n]) -> ([(k, [n])], [n]) 
+          zop k (k', n') = ((k, take 3 n') : k', drop 3 n')
+  let addKs = (uncurry StartKbtz) <$> kns
+      rmKs = StopKbtz <$> ks
+      addNs = conc $ (\(k', ns') -> (StartNode k' <$> ns')) <$> kns
+      rmNs = conc $ (\(k', ns') -> (StopNode k' <$> ns')) <$> kns
+  k <- atomically $ newTVar mempty
+  -- let readK tag = do
+  --       print tag
+  --       v <- atomically $ readKbtzim k
+  --       print v
+  kadd <- mapM_ (atomically . onCommand k) addKs
+  p <- async $ do
+    S.mapM_ (print) $ S.unfoldManyRoundRobin (getKbtzNodes k) (S.fromList ks)
+    print ("STOPPING 1" :: String)
+  --kadd <- mapM_ (atomically . onCommand k) addKs
+  --readK "Add Ks"
+  krm <- mapM_ (atomically . onCommand k) rmKs
+  wait p
+  --readK "Rm Ks"
+  mapM_ (atomically . onCommand k) ((flip StartKbtz []) <$> ks)
+  --readK "Add JUST kbtz"
+  --p' <- async $ do
+  --  S.mapM_ (print) $ S.unfoldManyRoundRobin (getKbtzNodes k) (S.fromList ks)
+  --  print ("STOPPING 2" :: String)
+  nadd <- mapM_ (atomically . onCommand k) addNs
+  --readK "Add Ns"
+  nrm <- mapM_ (atomically . onCommand k) rmNs
+  mapM_ (atomically . onCommand k) rmKs
+  --wait p'
+  --readK "RM Ns"
+  return True
+  where
+    conc = foldl (<>) mempty

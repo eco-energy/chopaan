@@ -254,6 +254,7 @@ library:
         - Chopaan.Hydrate
         - Chopaan.Kibbutz.KbtzId
         - Chopaan.Kibbutz.Kibbutz
+        - Chopaan.Kibbutz.DataSource
         - Chopaan.Kibbutz.Transactor
         - Chopaan.Kibbutz.Allocate
         - Chopaan.Kibbutz.AWS.Common

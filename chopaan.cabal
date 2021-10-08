@@ -44,7 +44,6 @@ library
   exposed-modules:
       Chopaan.API.Kbtz
       Chopaan.Graph.Algebraic
-      Chopaan.Kibbutz.DataSource
   other-modules:
       Paths_chopaan
   hs-source-dirs:
@@ -257,6 +256,7 @@ library
         Chopaan.Hydrate
         Chopaan.Kibbutz.KbtzId
         Chopaan.Kibbutz.Kibbutz
+        Chopaan.Kibbutz.DataSource
         Chopaan.Kibbutz.Transactor
         Chopaan.Kibbutz.Allocate
         Chopaan.Kibbutz.AWS.Common
