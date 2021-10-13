@@ -23,17 +23,35 @@
 # commonLib include iohk-nix utilities, our util.nix and nixpkgs lib.
 with pkgs; with commonLib;
 let
-
-
-  haskellPackages = recRecurseIntoAttrs
+  cacheCreds = splitString ":" (builtins.readFile ./credentials/chopaan-build);
+  add-build-cache = 
+      import 
+        ./nix/nix-build-cache.nix 
+        {  
+          pkgs = pkgs;
+          aws-key = elemAt cacheCreds 0;
+          aws-secret = elemAt cacheCreds 1;
+          aws-region = "ap-southeast-1";
+          cache-name = "chopaan";
+          master-cache = "chopaan";
+          cache-dirs = [ "dist" ];
+          s3-bucket = "chopaan-build";
+        };
+  recRecurseIntoAttrsAndCache = x:
+        if (isAttrs x && !isDerivation x && x.recurseForDerivations or true)
+        then recurseIntoAttrs (mapAttrs (n: v: if n == "buildPackages" then (withCache v) else recRecurseIntoAttrsAndCache v) x)
+        else (if isDerivation x then add-build-cache x else x);
+  withCache = attrs: lib.mapDerivationAttrset add-build-cache attrs;
+  haskellPackages = (recRecurseIntoAttrs #AndCache
     # the Haskell.nix package set, reduced to local packages.
-    (selectProjectPackages chopaanHaskellPackages);
-
+    (selectProjectPackages chopaanHaskellPackages));
+  
   self = {
     inherit haskellPackages;
 
     version = (haskellPackages.chopaan.identifier);
     # Grab the executable component of our package.
+    #  
     chopaan = (haskellPackages.chopaan.components.exes);
 
     passthru = (chopaanHaskellPackages.plan-nix.passthru);
@@ -53,7 +71,8 @@ let
       inherit pkgs;
       withHoogle = true;
     };
-
+    lib = commonLib;
+    haskell-nix = haskell-nix;
     #website = import ./nix/website.nix {};
     # Attrset of PDF builds of LaTeX documentation.
     #docs = pkgs.callPackage ./docs/default.nix {};

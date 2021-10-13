@@ -6,6 +6,8 @@ module Chopaan.Types where
 
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Text (Text)
+import Text.Read (readMaybe)
+import qualified Data.Text as T
 import Servant.API (FromHttpApiData(..), ToHttpApiData(..))
 import qualified Data.Text as Text
 #ifndef ghcjs_HOST_OS
@@ -14,6 +16,7 @@ import Prelude (Enum(..), read)
 import RIO.Process
 import RIO.Time (UTCTime(..), fromGregorian, secondsToDiffTime)
 import Dhall
+import System.Envy
 import Chopaan.Node.NodeOpts
 #else
 import Prelude
@@ -22,7 +25,12 @@ import GHC.Generics
 #endif
 
 data Resolution = Year | Month | Week | Day | Hour | Minute | Second
-  deriving (Eq, Ord, Show, Generic, Bounded, Enum, NFData, ToJSON, FromJSON)
+  deriving (Eq, Ord, Show, Generic, Bounded, Read, Enum, NFData, ToJSON, FromJSON)
+
+instance Var Resolution where
+  toVar = show
+  fromVar = readMaybe
+
 
 toUrlPieceViaEnum :: Enum a => a -> Text
 toUrlPieceViaEnum = Text.pack . show . fromEnum
@@ -77,6 +85,20 @@ toUTC d = UTCTime (fromGregorian
 
 instance FromDhall Date
 
+instance FromEnv Date
+
+-- $ "mm-dd-yyyy"
+instance Var Date where
+  fromVar = parse
+    where
+      parse = (\[d, m, y] -> Date <$> d <*> m <*> y)
+                   . (fmap (readMaybe . T.unpack))
+                   . (take 3)
+                   . T.split (== '-')
+                   . T.pack
+  toVar (Date d m y) = (show d) <-> (show m) <-> (show y)
+    where
+      a <-> b = a <> "-" <> b 
 
 instance FromDhall Resolution
 

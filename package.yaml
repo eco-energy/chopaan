@@ -16,7 +16,6 @@ extra-source-files:
 
 data-files:
  - options.dhall
- - hydration.dhall
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -252,6 +251,7 @@ library:
         - Chopaan.Haxl.Kbtz
         - Chopaan.Kibbutz
         - Chopaan.Hydrate
+        - Chopaan.Hydration.Store
         - Chopaan.Kibbutz.KbtzId
         - Chopaan.Kibbutz.Kibbutz
         - Chopaan.Kibbutz.DataSource

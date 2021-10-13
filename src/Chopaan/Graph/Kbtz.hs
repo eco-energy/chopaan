@@ -145,7 +145,7 @@ data AKbtz = AKbtz
   --, createdBy :: User
   } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
 
-parseAKbtz :: PMap Single GValue -> Either PMapLookupException AKbtz
+parseAKbtz :: PMap Multi GValue -> Either PMapLookupException AKbtz
 parseAKbtz pm = AKbtz
                 <$> (lookupAs kbtzId pm)
   where

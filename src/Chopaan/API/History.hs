@@ -54,7 +54,7 @@ import Data.Pool
 import Network.Wai (Application)
 
 import Chopaan.Kibbutz (KbtzC(..))
-import Chopaan.Hydrate (hydrateKbtz, Hydration)
+--import Chopaan.Hydrate (hydrateKbtz, Hydration)
 import Chopaan.Utils.Time (dayRange)
 
 #else
@@ -106,7 +106,7 @@ instance CRUDChopaan (GraphM) where
     return . NodeList $ ns
   getGraph :: (IsStream t) => KbtzName -> GraphType -> Resolution -> UTCTime -> UTCTime -> t GraphM (SG NodeMAC)
   getGraph k g r t t' = S.concatM (getHistoryForGraph k g r t t')
-  createKbtz k ns t t' = S.concatM (createKbtzWithHydration k ns t t')
+  --createKbtz k ns t t' = S.concatM (createKbtzWithHydration k ns t t')
 
 daytimeRange s e = zip r (tail r)
   where
@@ -136,19 +136,19 @@ getHistoryForGraph kn g r t0 t1 = do
     streamQ wr q ns ts = S.mapM (\(t, t') -> (wr . G.SG) <$> (withSpider $ q ns t t')) $ ts
 
 
-createKbtzWithHydration :: forall t. (IsStream t)
-  => KbtzName
-  -> [NodeMAC]
-  -> UTCTime
-  -> UTCTime
-  -> GraphM (t GraphM Hydration)
-createKbtzWithHydration k ns t t' = do
-  withKbtzPool (\c -> do
-                     addKbtz c k
-                     mapM_ (addNodeToKbtz c k) ns
-                 )
-  b <- s3Bucket <$> ask
-  hydrateKbtz undefined (KbtzC k ns undefined (Just b))
+-- createKbtzWithHydration :: forall t. (IsStream t)
+--   => KbtzName
+--   -> [NodeMAC]
+--   -> UTCTime
+--   -> UTCTime
+--   -> GraphM (t GraphM Hydration)
+-- createKbtzWithHydration k ns t t' = do
+--   withKbtzPool (\c -> do
+--                      addKbtz c k
+--                      mapM_ (addNodeToKbtz c k) ns
+--                  )
+--   b <- s3Bucket <$> ask
+--   hydrateKbtz undefined (KbtzC k ns undefined (Just b))
 
 serveHistoryAPI :: forall t. (IsStream t)
   => DBPools

@@ -6,14 +6,31 @@ import qualified Control.Exception as E
 import qualified Control.Monad.Catch as C
 import Data.Either
 import Control.Monad.IO.Class
+import Streamly.Internal.Data.SVar (ThreadAbort(..))
+import Network.HTTP.Client (HttpException)
 
 chopaanPolicy :: (MonadIO m) => Int -> RetryPolicyM m
 chopaanPolicy n = exponentialBackoff 10 <> limitRetries n
 
+skipThreadAbort :: Monad m => RetryStatus -> C.Handler m Bool  
+skipThreadAbort = \_ -> C.Handler $ \ (_ :: ThreadAbort) -> return False
+
+logMsg :: (MonadIO m, C.Exception e) => String -> Bool -> e -> RetryStatus -> m ()
+logMsg msg b e rr = liftIO $ print $ (show msg) <> (defaultLogMsg b e rr)
+
+retryHttp :: MonadIO m => String -> RetryStatus -> C.Handler m Bool
+retryHttp msg r = logRetries (\(a :: HttpException) -> return True) (logMsg msg) r  
+
+catchThese msg r = flip C.catches [retryHttp msg r] 
+
 recoverC :: (MonadIO m, C.MonadMask m, Show e) => e -> Int -> m a -> m a
-recoverC msg n action = recovering (chopaanPolicy n) [logDef] (\_ -> action)
+recoverC msg n action = recovering (chopaanPolicy n) (skipAsyncExceptions <> [retryHttp (show msg)
+                                                                             , skipThreadAbort
+                                                                             , logDef]) (\_ -> action)
   where
-    logDef r = logRetries (\_ -> return True) (\b (C.SomeException e) rr -> liftIO $ print $ defaultLogMsg b e rr) r
+    logDef r = logRetries (\_ -> return True) (\b (C.SomeException e) rr ->
+                                                 liftIO $ print $
+                                                 (show msg) <> (defaultLogMsg b e rr)) r
 
 recoverOrNothing :: forall m a e. (MonadIO m, C.MonadMask m, C.MonadCatch m, Show e) => e -> Int -> m a -> m (Maybe a)
 recoverOrNothing msg n act = C.catchAll ((pure . Just) =<< (recoverC msg n act)) (\e -> (liftIO . print $ ("Failed After Retries: " <> show e))  >> return Nothing) 

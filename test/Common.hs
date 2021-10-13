@@ -35,12 +35,13 @@ import Linear.Affine
 import Linear.Matrix
 import Linear.Quaternion
 
-
+import Chopaan.Types
 import Chopaan.Graph
 import Chopaan.Node.NodeId
 import Chopaan.Node.Metrics
 import Chopaan.Node.Mesh
 import Chopaan.Kibbutz.Transactor
+import Chopaan.Comm.S3
 import qualified Chopaan.Node.HW as HW
 import qualified Chopaan.Node.Components as C
 import Chopaan.Kibbutz.KbtzId (KbtzId(..))
@@ -110,6 +111,11 @@ almostEqual :: (Show a, Eq a, Num a, Ord a) => a -> a -> a -> Expectation
 almostEqual eta a b = do
   ((abs $ a - b) < eta) `shouldBe` True
 
+instance Arbitrary Prefix where
+  arbitrary = (pure . Prefix . getPositive) =<< arbitrary
+
+instance Arbitrary Resolution where
+  arbitrary = genericArbitrary
 
 instance (Num a, Arbitrary a, Compensable a) => (Arbitrary (Compensated a)) where
   arbitrary =  (\a -> pure $ add a 0 compensated) =<< arbitrary

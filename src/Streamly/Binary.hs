@@ -238,7 +238,13 @@ decodeFile f = S.concatM $ do
     False -> return $ S.fromPure (Left NoFile)
 {-# INLINE decodeFile #-}
 
+
 type FileSource a = (P.Source FilePath a)
+
+decodeUnfold :: forall m a. (HasEncoding a, MonadAsync m, MonadCatch m)
+  => P.Producer m (FileSource Word8) Word8
+  -> UF.Unfold m (FileSource Word8) (Either DecodeException a)
+decodeUnfold = P.simplify . decodeProducer
 
 decodeProducer :: forall m a. (HasEncoding a, MonadAsync m, MonadCatch m)
   => P.Producer m (FileSource Word8) Word8
@@ -248,8 +254,14 @@ decodeProducer = (fmap decodeA) . P.parseManyD (chunkBytes @a)
 
 encodeFold :: (HasEncoding a, MonadAsync m, MonadCatch m)
   => FilePath -> FL.Fold m a ()
-encodeFold fp = FL.lmapM encodeA (A.lpackArraysChunksOf A.defaultChunkSize (File.writeChunks fp))
+encodeFold fp = FL.lmapM encodeA (File.writeChunks fp)
 {-# INLINE encodeFold #-}
+
+-- encodeFold2 :: (HasEncoding a, MonadAsync m, MonadCatch m)
+--   => FilePath -> FL.Fold m a ()
+-- encodeFold2 fp = FL.lmapM encodeA (File.writeChunks2 fp)
+-- {-# INLINE encodeFold2 #-}
+
 
 parseMsgS :: (IsStream t, MonadAsync m, Message a, MonadCatch m)
   => FilePath -> t m (Either DecodeException (PB a))

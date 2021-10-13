@@ -196,9 +196,7 @@ extra-deps:
  - higgledy-0.4.1.1@sha256:103701c8080ec345a21edd3ef149b4d3b8ec66a12a82d3d0b5c5e4a0d7d6ac26,2238
  - generic-lens-2.2.0.0@sha256:4008a39f464e377130346e46062e2ac1211f9d2e256bbb1857216e889c7196be,3867
  - generic-lens-core-2.2.0.0@sha256:b6b69e992f15fa80001de737f41f2123059011a1163d6c8941ce2e3ab44f8c03,2913
-
  # Override default flag values for local packages and extra-deps
-
 
 flags:
   concat-examples:

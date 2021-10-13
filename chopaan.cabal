@@ -29,7 +29,6 @@ extra-source-files:
     js/periodic.html
 data-files:
     options.dhall
-    hydration.dhall
 
 source-repository head
   type: git
@@ -254,6 +253,7 @@ library
         Chopaan.Haxl.Kbtz
         Chopaan.Kibbutz
         Chopaan.Hydrate
+        Chopaan.Hydration.Store
         Chopaan.Kibbutz.KbtzId
         Chopaan.Kibbutz.Kibbutz
         Chopaan.Kibbutz.DataSource

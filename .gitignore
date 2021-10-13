@@ -4,4 +4,4 @@ tarballs/
 .stack-work/
 certs/*
 data
-key
+credentials

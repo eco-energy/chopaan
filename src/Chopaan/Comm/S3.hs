@@ -29,6 +29,7 @@ import Data.Time (UTCTime(..))
 import Data.Time.Clock.Compat (nominalDiffTimeToSeconds)
 import Data.Maybe
 import Data.Either
+import Foreign.Storable (Storable)
 
 import Data.Conduit.Combinators (sinkList)
 
@@ -226,6 +227,10 @@ timedPrefix n t = (<> ("/" <> (asFileName t))) <$> (nodeS3Prefix n)
 worldStart :: MilliSecond64
 worldStart = MilliSecond64 1607478885000
 
+-- https://vimeo.com/72870861
+-- THERE IS A GALOIS CONNECTION BETWEEN PREFIX AND SECONDS
+-- THAT IS MEDIATED BY RESOLUTION
+
 resDiff :: Resolution -> Double
 resDiff r = case r of
   Second -> 1
@@ -237,10 +242,12 @@ resDiff r = case r of
   Year -> 365 * (resDiff Day) 
 {-# INLINE resDiff #-}
 
+numDigits :: Resolution -> Int
+numDigits = (ceiling . (logBase 10)) . resDiff
 
 newtype Prefix = Prefix { unPrefix :: Int64 }
   deriving (Eq, Ord, Show, Generic)
-  deriving newtype (Enum, Bounded, Num, Real, Integral)
+  deriving newtype (Enum, Bounded, Num, Real, Integral, Storable)
   deriving (W.Serialise) via (W.WineryRecord (Prefix))
 
 asFileName :: Prefix -> T.Text
@@ -250,7 +257,7 @@ asFileName = T.pack . show . unPrefix
 prefixRange :: Resolution -> UTCTime -> UTCTime -> [Prefix]
 prefixRange !r !t !t' = Prefix <$> [start..end]
   where
-    sigDigs = (9 -) . (ceiling . (logBase 10)) . resDiff $ r
+    sigDigs = (9 -) . numDigits $ r
     start :: Int64
     start = unDigits 10 $ take sigDigs $ digits 10 $ utcToSeconds t
     end = unDigits 10 $ take sigDigs $ digits 10 $ utcToSeconds t'

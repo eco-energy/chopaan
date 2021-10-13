@@ -121,7 +121,7 @@ pageUFM env = UF.lmap Just $ UF.unfoldrM step
     step Nothing = return Nothing
     step (Just req) = do
       y <- liftIO $ withAwsEnv env
-           $ recoverC ("paging retry" :: String) 10 $ timeout 120 $ send req
+           $ recoverC ("paging retry" :: String) 10 $ timeout 90 $ send req
       return $ Just (y, page req y)
 {-# INLINE pageUFM #-}
 
@@ -132,7 +132,7 @@ pageS env req = S.unfoldrM step start
     step :: (Maybe a) -> m (Maybe (Rs a, Maybe a)) 
     step Nothing = return Nothing
     step (Just req') = do
-      y <- liftIO $ withAwsEnv env $ recoverC ("paging retry" :: String) 10 $ timeout 120 $ send req'
+      y <- liftIO $ withAwsEnv env $ recoverC ("paging retry" :: String) 10 $ timeout 90 $ send req'
       return $ Just (y, page req' y)
 {-# INLINE pageS #-}
 

@@ -29,26 +29,16 @@ import Chopaan.Node.Mesh (MeshNode, RxSignal)
 import Chopaan.Node.Folds (SensorR)
 
 
-#ifndef ghcjs_HOST_OS
-import Chopaan.Hydrate (Hydration)
-#endif
-
 import Chopaan.Types (Resolution(..))
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Graph
 import Data.Time
 
-#ifdef ghcjs_HOST_OS
-type Hydration = ((NodeMAC, Text, Maybe UTCTime)
-                 , ((Maybe NodeMAC, M.Map NodeMAC SensorR)
-                   , (Maybe NodeMAC, M.Map NodeMAC (MeshNode, RxSignal))))
-#endif
-
 class CRUDChopaan m where
   listKibbutzim :: m (KbtzList)
   listNodezim :: KbtzName -> m (NodeList)
   getGraph :: forall t. IsStream t => KbtzName -> GraphType -> Resolution -> UTCTime -> UTCTime -> t m (SG NodeMAC)
-  createKbtz :: forall t. IsStream t => KbtzName -> [NodeMAC] -> UTCTime -> UTCTime -> t m (Hydration)
+  --createKbtz :: forall t. IsStream t => KbtzName -> [NodeMAC] -> UTCTime -> UTCTime -> t m (Hydration)
   --sensorMonitor :: (IsStream t) => NodeMAC -> t m SensorR
 
 instance (MonadTrans t, Monad m, CRUDChopaan m, Monad (t m)) => CRUDChopaan (t m) where
@@ -56,8 +46,8 @@ instance (MonadTrans t, Monad m, CRUDChopaan m, Monad (t m)) => CRUDChopaan (t m
   listNodezim = lift . listNodezim
   getGraph :: forall t'. (IsStream t') => KbtzName -> GraphType -> Resolution -> UTCTime -> UTCTime -> t' (t m) (SG NodeMAC)
   getGraph k g r t0 t1 = adapt . hoist lift $ getGraph k g r t0 t1
-  createKbtz :: forall t'. IsStream t' => KbtzName -> [NodeMAC] -> UTCTime -> UTCTime -> t' (t m) (Hydration)
-  createKbtz k ns t0 t1 = adapt . hoist lift $ createKbtz k ns t0 t1
+  --createKbtz :: forall t'. IsStream t' => KbtzName -> [NodeMAC] -> UTCTime -> UTCTime -> t' (t m) (Hydration)
+  --createKbtz k ns t0 t1 = adapt . hoist lift $ createKbtz k ns t0 t1
 
 
 newtype NodeList = NodeList { unNodeList :: Nodezim }

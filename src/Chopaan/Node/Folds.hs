@@ -47,6 +47,9 @@ Folds of type FL.Fold, as functions to the instantatenous values of the system o
 
 
 -----------------------------------------------------------------------------------------------------}
+
+type MeshR = (MeshNode, RxSignal)
+
 meshFold :: forall m. Monad m => NodeMAC -> FL.Fold m (RuntimeStats) (MeshNode, RxSignal)
 meshFold = meshF
 {-# INLINE meshFold #-}

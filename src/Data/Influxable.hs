@@ -93,7 +93,9 @@ createDB :: IO ()
 createDB = DB.manage qp $ F.formatQuery ("CREATE DATABASE "F.%F.database) chopaanDB
 
 wp :: Http.WriteParams
-wp = Http.writeParams chopaanDB
+wp = (Http.writeParams chopaanDB)
+     --{
+     --}
 
 qp :: QueryParams
 qp = queryParams chopaanDB
@@ -132,9 +134,11 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
                                        . " FROM "
                                        . F.database
                                        . "."
+                                       . F.text
+                                       . "."
                                        . F.measurement
                                        . F.text
-                                     ) f chopaanDB (measurementName @tag @a) whereC
+                                     ) f chopaanDB "autogen" (measurementName @tag @a) whereC
         where
           whereC :: Text
           whereC = " WHERE " <>
