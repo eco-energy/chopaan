@@ -21,6 +21,7 @@ module Chopaan.Hydrate
   , HConS
   ) where
 
+
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Comm.S3 hiding (pathFile)
@@ -33,7 +34,7 @@ import Chopaan.Node.Folds (sensorFold, meshFold, SensorR, MeshR)
 import Chopaan.Utils.Time (utcTimeNow)
 import Data.Influxable (KbtzNode, asKbtzNode, lineSensorR
                        , lineMesh, lineFoldHttp, showText, chopaanDB, wp)
-
+import Chopaan.Graph
 
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N
@@ -54,6 +55,7 @@ import Control.Concurrent.STM.TVar
 import Control.Concurrent.STM.TQueue
 import Data.Bifunctor
 import Data.Word
+import Data.IORef (readIORef)
 import qualified Data.Map.Strict as M
 import Data.Int
 import Data.Maybe
@@ -67,8 +69,10 @@ import Data.Time.Clock.POSIX.Compat (posixSecondsToUTCTime)
 import qualified Data.Set as Set
 import Data.Set (Set)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Encoding as T
 import Network.AWS hiding (Metadata)
+import Network.AWS.Data.Sensitive (Sensitive(..))
 import qualified Network.AWS.S3 as S3
 
 import Network.DNS.Resolver
@@ -90,6 +94,10 @@ import qualified Codec.Winery as W
 import Data.ProtoLens
 
 import Data.Void
+
+import qualified Network.Wreq.Session as Session
+import Network.Wreq
+
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Unfold as UF
@@ -167,6 +175,7 @@ data ParStrategy = ParStrategy
   , sourceGenThreads :: Int
   } deriving (Generic, FromEnv)
 
+parseParStrategy :: IO ParStrategy
 parseParStrategy = decodeWithDefaults (ParStrategy 1000 5)
 
 parseHConf :: IO (HydrationConf)
@@ -235,15 +244,6 @@ mkTKbtz kns = do
   nSets <- traverse (newTVar . Set.fromList) (snd <$> kns)
   newTVar (M.fromList (zip (fst <$> kns) nSets))
 
-defK :: MonadIO m => m (TKbtzim) 
-defK = liftIO . atomically $ do
-  mkTKbtz [(kbtz0, labNodes), (kbtz1, labNodes1)]
-    where
-      kbtz0 = KbtzId "TestGrid0"
-      kbtz1 = KbtzId "TestGrid1"
-
---drainPar = S.drain . S.fromParallel
-
 mkKbtzConf :: HydrationConf
   -> Env
   -> KbtzName
@@ -257,11 +257,12 @@ mkKbtzConf (HydrationConf{s3Bucket
                          , pastRes, futureRes}) env name store manager wp parHow =
   KbtzConf env (S3.BucketName s3Bucket) store name manager (toUTC startDate) lifetime wp (pastRes, futureRes) parHow
 
-runHydration :: HydrationConf -> IO ()
-runHydration conf = do
+runHydration :: TinkerConf -> HydrationConf -> IO ()
+runHydration tk conf = do
+  kns <- runGraphM (PoolConf 1 1 1) tk getKNs
   manConf <- parseManagerConf
   parConf <- parseParStrategy
-  kbtzim <- defK
+  kbtzim <- atomically $ mkTKbtz kns
   aws <- getAwsEnv S3.s3
   man <- newManager manConf
   let p = DB.queryParams chopaanDB
@@ -724,6 +725,40 @@ dl nThreads man signWith = S.trace (logEither)
 {-# INLINE dl #-}
 
 type SignWith = (S3.BucketName, Env, Time.UTCTime)
+
+sessionS3 :: forall m. (S.MonadAsync m)
+  => Env -> S3.BucketName -> NC.ManagerSettings -> S.AheadT m S3Key -> S.AheadT m S3Resp
+sessionS3 env (S3.BucketName bucket) manSettings ks = S.concatM $ do
+  sesh <- liftIO $ Session.newSessionControl Nothing manSettings
+  auth <- liftIO $ getAuth
+  let
+    (AccessKey accessKey) = _authAccess auth
+    (SecretKey secretKey) = desensitise . _authSecret $ auth
+    opts = ropts accessKey secretKey
+  return $ S.mapM (pure . a) S.|$ S.mapM (traverse (s3Get opts sesh)) ks
+  where
+    a (S3Idx (idx, o)) = bimap (S3Idx . (idx,)) (S3Idx . (idx,)) o
+    s3Get :: Network.Wreq.Options
+      -> Session.Session
+      -> S3.ObjectKey
+      -> m (Either RespStatus BS.ByteString)
+    s3Get opts sesh r = liftIO $ do
+      (checkResponse) =<< (Session.getWith opts sesh . toReq $ r) 
+    region = "ap-southeast-1"
+    basePath = T.unpack $ "https://" <> bucket <> ".s3." <> region <> ".amazonaws.com" <> "/"
+    toReq (S3.ObjectKey k) = basePath <> (T.unpack k) 
+    -- region = env ^. envRegion
+    ropts access secret = defaults &
+      auth ?~ awsFullAuth AWSv4 access secret Nothing (Just ("s3", "ap-southeast-1"))
+    getAuth = case (env ^. envAuth) of
+      Ref _ r -> readIORef r
+      Auth ae -> return ae
+    checkResponse :: NC.Response BL.ByteString -> IO (Either RespStatus (BS.ByteString)) 
+    checkResponse resp = case (NC.responseStatus resp == NC.ok200) of
+                           True -> do
+                             let bo = BL.toStrict (NC.responseBody $ resp)
+                             return . Right $! bo
+                           _ -> return . Left . wrapStatus $ NC.responseStatus resp
 
 signGetObject :: (MonadIO m) => SignWith -> S3.ObjectKey -> m (BS.ByteString)
 signGetObject (bucket, env, t) = sign

@@ -147,6 +147,7 @@ when:
       - warp
       - wai-cors
       - wai-extra
+      - wreq
       - connection
       - conduit
       - tls
