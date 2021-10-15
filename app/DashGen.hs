@@ -51,7 +51,7 @@ dashName = showText
 
 nodeGraph :: NodeMAC -> GraphType -> [Query] -> Graph
 nodeGraph n g qs = defaultGraph
-  { graphTitle = (showText n) <> " " <> (showText g)
+  { graphTitle = (showText n)
   , graphQueries = qs
   , graphNullPointMode = Connected
   , graphUnit = Just (getUnit g)

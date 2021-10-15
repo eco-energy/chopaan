@@ -28,16 +28,15 @@ let
   cleanGitHaskell = {src, name } :
     let
       clean = haskell-nix.haskellLib.cleanGit { inherit name src; };
-   in clean;
-  #   THIS IS DANGEROUS! DOES NOT CLEAN SOURCE!
-  #   haskell-nix.cleanSourceHaskell { inherit name src; };
+    in haskell-nix.cleanSourceHaskell { inherit name; src = clean; };
+
   # This creates the Haskell package set.
   # https://input-output-hk.github.io/haskell.nix/user-guide/projects/
   pkgSet = haskell-nix.cabalProject  {
     src = cleanGitHaskell { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
     index-state = "2021-08-01T00:00:00Z";
-    plan-sha256 = "0q0f87jxv93sqkgqas7rsirx3qyqrs7bbdbghvsc6i49l3dxn2rb";
+    plan-sha256 = "11x3icmnjfk5z76fl9x2hm85pxx6vd8fyjl7gqkpi3adjkjp36q2";
     materialized = ./chopaan.materialized;
     #checkMaterialization = true;
     # these extras will provide additional packages
@@ -47,7 +46,7 @@ let
           # Win32 = hackage.Win32."2.8.3.0".revisions.default;
       };
     })];
-
+    cleanHpack = true;
     modules = [
       {
         compiler.nix-name = compiler;
@@ -59,6 +58,7 @@ let
       {
         
         packages.chopaan = {
+          package.cleanHpack = true;
           doCheck = false;
           flags.prod = false;
           components.exes.kbtzim.dontStrip = false;

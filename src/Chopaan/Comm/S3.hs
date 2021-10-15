@@ -231,19 +231,19 @@ worldStart = MilliSecond64 1607478885000
 -- THERE IS A GALOIS CONNECTION BETWEEN PREFIX AND SECONDS
 -- THAT IS MEDIATED BY RESOLUTION
 
-resDiff :: Resolution -> Double
-resDiff r = case r of
+resToSeconds :: Resolution -> Double
+resToSeconds r = case r of
   Second -> 1
-  Minute -> 60 * (resDiff Second)
-  Hour -> 60 * (resDiff Minute)
-  Day -> 24 * (resDiff Hour)
-  Month -> 30 * (resDiff Day)
-  Week -> 7 * (resDiff Day)
-  Year -> 365 * (resDiff Day) 
-{-# INLINE resDiff #-}
+  Minute -> 60 * (resToSeconds Second)
+  Hour -> 60 * (resToSeconds Minute)
+  Day -> 24 * (resToSeconds Hour)
+  Month -> 30 * (resToSeconds Day)
+  Week -> 7 * (resToSeconds Day)
+  Year -> 365 * (resToSeconds Day) 
+{-# INLINE resToSeconds #-}
 
 numDigits :: Resolution -> Int
-numDigits = (ceiling . (logBase 10)) . resDiff
+numDigits = (ceiling . (logBase 10)) . resToSeconds
 
 newtype Prefix = Prefix { unPrefix :: Int64 }
   deriving (Eq, Ord, Show, Generic)
@@ -254,13 +254,19 @@ asFileName :: Prefix -> T.Text
 asFileName = T.pack . show . unPrefix
 
 
-prefixRange :: Resolution -> UTCTime -> UTCTime -> [Prefix]
-prefixRange !r !t !t' = Prefix <$> [start..end]
+prefixRange :: Resolution -> UTCTime -> Maybe UTCTime -> [Prefix]
+prefixRange !r !t !t' = case t' of
+  Nothing -> let
+    start = toPrefix t
+    in [start, succ start..]
+  Just t'' -> let
+    start = toPrefix t
+    end = toPrefix t''
+    in [start..end]
   where
     sigDigs = (9 -) . numDigits $ r
-    start :: Int64
-    start = unDigits 10 $ take sigDigs $ digits 10 $ utcToSeconds t
-    end = unDigits 10 $ take sigDigs $ digits 10 $ utcToSeconds t'
+    toPrefix :: UTCTime -> Prefix
+    toPrefix = Prefix . unDigits 10 . take sigDigs . digits 10 . utcToSeconds
     utcToSeconds = (ceiling @_ @Int64) . nominalDiffTimeToSeconds
                        . TP.utcTimeToPOSIXSeconds
     digits !n !n' = reverse . fromJust $ mDigitsRev n n' 

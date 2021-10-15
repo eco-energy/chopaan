@@ -53,32 +53,32 @@ import           Options.Applicative       (Parser, ParserInfo, auto,
 import qualified Dhall as D
 
 import Chopaan.Types
-import Chopaan.UiTypes
+--import Chopaan.UiTypes
 import Chopaan.CRUD
 import Chopaan.API.History
 import Chopaan.Graph
-import Chopaan.View (view, template, onRouteChange)
+-- import Chopaan.View (view, template, onRouteChange)
 
 
 
-newtype Noop a = Noop (JSM a)
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadJSM,
-                    MonadBase IO, MonadBaseControl IO, MonadThrow)
-  deriving anyclass CRUDChopaan
+-- newtype Noop a = Noop (JSM a)
+--   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadJSM,
+--                     MonadBase IO, MonadBaseControl IO, MonadThrow)
+--   deriving anyclass CRUDChopaan
 
 
 type Static = Raw
 
 app :: Env -> FilePath -> DBPools -> Application
-app ev root poo =
-  serve (Proxy @ ((HistoryAPI AheadT) :<|> SPA Noop :<|> Static))
-  ((serveHistoryAPI poo) :<|> (serveSPA) :<|> (serveDirectoryWebApp root))
-  where
-    serveSPA :: Server (SPA GraphM)
-    serveSPA = serveUI @ (SPA GraphM) root
-      (\r -> runGraphWithDB poo $ do
-          i <- onRouteChange r
-          return . template ev i $ view @ Noop i) routes
+app ev root poo = serve (Proxy @ (HistoryAPI AheadT)) (serveHistoryAPI poo)
+        --  :<|> SPA Noop :<|> Static))
+          -- :<|> (serveSPA) :<|> (serveDirectoryWebApp root))
+  -- where
+  --   serveSPA :: Server (SPA GraphM)
+  --   serveSPA = serveUI @ (SPA GraphM) root
+  --     (\r -> runGraphWithDB poo $ do
+  --         i <- onRouteChange r
+  --         return . template ev i $ view @ Noop i) routes
 
 
 data ServerOpts = ServerOpts

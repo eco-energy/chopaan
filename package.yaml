@@ -9,10 +9,10 @@ copyright:           2019 Faez Shakil
 extra-source-files:
 - README.md
 - ChangeLog.md
-- assets/*.css
-- js/*.js
-- js/*.html
-- assets/*.css
+- assets/style.css
+- assets/tailwind.min.css
+#- js/*.js
+#- js/*.html
 
 data-files:
  - options.dhall
@@ -369,43 +369,43 @@ executables:
                 - -fdicts-strict
                 - -O1
                 - -threaded 
-  dev:
-    main:             Dev.hs
-    other-modules:
-      - Paths_chopaan
-    source-dirs:         app
-    when:
-      condition: "impl(ghcjs)"
-      then:
-        buildable: false
-      else:
-        dependencies:
-          - chopaan
-          - optparse-simple
-          - base
-        when:
-          - condition: flag(prod)
-            then:
-              ghc-options:
-                - -fdicts-strict
-                - -O1
-                - -threaded
-            else:
-              ghc-options:
-                - -fdicts-strict
-                - -O1
-                - -threaded 
-  ui:
-    main:                Ui.hs
-    other-modules: []
-    source-dirs:         app
-    dependencies:
-      - chopaan
-      - optparse-simple
-      - base
-    ghc-options:
-      - -threaded
-      - -O1
+  # dev:
+  #   main:             Dev.hs
+  #   other-modules:
+  #     - Paths_chopaan
+  #   source-dirs:         app
+  #   when:
+  #     condition: "impl(ghcjs)"
+  #     then:
+  #       buildable: false
+  #     else:
+  #       dependencies:
+  #         - chopaan
+  #         - optparse-simple
+  #         - base
+  #       when:
+  #         - condition: flag(prod)
+  #           then:
+  #             ghc-options:
+  #               - -fdicts-strict
+  #               - -O1
+  #               - -threaded
+  #           else:
+  #             ghc-options:
+  #               - -fdicts-strict
+  #               - -O1
+  #               - -threaded 
+  # ui:
+  #   main:                Ui.hs
+  #   other-modules: []
+  #   source-dirs:         app
+  #   dependencies:
+  #     - chopaan
+  #     - optparse-simple
+  #     - base
+  #   ghc-options:
+  #     - -threaded
+  #     - -O1
 
   dashgen:
     main:                DashGen.hs
@@ -495,23 +495,6 @@ executables:
                 - -eventlog
       else:
         buildable: false
-  # hydrate:
-  #   main:                Hydrate.hs
-  #   other-modules: []
-  #   source-dirs:         app
-  #   when:
-  #     condition: "!impl(ghcjs)"
-  #     then:
-  #       buildable: true
-  #       dependencies:
-  #         - chopaan
-  #         - optparse-simple
-  #         - base
-  #       ghc-options:
-  #         - -threaded
-  #         - -O2
-  #     else:
-  #       buildable: false
 
 
 tests:

@@ -130,7 +130,7 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
   seriesQueries tag = seriesQuery <$> (getInfluxKeys @a)
     where
       seriesQuery f = F.formatQuery ( "SELECT "
-                                       . F.key
+                                       . F.text
                                        . " FROM "
                                        . F.database
                                        . "."
@@ -138,18 +138,24 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
                                        . "."
                                        . F.measurement
                                        . F.text
-                                     ) f chopaanDB "autogen" (measurementName @tag @a) whereC
+                                     ) (asMean f) chopaanDB retention (measurementName @tag @a) whereC
         where
+          unKey (Key a) = a
+          asMean :: Key -> Text
+          asMean p = "mean(" <> (unKey $ F.formatKey ("" . F.key) p) <> ")"
+          retention = "\"autogen\""
+          timeThing = " AND $timeFilter GROUP BY time($__interval)"
           whereC :: Text
-          whereC = " WHERE " <>
-            (T.intercalate " AND " (eqOn <$> (M.toList $ getTags tag)))
+          whereC = " WHERE "
+            <> (T.intercalate " AND " (eqOn <$> (M.toList $ getTags tag)))
+            <> timeThing
             where
               eqOn :: (Key, Key) -> Text
               eqOn (t, v) = unKey $ F.formatKey (F.key
                                   . " = "
-                                  . F.key) t v
+                                  . F.text) t (singleQuote . unKey $ v)
                 where
-                  unKey (Key a) = a
+                  singleQuote x = "\'" <> x <> "\'"
   {-# INLINE seriesQueries #-}
 
 -- pqr :: forall tag a. (IsTag tag, HasInfluxFields a)

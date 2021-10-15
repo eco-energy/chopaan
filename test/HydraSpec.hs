@@ -1,4 +1,4 @@
-{-# LANGUAGE PackageImports, TypeApplications, OverloadedStrings, FlexibleContexts, ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE PackageImports, TypeApplications, OverloadedStrings, FlexibleContexts, ExplicitForAll, ScopedTypeVariables, TypeApplications, TupleSections, TypeSynonymInstances, FlexibleInstances #-}
 module HydraSpec where
 
 import Common
@@ -25,15 +25,21 @@ import Streamly.Binary
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Stream.IsStream.Expand as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
+import qualified Streamly.Internal.Data.Array.Foreign as A
+import qualified Streamly.Internal.Data.Array.Foreign.Type as A
+import qualified Streamly.Internal.Data.Array.Stream.Foreign as AS
 import Control.Concurrent.STM
 import Control.Concurrent.Async
+
+import qualified Streamly.Internal.Data.Time.Units as TU
 
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId
 
-spec = do
+spec = parallel $ do
   prefixSpec
   controlSpec
+  prefixGenSpec
   --keySpec
   --frameSpec
   --ingestionSpec
@@ -47,34 +53,96 @@ eqS a b = do
     sEq = S.the
           --  $ S.map eqTup
           --  $ S.trace (\a -> print $ (a, eqTup a))
-          $ S.zipWith (==) (S.adapt a) (S.adapt b)
+          $ S.mapM (pure . uncurry (==))
+          --  $ S.trace (\(x, y) -> if dbg then print (x, y) else return ())
+          $ S.zipWith (,) (S.adapt a) (S.adapt b)
     -- eqTup = (\(a, b) -> a == b)
 type Tup3 a = (a, a, a)
 
 
+newtype InAMinute = InAMinute (Tup3 Time.UTCTime)
+  deriving (Show)
+
+instance Arbitrary InAMinute where
+  arbitrary = do
+    t0 <- (arbitrary @Time.UTCTime)
+    dt <- suchThat (arbitrary @Time.NominalDiffTime) (\x -> (1 <= x) && (x <= 30))
+    dt' <- suchThat (arbitrary @Time.NominalDiffTime) (\x -> (1 <= x) && (x <= 30))
+    let t1 = Time.addUTCTime dt t0
+        t2 = Time.addUTCTime dt' t1
+    return $ InAMinute (t0, t1, t2)
+
+instance Arbitrary KbtzName where
+  arbitrary = (KbtzId . T.pack) <$> (listOf1 arbitraryPrintableChar)
+
+pipelineSpec :: Spec
+pipelineSpec = do
+  describe "pipeline invariants" $ do
+    it "prefix congregation works" $ do
+      k <- liftIO $ generate (arbitrary @KbtzName)
+      ns <- S.toList $ S.replicateM 10 (liftIO . generate $ (arbitrary @NodeMAC))
+      tk <- liftIO . atomically $ mkTKbtz [(k, ns)]
+      (InAMinute (t0, t1, _)) <- liftIO $ generate $ (arbitrary @InAMinute)
+      let ufN = unfoldNodes Finite tk
+          ps = ufStream (prefixGen Infinite (\_ -> pure True) (Minute, Second) t0 t1)
+          nps = nodePrefixes k (\_ -> pure ()) ufN ps
+      r <- S.length $ S.hoist (liftIO) --  $ S.fromWAsync --  $
+           -- S.concatMapM (mapToStream bo)
+           --  $ S.maxBuffer 1
+           --  S.|$ S.take 10
+           --   S.|$ S.interleave
+           --  $ S.fromWAsync
+           $ S.trace (liftIO . print)
+           S.|$ S.mapM (uncurry bo)
+           --  $ S.trace (liftIO . print)
+           $ S.fromWAsync
+           $ nps
+      r `shouldBe` (6 * (length ns))
+      where
+        bo :: (HConM m) => NodeMAC -> Prefix -> m ((NodeMAC, Prefix), Int)
+        bo n a = return ((n,a), 10)
+          --let l = numDigits a
+          -- p <- latestPrefix a
+          --liftIO $ print $ "Latest Prefix and Length: " <> (show (p, l))
+          -- case (l > 0) of
+          --  True -> return $ (, l) <$> a
+          --  False -> return $ Nothing
+
 prefixGenSpec :: Spec
-prefixGenSpec = modifyMaxSuccess (const 1000) $ describe "Prefix Generation Invariants for Infinite and finite streams" $ do
+prefixGenSpec = describe "Prefix Generation Invariants for Infinite and finite streams" $ do
   describe "should be an appendy monoid" $ do
     --       xs <- liftIO $ arbs @Time.UTCTime 3
-    prop "The length of both should be same" $ \(start, now, end) -> do
-      let (x, y, z) = mkFin (start :: Time.UTCTime, now, end)
+    prop "The length of both should be same" $ \(start, now, end) (resP :: Resolution, resF) -> do
+      let (x, y, z) = mkFin (dup3 (resP, resF)) (start :: Time.UTCTime, now, end)
       l <- S.length $ S.uniq (x <> y)
       l' <- S.length z
       l `shouldBe` l'
     prop "The appended stream should equal one generated from start to end" $
-      \(start, now, end) -> do
-        let (x, y, z) = mkFin (start, now, end)
+      \(start, now, end) (resP :: Resolution, resF) -> do
+        let (x, y, z) = mkFin (dup3 (resP, resF)) (start, now, end) 
         eqS @S.SerialT @Prefix (S.uniq (x <> y)) z
-    prop "Infinite Streams should respect the Resolution Difference Switch" $
-      \(start, now, end) (resP, resF)-> do
-        let (x, y, z) = mkT (Finite, Finite, Infinite) (dup3 (resP, resF)) (start, now, end)
-        let r = S.uniq (x <> y)
+    modifyMaxSuccess (const 5) $ prop "Infinite Streams should respect the Resolution Difference Switch" $
+      \(InAMinute (s, n, e)) -> do
+        let
+          [start, now, end] = sortBy compare [s, n, e]
+          yes _ = return True
+          x = prefixGen Infinite yes (Minute, Second) start now ()
+          y = prefixGen Finite yes (Minute, undefined) start now ()
+          z = prefixGen Finite yes (Second, undefined) now end ()
+        -- let (x, y, z) = mkT
+        --                 (Infinite, Finite, Finite)
+        --                 ((resP, resF), (resP, resP), (resP, resF))
+        --                 (start, now, end)
+        let r = (S.uniq (y <> z))
         l <- S.length r
-        let z' = (S.take l z)
-        eqS @S.SerialT @Prefix r z' 
+        let x' = (S.take l x)
+        eqS @S.SerialT @Prefix r x'
+    -- it "Future Pipeline Stages can Occur Concurrently" $ do
+    --   state <- atomically $ newTVar (0, 0)
+      
     where
       dup3 a = (a, a, a)
-      mkFin = mkT (Finite, Finite, Finite) (dup3 (Minute, Minute))
+      mkFin = mkT (Finite, Finite, Finite)
       mkT :: Tup3 LifeTime
           -> Tup3 (Resolution, Resolution)
           -> Tup3 Time.UTCTime
@@ -88,7 +156,7 @@ prefixGenSpec = modifyMaxSuccess (const 1000) $ describe "Prefix Generation Inva
         in (x, y, z)
     
 controlSpec :: Spec
-controlSpec = describe "State Management" $ do
+controlSpec = parallel $ describe "State Management" $ do
   let ks = (KbtzId . T.pack . (pure @[])) <$> ['a'..'d']
       ns = (NodeId . T.pack . show) <$> [1..12]
       kns = fst $ foldr zop ([], ns) ks
@@ -117,14 +185,14 @@ controlSpec = describe "State Management" $ do
 
 
 prefixSpec :: Spec
-prefixSpec = describe "Prefix Generation Spec" $ do
+prefixSpec = parallel $ describe "Prefix Generation Spec" $ do
   it "length corresponds to time units" $ do
-    (length $ prefixRange Second s e) `shouldBe` 8641
+    (length $ prefixRange Second s (Just e)) `shouldBe` 8641
   it "prefix length is sane" $ do
     let
       matchDigs res x = (foldl (\a b -> if b /= x then b else a) x rng) `shouldBe` x
         where
-          rng = fmap (digs . unPrefix) $ prefixRange res s e
+          rng = fmap (digs . unPrefix) $ prefixRange res s (Just e)
     matchDigs Second 9
     matchDigs Minute 7
     matchDigs Hour 5

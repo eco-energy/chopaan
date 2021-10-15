@@ -1,5 +1,4 @@
 { pkgs ? import ./nix/default.nix {}
-, hostName ? "localhost"
 }:
 
 {
@@ -8,8 +7,9 @@
   chopaan = { config, pkgs, resources, lib, ... }:
     {
       imports = [
-        ( import ./machine.nix {
-          inherit config pkgs resources lib hostName;
+        ( import ./deploy/machine.nix {
+          inherit config pkgs resources lib;
+          hostName = "localhost";
           grubDevice = "/dev/sda";
         } )
       ];

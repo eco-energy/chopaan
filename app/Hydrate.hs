@@ -14,9 +14,9 @@ import Chopaan.Hydrate
 
 main :: IO ()
 main = do
-  conf <- parseHConf'
-  case conf of
-    Left e -> do
-      print e
-      return ()
-    Right c -> runHydration c
+  runHydration =<< parseHConf
+  -- case conf of
+  --   Left e -> do
+  --     print e
+  --     return ()
+  --   Right c -> runHydration c

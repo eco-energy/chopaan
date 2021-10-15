@@ -2,19 +2,19 @@
 let
   #uijs = "${staticUi}/bin/ui.jsexe";
   region = "ap-southeast-1";
-  app = (import ./. {}).chopaan;
+  app = (import ../. {}).chopaan;
   janusPort = 8182;
   serverPort = 8080;
   mqttPort = 8883;
   awskey = "/run/keys/aws-creds";
   tinkerHost = "localhost";
-  janusConf = ./janusgraph-config;
-  frontend = (import ./nix/website.nix) {};
+  janusConf = ../janusgraph-config;
+  frontend = (import ../nix/website.nix) {};
   #dashes = (import ./nix/dashboard.nix) {};
   withJanus = p: "${p} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}";
   withRTSOpts = p: "${p} +RTS -A32m -n4m -N";
-  dashboardDir = "/dash";
   chopaanDir = "${config.users.users.chopaan.home}";
+  dashboardDir = "/dash";
   isHttps = if (hostName == "localhost") then false else true;
 in
 {
@@ -25,14 +25,25 @@ in
       chopaan = {
         createHome = true;
         group = "chopaan";
-        extraGroups = ["keys" "root"];
+        extraGroups = ["keys" "dash"];
+        isSystemUser = true;
         home = "/chopaan";
         useDefaultShell = true;
       };
     };
     groups.chopaan = {};
+    groups.dash = {};
   };
 
+  deployment.keys = {
+    aws-creds = {
+      text = builtins.readFile ../credentials/key;
+      user = "chopaan";
+      group = "chopaan";
+      permissions = "0640";
+    };
+  };
+  
   boot.loader.grub.device = grubDevice;
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [ 80 443 ];
@@ -73,73 +84,62 @@ in
   systemd.extraConfig = "DefaultLimitNOFILE=6400000\nDefaultStandardError='journal'\nDefaultStandardOut='journal'";
 
   systemd.services.chopaan = {
-    after = [ "network.target" "docker-janusgraph.service" ];        
+    after = [ "aws-creds-key.service" "network.target" "docker-janusgraph.service" ];        
     wantedBy = [ "multi-user.target" ];
-
     environment = {
       AWS_CREDS = awskey;
       XDG_ROOT_DIR = chopaanDir;
     };
-
     path = [ pkgs.z3 ];
-
     serviceConfig = {
-      # WorkingDirectory = "~";
-      # User = "chopaan";
-      # Group = "chopaan";
+      WorkingDirectory = "~";
+      User = "chopaan";
       LimitNOFILE = 6400000;
-      # CacheDirectory = "chopaan";
-      # CacheDirectoryMode = "0770";
     };
-
-    unitConfig.RequiresMountsFor = chopaanDir;
     script = withRTSOpts ((withJanus "${app.kbtzim}/bin/kbtzim"));
   };
 
   systemd.services.hydrate = {
-
     wantedBy = [ "multi-user.target" ];
-
-    after = [ "network.target" "docker-janusgraph.service" "influxdb.service" ];
-
+    after = [ "aws-creds-key.service" "network.target" "docker-janusgraph.service" "influxdb.service" ];
     environment = {
       AWS_CREDS = awskey;
       XDG_ROOT_DIR = chopaanDir;
-      STORE_PATH = "$${chopaanDir}/data/hydration";
+      STORE_PATH = "${chopaanDir}/data/hydration";
       S3_BUCKET = "dosti-datastream";
       START_DATE = "01-08-2021";
       PAST_RES = "Day";
       FUTURE_RES = "Minute";
       LIFETIME = "Infinite";
+      MAN_CONN_COUNT = "1000";
+      MAN_IDLE_CONN = "128";
+      MAN_TIMEOUT = "90";
+      DL_THREADS = "1000";
+      SOURCE_GEN_THREADS = "5";
     };
-
     serviceConfig = {
-      # WorkingDirectory = "~";
-      # User = "";
-      # Group = "chopaan";
+      WorkingDirectory = "~";
+      User = "chopaan";
       LimitNOFILE = 6400000;
-      # CacheDirectory = "hydrate";
-      # CacheDirectoryMode = "0770";
     };
-    unitConfig.RequiresMountsFor = chopaanDir;
-
     script = withRTSOpts ((withJanus "${app.hydrate}/bin/hydrate"));
   };
 
+  systemd.tmpfiles.rules = [
+    "d ${dashboardDir} 0775 chopaan dash"
+  ];
   systemd.services.dashgen = {
     wantedBy = [ "grafana.service" ];
-    after = [ "docker-janusgraph.service" "chopaan.service" ];
-    # serviceConfig = {
-      #   WorkingDirectory = "~";
-      #   User = "chopaan";
-      #   Group = "chopaan";
-      #   CacheDirectory = "dash";
-      #   CacheDirectoryMode = "0770";
-      # };
-      preStart = ''
-        mkdir -p ${dashboardDir}
-        chmod -R 644 ${dashboardDir}
-      '';
+    after = [ "chopaan.service" ];
+    serviceConfig = {
+        User = "chopaan";
+        Group = "dash";
+      };
+      # preStart = ''
+      #   mkdir -p ${dashboardDir}
+      #   chgrp -R dash ${dashboardDir}
+      #   chmod -R 775 ${dashboardDir}
+      # '';
       unitConfig.RequiresMountsFor = dashboardDir;
       script = (withJanus "${app.dashgen}/bin/dashgen --outpath ${dashboardDir}");
   };
@@ -159,7 +159,8 @@ in
         udp = [{ enabled = true; }];
       };
     };
-
+    
+    users.users.grafana.extraGroups = ["dash"];
     services.grafana = {
       enable = true;
       domain = hostName;
@@ -191,11 +192,12 @@ in
         ];  
       };
     };
+    
     virtualisation.virtualbox.guest.enable = lib.mkForce false;
     users.users.nginx.extraGroups = [ "acme" ];
     security.acme.acceptTerms = true;
     security.acme.email = "faez@ecoenergy.global";
-    #security.acme.server = "https://acme-staging-v02.api.letsencrypt.org/directory";
+    security.acme.server = lib.mkIf (!isHttps) "https://acme-staging-v02.api.letsencrypt.org/directory";
     services.nginx = {
       enable = true;
       logError = "stdout info";
