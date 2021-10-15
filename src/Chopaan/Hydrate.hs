@@ -80,7 +80,7 @@ import qualified Network.HTTP.Client.Internal as NC (hostAddress)
 
 import Database.InfluxDB.Line (Line)
 import qualified Database.InfluxDB.Query as Q
-import qualified Database.InfluxDB.Write.UDP as UDP
+import qualified Database.InfluxDB.Write.UDP as Udp
 import qualified Database.InfluxDB.Write as Http
 import qualified Database.InfluxDB.Format as F
 import qualified Database.InfluxDB.Manage as DB
