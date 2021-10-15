@@ -2,6 +2,8 @@ module Main where
 
 import qualified Data.Text as T
 import Chopaan.Hydrate
+import Chopaan.Graph (tkOptions)
+import Options.Applicative
 
 --import Dhall hiding (newManager, void)
 --import Paths_chopaan
@@ -14,7 +16,8 @@ import Chopaan.Hydrate
 
 main :: IO ()
 main = do
-  runHydration =<< parseHConf
+  tc <- execParser tkOptions
+  runHydration tc =<< parseHConf
   -- case conf of
   --   Left e -> do
   --     print e
