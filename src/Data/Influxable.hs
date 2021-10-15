@@ -27,6 +27,7 @@ import Prelude hiding ((.))
 import Control.Category
 import Control.Lens
 import Control.Monad.IO.Class
+import Control.Monad.Catch
 
 import Network.HTTP.Client
 
@@ -62,6 +63,7 @@ import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 import qualified Data.Vector as V
 import Data.Vector (Vector)
+import Chopaan.Utils.Retry
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 import Chopaan.Node.Metrics hiding (Timestamp)
@@ -92,6 +94,9 @@ chopaanDB = F.formatDatabase "chopaan"
 createDB :: IO ()
 createDB = DB.manage qp $ F.formatQuery ("CREATE DATABASE "F.%F.database) chopaanDB
 
+-- wUdp :: UDP.WriteParams
+-- wUdp = UDP.writeParams 
+
 wp :: Http.WriteParams
 wp = (Http.writeParams chopaanDB)
      --{
@@ -105,10 +110,10 @@ lineFoldUdp batchSize wp = FL.many (FL.take batchSize FL.mconcat) lineFold'
   where
     lineFold' = Sink.toFold $ Sink.drainM (liftIO . UDP.writeBatch wp)
 
-lineFoldHttp :: forall m. (MonadIO m) => Int -> Http.WriteParams -> FL.Fold m [Line UTCTime] ()
+lineFoldHttp :: forall m. (MonadIO m, MonadMask m) => Int -> Http.WriteParams -> FL.Fold m [Line UTCTime] ()
 lineFoldHttp batchSize wp = FL.many (FL.take batchSize FL.mconcat) lineFold'
   where
-    lineFold' = Sink.toFold $ Sink.drainM (liftIO . Http.writeBatch wp)
+    lineFold' = Sink.toFold $ Sink.drainM (recoverC "lineFold" 10 . liftIO . Http.writeBatch wp)
 
 renderQuery :: Query -> Text
 renderQuery (Query q) = q
