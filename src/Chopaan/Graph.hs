@@ -22,6 +22,9 @@ import Control.DeepSeq
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Text (pack, Text)
 
+import Chopaan.Kibbutz.KbtzId (KbtzName)
+import Chopaan.Node.NodeId (NodeMAC)
+
 #ifndef ghcjs_HOST_OS
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader hiding (ask)
@@ -101,5 +104,19 @@ tkOptions :: ParserInfo TinkerConf
 tkOptions = info (tkParser <**> helper) $
     fullDesc <> progDesc "Chopaan"
              <> header "Control and Monitor Kbtzim"
+
+getKNs :: GraphM ([(KbtzName, [NodeMAC])])
+getKNs = withKbtzPool $ \c -> do
+  ks' <- getKbtzim c
+  nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks'
+  return $ zip ks' nss
+  
+addzim :: [(KbtzName, [NodeMAC])] -> GraphM ([(KbtzName, [NodeMAC])]) 
+addzim kns = withKbtzPool $ \c -> do
+  mapM_ (addKbtz c) (fst <$> kns)
+  sequence_ $ an c
+  getKNs
+  where
+    an c = mconcat $ fmap (\(k, ns) -> (addNodeToKbtz c k) <$> ns) kns
 
 #endif

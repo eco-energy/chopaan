@@ -26,18 +26,6 @@ import qualified Data.Time as Ti
 
 type KbtzM = ReaderT (MQTTOpts) GraphM
 
-getKNs = withKbtzPool $ \c -> do
-  ks' <- getKbtzim c
-  nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks'
-  return $ zip ks' nss
-  
-addzim :: [(KbtzName, [NodeMAC])] -> GraphM ([(KbtzName, [NodeMAC])]) 
-addzim kns = withKbtzPool $ \c -> do
-  mapM_ (addKbtz c) (fst <$> kns)
-  sequence_ $ an c
-  getKNs
-  where
-    an c = mconcat $ fmap (\(k, ns) -> (addNodeToKbtz c k) <$> ns) kns
 
 runKbtzim :: forall t.
   (S.IsStream t)
@@ -62,19 +50,9 @@ runKbtzim mq hydrationOpts = do
   where
     kns = [(labKbtz, labNodes), (labKbtz1, labNodes1)]
     futPrefix = "runKibbutz :"
-    labKbtz = (KbtzId "Lab Original")
-    labKbtz1 = (KbtzId "Lab Latest")
-    -- labNodes = NodeId <$> [ "7c:9e:bd:f5:ec:74", "c4:4f:33:67:ea:69"
-    --                           , "ac:67:b2:11:e5:c4", "7c:9e:bd:f6:43:88" ]
-    -- labNodes = NodeId <$> [ "8c:aa:b5:97:69:48"
-    --                       , "ac:67:b2:11:f2:30"
-    --                       , "8c:aa:b5:95:97:c8"
-    --                       , "ac:67:b2:1c:ec:d8"
-    --                       , "c4:4f:33:67:ea:69"
-    --                       , "7c:9e:bd:f5:ec:74"
-    --                       , "ac:67:b2:11:f0:28"
-    --                       , "7c:9e:bd:f6:48:88"
-    --                       ]
+    labKbtz = (KbtzId "Lab_Original")
+    labKbtz1 = (KbtzId "Multan_Pilot")
+    
     labNodes = NodeId <$> [ "ac:67:b2:11:f3:20",
                          "ac:67:b2:1d:e7:f4",
                          "8c:aa:b5:97:69:48",
@@ -94,7 +72,6 @@ runKbtzim mq hydrationOpts = do
       , "7c:9e:bd:48:a2:c4"
       , "ac:67:b2:11:e6:e4"
       ]
-
     t0 = toUTC (start hydrationOpts)
     tn = toUTC (end hydrationOpts)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
