@@ -3,7 +3,7 @@ let
   pkgs = (import ./nix/default.nix {});
   accessKeyId = "default";
   hostName = "dosti.ecoenergy.global";
-  grubDevice = lib.mkForce "/dev/nvme0n1"
+  grubDevice = "/dev/nvme0n1";
 in
 {
   network.description = "Chopaan Services And Data Stores.";
@@ -14,7 +14,7 @@ in
     imports = [
       ( import ./deploy/machine.nix { inherit config pkgs resources lib hostName grubDevice; })
     ];
-    deployment.targetEnv = targetEnv = "ec2";
+    deployment.targetEnv = "ec2";
 
     deployment.ec2 = {
       inherit accessKeyId region;
@@ -33,15 +33,13 @@ in
       ];
       elasticIPv4 = resources.elasticIPs.chopaan-ip;
     };
-
-    route53 = {
+    deployment.route53 = {
       inherit accessKeyId region;
       hostName = hostName;
       usePublicDNSName = true;
     };
   };
 
-};
 
 resources = {
   ec2KeyPairs.chopaan-key-pair = { inherit region accessKeyId; };

@@ -44,7 +44,7 @@ in
     };
   };
   
-  boot.loader.grub.device = grubDevice;
+  boot.loader.grub.device = lib.mkForce grubDevice;
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [ 80 443 ];
   environment.variables = { REGION = region; };
@@ -101,7 +101,7 @@ in
 
   systemd.services.hydrate = {
     wantedBy = [ "multi-user.target" ];
-    after = [ "aws-creds-key.service" "network.target" "docker-janusgraph.service" "influxdb.service" ];
+    after = [ "aws-creds-key.service" "network.target" "docker-janusgraph.service" "chopaan.service" "influxdb.service" ];
     environment = {
       AWS_CREDS = awskey;
       XDG_ROOT_DIR = chopaanDir;
@@ -140,8 +140,8 @@ in
       #   chgrp -R dash ${dashboardDir}
       #   chmod -R 775 ${dashboardDir}
       # '';
-      unitConfig.RequiresMountsFor = dashboardDir;
-      script = (withJanus "${app.dashgen}/bin/dashgen --outpath ${dashboardDir}");
+    unitConfig.RequiresMountsFor = dashboardDir;
+    script = (withJanus "${app.dashgen}/bin/dashgen --outpath ${dashboardDir}");
   };
 
   # systemd.services.server = {
