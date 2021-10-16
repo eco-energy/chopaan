@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, TypeApplications, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, TypeApplications, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, OverloadedStrings, FlexibleContexts, ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module SpiderSpec (spec) where
 
@@ -19,7 +19,15 @@ import qualified Data.Text as Text
 import Data.ProtoLens
 import Data.Word
 import Data.Maybe
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Parser as A
+import qualified Data.Aeson.Types as A
 
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Vector as V
+import qualified Network.HTTP.Client as NC (brConsume, responseBody)
+import Database.InfluxDB.Query (Query, withQueryResponse)
+import Database.InfluxDB.JSON (parseSeriesObject, parseSeriesBody, parseResultsObject, parseErrorObject)
 import qualified Data.Vector as V
 import Data.Influxable
 import NetSpider.Snapshot
@@ -69,7 +77,7 @@ spec = do
   --hydrationSpec
 
 nNodes = 10
-nMessages = 100
+nMessages = 10
 kId = KbtzId "test"
 t0 = t
 tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
@@ -123,7 +131,7 @@ kbtzSpec :: Spec
 kbtzSpec = do
   aroundAll (TC.withContainers (runWithDBPools)) $ describe "Spiders are great" $ do
     it "qKbtz processor processes all messages!" $ \(ns, db) -> do
-      createDB
+      createDB "chopaanMQTT"
       let sp = (spools db)
       es <- do
         xs'' <- mapM (\i ->
@@ -147,12 +155,6 @@ kbtzSpec = do
         S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
         S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
         print "Messages Queued"
-          --let o = runNodeQueue (outbox qs)
-          -- atomically $ do
-          --   e <- isEmptyTBQueue o
-          --   case e of
-          --     True -> retry
-          --     False -> void (flushTBQueue o)
       l <- S.length $ S.take ((2 * nNodes * nMessages) + 0) k
       l `shouldBe` (2 * nNodes * nMessages)
 
@@ -175,11 +177,57 @@ kbtzSpec = do
       constHypergraphLinks gotLs nNodes
     it "NodeQueries should yield errythang" $ \(ns, db) -> do
        let kns = asKbtzNode kId <$> ns
-           nqs = nodeQueries <$> kns
-       rs <- mapM_ chkNodeQs nqs
-       rs `shouldBe` ()
+           qgp = QueryGenParams "chopaanMQTT" "\"autogen\"" Nothing Nothing 
+           nqs = nodeQueries qgp <$> kns
+           eqNM = (== nMessages)
+       t <- qResultTest eqNM nqs
+       t `shouldBe` (True)
+
+qResultTest :: forall m. (S.MonadAsync m) => (Int -> Bool) -> [NodeQueries] -> m (Bool)
+qResultTest eqNM nqs = do
+  ls <- mapM chkNodeQs nqs
+  return $ all (\(a, b, c, d) -> eqNM a && eqNM b && eqNM c && eqNM d) ls
+
+chkNodeQs :: forall m. (S.MonadAsync m) => NodeQueries -> m (Int, Int, Int, Int)
+chkNodeQs nq = do
+  ps <- resLen (powerQ nq)
+  es <- resLen (energyQ nq)
+  bs <- resLen (batteryQ nq)
+  ms <- resLen (meshQ nq)
+  liftIO . print $ (ps, es, bs, ms)
+  return (ps, es, bs, ms)
+  where
+    resLen = (pure . fromMaybe 0) <=< (S.the . S.mapM mkQ . S.fromList)
+    lengthParser :: A.Value -> A.Parser Int
+    lengthParser val0 = do
+      results <- parseResultsObject val0
+      series <- V.forM results $ \val -> do
+        r <- foldr1 (<|>)
+          [ Left <$> parseErrorObject val
+          , Right <$> parseSeriesObject val
+          ]
+        case r of
+          Left err -> fail err
+          Right vec -> return $ vec
+      (join -> values) <- V.forM (join series) $ \val -> do
+        (name, tags, columns, values) <- parseSeriesBody val
+        return values
+      return $ V.length values
+          
+    countm _ resp = do
+      chunks <- (NC.brConsume $ NC.responseBody resp)
+      let body = BL.fromChunks chunks
+      case A.eitherDecode' body of
+        Left message -> error message
+        Right val -> do 
+          case A.parse lengthParser val of
+            A.Success veclen -> return $ veclen
+            A.Error message -> error message
+    mkQ :: Query -> m Int
+    mkQ q = liftIO $ withQueryResponse (qp "chopaanMQTT") Nothing q countm
        --(V.length (fst rs)) `shouldBe` nMessages
-    
+
+
 -- hydrationSpec :: Spec
 -- hydrationSpec = aroundAll (TC.withContainers (runJanus "hydrationSpec")) $ describe "hydration tests" $ do
 --   it "Hydration Works" $ \(host, port) -> do

@@ -136,6 +136,7 @@ library
   if !impl(ghcjs)
     build-depends:
         amazonka
+      , amazonka-core
       , amazonka-iot
       , amazonka-s3
       , cas-hashable
@@ -436,6 +437,7 @@ executable dashgen
   if !impl(ghcjs)
     build-depends:
         amazonka
+      , amazonka-core
       , amazonka-iot
       , amazonka-s3
       , cas-hashable
@@ -602,6 +604,7 @@ executable hydrate
   if !impl(ghcjs)
     build-depends:
         amazonka
+      , amazonka-core
       , amazonka-iot
       , amazonka-s3
       , cas-hashable
@@ -770,6 +773,7 @@ executable kbtzim
   if !impl(ghcjs)
     build-depends:
         amazonka
+      , amazonka-core
       , amazonka-iot
       , amazonka-s3
       , cas-hashable
@@ -936,6 +940,7 @@ executable server
   if !impl(ghcjs)
     build-depends:
         amazonka
+      , amazonka-core
       , amazonka-iot
       , amazonka-s3
       , cas-hashable
@@ -1117,6 +1122,7 @@ test-suite chopaan-test
   if !impl(ghcjs)
     build-depends:
         amazonka
+      , amazonka-core
       , amazonka-iot
       , amazonka-s3
       , cas-hashable

@@ -133,6 +133,7 @@
           ] ++ (if !(compiler.isGhcjs && true)
           then [
             (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
+            (hsPkgs."amazonka-core" or (errorHandler.buildDepError "amazonka-core"))
             (hsPkgs."amazonka-iot" or (errorHandler.buildDepError "amazonka-iot"))
             (hsPkgs."amazonka-s3" or (errorHandler.buildDepError "amazonka-s3"))
             (hsPkgs."cas-hashable" or (errorHandler.buildDepError "cas-hashable"))
@@ -175,6 +176,7 @@
             (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
             (hsPkgs."websockets" or (errorHandler.buildDepError "websockets"))
             (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
+            (hsPkgs."wreq" or (errorHandler.buildDepError "wreq"))
             (hsPkgs."x509-store" or (errorHandler.buildDepError "x509-store"))
             (hsPkgs."x509-validation" or (errorHandler.buildDepError "x509-validation"))
             ]
@@ -425,6 +427,7 @@
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
+              (hsPkgs."amazonka-core" or (errorHandler.buildDepError "amazonka-core"))
               (hsPkgs."amazonka-iot" or (errorHandler.buildDepError "amazonka-iot"))
               (hsPkgs."amazonka-s3" or (errorHandler.buildDepError "amazonka-s3"))
               (hsPkgs."cas-hashable" or (errorHandler.buildDepError "cas-hashable"))
@@ -467,6 +470,7 @@
               (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
               (hsPkgs."websockets" or (errorHandler.buildDepError "websockets"))
               (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
+              (hsPkgs."wreq" or (errorHandler.buildDepError "wreq"))
               (hsPkgs."x509-store" or (errorHandler.buildDepError "x509-store"))
               (hsPkgs."x509-validation" or (errorHandler.buildDepError "x509-validation"))
               ]
@@ -583,6 +587,7 @@
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
+              (hsPkgs."amazonka-core" or (errorHandler.buildDepError "amazonka-core"))
               (hsPkgs."amazonka-iot" or (errorHandler.buildDepError "amazonka-iot"))
               (hsPkgs."amazonka-s3" or (errorHandler.buildDepError "amazonka-s3"))
               (hsPkgs."cas-hashable" or (errorHandler.buildDepError "cas-hashable"))
@@ -625,6 +630,7 @@
               (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
               (hsPkgs."websockets" or (errorHandler.buildDepError "websockets"))
               (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
+              (hsPkgs."wreq" or (errorHandler.buildDepError "wreq"))
               (hsPkgs."x509-store" or (errorHandler.buildDepError "x509-store"))
               (hsPkgs."x509-validation" or (errorHandler.buildDepError "x509-validation"))
               ]
@@ -741,6 +747,7 @@
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
+              (hsPkgs."amazonka-core" or (errorHandler.buildDepError "amazonka-core"))
               (hsPkgs."amazonka-iot" or (errorHandler.buildDepError "amazonka-iot"))
               (hsPkgs."amazonka-s3" or (errorHandler.buildDepError "amazonka-s3"))
               (hsPkgs."cas-hashable" or (errorHandler.buildDepError "cas-hashable"))
@@ -783,6 +790,7 @@
               (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
               (hsPkgs."websockets" or (errorHandler.buildDepError "websockets"))
               (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
+              (hsPkgs."wreq" or (errorHandler.buildDepError "wreq"))
               (hsPkgs."x509-store" or (errorHandler.buildDepError "x509-store"))
               (hsPkgs."x509-validation" or (errorHandler.buildDepError "x509-validation"))
               ]
@@ -899,6 +907,7 @@
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
+              (hsPkgs."amazonka-core" or (errorHandler.buildDepError "amazonka-core"))
               (hsPkgs."amazonka-iot" or (errorHandler.buildDepError "amazonka-iot"))
               (hsPkgs."amazonka-s3" or (errorHandler.buildDepError "amazonka-s3"))
               (hsPkgs."cas-hashable" or (errorHandler.buildDepError "cas-hashable"))
@@ -941,6 +950,7 @@
               (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
               (hsPkgs."websockets" or (errorHandler.buildDepError "websockets"))
               (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
+              (hsPkgs."wreq" or (errorHandler.buildDepError "wreq"))
               (hsPkgs."x509-store" or (errorHandler.buildDepError "x509-store"))
               (hsPkgs."x509-validation" or (errorHandler.buildDepError "x509-validation"))
               ]
@@ -1059,6 +1069,7 @@
             ] ++ (if !(compiler.isGhcjs && true)
             then [
               (hsPkgs."amazonka" or (errorHandler.buildDepError "amazonka"))
+              (hsPkgs."amazonka-core" or (errorHandler.buildDepError "amazonka-core"))
               (hsPkgs."amazonka-iot" or (errorHandler.buildDepError "amazonka-iot"))
               (hsPkgs."amazonka-s3" or (errorHandler.buildDepError "amazonka-s3"))
               (hsPkgs."cas-hashable" or (errorHandler.buildDepError "cas-hashable"))
@@ -1101,6 +1112,7 @@
               (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
               (hsPkgs."websockets" or (errorHandler.buildDepError "websockets"))
               (hsPkgs."winery" or (errorHandler.buildDepError "winery"))
+              (hsPkgs."wreq" or (errorHandler.buildDepError "wreq"))
               (hsPkgs."x509-store" or (errorHandler.buildDepError "x509-store"))
               (hsPkgs."x509-validation" or (errorHandler.buildDepError "x509-validation"))
               ]

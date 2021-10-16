@@ -265,17 +265,17 @@ runHydration tk conf = do
   kbtzim <- atomically $ mkTKbtz kns
   aws <- getAwsEnv S3.s3
   man <- newManager manConf
-  let p = DB.queryParams chopaanDB
-  DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) chopaanDB
+  let hydrationDB = "chopaanS3"
+  let p = DB.queryParams hydrationDB
+  DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) hydrationDB
   let
     configureH (kId, kNodes) = do
       let
         store = initKbtzStore kId (storePath conf)
-        c = mkKbtzConf conf aws kId store man wp parConf 
+        c = mkKbtzConf conf aws kId store man (wp hydrationDB) parConf 
       hydrateKbtz c kNodes (unfoldNodes (lifetime conf) kbtzim)
   S.drain . S.fromWAsync $
     S.mapM configureH $ S.unfold (unfoldKbtzim (lifetime conf) kbtzim) ()
-  --S.drain $ h --`S.wAsync` control
 
 data Command = StartKbtz KbtzName [NodeMAC]
              | StopKbtz KbtzName
@@ -641,7 +641,7 @@ dlFramesParFS ::
 dlFramesParFS st man sw getPath = S.maxThreads (sourceGenThreads st) . S.mapM (uncurry dlF') --  $ --S.trace (liftIO . print) $ S.foldMany congregatePrefixes ps
   where
     dlF' :: NodeMAC -> Prefix -> m ((NodeMAC, Prefix), Int)
-    dlF' n p = download (dlThreads st) man sw (n, p) frameSink errSink keySource
+    dlF' n p = withDL (dlThreads st) man sw (n, p) frameSink errSink keySource
       where
         frameSink = saveWithLength (n, p) (encodeFold (getPath Frames n p))
         errSink = encodeFold (getPath Errors n p)
@@ -684,7 +684,7 @@ saveWithLength tag f = FL.rmapM (\x -> (liftIO . print $ x) >> (return (tag, (sn
                        (FL.tee f FL.length)
 {-# INLINE saveWithLength #-}
 
-download :: forall m tag r. (HConM m, Show tag)
+withDL :: forall m tag r. (HConM m, Show tag)
   => Int
   -> NC.Manager
   -> SignWith
@@ -692,13 +692,23 @@ download :: forall m tag r. (HConM m, Show tag)
   -> FL.Fold m (Wino S3Body) r
   -> FL.Fold m (Wino GetObjError) ()
   -> (forall t. S.IsStream t => t m S3Key)
+  -> m r 
+withDL nThreads man signWith = download (dl nThreads man signWith)
+{-# INLINABLE withDL #-}
+
+download :: forall m tag r. (HConM m, Show tag)
+  => (S.AheadT m S3Key -> S.AheadT m S3Resp)
+  -> tag
+  -> FL.Fold m (Wino S3Body) r
+  -> FL.Fold m (Wino GetObjError) ()
+  -> (forall t. S.IsStream t => t m S3Key)
   -> m r
-download nThreads man signWith tag saveDL saveErr = (fmap snd)
+download download' tag saveDL saveErr = (fmap snd)
   . S.fold (FL.partition saveErr saveDL)
   . S.map (bimap toWino toWino)
   . S.tapRate 60 (printDLRate)
   . S.fromAhead
-  . (dl nThreads man signWith)
+  . download'
   where
     printDLRate r = liftIO . print
       $ "Download rate from Node "
@@ -726,14 +736,16 @@ dl nThreads man signWith = S.trace (logEither)
 
 type SignWith = (S3.BucketName, Env, Time.UTCTime)
 
+
+
 sessionS3 :: forall m. (S.MonadAsync m)
-  => Env -> S3.BucketName -> NC.ManagerSettings -> S.AheadT m S3Key -> S.AheadT m S3Resp
-sessionS3 env (S3.BucketName bucket) manSettings ks = S.concatM $ do
+  => SignWith -> NC.ManagerSettings -> S.AheadT m S3Key -> S.AheadT m S3Resp
+sessionS3 (S3.BucketName bucket, env, _) manSettings ks = S.concatM $ do
   sesh <- liftIO $ Session.newSessionControl Nothing manSettings
-  auth <- liftIO $ getAuth
+  aut <- liftIO $ getAuth
   let
-    (AccessKey accessKey) = _authAccess auth
-    (SecretKey secretKey) = desensitise . _authSecret $ auth
+    (AccessKey accessKey) = _authAccess aut
+    (SecretKey secretKey) = desensitise . _authSecret $ aut
     opts = ropts accessKey secretKey
   return $ S.mapM (pure . a) S.|$ S.mapM (traverse (s3Get opts sesh)) ks
   where

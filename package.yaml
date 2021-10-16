@@ -142,6 +142,7 @@ when:
       - amazonka
       - amazonka-iot
       - amazonka-s3
+      - amazonka-core
       - net-mqtt == 0.7.0.1
       - wai
       - warp

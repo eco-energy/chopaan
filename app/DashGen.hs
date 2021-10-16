@@ -29,8 +29,9 @@ data GraphType = Power | Energy | Battery | Mesh
   deriving (Eq, Ord, Show, Generic, Enum, Bounded)
 
 getQ :: NodeQueries -> GraphType -> [Query]
-getQ qs d = (Influx . InfluxQuery . renderQuery) <$> q
+getQ qs d = (Influx . InfluxQuery . timeThing . renderQuery) <$> q
   where
+    timeThing x = x <> " AND $timeFilter GROUP BY time($__interval)"
     q = case d of
       Power -> powerQ qs
       Energy -> energyQ qs
@@ -77,8 +78,8 @@ gridLayout numberOfPanels numberOfRows = let
 nodePanel :: GraphType -> (NodeMAC -> NodeQueries) -> NodeMAC -> GridPos -> Panel
 nodePanel g qs n = graphPanel (nodeGraph n g (getQ (qs n) g))
 
-kbtzMeasurementDash :: KbtzName -> [NodeMAC] -> GraphType -> KbtzDash
-kbtzMeasurementDash k ns g = KbtzDash g k d
+kbtzMeasurementDash :: QueryGenParams -> KbtzName -> [NodeMAC] -> GraphType -> KbtzDash
+kbtzMeasurementDash qgp k ns g = KbtzDash g k d
   where
     d = defaultDashboard
       { dashboardIdentifier = Just (fromEnum g)
@@ -88,7 +89,7 @@ kbtzMeasurementDash k ns g = KbtzDash g k d
       , dashboardRefresh = Interval 5 Seconds
       , dashboardVersion = 1
       }
-    nq n = nodeQueries (asKbtzNode k n) 
+    nq n = nodeQueries qgp (asKbtzNode k n) 
     nRows = 3
 
 data KbtzDash = KbtzDash
@@ -120,8 +121,8 @@ dashPath base k = base <> (T.unpack $ prefix
       _ -> "/"
 
 
-chopaanDashes :: [(KbtzName, [NodeMAC])] -> [KbtzDash]
-chopaanDashes kns = (((uncurry kbtzMeasurementDash) <$> kns) <*> [minBound..maxBound])
+chopaanDashes :: QueryGenParams -> [(KbtzName, [NodeMAC])] -> [KbtzDash]
+chopaanDashes qgp kns = (((uncurry (kbtzMeasurementDash qgp)) <$> kns) <*> [minBound..maxBound])
 
 writeDashes :: FilePath -> [KbtzDash] -> IO ()
 writeDashes base dashes = mapM_
@@ -165,13 +166,14 @@ main = do
             print ("Creating Directories")
             mapM_ (\k -> cd (kbtzDir output k)) (fst <$> kns)
             print $ "Writing Kbtzim: " <> (show $ length kns)
-            let dashes = chopaanDashes kns
+            let dashes = chopaanDashes queryGenParams kns
             writeDashes output dashes
             return $ kns
   S.drain $ S.delay (pollEveryMin 1)
     $ S.trace (liftIO . print)
     $ S.iterateM pollDBForStructure (pure [])
   where
+    queryGenParams = defaultGenParams "chopaanS3"
     defPoolConf = PoolConf 1 1 1
     cd = createDirectoryIfMissing True
     structByLen :: [(KbtzName, [NodeMAC])] -> (Int, [Int])

@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses, OverloadedStrings
 , TypeApplications, ScopedTypeVariables, OverloadedLabels, ExistentialQuantification
-, AllowAmbiguousTypes, FlexibleInstances
+, AllowAmbiguousTypes, FlexibleInstances, DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, NamedFieldPuns
 , DataKinds, QuantifiedConstraints, ImpredicativeTypes, DefaultSignatures, FlexibleContexts
 #-}
 module Data.Influxable (asKbtzNode
@@ -18,12 +18,14 @@ module Data.Influxable (asKbtzNode
                        , chopaanDB
                        , wp
                        , qp
-                       , mkNodeQs
-                       , chkNodeQs
                        , createDB
+                       , QueryGenParams(..)
+                       , Agg(..)
+                       , defaultGenParams
                        ) where
 
 import Prelude hiding ((.))
+import GHC.Generics
 import Control.Category
 import Control.Lens
 import Control.Monad.IO.Class
@@ -74,41 +76,29 @@ import System.IO.Unsafe
 
 data Grouping = GroupTime | GroupTag Key deriving (Eq)
 
-data Agg = Mean | Count deriving (Eq)
+data Agg = Mean | Count deriving (Eq, Show, Generic)
 
--- data WhereOp = EqOp | NEqOp -- | GTOp | GTEOp | LTOp | LTEOp 
-
--- getOp :: WhereOp -> Text
--- getOp o = case o of
---   EqOp -> " = "
---   NEqOp -> " != "
-
--- data InfluxQ = Select ![(QueryField, Agg)]
---              | From !Measurement
---              | Where ![(Key, Key, WhereOp)]
---              | GroupBy Grouping
 
 chopaanDB :: Database
 chopaanDB = F.formatDatabase "chopaan"
 
-createDB :: IO ()
-createDB = DB.manage qp $ F.formatQuery ("CREATE DATABASE "F.%F.database) chopaanDB
+createDB :: Database -> IO ()
+createDB d = DB.manage (qp d) $ F.formatQuery ("CREATE DATABASE "F.%F.database) d
 
--- wUdp :: UDP.WriteParams
--- wUdp = UDP.writeParams 
+deleteDB :: Database -> IO ()
+deleteDB d = DB.manage (qp d) $ F.formatQuery ("DELETE DATABASE "F.%F.database) d
 
-wp :: Http.WriteParams
-wp = (Http.writeParams chopaanDB)
-     --{
-     --}
 
-qp :: QueryParams
-qp = queryParams chopaanDB
+wp :: Database -> Http.WriteParams
+wp = Http.writeParams
 
-lineFoldUdp :: forall m. (MonadIO m) => Int -> UDP.WriteParams -> FL.Fold m [Line UTCTime] ()
+qp :: Database -> QueryParams
+qp = queryParams
+
+lineFoldUdp :: forall m. (MonadIO m, MonadMask m) => Int -> UDP.WriteParams -> FL.Fold m [Line UTCTime] ()
 lineFoldUdp batchSize wp = FL.many (FL.take batchSize FL.mconcat) lineFold'
   where
-    lineFold' = Sink.toFold $ Sink.drainM (liftIO . UDP.writeBatch wp)
+    lineFold' = Sink.toFold $ Sink.drainM (recoverC "lineFold" 10 . liftIO . UDP.writeBatch wp)
 
 lineFoldHttp :: forall m. (MonadIO m, MonadMask m) => Int -> Http.WriteParams -> FL.Fold m [Line UTCTime] ()
 lineFoldHttp batchSize wp = FL.many (FL.take batchSize FL.mconcat) lineFold'
@@ -117,6 +107,23 @@ lineFoldHttp batchSize wp = FL.many (FL.take batchSize FL.mconcat) lineFold'
 
 renderQuery :: Query -> Text
 renderQuery (Query q) = q
+
+data QueryGenParams = QueryGenParams
+  { qDB :: Database
+  , qRetention :: T.Text
+  , qAgg :: Maybe (Agg)
+  , templateOnly :: Maybe (Measurement -> Database -> Map Key Key -> Key -> Query)
+  } deriving (Generic)
+
+defaultGenParams :: Database -> QueryGenParams
+defaultGenParams db = QueryGenParams db "\"autogen\"" (Just Mean) Nothing
+
+wrapAgg :: Agg -> T.Text -> T.Text
+wrapAgg Mean m = "mean(" <> m <> ")"
+wrapAgg Count m = "count(" <> m <> ")"
+
+
+
 
 -- $ Measurement Construction depends on the ability to construct
 -- $ a Tagset and a Fieldset for a datatype
@@ -130,10 +137,13 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
     (getInfluxFields a)
     (getTime a)
   {-# INLINE mkLine #-}
-  seriesQueries :: tag -> [Query]
-  default seriesQueries :: tag -> [Query]
-  seriesQueries tag = seriesQuery <$> (getInfluxKeys @a)
+  seriesQueries :: QueryGenParams -> tag -> [Query]
+  default seriesQueries :: QueryGenParams -> tag -> [Query]
+  seriesQueries qgp tag = case (templateOnly) of
+    Just f ->  (f (measurementName @tag @a) qDB (getTags tag)) <$> (getInfluxKeys @a)
+    Nothing -> seriesQuery <$> (getInfluxKeys @a)
     where
+      QueryGenParams{qDB, qRetention, qAgg, templateOnly} = qgp
       seriesQuery f = F.formatQuery ( "SELECT "
                                        . F.text
                                        . " FROM "
@@ -143,17 +153,19 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
                                        . "."
                                        . F.measurement
                                        . F.text
-                                     ) (asMean f) chopaanDB retention (measurementName @tag @a) whereC
+                                     ) (aggF f) qDB qRetention (measurementName @tag @a) whereC
         where
           unKey (Key a) = a
-          asMean :: Key -> Text
-          asMean p = "mean(" <> (unKey $ F.formatKey ("" . F.key) p) <> ")"
-          retention = "\"autogen\""
-          timeThing = " AND $timeFilter GROUP BY time($__interval)"
+          aggF :: Key -> Text
+          aggF p = case qAgg of
+            Nothing -> t
+            Just aff -> wrapAgg aff t
+            where
+              t = (unKey $ F.formatKey ("" . F.key) p)
           whereC :: Text
-          whereC = " WHERE "
+          whereC = " WHERE ("
             <> (T.intercalate " AND " (eqOn <$> (M.toList $ getTags tag)))
-            <> timeThing
+            <> ")"
             where
               eqOn :: (Key, Key) -> Text
               eqOn (t, v) = unKey $ F.formatKey (F.key
@@ -163,21 +175,6 @@ class (IsTag tag, HasInfluxFields a) => ToMeasurement tag a where
                   singleQuote x = "\'" <> x <> "\'"
   {-# INLINE seriesQueries #-}
 
--- pqr :: forall tag a. (IsTag tag, HasInfluxFields a)
---     => Precision 'QueryRequest
---     -> Maybe Text
---     -> HM.HashMap Text Text
---     -> Vector Text
---     -> A.Array
---     -> A.Parser a
--- pqr prec _name _tags columns fields = do
---   let ks = getInfluxKeys @a
---       a = gf <$> ks
---       --getField
---   return a
---   where
---     gf :: forall x. (A.FromJSON x) => Key -> A.Parser x
---     gf (Key f) = DJ.getField f columns fields >>= A.parseJSON 
 
 type KbtzNode = HList '[KbtzName, NodeMAC]
 
@@ -195,7 +192,7 @@ data NodeQueries = NodeQueries
   , energyQ :: [Query]
   , batteryQ :: [Query]
   , meshQ :: [Query]
-  }
+  } deriving (Generic, Show)
 
 
 instance QueryResults Watts where
@@ -208,42 +205,12 @@ instance QueryResults WattSeconds where
     let deb = ((show (p, s, t, f, a)))
     trace deb (A.parseJSON $ V.head a)
 
---instance (QueryResults e, QueryResults p) => QueryResults (Battery e p)
-
-chkNodeQs :: forall m. (MonadIO m) => NodeQueries -> m ()
-chkNodeQs nq = do
-  mapM_ mkQ (powerQ nq)
-  mapM_ mkQ (energyQ nq)
-  mapM_ mkQ (batteryQ nq)
-  mapM_ mkQ (meshQ nq)
-  where
-    pwinte req resp = do
-      --print req
-      --print (responseHeaders resp)
-      print =<< (brConsume $ responseBody resp)
-    mkQ q = liftIO $ withQueryResponse qp Nothing q pwinte
-
-mkNodeQs :: forall m. (MonadIO m) => QueryParams -> NodeQueries -> m (Vector (PowerNR), Vector (EnergyNR))
-mkNodeQs qp nq = (,) <$> pows <*> es
-  where
-    toNode [a, b, c] = Node a b c
-    --toBattery = undefined
-    pows :: m (Vector (Node Watts))
-    pows = (fmap sequence) $ (fmap toNode) $ mapM (q @Watts) (powerQ nq)
-    es :: m (Vector (Node WattSeconds))
-    es = (fmap sequence) $ (fmap toNode) $ mapM (q @WattSeconds) (energyQ nq)
-    --ms :: m (Vector (MeshNode, RxSignal))
-    --ms = undefined
-    --bs :: m (Vector (Battery WattSeconds Watts))
-    --bs = (fmap sequence) $ (fmap toBattery) $ mapM (q @WattSeconds) (energyQ nq)
-    q :: forall x. (QueryResults x) => Query -> m (Vector x)
-    q = liftIO . (query qp)
     
-nodeQueries :: KbtzNode -> NodeQueries
-nodeQueries kn = NodeQueries (these @PowerNR) (these @EnergyNR) (these @BatteryR) (these @(MeshNode, RxSignal))
+nodeQueries :: QueryGenParams -> KbtzNode -> NodeQueries
+nodeQueries g kn = NodeQueries (these @PowerNR) (these @EnergyNR) (these @BatteryR) (these @(MeshNode, RxSignal))
   where
     these :: forall a. (HasInfluxFields a, ToMeasurement KbtzNode a) => [Query]
-    these = seriesQueries @KbtzNode @a kn
+    these = seriesQueries @KbtzNode @a g kn
 
 
 lineSensorR :: KbtzNode -> SensorR -> [Line UTCTime]

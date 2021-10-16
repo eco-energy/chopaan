@@ -71,6 +71,7 @@
         "tar".revision = (((hackage."tar")."0.5.1.1").revisions).default;
         "tar".flags.old-time = false;
         "tar".flags.old-bytestring = false;
+        "authenticate-oauth".revision = (((hackage."authenticate-oauth")."1.7").revisions).default;
         "base64".revision = (((hackage."base64")."0.4.2.3").revisions).default;
         "ghc-prim".revision = (((hackage."ghc-prim")."0.5.3").revisions).default;
         "proto-lens".revision = (((hackage."proto-lens")."0.7.0.0").revisions).default;
@@ -224,6 +225,7 @@
         "distributive".flags.tagged = true;
         "monad-bayes".revision = (((hackage."monad-bayes")."0.1.1.0").revisions).default;
         "monad-bayes".flags.dev = false;
+        "crypto-pubkey-types".revision = (((hackage."crypto-pubkey-types")."0.4.3").revisions).default;
         "generic-arbitrary".revision = (((hackage."generic-arbitrary")."0.1.0").revisions).default;
         "asn1-encoding".revision = (((hackage."asn1-encoding")."0.9.6").revisions).default;
         "binary-orphans".revision = (((hackage."binary-orphans")."1.0.1").revisions).default;
@@ -366,6 +368,8 @@
         "store-core".revision = (((hackage."store-core")."0.4.4.4").revisions).default;
         "store-core".flags.force-alignment = false;
         "profunctors".revision = (((hackage."profunctors")."5.5.2").revisions).default;
+        "time-locale-compat".revision = (((hackage."time-locale-compat")."0.1.1.5").revisions).default;
+        "time-locale-compat".flags.old-locale = false;
         "safe".revision = (((hackage."safe")."0.3.19").revisions).default;
         "aeson-optics".revision = (((hackage."aeson-optics")."1.1.0.1").revisions).default;
         "blaze-builder".revision = (((hackage."blaze-builder")."0.4.2.1").revisions).default;
@@ -476,6 +480,7 @@
         "cryptohash-sha1".revision = (((hackage."cryptohash-sha1")."0.11.100.1").revisions).default;
         "serialise".revision = (((hackage."serialise")."0.2.3.0").revisions).default;
         "serialise".flags.newtime15 = true;
+        "lens-aeson".revision = (((hackage."lens-aeson")."1.1.1").revisions).default;
         "hostname".revision = (((hackage."hostname")."1.0").revisions).default;
         "tasty-smallcheck".revision = (((hackage."tasty-smallcheck")."0.8.2").revisions).default;
         "heaps".revision = (((hackage."heaps")."0.4").revisions).default;
@@ -581,6 +586,7 @@
         "one-liner".revision = (((hackage."one-liner")."1.0").revisions).default;
         "universe-base".revision = (((hackage."universe-base")."1.1.2").revisions).default;
         "terminfo".revision = (((hackage."terminfo")."0.4.1.2").revisions).default;
+        "RSA".revision = (((hackage."RSA")."2.4.1").revisions).default;
         "base16-bytestring".revision = (((hackage."base16-bytestring")."1.0.1.0").revisions).default;
         "vector-algorithms".revision = (((hackage."vector-algorithms")."0.8.0.4").revisions).default;
         "vector-algorithms".flags.unsafechecks = false;
@@ -728,6 +734,11 @@
         "conduit-extra".revision = (((hackage."conduit-extra")."1.3.5").revisions).default;
         "erf".revision = (((hackage."erf")."2.0.0.0").revisions).default;
         "lens-family-core".revision = (((hackage."lens-family-core")."2.0.0").revisions).default;
+        "wreq".revision = (((hackage."wreq")."0.5.3.3").revisions).default;
+        "wreq".flags.aws = false;
+        "wreq".flags.doctest = true;
+        "wreq".flags.httpbin = false;
+        "wreq".flags.developer = false;
         "simple-sendfile".revision = (((hackage."simple-sendfile")."0.2.30").revisions).default;
         "simple-sendfile".flags.allow-bsd = true;
         "servant-client-js".revision = (((hackage."servant-client-js")."0.1.0.0").revisions).default;
