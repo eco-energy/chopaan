@@ -10,7 +10,7 @@ import Streamly.Internal.Data.SVar (ThreadAbort(..))
 import Network.HTTP.Client (HttpException)
 
 chopaanPolicy :: (MonadIO m) => Int -> RetryPolicyM m
-chopaanPolicy n = fullJitterBackoff 100 <> limitRetries n
+chopaanPolicy n = fullJitterBackoff 1000 <> limitRetries n
 
 skipThreadAbort :: Monad m => RetryStatus -> C.Handler m Bool  
 skipThreadAbort = \_ -> C.Handler $ \ (_ :: ThreadAbort) -> return False

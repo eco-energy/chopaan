@@ -10,7 +10,7 @@ let
   tinkerHost = "localhost";
   janusConf = ../janusgraph-config;
   frontend = (import ../nix/website.nix) {};
-  #dashes = (import ./nix/dashboard.nix) {};
+  dashes = (import ../nix/dashboard.nix) {};
   withJanus = p: "${p} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}";
   withRTSOpts = p: "${p} +RTS -A32m -n4m -N";
   chopaanDir = "${config.users.users.chopaan.home}";
@@ -107,15 +107,15 @@ in
       XDG_ROOT_DIR = chopaanDir;
       STORE_PATH = "${chopaanDir}/data/hydration";
       S3_BUCKET = "dosti-datastream";
-      START_DATE = "01-08-2021";
+      START_DATE = "01-10-2021";
       PAST_RES = "Day";
       FUTURE_RES = "Minute";
       LIFETIME = "Infinite";
-      MAN_CONN_COUNT = "1000";
-      MAN_IDLE_CONN = "128";
+      MAN_CONN_COUNT = "100";
+      MAN_IDLE_CONN = "0";
       MAN_TIMEOUT = "90";
-      DL_THREADS = "1000";
-      SOURCE_GEN_THREADS = "5";
+      DL_THREADS = "300";
+      SOURCE_GEN_THREADS = "1";
     };
     serviceConfig = {
       WorkingDirectory = "~";
@@ -135,11 +135,6 @@ in
         User = "chopaan";
         Group = "dash";
       };
-      # preStart = ''
-      #   mkdir -p ${dashboardDir}
-      #   chgrp -R dash ${dashboardDir}
-      #   chmod -R 775 ${dashboardDir}
-      # '';
     unitConfig.RequiresMountsFor = dashboardDir;
     script = (withJanus "${app.dashgen}/bin/dashgen --outpath ${dashboardDir}");
   };
@@ -179,6 +174,14 @@ in
           updateIntervalSeconds = 30;
           options.path = "${dashboardDir}";
           }
+          { name = "Chopaan Flat";
+          orgId = 1;
+          type = "file";
+          folder = "Chopaan_Flat";
+          disableDeletion = false;
+          updateIntervalSeconds = 30;
+          options.path = "${dashes}";
+          }
         ];
         datasources = [
           { name = "InfluxDB";
@@ -187,7 +190,15 @@ in
           orgId = 1;
           url = "http://localhost:8086";
           editable = true;
-          database = "chopaan";
+          database = "chopaanS3";
+          }
+          { name = "InfluxDBMQTT";
+          type = "influxdb";
+          access = "proxy";
+          orgId = 1;
+          url = "http://localhost:8086";
+          editable = true;
+          database = "chopaanMQTT";
           }
         ];  
       };

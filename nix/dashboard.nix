@@ -5,7 +5,6 @@
 }:
 
 let
-  artifact = (import ../default.nix { inherit system; }).chopaan.dashgen;
   pkgs = import ./default.nix { inherit system; };
   dash = ../dash;
   #jslib = ../js;
