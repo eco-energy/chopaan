@@ -47,7 +47,7 @@ runKbtzim mq hydrationOpts = do
       present = S.concatMapWith S.wAsync (S.concatM . runKibbutz @t) confss
   return $ S.mapM (pure . const True) $ present
   where
-    deployKbtz = (KbtzId "", fmap fst deployNodes)
+    deployKbtz = (KbtzId "Bismillah_Mor", fmap fst deployNodes)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
                           , nodes = ns
                           , channelOpts = Left mq

@@ -1,6 +1,6 @@
 
 let BatteryType : Type = < LAFlooded | LASealed | LIon >
-let Resolution : Type =  < Year | Month | Week | Day | Hour | Minute | Second >
+let Resolution : Type =  < Second | Ten | Ten2 | Ten3 | Ten4 | Ten5 | Ten6 | Ten7 >
 
 in
 
@@ -44,7 +44,7 @@ in
                            }
                    , s3BucketName = "dosti-datastream"
                    , dbSave = False
-                   , resolution = Resolution.Hour
+                   , resolution = Resolution.Ten3
                    , bufOpts = { prefixBuffer = +10
                                , pathBuffer = +100
                                , frameBuffer = +100

@@ -107,9 +107,9 @@ in
       XDG_ROOT_DIR = chopaanDir;
       STORE_PATH = "${chopaanDir}/data/hydration";
       S3_BUCKET = "dosti-datastream";
-      START_DATE = "01-10-2021";
-      PAST_RES = "Day";
-      FUTURE_RES = "Minute";
+      START_DATE = "15-10-2021";
+      PAST_RES = "Ten3";
+      FUTURE_RES = "Ten2";
       LIFETIME = "Infinite";
       MAN_CONN_COUNT = "100";
       MAN_IDLE_CONN = "0";
@@ -131,6 +131,7 @@ in
   systemd.services.dashgen = {
     wantedBy = [ "grafana.service" ];
     after = [ "chopaan.service" ];
+    preStart = "cp ${dashes} ${dashboardDir}/Flat";
     serviceConfig = {
         User = "chopaan";
         Group = "dash";
@@ -171,16 +172,8 @@ in
           type = "file";
           folder = "Chopaan";
           disableDeletion = false;
-          updateIntervalSeconds = 30;
+          updateIntervalSeconds = 60;
           options.path = "${dashboardDir}";
-          }
-          { name = "Chopaan Flat";
-          orgId = 1;
-          type = "file";
-          folder = "Chopaan_Flat";
-          disableDeletion = false;
-          updateIntervalSeconds = 30;
-          options.path = "${dashes}";
           }
         ];
         datasources = [
@@ -200,7 +193,7 @@ in
           editable = true;
           database = "chopaanMQTT";
           }
-        ];  
+        ];
       };
     };
     
