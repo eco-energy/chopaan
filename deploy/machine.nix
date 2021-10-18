@@ -108,14 +108,14 @@ in
       STORE_PATH = "${chopaanDir}/data/hydration";
       S3_BUCKET = "dosti-datastream";
       START_DATE = "15-10-2021";
-      PAST_RES = "Ten3";
+      PAST_RES = "Ten4";
       FUTURE_RES = "Ten2";
       LIFETIME = "Infinite";
       MAN_CONN_COUNT = "100";
       MAN_IDLE_CONN = "0";
       MAN_TIMEOUT = "90";
-      DL_THREADS = "300";
-      SOURCE_GEN_THREADS = "1";
+      DL_THREADS = "100";
+      SOURCE_GEN_THREADS = "12";
     };
     serviceConfig = {
       WorkingDirectory = "~";
@@ -131,7 +131,7 @@ in
   systemd.services.dashgen = {
     wantedBy = [ "grafana.service" ];
     after = [ "chopaan.service" ];
-    preStart = "cp ${dashes} ${dashboardDir}/Flat";
+    preStart = "cp -r ${dashes} ${dashboardDir}/Flat";
     serviceConfig = {
         User = "chopaan";
         Group = "dash";
