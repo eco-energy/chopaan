@@ -10,6 +10,8 @@ import Text.Read (readMaybe)
 import qualified Data.Text as T
 import Servant.API (FromHttpApiData(..), ToHttpApiData(..))
 import qualified Data.Text as Text
+
+import Chopaan.Hydration.Prefix
 #ifndef ghcjs_HOST_OS
 import RIO
 import Prelude (Enum(..), read)
@@ -24,25 +26,7 @@ import Control.DeepSeq (NFData(..))
 import GHC.Generics
 #endif
 
-data Resolution = Year | Month | Week | Day | Hour | Minute | Second
-  deriving (Eq, Ord, Show, Generic, Bounded, Read, Enum, NFData, ToJSON, FromJSON)
 
-instance Var Resolution where
-  toVar = show
-  fromVar = readMaybe
-
-
-toUrlPieceViaEnum :: Enum a => a -> Text
-toUrlPieceViaEnum = Text.pack . show . fromEnum
-
-parseUrlPieceViaEnum :: Enum a => Text -> Either Text a
-parseUrlPieceViaEnum = Right . toEnum . read . Text.unpack
-
-instance ToHttpApiData Resolution where
-  toUrlPiece = toUrlPieceViaEnum
-
-instance FromHttpApiData Resolution where
-  parseUrlPiece = parseUrlPieceViaEnum
 
 #ifndef ghcjs_HOST_OS
 data DBOpts = DBOpts

@@ -5,11 +5,9 @@ module Chopaan.Hydrate
   , Command(..)
   , onCommand
   , unfoldNodes
-  , prefixGen
   , LifeTime(..)
   , HydrationConf(..)
   , parseHConf
-  , withDigits
   , mkTKbtz
   , ufStream
   , prefixGen
@@ -22,6 +20,7 @@ module Chopaan.Hydrate
   ) where
 
 
+import Chopaan.Hydration.Prefix
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Comm.S3 hiding (pathFile)
@@ -119,29 +118,6 @@ import System.Envy hiding (env)
 
 
 
-labNodes1 :: [NodeMAC]
-labNodes1 = NodeId <$>
-  [ "ac:67:b2:11:f3:10"
-  , "ac:67:b2:12:07:b0"
-  , "7c:9e:bd:47:61:bc"
-  , "7c:9e:bd:47:b7:e8"
-  , "7c:9e:bd:48:4e:e0"
-  , "7c:9e:bd:48:a2:c4"
-  , "ac:67:b2:11:e6:e4"
-  ]
-
-labNodes :: [NodeMAC]
-labNodes = NodeId <$>
-  [ "ac:67:b2:11:f3:20",
-    "ac:67:b2:1d:e7:f4",
-    "8c:aa:b5:97:69:48",
-    "8c:aa:b5:95:97:c8",
-    "8c:aa:b5:95:8f:9c",
-    "ac:67:b2:1c:ec:d8",
-    "7c:9e:bd:f5:ec:74",
-    "ac:67:b2:11:f0:28"
-  ]
-
 type HConM m = (S.MonadAsync m, MonadCatch m, MonadThrow m, MonadMask m)
 
 type HConS t m = (S.IsStream t, HConM m) 
@@ -191,12 +167,12 @@ manConfDef :: ManagerSettings
 manConfDef = ManagerSettings 1000 128 90
 
 hConfDef :: HydrationConf
-hConfDef = HydrationConf basePath bucket defDate Day Minute Infinite 
+hConfDef = HydrationConf basePath bucket defDate Ten5 Ten2 Infinite 
   where
     defDate = Date 1 1 2021
     basePath = "./data/hydration"
     bucket = "dosti-datastream"
-  
+
 data KbtzConf = KbtzConf
   { env :: Env
   , bucket :: S3.BucketName
@@ -434,17 +410,9 @@ prefixGen life keep (pastRes, futureRes) start now n = case life of
   where
     past = S.fromList (prefixRange pastRes start (Just now))
     {-# INLINE past #-}
-    future = S.takeWhileM (\_ -> (keep n)) $ S.delayPre diff
-      (S.fromList (prefixRange futureRes now Nothing))
+    future = posthence futureRes
     {-# INLINE future #-}
-    diff = secondsUpperBound futureRes
 {-# INLINE prefixGen #-}
-
-secondsUpperBound :: Num a => Resolution -> a
-secondsUpperBound r = (10 ^ (numDigits $ r))
-
-withDigits :: (Prefix -> Prefix -> Prefix) -> Prefix -> Resolution -> Prefix
-withDigits op a r = a `op` secondsUpperBound r
     
 
 deriving newtype instance W.Serialise ST.MilliSecond64

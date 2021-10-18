@@ -54,8 +54,23 @@ import Data.Pool
 
 type KbtzPool = (Pool Client)
 
---newtype KbtzM m = KbtzM { runKbtzM :: ReaderT KbtzPool IO }
 
+{--
+newtype KbtzM m = KbtzM { runKbtzM :: ReaderT KbtzPool IO }
+
+data NTy = KbtzN | NodeN | HwN
+
+data ETy = KbtzE | HwE
+
+data GNode n where
+
+data GEdge n where
+
+instance Monoid GEdge
+
+newtype G e n = G { unG :: G.Graph (GEdge e) (GNode n) }
+
+--}
 
 
 getKbtzim :: MonadIO m => Client -> m [KbtzName]

@@ -29,7 +29,7 @@ import Chopaan.Node.Mesh (MeshNode, RxSignal)
 import Chopaan.Node.Folds (SensorR)
 
 
-import Chopaan.Types (Resolution(..))
+import Chopaan.Hydration.Prefix (Resolution(..))
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Graph
 import Data.Time

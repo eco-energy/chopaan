@@ -4,7 +4,8 @@ module Common (
   module Test.QuickCheck.Checkers,
   module Test.QuickCheck,
   almostEqual,
-  runJanus
+  runJanus,
+  runDBs
   ) where
 
 import Test.Hspec
@@ -35,6 +36,7 @@ import Linear.Affine
 import Linear.Matrix
 import Linear.Quaternion
 
+import Chopaan.Hydration.Prefix
 import Chopaan.Types
 import Chopaan.Graph
 import Chopaan.Node.NodeId
@@ -65,7 +67,13 @@ tr = \c -> TC.withLogs c ((\stdout stderr -> liftIO $ do
                  print =<< hGetLine stdout
                  print =<< hGetLine stderr
                  ))
-  
+
+runDBs :: TC.MonadDocker m => T.Text -> m ((String, Int), (String, Int))
+runDBs name = do
+  j <- runJanus name
+  i <- runInflux name
+  return $ (j, i)
+
 runJanus :: (TC.MonadDocker m) => T.Text -> m (String, Int)
 runJanus name = do
   c <- ask
@@ -75,6 +83,23 @@ runJanus name = do
   --tr jC
   --liftIO . print $ c
   pure ("localhost", TC.containerPort jC 8182)
+
+runInflux :: (TC.MonadDocker m) => T.Text -> m (String, Int)
+runInflux name = do
+  c <- ask
+  let t = TC.newTracer print
+  iC <- (flip runReaderT $ c) $ TC.run (influx name)
+  pure ("localhost", TC.containerPort iC 8182)
+
+
+influx :: T.Text -> TC.ContainerRequest
+influx name = TC.containerRequest (TC.fromTag "influxdb:1.8")
+              & TC.setName ("influx-test-" <> name)
+              & TC.setExpose [ 8086 ]
+              & TC.setWaitingFor waiter
+  where
+    waiter = TC.waitForLogLine TC.Stdout (TL.isInfixOf readyLog)
+    readyLog = "lvl=info msg=\"Listening for signals\""
 
 janus :: (MonadIO m) => T.Text -> m TC.ContainerRequest
 janus name = do

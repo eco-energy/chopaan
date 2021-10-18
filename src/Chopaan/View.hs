@@ -75,7 +75,7 @@ import Chopaan.Node.Components
 import Chopaan.Ui.FormCommon
 import Chopaan.Ui.GraphView
 import Chopaan.Ui.Timeline
-import Chopaan.Types (Resolution(..))
+import Chopaan.Hydration.Prefix (Resolution(..))
 import qualified Chopaan.Ui.Style as Css
 import qualified Data.Time as Ti
 
@@ -86,7 +86,7 @@ ainit :: (Monad m, CRUDChopaan m) => Route -> m Frontend
 ainit _ = MHomePage . RosterKbtzim (SortCol KId ASC) mempty <$> listKibbutzim
 
 defGView :: GView
-defGView = GView (KbtzId "Lab_TestGrid") StatusG Day t0 t1 (t0, t1) Nothing
+defGView = GView (KbtzId "Lab_TestGrid") StatusG Ten5 t0 t1 (t0, t1) Nothing
   where
     t0 = Ti.UTCTime (Ti.fromGregorian 2021 7 11) (Ti.secondsToDiffTime 0)
     t1 = Ti.UTCTime (Ti.fromGregorian 2021 10 11) (Ti.secondsToDiffTime 0)

@@ -18,7 +18,7 @@ import qualified Data.Time as Time
 import qualified Data.Text as T
 import qualified Data.Set as Set
 import Data.Time.Clock.POSIX
-import Chopaan.Types (Resolution(..))
+import Chopaan.Hydration.Prefix
 import Chopaan.Comm.S3
 import Chopaan.Hydrate
 import Streamly.Binary
@@ -51,12 +51,12 @@ eqS a b = do
   where
     sEq :: IO (Maybe Bool)
     sEq = S.the
-          --  $ S.map eqTup
+          $ S.map eqTup
           --  $ S.trace (\a -> print $ (a, eqTup a))
-          $ S.mapM (pure . uncurry (==))
+          --  $ S.mapM (pure . uncurry (==))
           --  $ S.trace (\(x, y) -> if dbg then print (x, y) else return ())
           $ S.zipWith (,) (S.adapt a) (S.adapt b)
-    -- eqTup = (\(a, b) -> a == b)
+    eqTup = (\(a, b) -> a == b)
 type Tup3 a = (a, a, a)
 
 
@@ -66,8 +66,8 @@ newtype InAMinute = InAMinute (Tup3 Time.UTCTime)
 instance Arbitrary InAMinute where
   arbitrary = do
     t0 <- (arbitrary @Time.UTCTime)
-    dt <- suchThat (arbitrary @Time.NominalDiffTime) (\x -> (1 <= x) && (x <= 30))
-    dt' <- suchThat (arbitrary @Time.NominalDiffTime) (\x -> (1 <= x) && (x <= 30))
+    dt <- suchThat (arbitrary @Time.NominalDiffTime) (\x -> (1 <= x) && (x <= 100))
+    dt' <- suchThat (arbitrary @Time.NominalDiffTime) (\x -> (1 <= x) && (x <= 100))
     let t1 = Time.addUTCTime dt t0
         t2 = Time.addUTCTime dt' t1
     return $ InAMinute (t0, t1, t2)
@@ -77,21 +77,16 @@ instance Arbitrary KbtzName where
 
 pipelineSpec :: Spec
 pipelineSpec = do
-  describe "pipeline invariants" $ do
+  parallel $ describe "pipeline invariants" $ do
     it "prefix congregation works" $ do
       k <- liftIO $ generate (arbitrary @KbtzName)
       ns <- S.toList $ S.replicateM 10 (liftIO . generate $ (arbitrary @NodeMAC))
       tk <- liftIO . atomically $ mkTKbtz [(k, ns)]
       (InAMinute (t0, t1, _)) <- liftIO $ generate $ (arbitrary @InAMinute)
       let ufN = unfoldNodes Finite tk
-          ps = ufStream (prefixGen Infinite (\_ -> pure True) (Minute, Second) t0 t1)
+          ps = ufStream (prefixGen Infinite (\_ -> pure True) (Ten2, Second) t0 t1)
           nps = nodePrefixes k (\_ -> pure ()) ufN ps
-      r <- S.length $ S.hoist (liftIO) --  $ S.fromWAsync --  $
-           -- S.concatMapM (mapToStream bo)
-           --  $ S.maxBuffer 1
-           --  S.|$ S.take 10
-           --   S.|$ S.interleave
-           --  $ S.fromWAsync
+      r <- S.length $ S.hoist (liftIO)
            $ S.trace (liftIO . print)
            S.|$ S.mapM (uncurry bo)
            --  $ S.trace (liftIO . print)
@@ -101,16 +96,12 @@ pipelineSpec = do
       where
         bo :: (HConM m) => NodeMAC -> Prefix -> m ((NodeMAC, Prefix), Int)
         bo n a = return ((n,a), 10)
-          --let l = numDigits a
-          -- p <- latestPrefix a
-          --liftIO $ print $ "Latest Prefix and Length: " <> (show (p, l))
-          -- case (l > 0) of
-          --  True -> return $ (, l) <$> a
-          --  False -> return $ Nothing
+
+suc1 = modifyMaxSuccess (const 1)
 
 prefixGenSpec :: Spec
 prefixGenSpec = describe "Prefix Generation Invariants for Infinite and finite streams" $ do
-  describe "should be an appendy monoid" $ do
+  parallel $ describe "should be an appendy monoid" $ do
     --       xs <- liftIO $ arbs @Time.UTCTime 3
     prop "The length of both should be same" $ \(start, now, end) (resP :: Resolution, resF) -> do
       let (x, y, z) = mkFin (dup3 (resP, resF)) (start :: Time.UTCTime, now, end)
@@ -121,25 +112,6 @@ prefixGenSpec = describe "Prefix Generation Invariants for Infinite and finite s
       \(start, now, end) (resP :: Resolution, resF) -> do
         let (x, y, z) = mkFin (dup3 (resP, resF)) (start, now, end) 
         eqS @S.SerialT @Prefix (S.uniq (x <> y)) z
-    modifyMaxSuccess (const 5) $ prop "Infinite Streams should respect the Resolution Difference Switch" $
-      \(InAMinute (s, n, e)) -> do
-        let
-          [start, now, end] = sortBy compare [s, n, e]
-          yes _ = return True
-          x = prefixGen Infinite yes (Minute, Second) start now ()
-          y = prefixGen Finite yes (Minute, undefined) start now ()
-          z = prefixGen Finite yes (Second, undefined) now end ()
-        -- let (x, y, z) = mkT
-        --                 (Infinite, Finite, Finite)
-        --                 ((resP, resF), (resP, resP), (resP, resF))
-        --                 (start, now, end)
-        let r = (S.uniq (y <> z))
-        l <- S.length r
-        let x' = (S.take l x)
-        eqS @S.SerialT @Prefix r x'
-    -- it "Future Pipeline Stages can Occur Concurrently" $ do
-    --   state <- atomically $ newTVar (0, 0)
-      
     where
       dup3 a = (a, a, a)
       mkFin = mkT (Finite, Finite, Finite)
@@ -175,11 +147,6 @@ controlSpec = parallel $ describe "State Management" $ do
     krm <- mapM_ (atomically . onCommand k) rmKs
     noNS <- S.toList $ S.unfoldManyRoundRobin (unfoldNodes Infinite k) (S.fromList ks)
     (length noNS) `shouldBe` 0
-    -- mapM_ (atomically . onCommand k) ((flip StartKbtz []) <$> ks)
-    -- nadd <- mapM_ (atomically . onCommand k) addNs
-    -- nrm <- mapM_ (atomically . onCommand k) rmNs
-    -- mapM_ (atomically . onCommand k) rmKs
-    -- 1 `shouldBe` 1
   where
     conc = foldl (<>) mempty
 
@@ -187,17 +154,20 @@ controlSpec = parallel $ describe "State Management" $ do
 prefixSpec :: Spec
 prefixSpec = parallel $ describe "Prefix Generation Spec" $ do
   it "length corresponds to time units" $ do
-    (length $ prefixRange Second s (Just e)) `shouldBe` 8641
+    (length $ prefixRange Second s (Just e)) `shouldBe` 86401
   it "prefix length is sane" $ do
     let
       matchDigs res x = (foldl (\a b -> if b /= x then b else a) x rng) `shouldBe` x
         where
           rng = fmap (digs . unPrefix) $ prefixRange res s (Just e)
-    matchDigs Second 9
-    matchDigs Minute 7
-    matchDigs Hour 5
-    matchDigs Day 4
-    matchDigs Week 3
+    matchDigs Second 10
+    matchDigs Ten 9
+    matchDigs Ten2 8
+    matchDigs Ten3 7
+    matchDigs Ten4 6
+    matchDigs Ten5 5
+    matchDigs Ten6 4
+    matchDigs Ten7 3
   where
     digs = ceiling . (logBase 10) . realToFrac
     unM (MilliSecond64 w') = w'

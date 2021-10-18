@@ -35,7 +35,7 @@ import Chopaan.Node.NodeId
 import Chopaan.Node.NodeT
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.CRUD
-import Chopaan.Types (Resolution(..))
+import Chopaan.Hydration.Prefix (Resolution(..))
 import Chopaan.Graph
 import qualified Data.Time as Ti
 

@@ -1,9 +1,5 @@
 {-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies, DeriveGeneric, StandaloneDeriving, DeriveAnyClass, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, TupleSections, DerivingStrategies, DerivingVia, BangPatterns, OverloadedLabels, RecordWildCards, DeriveFunctor, QuantifiedConstraints, InstanceSigs, LambdaCase, GeneralizedNewtypeDeriving #-}
 
-{-# OPTIONS_GHC -ddump-simpl #-}
-{-# OPTIONS_GHC -dsuppress-all #-}
-{-# OPTIONS_GHC -ddump-to-file #-}
-
 module Chopaan.Comm.S3 where
 
 import Control.Lens
@@ -51,7 +47,6 @@ import Chopaan.Kibbutz.AWS.Things
 import Chopaan.Utils.Time
 import Chopaan.Utils.Retry
 import Chopaan.Types (BufferingOpts(..))
-import Chopaan.Types (Resolution(..))
 
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N (cpuTime)
@@ -81,7 +76,7 @@ import Control.Monad.Trans.Resource
 import Chopaan.Comm.Address
 import Chopaan.Comm.Dispatch
 import Chopaan.Comm.Monitor
-
+import Chopaan.Hydration.Prefix
 
 data HydrationError = DownloadError T.Text | ParsingError T.Text
   deriving (Show, Generic)
@@ -226,68 +221,6 @@ timedPrefix n t = (<> ("/" <> (asFileName t))) <$> (nodeS3Prefix n)
 
 worldStart :: MilliSecond64
 worldStart = MilliSecond64 1607478885000
-
--- https://vimeo.com/72870861
--- THERE IS A GALOIS CONNECTION BETWEEN PREFIX AND SECONDS
--- THAT IS MEDIATED BY RESOLUTION
-
-resToSeconds :: Resolution -> Double
-resToSeconds r = case r of
-  Second -> 1
-  Minute -> 60 * (resToSeconds Second)
-  Hour -> 60 * (resToSeconds Minute)
-  Day -> 24 * (resToSeconds Hour)
-  Month -> 30 * (resToSeconds Day)
-  Week -> 7 * (resToSeconds Day)
-  Year -> 365 * (resToSeconds Day) 
-{-# INLINE resToSeconds #-}
-
-numDigits :: Resolution -> Int
-numDigits = (ceiling . (logBase 10)) . resToSeconds
-
-newtype Prefix = Prefix { unPrefix :: Int64 }
-  deriving (Eq, Ord, Show, Generic)
-  deriving newtype (Enum, Bounded, Num, Real, Integral, Storable)
-  deriving (W.Serialise) via (W.WineryRecord (Prefix))
-
-asFileName :: Prefix -> T.Text
-asFileName = T.pack . show . unPrefix
-
-
-prefixRange :: Resolution -> UTCTime -> Maybe UTCTime -> [Prefix]
-prefixRange !r !t !t' = case t' of
-  Nothing -> let
-    start = toPrefix t
-    in [start, succ start..]
-  Just t'' -> let
-    start = toPrefix t
-    end = toPrefix t''
-    in [start..end]
-  where
-    sigDigs = (9 -) . numDigits $ r
-    toPrefix :: UTCTime -> Prefix
-    toPrefix = Prefix . unDigits 10 . take sigDigs . digits 10 . utcToSeconds
-    utcToSeconds = (ceiling @_ @Int64) . nominalDiffTimeToSeconds
-                       . TP.utcTimeToPOSIXSeconds
-    digits !n !n' = reverse . fromJust $ mDigitsRev n n' 
-    mDigitsRev :: Integral n
-      => n         -- ^ The base to use.
-      -> n         -- ^ The number to convert to digit form.
-      -> Maybe [n] -- ^ Nothing or Just the digits of the number in list form, in reverse.
-    mDigitsRev base i = if base < 1
-                    then Nothing -- We do not support zero or negative bases
-                    else Just $ dr base i
-      where
-        dr _ 0 = []
-        dr b x = case base of
-                   1 -> genericTake x $ repeat 1
-                   _ -> let (rest, lastDigit) = quotRem x b in lastDigit : dr b rest
-    unDigits :: Integral n
-      => n   -- ^ The base to use.
-      -> [n] -- ^ The digits of the number in list form.
-      -> n   -- ^ The original number.
-    unDigits base = foldl (\ a b -> a * base + b) 0
-
 
 
 nodeMACPath :: NodeMAC -> FilePath
@@ -468,12 +401,6 @@ validateMF k m = case accessEnergyState m of
                          Nothing -> (k, Nothing)
   where
     t = parseTime k
-    -- toNodeMAC :: S3.ObjectKey -> Maybe (NodeMAC, Time.UTCTime)
-    -- toNodeMAC (S3.ObjectKey txt) = do
-    --   (nodePath, filename) <- cleanMAC txt
-    --   nodeId <- topicToNodeId "/state/" nodePath
-    --   ts <- Just . parseUTCTimeMS $ filename
-    --   return (nodeId, ts)
     parseTime :: S3.ObjectKey -> Maybe Time.UTCTime
     parseTime (S3.ObjectKey k') = (fmap (parseUTCTimeMS . snd)) . cleanMAC $ k'
     cleanMAC :: T.Text -> Maybe (T.Text, T.Text)

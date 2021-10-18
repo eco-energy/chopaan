@@ -122,6 +122,8 @@ runWithDBPools = do
   let pc = PoolConf 1 20000 1
   sp <- mkDBPools pc host port
   let kp = gremlinPool sp
+  -- Create Influx DB!
+  liftIO $ createDB "chopaanMQTT"
   ns <- liftIO $ arbs @NodeMAC nNodes
   liftIO $ withResource kp  (\c -> addKbtz c kId)
   liftIO $ mapM_ (\n -> withResource kp (\c -> addNodeToKbtz c kId n)) ns
@@ -131,7 +133,6 @@ kbtzSpec :: Spec
 kbtzSpec = do
   aroundAll (TC.withContainers (runWithDBPools)) $ describe "Spiders are great" $ do
     it "qKbtz processor processes all messages!" $ \(ns, db) -> do
-      createDB "chopaanMQTT"
       let sp = (spools db)
       es <- do
         xs'' <- mapM (\i ->
