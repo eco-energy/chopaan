@@ -249,6 +249,7 @@ library
         Chopaan.Kibbutz
         Chopaan.Hydrate
         Chopaan.Hydration.Store
+        Chopaan.Hydration.Prefix
         Chopaan.Kibbutz.KbtzId
         Chopaan.Kibbutz.Kibbutz
         Chopaan.Kibbutz.DataSource
@@ -268,6 +269,7 @@ library
         Chopaan.Utils.Streamly
         Chopaan.Utils.StreamsInterop
         Chopaan.Utils.Time
+        Chopaan.Utils.API
         Data.Selectors
         Data.Influxable
         Data.HList
@@ -323,10 +325,12 @@ library
         Chopaan.Node.NodeT
         Chopaan.Node.SoC
         Chopaan.Node.Storage
+        Chopaan.Hydration.Prefix
         Chopaan.Utils.JSON
         Chopaan.Utils.Retry
         Chopaan.Utils.Streamly
         Chopaan.Utils.Time
+        Chopaan.Utils.API
         Data.Selectors
         Servant.Streamly
         Proto.NodeMessageSchema.NodeMessages
@@ -1180,7 +1184,7 @@ test-suite chopaan-test
         base
     buildable: False
   else
-    ghc-options: -threaded
+    ghc-options: -threaded -with-rtsopts=-N
     build-tool-depends:
         hspec-discover:hspec-discover
     build-depends:
