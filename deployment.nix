@@ -19,8 +19,8 @@ in
     deployment.ec2 = {
       inherit accessKeyId region;
 
-      instanceType = "m6i.large";
-      spotInstancePrice = 04;
+      instanceType = "m6i.xlarge";
+      spotInstancePrice = 05;
       ebsBoot = true;
       ebsInitialRootDiskSize = 100;
 
