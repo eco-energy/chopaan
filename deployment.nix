@@ -7,6 +7,7 @@ let
 in
 {
   network.description = "Chopaan Services And Data Stores.";
+  network.enableRollback = true;
   #chopaan.deployment 
   # = aws;
   chopaan = { config, pkgs, resources, lib, ... }:
@@ -20,7 +21,7 @@ in
       inherit accessKeyId region;
 
       instanceType = "m6i.xlarge";
-      spotInstancePrice = 05;
+      spotInstancePrice = 07;
       ebsBoot = true;
       ebsInitialRootDiskSize = 100;
 

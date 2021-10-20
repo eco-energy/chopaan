@@ -20,7 +20,14 @@ chopaanHaskellPackages.shellFor {
     # You might want some extra tools in the shell (optional).
 
     # Some common tools can be added with the `tools` argument
-    tools = { cabal = "3.2.0.0"; hlint = "2.2.11"; };
+    tools = {
+      cabal =
+        {  version = "3.2.0.0";
+           index-state = "2021-08-13T00:00:00Z";
+           #plan-sha256 = "1hxjlk1fmx9q89wxrbbfsz4g56ldaak2vf52blnv2vrk18ycla32";
+           #materialized = ./nix/chopaan.materialized/cabal;
+        };
+    };
     # See overlays/tools.nix for more details
 
     # Some you may need to get some other way.
