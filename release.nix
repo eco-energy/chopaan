@@ -2,7 +2,7 @@
 let
   sources = import ./nix/sources.nix {};
   haskellNix = import sources."haskell.nix" {};
-  nixpkgsSrc = haskellNix.sources.nixpkgs-2003;
+  nixpkgsSrc = haskellNix.sources.nixpkgs-2009;
   nixpkgsArgs = haskellNix.nixpkgsArgs;
   # import nixpkgs with overlays
   pkgs = import nixpkgsSrc nixpkgsArgs;
