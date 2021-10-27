@@ -164,3 +164,5 @@ type SensorR = SensorMetrics WattSeconds Watts
 defSensorR :: SensorR
 defSensorR = SensorMetrics Nothing 0 mempty mempty mempty 0 zeroMsg
 {-# INLINE defSensorR #-}
+
+
