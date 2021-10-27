@@ -1,68 +1,104 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, TypeApplications #-}
 
 module NodeSpec (spec) where
 
-import Node
+import System.IO.Unsafe
+import Common
+import Chopaan.Node.Metrics
 import Test.Hspec
 import Test.QuickCheck.Classes
 import Test.QuickCheck.Checkers
 import Test.QuickCheck
 import Test.QuickCheck.Instances.Time ()
+import Test.QuickCheck.Arbitrary.Generic
 
 import qualified Streamly.Prelude as S
 import Streamly
 import qualified Streamly.Data.Fold as FL
 
-import Proto.NodeMessages ()
-import Proto.NodeMessages_Fields
+import Proto.NodeMessageSchema.NodeMessages ()
+import Proto.NodeMessageSchema.NodeMessages_Fields
 import Lens.Micro ()
-import Data.ProtoLens.Arbitrary
+--import Data.ProtoLens.Arbitrary
 
+import Data.Aeson as A
+import Data.Text.Encoding.Base64
 import Data.ProtoLens (defMessage)
 import Lens.Micro
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import qualified Data.Time as Time
-import Subscriber (subStream, runSubscriber, Subscriber, StreamMap, getStream, writeSub, mkSub, subMap)
 
 import Control.Concurrent (threadDelay, forkIO)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (isEmptyTChan, dupTChan)
 import Control.Monad (forever, liftM)
-
-import Registry (duplicateS)
-import StateMonitor (initKM, updateKM, readKM)
+import Chopaan.Graph.Greskell
+import Chopaan.Utils.Time
 import Numeric.Compensated
 
-instance Arbitrary EnergyState where
-  arbitrary = arbitraryMessage
+--instance Arbitrary EnergyState where
+--  arbitrary = arbitraryMessage
 
-instance (Arbitrary a) => Arbitrary (Power a) where
-  arbitrary = Power <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary 
-
-instance (Arbitrary a) => Arbitrary (Energy a) where
-  arbitrary = Energy <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+-- instance (Arbitrary a) => Arbitrary (Node a) where
+--   arbitrary = Node <$> arbitrary <*> arbitrary <*> arbitrary 
 
 
---instance (Arbitrary a, Arbitrary b) => Arbitrary (NodeMetrics a b) where
---  arbitrary = NodeMetrics <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
-
-instance (Eq a) => EqProp (Power a) where
+instance (Eq a) => EqProp (Node a) where
   a =-= b = eq a b
 
-instance (Eq a) => EqProp (Energy a) where
-  a =-= b = eq a b
+-- instance (Arbitrary v) => Arbitrary (Node v) where
+--   arbitrary = genericArbitrary
+--   shrink = genericShrink
 
+-- instance (Arbitrary e, Arbitrary p) => Arbitrary (Battery e p) where
+--   arbitrary = genericArbitrary
+--   shrink = genericShrink
+
+-- -- instance (Arbitrary e, Arbitrary p) => Arbitrary (SensorMetrics e p) where
+-- --   arbitrary = genericArbitrary
+-- --   shrink = genericShrink
+
+
+-- instance (Arbitrary e, Arbitrary p) => Arbitrary (SensorMetrics e p) where
+--   arbitrary = genericArbitrary
+--   shrink = genericShrink
 
 spec :: Spec
 spec = do
   describe "This is how we use node streams" $ do
-    it "power is a monoid and an applicative" $ do
-      verboseBatch (monoid (undefined :: (Power Double)))
-      verboseBatch (applicative (undefined :: Power (Double, Double, Double)))
-    it "energy is a monoid and an applicative" $ do
-      verboseBatch (monoid (undefined :: (Energy Double)))
-      verboseBatch (applicative (undefined :: Energy (Double, Double, Double)))
+    it "Node is applicative" $ do
+      verboseBatch (applicative (undefined :: Node (Double, Double, Double)))
+    it "Node is monoidal" $ do
+      verboseBatch (monoid (undefined :: (Node Int)))
+    it "Sensor Metrics can round-trip json" $ do
+      sms <- arbs @(SensorMetrics Double Double) 10
+       -- let p = fromJSON . toJSON
+        --    xs = p <$> sms
+      -- print x
+      -- print y
+      (decode . encode . head $ sms) `shouldBe` (Just . head $ sms)
+    it "time encoding and decoding works" $ (withMaxSuccess 1000 prop_isoSecondUTCTimeWord64)
+
+
+posTime = fmap (fmap posixSecondsToUTCTime) (arbitrary @(NonNegative Time.NominalDiffTime))
+
+prop_isoSecondUTCTimeWord64 :: Property
+prop_isoSecondUTCTimeWord64 = forAll posTime (\(NonNegative a) -> let 
+                                            cond = (utcTimeNow . timeToUIntSeconds $ a)
+                                                   == (a {
+                                                          Time.utctDayTime =
+                                                          Time.secondsToDiffTime . floor . Time.utctDayTime $ a
+                                                         })
+                                            -- debug = unsafePerformIO $ do
+                                            --   print a
+                                            --   print (timeToUIntSeconds a)
+                                            --   print (utcTimeNow . timeToUIntSeconds $ a)
+                                            in cond -- `fseq` debug 
+                                         )
+  where
+    fseq = flip seq
+
 {--    it "a stream at a 1 sec interval with a fixed power has an energy after n steps equivalent to the sum of the powers" $ do
       let
         len = 102 :: Int

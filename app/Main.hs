@@ -12,16 +12,17 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main (main) where
 
-import Import
-import Run
+import Chopaan
+import RIO
 import RIO.Process
+import qualified RIO.Text as T
 import Dhall
-
---import qualified Paths_chopaan
+import Chopaan.Types
+import Paths_chopaan
 
 main :: IO ()
 main = do
-  options <- input auto "./options.dhall" 
+  options <- getOptions
   lo <- logOptionsHandle stderr (logVerbose options)
   pc <- mkDefaultProcessContext
   withLogFunc lo $ \lf ->
@@ -31,3 +32,16 @@ main = do
           , appOptions = options
           }
      in runRIO app run
+
+getOptions :: IO (Options)
+getOptions = do
+  optsPath <- getDataFileName "options.dhall" 
+  caCert <- getDataFileName "certs/ca.cert"
+  cert <- getDataFileName "certs/chopaan.cert.pem"
+  key <- getDataFileName "certs/chopaan.private.key.pem"
+  fileOptions@Options{mqttOpts} <- input auto $ T.pack optsPath
+  return $ fileOptions{
+        mqttOpts=mqttOpts{ certPath = cert
+                         , keyPath = key
+                         , caPath = caCert }
+        }

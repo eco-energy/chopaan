@@ -1,0 +1,431 @@
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, OverloadedStrings, TypeApplications, TypeFamilies, DeriveGeneric, StandaloneDeriving, DeriveAnyClass, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, TupleSections, DerivingStrategies, DerivingVia, BangPatterns, OverloadedLabels, RecordWildCards, DeriveFunctor, QuantifiedConstraints, InstanceSigs, LambdaCase, GeneralizedNewtypeDeriving #-}
+
+module Chopaan.Comm.S3 where
+
+import Control.Lens
+import GHC.Generics hiding (Prefix)
+import Control.Arrow (second)
+import Control.Applicative
+import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.AWS -- (AWST'(..))
+import Control.Monad.Catch
+--import Control.Concurrent.STM
+--import Control.Concurrent.MVar
+
+import Data.Generics.Product
+import Data.Generics.Labels
+import qualified Codec.Winery as W
+import Data.Bifunctor (bimap, first)
+import Data.Bitraversable (bisequence)
+import Data.List (genericTake)
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
+import Data.Time (UTCTime(..))
+import Data.Time.Clock.Compat (nominalDiffTimeToSeconds)
+import Data.Maybe
+import Data.Either
+import Foreign.Storable (Storable)
+
+import Data.Conduit.Combinators (sinkList)
+
+--import Network.AWS
+import qualified Data.Time as Time
+import qualified Data.Time.Clock.POSIX as TP
+import qualified Network.AWS.S3.Types as S3
+import qualified Network.AWS.S3.ListObjectsV2 as S3
+import qualified Network.AWS.S3.GetObject as S3
+
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
+import Data.ProtoLens.Encoding (decodeMessage, encodeMessage)
+import Data.ProtoLens.Message (Message)
+
+import Chopaan.Kibbutz.AWS.Common
+import Chopaan.Node.NodeId
+import Chopaan.Kibbutz.AWS.Things
+import Chopaan.Utils.Time
+import Chopaan.Utils.Retry
+import Chopaan.Types (BufferingOpts(..))
+
+import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
+import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N (cpuTime)
+
+import Data.Int
+import Data.Word
+import qualified Streamly.Prelude as S
+import Streamly.Prelude (IsStream, MonadAsync, adapt)
+import qualified Streamly.Internal.Data.Unfold as UF
+import qualified Streamly.Internal.Data.Unfold.Type as UF
+import qualified Streamly.Internal.Data.Fold as FL
+import qualified Streamly.Internal.Data.Array.Foreign as A
+import qualified Streamly.Internal.Data.Array.Stream.Foreign as A
+import qualified Streamly.Internal.FileSystem.File as FL
+import qualified Streamly.Internal.Data.Stream.IsStream  as S
+import Streamly.Internal.Data.Time.Units
+import qualified Streamly.Internal.Data.Stream.IsStream.Generate as S
+import qualified Streamly.External.ByteString as SBS
+import qualified Streamly.External.ByteString.Lazy as SBL
+import System.Directory
+import qualified System.Remote.Gauge as G
+import qualified System.Remote.Counter as C
+import Streamly.Binary
+
+--import qualified Streamly.Internal.Data.Stream.IsStream  as S
+import Control.Monad.Trans.Resource
+import Chopaan.Comm.Address
+import Chopaan.Comm.Dispatch
+import Chopaan.Comm.Monitor
+import Chopaan.Hydration.Prefix
+
+data HydrationError = DownloadError T.Text | ParsingError T.Text
+  deriving (Show, Generic)
+  deriving (W.Serialise) via (W.WineryVariant (HydrationError))
+
+
+downloadMF :: forall m. (MonadIO m, MonadCatch m)
+                => Env
+                -> S3.BucketName
+                -> S3.ObjectKey
+                -> m (Either SomeException (Either String (MeshFrame), Int))
+downloadMF !env !bucket !n = do
+  obj <- liftIO $ handleAll (pure . Left)
+                            (Right <$> (withAwsEnv env (readObject bucket n)))
+  let mf = (first decodeMessage) <$> obj
+  return $! mf
+{-# INLINE downloadMF #-}
+
+downloadMF' :: forall m. (MonadIO m, MonadCatch m)
+                => Env
+                -> S3.BucketName
+                -> S3.ObjectKey
+                -> m (Either HydrationError (MeshFrame, Int))
+downloadMF' !env !bucket !n = do
+  obj <- liftIO $ handleAll (pure . Left . DownloadError . T.pack . show)
+                            (Right <$> (withAwsEnv env (readObject bucket n)))
+  let mf = (bimap (ParsingError . T.pack . show) id . (\(o, s) -> fmap (, s) $ decodeMessage o))
+        <$> obj
+  return $! (join mf)
+        
+
+
+readObject :: forall m. (MonadIO m, MonadCatch m)
+           => S3.BucketName
+           -> S3.ObjectKey
+           -> AWST' Env (ResourceT m) (BS.ByteString, Int)
+readObject bucket k = timeout 120 $ do
+  !x <- send $ S3.getObject bucket k
+  let byteLen = fromMaybe 0 $ x ^. S3.gorsContentLength
+  !body <- (BS.concat) <$> ((x ^. S3.gorsBody) `sinkBody` sinkList)
+  return $! (body, fromIntegral byteLen) 
+{-# INLINE readObject #-}
+
+-- readObjectUF :: forall m. (MonadIO m, MonadCatch m)
+--            => Env
+--            -> S3.BucketName
+--            -> UF.Unfold m S3.ObjectKey (Either SomeException (A.Array Word8))
+-- readObjectUF env bucket = UF.functionM $ \k -> do
+--   liftIO
+--     $ handleAll (pure . Left)
+--     $ (toArr =<< (withAwsEnv env
+--                   $ recoverC ("paging retry" :: String) 1
+--                   $ timeout 60
+--                   $ send $ S3.getObject bucket k))
+--     where
+--       byteLen x = fromIntegral $ fromMaybe 0 $ x ^. S3.gorsContentLength
+--       toArr x = (pure . Right) -- <$> (prefixWithLength (byteLen x)
+--                 =<< (A.toArray . SBL.toChunks)
+--                 =<< ((x ^. S3.gorsBody) `sinkBody` sinkLazy) --)
+          
+--       -- $ DOWNCASTING FROM INTEGER TO INT HERE IS ONLY OKAY BECAUSE WE ARE BUFFERING
+--       -- $ PROTOBUFS WHICH ARE RATHER SMALL!
+--       -- $ DO NOT USE FOR FILES WITH BYTELENGTHS LONGER THAN INT64!
+      
+
+-- firstPath bucket n = do
+--   o <- send req
+--   return $ o ^? S3.lovrsContents . _head . S3.oKey
+--   where
+--     req = S3.listObjectsV2 bucket
+--           & S3.lovPrefix .~ (s3Prefix n)
+--           & S3.lovMaxKeys .~ (Just 1)
+
+
+-- prefixObjects :: forall m. (MonadIO m, MonadCatch m)
+--   => Env
+--   -> S3.BucketName
+--   -> (Prefix -> S3.ListObjectsV2)
+--   -> UF.Unfold m (Prefix) (S3.ObjectKey, Either SomeException (A.Array Word8)) 
+-- prefixObjects env bucket f = UF.many (s3Paths'' env f) (UF.zipWith (,) (UF.function id) (readObjectUF env bucket))
+
+
+-- nodeUF :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
+--        => Env
+--        -> S3.BucketName
+--        -> (UTCTime, UTCTime)
+--        -> NodeMAC
+--        -> Maybe S3.ObjectKey
+--        -> t m (Either EnergyState RuntimeStats)
+-- nodeUF env bucket (startT, endT) n startAfter = S.mapMaybe process $
+--   S.unfoldMany (prefixObjects env bucket req) $ S.adapt prefixes
+--   where
+--     prefixes = prefixRange Day startT endT
+--     req :: Prefix -> S3.ListObjectsV2
+--     req (Prefix t) = S3.listObjectsV2 bucket
+--           & S3.lovPrefix .~ (timedPrefix n t)
+--           & S3.lovStartAfter .~ (fmap unObject startAfter)
+--     unObject (S3.ObjectKey k) = k
+--     process :: (S3.ObjectKey, Either SomeException (A.Array Word8))
+--             -> Maybe (Either EnergyState RuntimeStats)
+--     process = (onNothing (uncurry validateMF))
+--               . (second (vmE . fmap (decodeMessage . SBS.fromArray)))
+--       where
+--         onNothing :: ((n, a) -> Maybe b) -> ((n, Maybe a) -> Maybe b)
+--         onNothing f = \(n', x) -> (curry f n') =<< x
+--         vmE :: Either x (Either y z) -> Maybe z
+--         vmE e = case e of
+--                   (Left _) -> Nothing
+--                   (Right r) -> case r of
+--                     (Left _) -> Nothing
+--                     Right r' -> Just r'
+
+-- s3Paths :: forall m. (MonadIO m, MonadCatch m)
+--         => UF.Unfold (AWST' Env (ResourceT m)) S3.ListObjectsV2 (S3.ObjectKey)
+-- s3Paths = let
+--   plist = UF.map (((^. S3.oKey) <$>) . (^. S3.lovrsContents)) pageUF
+--   in UF.many plist UF.fromList
+
+
+s3Paths'' :: forall m. (MonadIO m, MonadCatch m)
+        => Env -> (Prefix -> S3.ListObjectsV2) -> UF.Unfold m Prefix (S3.ObjectKey, Int)
+s3Paths'' env f = let
+  plist = UF.map ((fmap (\a -> (a ^. S3.oKey, a ^. S3.oSize))) . (^. S3.lovrsContents))
+    (UF.lmap f $ (pageUFM env))
+  in UF.many plist UF.fromList
+{-# INLINE s3Paths'' #-}
+--s3File :: forall m. (MonadIO m, MonadCatch m)
+--  => UF.Unfold m S3.ObjectKey 
+
+s3Paths' :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
+        => Env -> S3.ListObjectsV2 -> t m S3.ObjectKey
+s3Paths' env req = let
+  plist = S.mapM (pure . ((^. S3.oKey) <$>) . (^. S3.lovrsContents)) (pageS env req)
+  in S.concatMapWith (S.ahead) S.fromList plist
+{-# INLINE s3Paths' #-}
+
+nodeS3Prefix :: (Address n) => n -> Maybe T.Text
+nodeS3Prefix = Just . stateTopic
+
+timedPrefix :: Address n => n -> Prefix -> Maybe T.Text
+timedPrefix n t = (<> ("/" <> (asFileName t))) <$> (nodeS3Prefix n)
+
+worldStart :: MilliSecond64
+worldStart = MilliSecond64 1607478885000
+
+
+nodeMACPath :: NodeMAC -> FilePath
+nodeMACPath = T.unpack . unNodeId
+
+instance HasEncoding S3.ObjectKey where
+  encodeA = encodeA . (toTxt . unObject)
+  decodeA = (fmap (S3.ObjectKey . fromTxt)) . decodeA
+  chunkBytes = chunkBytes @(Txt S3.ObjectKey)
+  
+
+unfoldNodeHydration :: forall t m. (IsStream t, MonadAsync m, MonadCatch m) => NodeMAC -> FilePath -> FilePath -> FilePath -> m (t m (A.Array Word8), t m S3.ObjectKey)
+unfoldNodeHydration n allPaths failedPaths dataPath = undefined
+
+foldNodeHydration :: forall m a e1 e2.
+  (MonadAsync m, MonadCatch m, Message a)
+  => (S3.ObjectKey -> a -> (Txt S3.ObjectKey, PB a))
+  -> FilePath
+  -> FilePath
+  -> (T.Text -> FilePath)
+  -> T.Text
+  -> T.Text
+  -> FL.Fold m (S3.ObjectKey, Either e1 (Either e2 a)) ()
+foldNodeHydration serData dataPath dlDonePath errPath err1Tag err2Tag = fmap (const ())
+  (FL.lmap bimapEncode
+    (FL.partition
+      (encodeFold (errPath err1Tag))
+      (FL.partition
+        (encodeFold (errPath err2Tag))
+        (FL.unzip (encodeFold (dlDonePath)) (encodeFold (dataPath))))))
+  where
+    bimapEncode (p, e) = bimap (const p) (bimap (const p) (serData p)) $ e
+    {-# INLINE bimapEncode #-}
+
+
+data HydrationC n = RootD FilePath
+  | PathD (HydrationC n)
+
+data HydrationDirs = HydrationDirs
+  { prefixFile' :: !FilePath
+  , pathFile' :: !FilePath
+  , pathDir' :: !FilePath
+  , errorDir' :: !FilePath
+  , frameDir' :: !FilePath
+  }
+
+
+dataDir :: T.Text -> FilePath
+dataDir hPrefix = "./data/hydration/" <> (T.unpack hPrefix) <> "/"
+
+fetchDir :: T.Text -> NodeMAC -> FilePath
+fetchDir hPrefix n = dataDir hPrefix <> nodeMACPath n <> "/fetch/" 
+
+prefixFile hPrefix n = fetchDir hPrefix n <> "prefixes"
+
+prefixFetchDir :: T.Text -> NodeMAC -> Prefix -> FilePath
+prefixFetchDir hPrefix n p = fetchDir hPrefix n <> (T.unpack . asFileName $ p)
+
+pathDir :: T.Text -> NodeMAC -> Prefix -> FilePath
+pathDir hPrefix n t = (prefixFetchDir hPrefix n t) <> "/paths/"
+
+pathFile :: T.Text -> NodeMAC -> Prefix -> T.Text -> FilePath
+pathFile hPrefix n t f = pathDir hPrefix n t <> (T.unpack f) 
+
+prefixPathFile hPrefix n t = pathFile hPrefix n t "s3paths"
+
+nodeSavedFile :: T.Text -> NodeMAC -> T.Text -> FilePath
+nodeSavedFile hPrefix n ty = fetchDir hPrefix n <> (T.unpack ty) 
+
+errorDir :: T.Text -> NodeMAC -> Prefix -> FilePath
+errorDir hPrefix n t = (prefixFetchDir hPrefix n t) <> "/errors/"
+
+frameDir :: T.Text -> NodeMAC -> Prefix -> FilePath
+frameDir hPrefix n t = (prefixFetchDir hPrefix n t) <> "/frames/"
+
+
+
+-- For each prefix, we want to fetch the paths that haven't been
+-- fetched yet for the prefix
+prefixStartKey :: (MonadAsync m, MonadCatch m)
+  => T.Text -> NodeMAC -> Prefix -> m (Prefix, Maybe (S3.ObjectKey))
+prefixStartKey hPrefix n t = pure (t, Nothing)
+  -- fmap (t,) $
+  -- (fmap (join @Maybe)) (S.last $ decodeFile (prefixPathFile hPrefix n t))
+
+addC :: (MonadIO m) => C.Counter -> Int -> m ()
+addC c = liftIO . C.add c . fromIntegral
+
+nodeS3 :: forall m. (MonadAsync m, MonadCatch m)
+       => Env
+       -> S3.BucketName
+       -> BufferingOpts
+       -> T.Text
+       -> Monitor
+       -> S.AheadT m (Prefix)
+       -> NodeMAC
+       -> S.AheadT m (S3.ObjectKey, Either EnergyState RuntimeStats)
+nodeS3 env bucket BufferingOpts{..} hPrefix Monitor{..} pfs n = let
+  prefixes :: S.AheadT m (Prefix, Maybe S3.ObjectKey)
+  prefixes = S.tapRate (tapR + 1) (addC numPrefixes)
+    S.|$ S.mapM (prefixStartKey hPrefix n)
+    $ pfs
+  prefixPaths :: Prefix -> Maybe S3.ObjectKey -> S.AheadT m S3.ObjectKey
+  prefixPaths t o = S.tap (savePrefixPath t)
+        S.|$ S.mapM (\(x, y) -> (addC totalDownloadableSize y) >> return x)
+        S.|$ S.unfold (s3Paths'' env (flip req o)) t
+  prefixFrames :: (Prefix, Maybe S3.ObjectKey) -> S.AheadT m (S3.ObjectKey, MeshFrame)
+  prefixFrames (t, o) = S.rights
+        S.|$ S.rights
+        S.|$ S.trace (countErrors)
+        $ S.map (\(!k, !e) -> (fmap (k,)) <$> e)
+        S.|$ S.tapRate (tapR) (addC framesStored)
+        S.|$ S.tapAsync (storeAll t)
+        S.|$ S.tapRate (tapR) (addC downloadedFrames)
+        S.|$ S.fromAhead
+        S.|$ S.mapM addDLSize
+        S.|$ S.mapM (downloadWithErrLog)
+        S.|$ S.tapRate (tapR - 2) (addC discoveredPaths)
+        $ prefixPaths t o
+  in S.maxBuffer frameBuffer
+    $ S.tapRate tapR (\x -> addC secondsElapsed (round tapR) >> addC validated x)
+    $ S.map (second fromJust)
+    $ S.filter (isJust . snd)
+    $ S.map (uncurry validateMF)
+    S.|$ S.concatMapWith (S.ahead) prefixFrames
+    $ prefixes
+  where
+    tapR = 30
+    countErrors = \case
+      Left _ -> (liftIO $ C.inc downloadErrors)
+      Right r -> case r of
+        Left _ ->  (liftIO $ C.inc parsingErrors)
+        Right _ -> return ()
+    savePrefixPath t = (FL.lmap (toTxt . unObject) (encodeFold (prefixPathFile hPrefix n t)))
+    addDLSize = \(n', x) -> case x of
+      Left l -> return $ (n', Left l)
+      Right (a, s) -> do
+        _ <- (addC downloadedSize s)
+        return $ (n', Right a)
+    np = (T.unpack . unNodeId $ n)
+    req prefix startAfter = S3.listObjectsV2 bucket
+          & S3.lovPrefix .~ (timedPrefix n prefix)
+          & S3.lovStartAfter .~ (fmap unObject startAfter)
+    downloadWithErrLog :: S3.ObjectKey
+      -> m (S3.ObjectKey, Either SomeException (Either String MeshFrame, Int)) 
+    downloadWithErrLog p = (((p,)) <$> downloadMF env bucket p)
+    storeAll t = foldNodeHydration @m @MeshFrame (curry (bimap (toTxt . unObject) toPB))
+            dataPath dlDonePath errPath err1Tag err2Tag
+            where
+              dlDonePath = pathFile hPrefix n t "success"
+              dataPath = (frameDir hPrefix n t) <> "meshframe"
+              errPath tag = (errorDir hPrefix n t) <> (T.unpack tag)
+              err1Tag = "downloadError"
+              err2Tag = "parsingError"
+
+
+createPrefixDirs hPrefix n t = do
+  cd (errorDir hPrefix n t)
+  cd (frameDir hPrefix n t)
+  cd (pathDir hPrefix n t)
+
+cd :: MonadIO m => FilePath -> m () 
+cd = liftIO . createDirectoryIfMissing True
+
+unObject :: S3.ObjectKey -> T.Text
+unObject (S3.ObjectKey k) = k
+{-# INLINE unObject #-}
+
+validateMF ::
+  S3.ObjectKey
+  -> MeshFrame
+  -> (S3.ObjectKey, Maybe (Either EnergyState RuntimeStats))
+validateMF k m = case accessEnergyState m of
+                     Just !e -> (k, Just . Left $ fixGridTS t e)
+                     Nothing ->
+                       case accessRTS m of
+                         Just !r -> (k, Just . Right $ fixMeshTS t r)
+                         Nothing -> (k, Nothing)
+  where
+    t = parseTime k
+    parseTime :: S3.ObjectKey -> Maybe Time.UTCTime
+    parseTime (S3.ObjectKey k') = (fmap (parseUTCTimeMS . snd)) . cleanMAC $ k'
+    cleanMAC :: T.Text -> Maybe (T.Text, T.Text)
+    cleanMAC = Just . (T.breakOnEnd ("/")) . (T.replace " " "")
+{-# INLINE validateMF #-}
+
+
+fixGridTS :: Maybe UTCTime
+          -> EnergyState
+          -> EnergyState
+fixGridTS Nothing r = r
+fixGridTS (Just t) r = case r ^? N.cpuTime of
+    Nothing -> r & N.cpuTime .~ (timeToUIntSeconds t)
+    (Just t') -> case (t' == 0) of
+      True -> r & N.cpuTime .~ (timeToUIntSeconds t)
+      False -> r
+{-# INLINE fixGridTS #-}
+
+fixMeshTS :: Maybe UTCTime
+          -> RuntimeStats
+          -> RuntimeStats
+fixMeshTS Nothing r = r
+fixMeshTS (Just t) r = case r ^? N.cpuTime of
+    Nothing -> r & N.cpuTime .~ (timeToUIntSeconds t)
+    (Just t') -> case (t' == 0) of
+      True -> r & N.cpuTime .~ (timeToUIntSeconds t)
+      False -> r
+{-# INLINE fixMeshTS #-}

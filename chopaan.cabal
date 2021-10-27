@@ -1,10 +1,8 @@
-cabal-version: 2.0
+cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: c1d3a546e769d6a0be18b05e9d0bfa3740373658280c7630207ec9689be54871
 
 name:           chopaan
 version:        0.1.0.0
@@ -16,223 +14,1189 @@ maintainer:     faez.shakil@gmail.com
 copyright:      2019 Faez Shakil
 license:        BSD3
 license-file:   LICENSE
-build-type:     Custom
+build-type:     Simple
 extra-source-files:
     README.md
     ChangeLog.md
-    node_message_schema/NodeMessages.proto
+    assets/style.css
+    assets/tailwind.min.css
+data-files:
+    options.dhall
 
 source-repository head
   type: git
   location: https://github.com/faezs/chopaan
 
-custom-setup
-  setup-depends:
-      Cabal
-    , base
-    , proto-lens-setup
+flag prod
+  description: Build for production
+  manual: True
+  default: False
 
 library
   exposed-modules:
-      Import
-      Mqtt
-      Node
-      NodeOpts
-      Registry
-      Run
-      SoC
-      StateMonitor
-      Storage
-      Subscriber
-      Transactor
-      Types
-      UI
-      UI.Types
-      Proto.NodeMessages
-      Proto.NodeMessages_Fields
+      Chopaan.API.Kbtz
+      Chopaan.Graph.Algebraic
   other-modules:
       Paths_chopaan
-  autogen-modules:
-      Proto.NodeMessages
-      Proto.NodeMessages_Fields
   hs-source-dirs:
       src
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
-  build-tool-depends:
-      proto-lens-protoc:proto-lens-protoc
   build-depends:
-      ad
+      Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-template
+    , Shpadoinkle-widgets
+    , ad
+    , adjunctions
     , aeson
-    , amazonka
-    , amazonka-iot
+    , algebraic-graphs >=0.5
+    , async
+    , barbies
     , base >=4.11 && <10
-    , brick
+    , base64
+    , binary
     , bytestring
     , cassava
+    , clay
+    , colour
+    , comonad
     , compensated
-    , concat-classes
-    , connection
+    , constraints-extras
     , containers
     , convertible
     , data-default-class
-    , dhall >=1.24.0
+    , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib >=1.4.4
+    , diagrams-svg >=1.4.3
+    , dimensional
     , directory
     , distributive
+    , envy
     , estimator
+    , exceptions
+    , file-embed
+    , filepath
+    , generic-data
+    , generic-lens
+    , ghc-prim
+    , ghcjs-dom
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
     , hashable
-    , hmatrix
+    , haxl
+    , higgledy
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
     , keys
-    , linear
+    , lens
+    , linear >=1.21.6
     , microlens
-    , microlens-th
+    , monad-bayes
+    , monad-control
     , mtl
-    , net-mqtt
-    , network-uri
-    , numeric-limits
+    , network >=3.1.2.1
+    , newtype-generics
+    , one-liner
+    , optparse-applicative
+    , pointed
     , proto-lens
     , proto-lens-runtime
+    , raw-strings-qq
+    , regex-applicative
+    , resource-pool
+    , resourcet
+    , retry
     , rio >=0.1.8.0
+    , safe-exceptions
+    , servant
+    , servant-client-js
     , stm
-    , stm-containers
-    , streamly
+    , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
     , text
     , time
-    , time-lens
-    , tls
-    , total-map
+    , time-compat >=1.9.2.2
+    , transformers
+    , transformers-base
     , ulid
+    , unagi-chan
+    , unliftio
+    , unliftio-core
     , unordered-containers
     , vector
-    , vty
-    , x509-store
-    , x509-validation
+    , vector-sized
+  if !impl(ghcjs)
+    build-depends:
+        amazonka
+      , amazonka-core
+      , amazonka-iot
+      , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
+      , composite-ekg
+      , concat-classes
+      , concat-examples
+      , concat-graphics
+      , concat-plugin
+      , concurrent-dns-cache >=0.1.3
+      , conduit
+      , connection
+      , dhall >=1.33.0
+      , directory-tree
+      , dns
+      , ekg
+      , ekg-core
+      , fusion-plugin >=0.2.3
+      , greskell-websocket >=0.1.2.5
+      , http-client
+      , http-client-tls
+      , http-types
+      , influxdb >=1.9.0
+      , katip
+      , net-mqtt ==0.7.0.1
+      , net-spider
+      , network-uri
+      , sbv
+      , servant-client
+      , servant-client-core
+      , servant-js
+      , servant-server
+      , servant-websockets
+      , tls
+      , unix
+      , vinyl
+      , wai
+      , wai-cors
+      , wai-extra
+      , warp
+      , websockets
+      , winery >=1.3.2
+      , wreq
+      , x509-store
+      , x509-validation
+    if flag(prod)
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    else
+      ghc-options: -fdicts-strict -O1
+  else
+    build-depends:
+        ghcjs-base
+  if !impl(ghcjs)
+    exposed-modules:
+        Chopaan
+        Chopaan.Client
+        Chopaan.API.History
+        Chopaan.Graph
+        Chopaan.Graph.Greskell
+        Chopaan.Graph.G
+        Chopaan.Graph.Snapshot
+        Chopaan.CRUD
+        Chopaan.Ui.Base
+        Chopaan.Ui.Events
+        Chopaan.Ui.AddKbtz
+        Chopaan.Ui.Foreign.Utils
+        Chopaan.Ui.Foreign.WebSocket
+        Chopaan.Ui.FormCommon
+        Chopaan.Ui.Grable
+        Chopaan.Ui.GraphView
+        Chopaan.Ui.ImageV
+        Chopaan.Ui.Style
+        Chopaan.Ui.WebGL
+        Chopaan.Ui.WebSocket
+        Chopaan.Ui.ThreeD
+        Chopaan.Ui.Interaction
+        Chopaan.Ui.Timeline
+        Chopaan.Ui.Tables
+        Chopaan.UiTypes
+        Chopaan.View
+        Chopaan.Monad.Env
+        Chopaan.Node.Calibration
+        Chopaan.Node.Components
+        Chopaan.Node.Folds
+        Chopaan.Node.HW
+        Chopaan.Node.Mesh
+        Chopaan.Node.Metrics
+        Chopaan.Node.Node
+        Chopaan.Node.NodeId
+        Chopaan.Node.NodeOpts
+        Chopaan.Node.NodeSensors
+        Chopaan.Node.NodeT
+        Chopaan.Node.SoC
+        Chopaan.Node.Storage
+        Chopaan.Node.Structure
+        Chopaan.Node.Tf
+        Chopaan.Comm.Address
+        Chopaan.Comm.Dispatch
+        Chopaan.Comm.Comm
+        Chopaan.Comm.Mqtt
+        Chopaan.Comm.Mqtt.AWS
+        Chopaan.Comm.Queues
+        Chopaan.Comm.S3
+        Chopaan.Comm.Monitor
+        Chopaan.Comm.Socket
+        Chopaan.Graph.Kbtz
+        Chopaan.Graph.Spider
+        Chopaan.Graph.VI
+        Chopaan.Haxl.Kbtz
+        Chopaan.Kibbutz
+        Chopaan.Hydrate
+        Chopaan.Hydration.Store
+        Chopaan.Hydration.Prefix
+        Chopaan.Kibbutz.KbtzId
+        Chopaan.Kibbutz.Kibbutz
+        Chopaan.Kibbutz.DataSource
+        Chopaan.Kibbutz.Transactor
+        Chopaan.Kibbutz.Allocate
+        Chopaan.Kibbutz.AWS.Common
+        Chopaan.Kibbutz.AWS.Things
+        Chopaan.Kibbutz.LinOpt
+        Chopaan.Kibbutz.Registry
+        Chopaan.Kibbutz.Serve
+        Chopaan.Run
+        Chopaan.Server
+        Chopaan.Testing
+        Chopaan.Types
+        Chopaan.Utils.JSON
+        Chopaan.Utils.Retry
+        Chopaan.Utils.Streamly
+        Chopaan.Utils.StreamsInterop
+        Chopaan.Utils.Time
+        Chopaan.Utils.API
+        Data.Selectors
+        Data.Influxable
+        Data.HList
+        Data.BTreeIndex
+        Data.BTreeIndex.Types
+        Kbtz
+        Proto.NodeMessageSchema.NodeMessages
+        Proto.NodeMessageSchema.NodeMessages_Fields
+        Servant.Streamly
+        SimNode
+        Streamly.Binary
+        TxModel
+    install-includes:
+        src/Chopaan/Node/UpdateInst.inc
+  else
+    exposed-modules:
+        Chopaan.Types
+        Chopaan.Client
+        Chopaan.API.History
+        Chopaan.Graph.Greskell
+        Chopaan.Graph.G
+        Chopaan.Graph
+        Chopaan.Graph.Snapshot
+        Chopaan.CRUD
+        Chopaan.Ui.Base
+        Chopaan.Ui.Events
+        Chopaan.Ui.AddKbtz
+        Chopaan.Ui.Foreign.Utils
+        Chopaan.Ui.Foreign.WebSocket
+        Chopaan.Ui.FormCommon
+        Chopaan.Ui.Grable
+        Chopaan.Ui.GraphView
+        Chopaan.Ui.Style
+        Chopaan.Ui.WebGL
+        Chopaan.Ui.WebSocket
+        Chopaan.Ui.ThreeD
+        Chopaan.Ui.Interaction
+        Chopaan.Ui.Timeline
+        Chopaan.UiTypes
+        Chopaan.View
+        Chopaan.Kibbutz.KbtzId
+        Chopaan.Kibbutz.Transactor
+        Chopaan.Monad.Env
+        Chopaan.Node.Calibration
+        Chopaan.Node.Components
+        Chopaan.Node.Folds
+        Chopaan.Node.HW
+        Chopaan.Node.Mesh
+        Chopaan.Node.Metrics
+        Chopaan.Node.Node
+        Chopaan.Node.NodeId
+        Chopaan.Node.NodeSensors
+        Chopaan.Node.NodeT
+        Chopaan.Node.SoC
+        Chopaan.Node.Storage
+        Chopaan.Hydration.Prefix
+        Chopaan.Utils.JSON
+        Chopaan.Utils.Retry
+        Chopaan.Utils.Streamly
+        Chopaan.Utils.Time
+        Chopaan.Utils.API
+        Data.Selectors
+        Servant.Streamly
+        Proto.NodeMessageSchema.NodeMessages
+        Proto.NodeMessageSchema.NodeMessages_Fields
+    hs-source-dirs:
+        src
+    install-includes:
+        src/Chopaan/Node/UpdateInst.inc
   default-language: Haskell2010
 
-executable chopaan-exe
+executable dashgen
+  main-is: DashGen.hs
+  hs-source-dirs:
+      app
+  build-depends:
+      Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-template
+    , Shpadoinkle-widgets
+    , ad
+    , adjunctions
+    , aeson
+    , algebraic-graphs >=0.5
+    , async
+    , barbies
+    , base >=4.11 && <10
+    , base64
+    , binary
+    , bytestring
+    , cassava
+    , clay
+    , colour
+    , comonad
+    , compensated
+    , constraints-extras
+    , containers
+    , convertible
+    , data-default-class
+    , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib >=1.4.4
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , envy
+    , estimator
+    , exceptions
+    , file-embed
+    , filepath
+    , generic-data
+    , generic-lens
+    , ghc-prim
+    , ghcjs-dom
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
+    , hashable
+    , haxl
+    , higgledy
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
+    , keys
+    , lens
+    , linear >=1.21.6
+    , microlens
+    , monad-bayes
+    , monad-control
+    , mtl
+    , network >=3.1.2.1
+    , newtype-generics
+    , one-liner
+    , optparse-applicative
+    , pointed
+    , proto-lens
+    , proto-lens-runtime
+    , raw-strings-qq
+    , regex-applicative
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , safe-exceptions
+    , servant
+    , servant-client-js
+    , stm
+    , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , transformers
+    , transformers-base
+    , ulid
+    , unagi-chan
+    , unliftio
+    , unliftio-core
+    , unordered-containers
+    , vector
+    , vector-sized
+  if !impl(ghcjs)
+    build-depends:
+        amazonka
+      , amazonka-core
+      , amazonka-iot
+      , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
+      , composite-ekg
+      , concat-classes
+      , concat-examples
+      , concat-graphics
+      , concat-plugin
+      , concurrent-dns-cache >=0.1.3
+      , conduit
+      , connection
+      , dhall >=1.33.0
+      , directory-tree
+      , dns
+      , ekg
+      , ekg-core
+      , fusion-plugin >=0.2.3
+      , greskell-websocket >=0.1.2.5
+      , http-client
+      , http-client-tls
+      , http-types
+      , influxdb >=1.9.0
+      , katip
+      , net-mqtt ==0.7.0.1
+      , net-spider
+      , network-uri
+      , sbv
+      , servant-client
+      , servant-client-core
+      , servant-js
+      , servant-server
+      , servant-websockets
+      , tls
+      , unix
+      , vinyl
+      , wai
+      , wai-cors
+      , wai-extra
+      , warp
+      , websockets
+      , winery >=1.3.2
+      , wreq
+      , x509-store
+      , x509-validation
+    if flag(prod)
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    else
+      ghc-options: -fdicts-strict -O1
+  else
+    build-depends:
+        ghcjs-base
+  if impl(ghcjs)
+    buildable: False
+  else
+    build-depends:
+        base
+      , bytestring
+      , chopaan
+      , grafana
+      , optparse-simple
+      , text
+  default-language: Haskell2010
+
+executable hydrate
+  main-is: Hydrate.hs
+  other-modules:
+      Paths_chopaan
+  hs-source-dirs:
+      app
+  build-depends:
+      Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-template
+    , Shpadoinkle-widgets
+    , ad
+    , adjunctions
+    , aeson
+    , algebraic-graphs >=0.5
+    , async
+    , barbies
+    , base >=4.11 && <10
+    , base64
+    , binary
+    , bytestring
+    , cassava
+    , clay
+    , colour
+    , comonad
+    , compensated
+    , constraints-extras
+    , containers
+    , convertible
+    , data-default-class
+    , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib >=1.4.4
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , envy
+    , estimator
+    , exceptions
+    , file-embed
+    , filepath
+    , generic-data
+    , generic-lens
+    , ghc-prim
+    , ghcjs-dom
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
+    , hashable
+    , haxl
+    , higgledy
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
+    , keys
+    , lens
+    , linear >=1.21.6
+    , microlens
+    , monad-bayes
+    , monad-control
+    , mtl
+    , network >=3.1.2.1
+    , newtype-generics
+    , one-liner
+    , optparse-applicative
+    , pointed
+    , proto-lens
+    , proto-lens-runtime
+    , raw-strings-qq
+    , regex-applicative
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , safe-exceptions
+    , servant
+    , servant-client-js
+    , stm
+    , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , transformers
+    , transformers-base
+    , ulid
+    , unagi-chan
+    , unliftio
+    , unliftio-core
+    , unordered-containers
+    , vector
+    , vector-sized
+  if !impl(ghcjs)
+    build-depends:
+        amazonka
+      , amazonka-core
+      , amazonka-iot
+      , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
+      , composite-ekg
+      , concat-classes
+      , concat-examples
+      , concat-graphics
+      , concat-plugin
+      , concurrent-dns-cache >=0.1.3
+      , conduit
+      , connection
+      , dhall >=1.33.0
+      , directory-tree
+      , dns
+      , ekg
+      , ekg-core
+      , fusion-plugin >=0.2.3
+      , greskell-websocket >=0.1.2.5
+      , http-client
+      , http-client-tls
+      , http-types
+      , influxdb >=1.9.0
+      , katip
+      , net-mqtt ==0.7.0.1
+      , net-spider
+      , network-uri
+      , sbv
+      , servant-client
+      , servant-client-core
+      , servant-js
+      , servant-server
+      , servant-websockets
+      , tls
+      , unix
+      , vinyl
+      , wai
+      , wai-cors
+      , wai-extra
+      , warp
+      , websockets
+      , winery >=1.3.2
+      , wreq
+      , x509-store
+      , x509-validation
+    if flag(prod)
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    else
+      ghc-options: -fdicts-strict -O1
+  else
+    build-depends:
+        ghcjs-base
+  if !impl(ghcjs)
+    build-depends:
+        base
+      , chopaan
+      , optparse-simple
+    buildable: True
+    if flag(prod)
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -O2 -fmax-worker-args=16 -fspec-constr-recursive=16 -with-rtsopts=-N -threaded -rtsopts -eventlog
+    else
+      ghc-options: -rtsopts -fdicts-strict -O1 -threaded -eventlog
+  else
+    buildable: False
+  default-language: Haskell2010
+
+executable kbtzim
   main-is: Main.hs
   other-modules:
       Paths_chopaan
   hs-source-dirs:
       app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
-  build-tool-depends:
-      proto-lens-protoc:proto-lens-protoc
   build-depends:
-      ad
+      Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-template
+    , Shpadoinkle-widgets
+    , ad
+    , adjunctions
     , aeson
-    , amazonka
-    , amazonka-iot
-    , base
-    , brick
+    , algebraic-graphs >=0.5
+    , async
+    , barbies
+    , base >=4.11 && <10
+    , base64
+    , binary
     , bytestring
     , cassava
-    , chopaan
+    , clay
+    , colour
+    , comonad
     , compensated
-    , concat-classes
-    , connection
+    , constraints-extras
     , containers
     , convertible
     , data-default-class
-    , dhall >=1.24.0
+    , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib >=1.4.4
+    , diagrams-svg >=1.4.3
+    , dimensional
     , directory
     , distributive
+    , envy
     , estimator
+    , exceptions
+    , file-embed
+    , filepath
+    , generic-data
+    , generic-lens
+    , ghc-prim
+    , ghcjs-dom
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
     , hashable
-    , hmatrix
+    , haxl
+    , higgledy
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
     , keys
-    , linear
+    , lens
+    , linear >=1.21.6
     , microlens
-    , microlens-th
+    , monad-bayes
+    , monad-control
     , mtl
-    , net-mqtt
-    , network-uri
-    , numeric-limits
-    , optparse-simple
+    , network >=3.1.2.1
+    , newtype-generics
+    , one-liner
+    , optparse-applicative
+    , pointed
     , proto-lens
     , proto-lens-runtime
+    , raw-strings-qq
+    , regex-applicative
+    , resource-pool
+    , resourcet
+    , retry
     , rio >=0.1.8.0
+    , safe-exceptions
+    , servant
+    , servant-client-js
     , stm
-    , stm-containers
-    , streamly
+    , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
     , text
     , time
-    , time-lens
-    , tls
-    , total-map
+    , time-compat >=1.9.2.2
+    , transformers
+    , transformers-base
     , ulid
+    , unagi-chan
+    , unliftio
+    , unliftio-core
     , unordered-containers
     , vector
-    , vty
-    , x509-store
-    , x509-validation
+    , vector-sized
+  if !impl(ghcjs)
+    build-depends:
+        amazonka
+      , amazonka-core
+      , amazonka-iot
+      , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
+      , composite-ekg
+      , concat-classes
+      , concat-examples
+      , concat-graphics
+      , concat-plugin
+      , concurrent-dns-cache >=0.1.3
+      , conduit
+      , connection
+      , dhall >=1.33.0
+      , directory-tree
+      , dns
+      , ekg
+      , ekg-core
+      , fusion-plugin >=0.2.3
+      , greskell-websocket >=0.1.2.5
+      , http-client
+      , http-client-tls
+      , http-types
+      , influxdb >=1.9.0
+      , katip
+      , net-mqtt ==0.7.0.1
+      , net-spider
+      , network-uri
+      , sbv
+      , servant-client
+      , servant-client-core
+      , servant-js
+      , servant-server
+      , servant-websockets
+      , tls
+      , unix
+      , vinyl
+      , wai
+      , wai-cors
+      , wai-extra
+      , warp
+      , websockets
+      , winery >=1.3.2
+      , wreq
+      , x509-store
+      , x509-validation
+    if flag(prod)
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    else
+      ghc-options: -fdicts-strict -O1
+  else
+    build-depends:
+        ghcjs-base
+  if !impl(ghcjs)
+    build-depends:
+        base
+      , chopaan
+      , optparse-simple
+    buildable: True
+    if flag(prod)
+      ghc-options: -fdicts-strict -O2 -with-rtsopts=-N -threaded -rtsopts -eventlog
+    else
+      ghc-options: -rtsopts -fdicts-strict -O1 -threaded -eventlog
+  else
+    buildable: False
+  default-language: Haskell2010
+
+executable server
+  main-is: Server.hs
+  hs-source-dirs:
+      app
+  build-depends:
+      Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-template
+    , Shpadoinkle-widgets
+    , ad
+    , adjunctions
+    , aeson
+    , algebraic-graphs >=0.5
+    , async
+    , barbies
+    , base >=4.11 && <10
+    , base64
+    , binary
+    , bytestring
+    , cassava
+    , clay
+    , colour
+    , comonad
+    , compensated
+    , constraints-extras
+    , containers
+    , convertible
+    , data-default-class
+    , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib >=1.4.4
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , distributive
+    , envy
+    , estimator
+    , exceptions
+    , file-embed
+    , filepath
+    , generic-data
+    , generic-lens
+    , ghc-prim
+    , ghcjs-dom
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
+    , hashable
+    , haxl
+    , higgledy
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
+    , keys
+    , lens
+    , linear >=1.21.6
+    , microlens
+    , monad-bayes
+    , monad-control
+    , mtl
+    , network >=3.1.2.1
+    , newtype-generics
+    , one-liner
+    , optparse-applicative
+    , pointed
+    , proto-lens
+    , proto-lens-runtime
+    , raw-strings-qq
+    , regex-applicative
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , safe-exceptions
+    , servant
+    , servant-client-js
+    , stm
+    , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , transformers
+    , transformers-base
+    , ulid
+    , unagi-chan
+    , unliftio
+    , unliftio-core
+    , unordered-containers
+    , vector
+    , vector-sized
+  if !impl(ghcjs)
+    build-depends:
+        amazonka
+      , amazonka-core
+      , amazonka-iot
+      , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
+      , composite-ekg
+      , concat-classes
+      , concat-examples
+      , concat-graphics
+      , concat-plugin
+      , concurrent-dns-cache >=0.1.3
+      , conduit
+      , connection
+      , dhall >=1.33.0
+      , directory-tree
+      , dns
+      , ekg
+      , ekg-core
+      , fusion-plugin >=0.2.3
+      , greskell-websocket >=0.1.2.5
+      , http-client
+      , http-client-tls
+      , http-types
+      , influxdb >=1.9.0
+      , katip
+      , net-mqtt ==0.7.0.1
+      , net-spider
+      , network-uri
+      , sbv
+      , servant-client
+      , servant-client-core
+      , servant-js
+      , servant-server
+      , servant-websockets
+      , tls
+      , unix
+      , vinyl
+      , wai
+      , wai-cors
+      , wai-extra
+      , warp
+      , websockets
+      , winery >=1.3.2
+      , wreq
+      , x509-store
+      , x509-validation
+    if flag(prod)
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    else
+      ghc-options: -fdicts-strict -O1
+  else
+    build-depends:
+        ghcjs-base
+  if impl(ghcjs)
+    buildable: False
+  else
+    other-modules:
+        Paths_chopaan
+    build-depends:
+        base
+      , chopaan
+      , optparse-simple
+    if flag(prod)
+      ghc-options: -fdicts-strict -O2 -with-rtsopts=-N -threaded
+    else
+      ghc-options: -fdicts-strict -O1 -threaded
   default-language: Haskell2010
 
 test-suite chopaan-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      KMSpec
+      APISpec
+      Common
+      DNSCacheSpec
+      GraphSpec
+      HydraSpec
+      KbtzSpec
       NodeSpec
-      RegistrySpec
+      SpiderSpec
       StorageSpec
-      SubscriberSpec
+      ThreeDSpec
       TransactorSpec
       Paths_chopaan
   hs-source-dirs:
       test
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
-  build-tool-depends:
-      proto-lens-protoc:proto-lens-protoc
   build-depends:
-      QuickCheck
+      Shpadoinkle >=0.3.0.0
+    , Shpadoinkle-backend-pardiff
+    , Shpadoinkle-backend-snabbdom
+    , Shpadoinkle-console
+    , Shpadoinkle-html
+    , Shpadoinkle-lens
+    , Shpadoinkle-router
+    , Shpadoinkle-template
+    , Shpadoinkle-widgets
     , ad
+    , adjunctions
     , aeson
-    , amazonka
-    , amazonka-iot
+    , algebraic-graphs >=0.5
+    , async
+    , barbies
     , base >=4.11 && <10
-    , brick
+    , base64
+    , binary
     , bytestring
     , cassava
-    , checkers
-    , chopaan
+    , clay
+    , colour
+    , comonad
     , compensated
-    , concat-classes
-    , connection
+    , constraints-extras
     , containers
     , convertible
     , data-default-class
-    , dhall >=1.24.0
+    , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib >=1.4.4
+    , diagrams-svg >=1.4.3
+    , dimensional
     , directory
     , distributive
+    , envy
     , estimator
+    , exceptions
+    , file-embed
+    , filepath
+    , generic-data
+    , generic-lens
+    , ghc-prim
+    , ghcjs-dom
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
     , hashable
-    , hmatrix
-    , hspec
+    , haxl
+    , higgledy
+    , interpolatedstring-perl6
+    , jsaddle >=0.9.7.1
     , keys
-    , linear
+    , lens
+    , linear >=1.21.6
     , microlens
-    , microlens-th
+    , monad-bayes
+    , monad-control
     , mtl
-    , net-mqtt
-    , network-uri
-    , numeric-limits
+    , network >=3.1.2.1
+    , newtype-generics
+    , one-liner
+    , optparse-applicative
+    , pointed
     , proto-lens
-    , proto-lens-arbitrary
     , proto-lens-runtime
-    , quickcheck-instances
+    , raw-strings-qq
+    , regex-applicative
+    , resource-pool
+    , resourcet
+    , retry
     , rio >=0.1.8.0
+    , safe-exceptions
+    , servant
+    , servant-client-js
     , stm
-    , stm-containers
-    , streamly
+    , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
     , text
     , time
-    , time-lens
-    , tls
-    , total-map
+    , time-compat >=1.9.2.2
+    , transformers
+    , transformers-base
     , ulid
+    , unagi-chan
+    , unliftio
+    , unliftio-core
     , unordered-containers
     , vector
-    , vty
-    , x509-store
-    , x509-validation
+    , vector-sized
+  if !impl(ghcjs)
+    build-depends:
+        amazonka
+      , amazonka-core
+      , amazonka-iot
+      , amazonka-s3
+      , cas-hashable
+      , cas-store >=1.1.0
+      , composite-ekg
+      , concat-classes
+      , concat-examples
+      , concat-graphics
+      , concat-plugin
+      , concurrent-dns-cache >=0.1.3
+      , conduit
+      , connection
+      , dhall >=1.33.0
+      , directory-tree
+      , dns
+      , ekg
+      , ekg-core
+      , fusion-plugin >=0.2.3
+      , greskell-websocket >=0.1.2.5
+      , http-client
+      , http-client-tls
+      , http-types
+      , influxdb >=1.9.0
+      , katip
+      , net-mqtt ==0.7.0.1
+      , net-spider
+      , network-uri
+      , sbv
+      , servant-client
+      , servant-client-core
+      , servant-js
+      , servant-server
+      , servant-websockets
+      , tls
+      , unix
+      , vinyl
+      , wai
+      , wai-cors
+      , wai-extra
+      , warp
+      , websockets
+      , winery >=1.3.2
+      , wreq
+      , x509-store
+      , x509-validation
+    if flag(prod)
+      ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    else
+      ghc-options: -fdicts-strict -O1
+  else
+    build-depends:
+        ghcjs-base
+  if impl(ghcjs)
+    build-depends:
+        base
+    buildable: False
+  else
+    ghc-options: -threaded -with-rtsopts=-N
+    build-tool-depends:
+        hspec-discover:hspec-discover
+    build-depends:
+        QuickCheck
+      , checkers
+      , chopaan
+      , generic-arbitrary
+      , hspec >=2.8.2
+      , hspec-golden-aeson
+      , hspec-wai
+      , proto-lens-arbitrary
+      , quickcheck-instances
+      , quickspec
+      , testcontainers
   default-language: Haskell2010

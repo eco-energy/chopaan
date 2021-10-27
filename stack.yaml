@@ -35,8 +35,8 @@ packages:
 # forks / in-progress versions pinned to a git hash. For example:
 #
 extra-deps:
- - git: https://github.com/conal/concat.git
-   commit: 6da06f44947ea8909fa3d60e94a238f7bc998bb6
+ - git: https://github.com/faezs/concat.git
+   commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
    subdirs:
      - inline
      - known
@@ -46,9 +46,49 @@ extra-deps:
      - examples
      - graphics
      - hardware
- - amazonka-1.6.1@sha256:d863557379350ed6bbb91187abeb8c349a654f60b140d138710486f58ae7c476,3536
- - amazonka-iot-1.6.1@sha256:b15ae9efd7b35a8817a4578a68baa22202b42946381862053f68e1417a189ae4,8169
- - amazonka-core-1.6.1@sha256:9bc59ce403c6eeba3b3eaf3f10e5f0b6a33b6edbbf8f6de0dd6f4c67b86fa698,5135
+   # nix-sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
+ - git: https://github.com/faezs/net-spider.git
+   commit: 831f10df821a299e6a79331dee8931e517bdffd4
+   subdirs:
+     - net-spider
+   # nix-sha256: 1dg2vv5ci2s1m6qx37mhgqpjv8xqp9c4w7cv2dvk4db5gnd6svay
+ - git: https://github.com/Fresheyeball/Shpadoinkle.git
+   commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
+   subdirs:
+     - core
+     - backends/pardiff
+     - backends/static
+     - html
+     - widgets
+     - router
+     - lens
+     - disembodied
+     - template
+     - backends/snabbdom
+     - console
+ - git: https://github.com/composewell/streamly.git
+   commit: 4f629b8cb36bd03b480edc08b77c9a0187ce2206
+   # nix-sha256: 1ag6lqr74c1ml0vmai7a1b28dyf149pv3mhpg06kp27sawl71sy2
+ - git: https://github.com/faezs/testcontainers-hs.git
+   commit: 9c83f9d11a1a55d30b6dc75d3f266cf5f275ee40
+   # nix-sha256: 0lbkh1m2y472hkvs0cqcgl6hxxn6anrpk0wd4dkk8v9k0b4k15fy
+ - git: https://github.com/wrl314/pool.git
+   commit: ecdfffe5dbaa51fb943c8734cebfc43fbe76583a
+   # nix-sha256: 09dksahyd0rwvlqkncj12nivmc6x6prqzpj9qjfgc9j9vcbz25s7
+ - git: https://github.com/faezs/grafana.git
+   commit: 5589a62c3a54638446a93d18c703ba5f7e2e22b3
+   # nix-sha256: 1cb0vpwy8pk2r57ikxpq4yavkjqd3wm7xdf730pbmszybb02jk3l
+ - git: https://github.com/Lysxia/generic-recursion-schemes.git
+   commit: 692505969c5774ab5f6c26be3c9b53c2d19d46c3
+ - git: https://github.com/brendanhay/amazonka.git
+   commit: 11379d44b0cb189f44a9854287eb9ca5a6703576
+   subdirs:
+     - amazonka
+     - amazonka-iot
+     - core
+     - amazonka-s3
+   
+ - base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
  - net-mqtt-0.7.0.1
  - ulid-0.2.0.0@sha256:ac415298b0272479909ca576f4444862ae942ed85c7849fa0675e3bf496be6f3,2485
  - crockford-0.2@sha256:6ec593711a20bd4b81a0fc13f3d850d2d890690941d777230fbf980c483e434a,553
@@ -60,25 +100,111 @@ extra-deps:
  - primitive-unlifted-0.1.3.0@sha256:a98f827740f5dcf097d885b3a47c32f4462204449620abc9d51b8c4f8619f9e6,1427
  - random-fu-multivariate-0.1.2.1@sha256:b8b3adcdb01269480b3d28dae1e9c9a040834b9974c434d6996d3e1545c4d4f7,1439
  - estimator-1.2.0.0@sha256:44c85267299ea1e3eeb3e4eb9f317e4972563c84ba8220924c834a99b9048960,2424
- - streamly-bytestring-0.1.0.1@sha256:aa522c22f992e70d005acbd7d4dba555b6a8b8f43f29cddba16fbeeb39f3e992,2471
  - language-glsl-0.3.0@sha256:85c1e7bf2cf5d6e604b7a2899c27e2935033425944db200798e57849e64d4c81,1636
  - numeric-limits-0.1.0.0@sha256:214bb53112bff315e42c0e9efa4a89e2cc2e9914e6232d923b596f29f9b1afe6,456
  - total-map-0.1.3@sha256:081b917276323564e6d6ebaaf20c14d8ffc0a260cf3f29113c2577f774a272f1,983
  - semiring-num-1.6.0.4@sha256:ea73b7ec4980add625dedfe159dbeea9a37aa540a2a9df0f36263455b1654cc1,2943
  - key-0.1.2.0@sha256:3bdfda94f99b8f2e01498ddf5f704cd84ce93315b532df50420ded94cbf5ba2e,1767
- - streamly-0.7.2@sha256:173a415316e230e2117365dcd0432f1a7992d42c89b79017df57c9f6581205e3,27421
  - fusion-plugin-types-0.1.0@sha256:0f11bbc445ab8ae3dbbb3d5d2ea198bdb1ac020518b7f4f7579035dc89182438,1506
+ - dependent-map-0.2.4.0@sha256:21d35c1eba3f2afa3af3c4c5d8998fd14ac76f596f951c280bd83d1d5a19ae28,1739
+ - dependent-sum-0.4
+ - monad-bayes-0.1.1.0@sha256:57d96f530a37a1c8efed0830c7f2bcf86da05d0d53324aebdd5b5aa165d72829,5132
+ - geodetics-0.1.0@sha256:699c10cd8d69222b125d054cdc8e2bcee7cb0558c78fa1b4fa06b2d3ecf29f5c,2387
+ - hgeometry-0.9.0.0@sha256:43043574d2ce39c543dfadb629ab3a41fe65d7bf68a1426d8d01312818bc6e4e,9702
+ - hgeometry-combinatorial-0.9.0.0@sha256:a03b48302d8c542ff2ff90ba5d45f2742cc21ed1a676c8fa4870cd461a273354,7367
+ - fusion-plugin-0.2.3@sha256:edb97d5c2ecd99d3a3ad3eccebbfb44ec1fafb7b48a8c2dfb77896066d8ea1b6,2354
+ - perfect-vector-shuffle-0.1.1.1@sha256:8656a3f1f491d1d79aba9e0a5dbb08589613202b08c7a9b92570d6bec7390093,3668
+ - servant-websockets-2.0.0@sha256:6e9e3600bced90fd52ed3d1bf632205cb21479075b20d6637153cc4567000234,2253
+ - servant-client-js-0.1.0.0@sha256:e066d7cb57e0c29e8171206bb979dca27f9ba690c70b1bb606ab5baa80e36549,1013
+ - servant-rawm-server-1.0.0.1@sha256:bdbc14572a3ca58a8468b1ea1ccb160d77aa56702007c19b55e01e0a4a87ef11,1869
+ - servant-rawm-1.0.0.0@sha256:abee186db4f9eaeaf66bc6a442abfdc27ca31871f8e945c8b74244cded001836,1380
+ - compactable-0.1.2.3@sha256:1dccae8bcf6aa4cfd01e2fd0ec36c98d6efdd3247b6ab1a49a7cfdede4d27d95,1707
+ - ghcjs-dom-0.9.4.0
+ - ghcjs-dom-jsaddle-0.9.4.0
+ - http2-1.6.5@sha256:f1743ba4a267f525106c218894e4bd2acf28fa047a9ba660b4a317a97382a877,13999
+ - jsaddle-0.9.7.1@sha256:711e48fa92c04d373fc18f058743dd9a53aecd048c851a47c932ff7d9bff2c82,4418
+ - jsaddle-dom-0.9.4.1
+ - jsaddle-warp-0.9.7.0@sha256:2499b761254df1935f95e73285b59de1933d39e405baa76190cb14f9ddf2a687,2712
+ - ref-tf-0.4.0.2@sha256:69de3550250e0cd69f45d080359cb314a9487c915024349c75b78732bbee9332,1134
+ - warp-3.2.28@sha256:b32fb8fed7ace4bd206fd897c388c00cdb915ec7e34ee61dc6397d518d9e651c,11186
+ - twee-lib-2.2@sha256:9fe9327505d8f450a94f2fc9eea74b292901b7992d520aa1dd4f0410fbe0e594,2112
+ - quickspec-2.1.5
+ - suavemente-0.2.0.0
+ - diagrams-lib-1.4.4
+ - diagrams-core-1.5.0
+ - diagrams-svg-1.4.3@sha256:7b4eefffba2b25267eea25155dded4309a153a965eebf16923d289bb797ac3a6
+ - diagrams-contrib-1.4.4@sha256:4f767211b35c60a018534c23cee1b00f560df999c111e5a2c1629d6fcac077d6
+ - diagrams-graphviz-1.4.1.1@sha256:e71afa8f89904c2a6a2cb490dba7108c6425779c2174b90bd90dbaf507a9d3dc,1388
+ - dual-tree-0.2.3.0
+ - force-layout-0.4.0.6@sha256:4adae4a45a09a9378ea87930f082a968767a2bc95f6b2122e11966c57046a01c
+ - active-0.2.0.15
+ - newtype-generics-0.6@sha256:ac08e4b6caff80c8310649581ffba887e9d65b659c8b5697feaf32cf135b6c68,2010
+ - beam-core-0.9.0.0
+ - beam-postgres-0.5.0.0
+ - beam-migrate-0.5.0.0
+ #- net-spider-0.4.3.6
+ - data-interval-2.0.1@sha256:e5a8705d15a14d56791fbc1cdb90fdcc434bc084f938c096e70a3194a442b444,2393
+ - extended-reals-0.2.4.0@sha256:c1c815b8d8763b22566c7877b43a5e9e748b09b753d63096604c61102146d6f0,1621
+ - algebraic-graphs-0.5@sha256:6eeec5ed1687ff7aa916e7bf9f02f51aaabde6f314dc0b7b1a84156974d7da73,8071
+ - dhall-1.38.0@sha256:c0ee9503c367b22d8c1ab23bec0c46d2920589e212eb545dd2d46536895df78e,35080
+ - cborg-json-0.2.2.0@sha256:cd4bff2a672b75642e9108a50487de49dafcbd91dbef2876390a625fb75c6ac1,2113
+ - prettyprinter-1.7.0@sha256:6a9569e21fa61163a7f066d23d701e23e917893e8f39733d6e617ec72787ae5f,6007
+ - repline-0.4.0.0@sha256:3324479e497d27c40c3d4762bffc52058f9921621d20d2947dcf9a554b94cd0d,2253
+ - haskeline-0.8.1.1@sha256:21c0d6bd9f36a8b0cfbceab30820f4fe4ac72535c4d2cdf217123d816a4e494e,5818
+ - greskell-websocket-0.1.2.5@sha256:1e2a9db2dac540452744940cdddd4f659a02c1667089e46cdd9c201e273dc459,5332
+ - greskell-1.2.0.1@sha256:a330a20f5dcf6b28eda7bc301b44322470c3493dcd5c09c176f8c37b6aad9144,6674
+ - greskell-core-0.1.3.6@sha256:8542953d972ff074db69ebc51fb5cdde3743c4c3bf18a43085c39444ab2d0f6d,3602
+ - network-3.1.2.1@sha256:188d6daea8cd91bc3553efd5a90a1e7c6d0425fa66a53baa74db5b6d9fd75c8b,4968
+ - ghc-byteorder-4.11.0.0.10@sha256:d47fdef63f2a145091e91b1aedbd46bf61ca03bb935e81e3462a1d904c319de3,1594
+ - constraints-extras-0.3.1.0@sha256:c70fcf437e1d640cfd50a8eda1db47a64e49c96857e08fd0d8c438327d908ac1,1846
+ - html-parse-0.2.0.2@sha256:268c6c3a723aae77ff799bf501d60a91e60536facab3ae70df7a74cea75e29c3,3898
+ - ghcjs-base-stub-0.3.0.2@sha256:1ce3ac155173b8036873ad990d3ed86137a643264fb6dad294a935a32e1105a2,3669
+ - derive-storable-0.3.0.0@sha256:819332e8dd666ec88dab17e3aca0cffced197c1a560f5a003789a9372e7f07f1,2299
+ - aeson-optics-1.1.0.1@sha256:730de585030e820cc3ade10d756f257be846d891028942b8c545a8498e6b5580,1629
+ - exceptions-0.10.4@sha256:d2546046d7ba4b460d3bc7fd269cd2c52d0b7fb3cfecc038715dd0881b78a484,2796
+ - resourcet-1.2.4.2@sha256:d57516781d1721f70aa0b9ec8ea9200ab02bf76349cb76d73ad57729302289cc,1730
+ - indexed-profunctors-0.1.1@sha256:363e1bcd89f8498a770ae783e8388fcce35e6515b4c38dca47327aad81196a7b,1063
+ - optics-extra-0.3
+ - indexed-traversable-instances-0.1@sha256:3aaf97040001bbe583e29c2b9c7d41660df265e6565a0d2ac09a3ed5b8bc21be,2874
+ - optics-core-0.3.0.1@sha256:50845a47810eb5a5f03dfa9bb1edd8a577fc7ca1702ba4bde68b235f7cb44528,4536
+ - indexed-traversable-0.1.1@sha256:e330ec1ab336ee2fb1eff117ebe3480d1663396fecd981f185b7123dc7941ae1,2469
+ - vector-0.12.3.0@sha256:0ae2c1ba86f0077910be242ec6802cc3d7725fe7b2bea6987201aa3737b239b5,7953
+ - linear-1.21.6
+ - base-orphans-0.8.4@sha256:9a70dc95761ab9a9d49a038a4599b7b7945d486d80ed1678f347445bc336f3e0,3149
+ - monoid-extras-0.6@sha256:fabcab0a59ac48d8f271016cf8190b21969b202c760df2db85add2fef93d38b4,2197
+ - hspec-2.8.3@sha256:43a42e23994a6c61a7adead7e8a412016680234f5a14a157f68c020871e59534,1709
+ - hspec-core-2.8.3@sha256:e4c1e08e16842804c470c2b4722e417ed2a556a47a74107401ad42195522f7a7,4992
+ - hspec-discover-2.8.3@sha256:b94758b375b5a810ea4c4c187381211c3acc77007f6f795c4e79f206ed6da56a,2025
+ - streamly-bytestring-0.1.3
+ - winery-1.3.2@sha256:c2289c82301a69df026c86ea31f14d76509309c30fb29fe7e7712ec45d36c2cc,2677
+ - barbies-2.0.3.0@sha256:cb400bf207b333d08b3882f6796a52fcd79eeb4924b09dc9b1157124f1cb5dc2,4407
+ - barbies-th-0.1.8@sha256:2855c0f80c683ad30295370e5d9e786d909355695054ae4126ae61ea5c7779c4,1085
+ - prettyprinter-ansi-terminal-1.1.2
+ - concurrent-dns-cache-0.1.3@sha256:aa90bbd66c325cb27d6ac3124027ffc86e1ecb1ec03dc9f095c1bff5381c5a50,2457
+ #- z3-408.2@sha256:1f8b6ccbcc6d06a6701900a09fcfcbaf86ed8a8495615710bef4da5cdb073a3f,4226
+ - ghc-events-0.16.0@sha256:ae0115dcf24b1b44ee62009ea377d4f816c53cd585b86541329f104012cececa,3788
+ - hvega-0.11.0.1@sha256:0631812a1f849ac3f55fe6f2d4108d023a17118f14ffec085ead2d3c35e5c057,11183
+ - statistics-linreg-0.3@sha256:95c6efe6c7f6b26bc6e9ada90ab2d18216371cf59a6ef2b517b4a6fd35d9a76f,2544
+ - trie-simple-0.4.1.1@sha256:f5a377053f869f34196178475932732242f73351a7f52c81df2f1d340e6f070a,2581
+ - influxdb-1.9.2
+ - composite-ekg-0.7.5.0@sha256:f211845509635f614f18a4b10e96701649c2ea098033099e0c1c2a97b10619fe,1375
+ - composite-base-0.7.5.0@sha256:3c754bca3a1a673e1f0ba9fa88850dd8c650b5a7140dc5afca09bb86e4843c17,2955
+ - cas-store-1.1.0@sha256:00175fd67f55582c593a57673f2c02d30b63ed9716a6fe415c6fbe3c9fd996d9,2752
+ - cas-hashable-1.0.1@sha256:fa10169aa9c58566eb3bfcda3fb62d76390ea43d8cdcc0878ab0dae2c93ba325,1548
+ - store-0.7.12
+ - one-liner-1.0
+ - higgledy-0.4.1.1@sha256:103701c8080ec345a21edd3ef149b4d3b8ec66a12a82d3d0b5c5e4a0d7d6ac26,2238
+ - generic-lens-2.2.0.0@sha256:4008a39f464e377130346e46062e2ac1211f9d2e256bbb1857216e889c7196be,3867
+ - generic-lens-core-2.2.0.0@sha256:b6b69e992f15fa80001de737f41f2123059011a1163d6c8941ce2e3ab44f8c03,2913
+ # Override default flag values for local packages and extra-deps
 
+flags:
+  concat-examples:
+    smt: False
 
- # - acme-missiles-0.3
-# - git: https://github.com/commercialhaskell/stack.git
-#   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
-#
-# extra-deps: []
+allow-newer: false
 
-# Override default flag values for local packages and extra-deps
-# flags: {}
-
+    
 # Extra package databases containing global packages
 # extra-package-dbs: []
 

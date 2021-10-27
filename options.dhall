@@ -1,19 +1,20 @@
 
 let BatteryType : Type = < LAFlooded | LASealed | LIon >
+let Resolution : Type =  < Second | Ten | Ten2 | Ten3 | Ten4 | Ten5 | Ten6 | Ten7 >
 
-{- let TxStart : Type = < Immediately | WithDelay Int > -}
+in
 
-in { logVerbose = True
-, mqttOpts = { connId = "chopaan-pilot-1"
-             , mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
+{ logVerbose = True
+
+, mqttOpts = { mqttURI = "mqtts://a1e7lyi19kctcn-ats.iot.ap-southeast-1.amazonaws.com"
              , certPath = "certs/chopaan.cert.pem"
              , keyPath = "certs/chopaan.private.key.pem"
              , caPath = "certs/ca.cert.pem"
              }
-, nodeOpts = [
+, nodeOpts = [ 
            { macAddress = "abcdefghi"
-           , battery = [{
-               _type = BatteryType.LAFlooded
+           , battery = [
+             { _type = BatteryType.LAFlooded
              , cutOffVoltage = 11.5
              , maxV = 13.0
              , ampHours = 150.0
@@ -27,11 +28,32 @@ in { logVerbose = True
            }
   ]
 , kibbutzOpts = { name = "kibbutz-pilot-node" }
-{- , transactions = { sender = "abcdefghi"
-                 , reciever = "abcdefghi"
-                 , power = "100"
-                 , duration = "60"
-                 , repeatFor = 20
-                 , start = WithDelay 20
-                 } -}
+, dbOpts = { host = "timescale"
+           , port = +5432
+           , database = "chopaan"
+           , user = "chopaan"
+           , password = "testPassword" --"3423dssgSSS$%@!!01G"
+           }
+, hydrationOpts = { start = { day = +1
+                            , month = +9
+                            , year = +2021
+                            }
+                   , end = { day = +15
+                           , month = +9
+                           , year = +2021
+                           }
+                   , s3BucketName = "dosti-datastream"
+                   , dbSave = False
+                   , resolution = Resolution.Ten3
+                   , bufOpts = { prefixBuffer = +10
+                               , pathBuffer = +100
+                               , frameBuffer = +100
+                               , nodeBuffer = +10
+                               }
+                   , hPrefix = "test2"
+                   }
+, poolConf = { pNumStripes = +5
+             , reaperWait =  5.0
+             , maxConnsPerStripe = Natural/toInteger 25
+             }
 }

@@ -1,0 +1,55 @@
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+module Chopaan.Node.Node (
+  -- scans
+  nodeS, SensorR, energyS, powerS, timeS
+  -- folds
+  , sensorFold, energyFold, powerFold, timeFold
+  ) where
+
+
+import Proto.NodeMessageSchema.NodeMessages
+
+import Streamly
+import qualified Streamly.Prelude as S
+
+
+import Chopaan.Node.Folds
+import Chopaan.Node.Metrics
+
+{--------------------------------------------------------------------------------------------------------------
+
+                                          Streams of Folds
+---------------------------------------------------------------------------------------------------------------}
+
+
+powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m PowerNR
+powerS = S.postscan powerFold
+{-# INLINE powerS #-}
+
+
+energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m EnergyNR
+energyS = S.postscan energyFold
+{-# INLINE energyS #-}
+
+nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m SensorR
+nodeS = S.postscan sensorFold
+{-# INLINE nodeS #-}
+
+timeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
+timeS = S.postscan timeFold
+{-# INLINE timeS #-}
