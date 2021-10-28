@@ -102,7 +102,6 @@ run = do
   tc <- liftIO $ execParser tkOptions
   liftIO $ forkServer "localhost" 8111
   liftIO $ createDB "chopaanMQTT"
-  liftIO $ runGraphM poolConf tc $ do
-    sp <- spools <$> ask
-    ks <- (runKbtzim @S.AheadT mqttOpts hydrationOpts)
-    S.drain $ S.fromAhead ks
+  liftIO $ runGraphM poolConf tc $
+    S.drain . S.fromAhead =<< (runKbtzim @S.AheadT mqttOpts hydrationOpts)
+    

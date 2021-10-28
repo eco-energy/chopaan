@@ -69,6 +69,7 @@ import Chopaan.Utils.Retry
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
 import Chopaan.Node.Metrics hiding (Timestamp)
+import Chopaan.Node.Storage.Battery
 import Chopaan.Node.Folds
 import Chopaan.Node.Mesh
 import Debug.Trace

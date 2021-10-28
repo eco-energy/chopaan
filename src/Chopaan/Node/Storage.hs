@@ -10,14 +10,25 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric, ApplicativeDo, GADTs, TypeOperators #-}
-{-# LANGUAGE StrictData #-}
-module Chopaan.Node.Storage where
+{-# LANGUAGE StrictData, BangPatterns #-}
+module Chopaan.Node.Storage ( initBP
+                            , estimatorStep
+                            , BatteryParams(..)
+                            , defBatteryParams
+                            , ParamType
+                            , SensorVector(..)
+                            , StateVector(..)
+                            , KF
+                            , runKF
+                            , initialSOC
+                            ) where
 
 import Numeric.Estimator.KalmanFilter
 import Numeric.Estimator.Augment
 import Numeric.Estimator.Model.Symbolic ()
 import Numeric.Estimator.Class
 
+import Data.Monoid
 import GHC.Generics (Generic)
 
 import Control.Monad.Bayes.Class hiding (gamma)
@@ -28,6 +39,8 @@ import Data.Foldable ()
 import Data.Traversable ()
 import Linear
 import Numeric.AD
+
+import Chopaan.Node.Storage.Battery
 --import Numeric.AD.Internal.Reverse ()
 
 --import ConCat.Interval
@@ -72,9 +85,11 @@ defBatteryParams = BatteryParams
 
 
 -- $ Create Battery Parameters at a certain AmpH of capacity
-initBP :: Double -> BatteryParams Double
-initBP cc = defBatteryParams {chargeCapacity = ampHToWS cc}
+initBP :: Double -> (BatteryParams Double, Battery Double Double)
+initBP cc = (bp, b)
   where
+    bp = defBatteryParams { chargeCapacity = ampHToWS cc }
+    b = (Battery 0 0 0 0) { totalCapacity = ampHToWS cc }
     ampHToWS a = (a * 12) * (60 * 60)
 {-# INLINE initBP #-}
 
@@ -171,13 +186,15 @@ type ParamType a = (Real a, RealFrac a, Floating a, Ord a, Enum a)
 -- | $           Kalman Filter Process Model
 -- | ----------------------------------------------------------------------------
 
+type BatteryProcessModel state sensor s = ((ParamType s)
+  => BatteryParams s
+  -> s
+  -> s  -- time since last process model update
+  -> AugmentState state sensor s -- prior (augmented) state
+  -> AugmentState state sensor s) -- posterior (augmented) state
 
-processModel :: forall a. (ParamType a)
-  => BatteryParams a
-  -> a
-  -> a  -- time since last process model update
-  -> AugmentState StateVector SensorVector a -- prior (augmented) state
-  -> AugmentState StateVector SensorVector a -- posterior (augmented) state
+
+processModel :: forall s. (ParamType s) => BatteryProcessModel StateVector SensorVector s
 processModel bp w_k dt
   (AugmentState st@StateVector{..} sensor@SensorVector{..}) = AugmentState state' $ sensor'
   where
@@ -213,23 +230,26 @@ i_rkn BatteryParams{..} delT i_rkp i_k =  (expTerm * i_rkp) + ((1 - expTerm) * i
 {-# INLINE i_rkn #-}
 
 
+--type SocOcv = socToOCV <-> ocvToSoC 
+
 soCtoOCV :: (ParamType a) => BatteryParams a -> a -> a
-soCtoOCV BatteryParams{..} soc = intervals !! index
+soCtoOCV BatteryParams{chargeCapacity} soc = intervals !! index
   where
     index = mod (round (soc / chargeCapacity)) 10
     intervals = [11.61, 11.76, 11.91, 12.06, 12.20, 12.34, 12.47, 12.60, 12.72, 12.83]
 {-# INLINE soCtoOCV #-}
 
 ocvToSoC :: forall a. (ParamType a) => BatteryParams a -> a -> a
-ocvToSoC BatteryParams{..} v_t = socPercentage * chargeCapacity
+ocvToSoC BatteryParams{chargeCapacity} terminalVoltage = (roundDown terminalVoltage) * chargeCapacity
   where
-    socPercentage :: a
-    socPercentage = roundDown v_t
     intervals = zip [0.0, 0.1 .. 1.0] [11.61, 11.76, 11.91, 12.06, 12.20, 12.34, 12.47, 12.60, 12.72, 12.83]
     roundDown v = goTillGreaterThan v intervals
-    goTillGreaterThan _ [] = 1.0
-    goTillGreaterThan v ((i, v'):xs) = if v > v' then (goTillGreaterThan v xs) else i
 {-# INLINE ocvToSoC #-}
+
+goTillGreaterThan :: forall a. (ParamType a) => a -> [(a, a)] -> a
+goTillGreaterThan _ [] = 1.0
+goTillGreaterThan v ((i, v'):xs) = if v > v' then (goTillGreaterThan v xs) else i
+
 
 -- | ESC output equation computes voltage
 --   v_k = OCV(z_k) + M (h_k) + M0 * s_k - sim (R_i i_rk - R0*ik)
@@ -299,16 +319,25 @@ initDynamic = (pure (0 :: a))
 
 type KF a = KalmanFilter StateVector a
 
+runKF :: forall a. (Num a, Ord a) => Battery a a -> KF a -> Battery a a
+runKF bat (KalmanFilter (StateVector{..}) _) = bat
+        { soc = clamp 0 100 soC
+        }
+initialSOC :: ParamType v => BatteryParams v -> v -> KF v
+initialSOC bat v = initKF $ initDynamic {
+  soC = ocvToSoC bat v
+  }
+
 type Cov a = StateVector (StateVector a)
 
 
-
+initKF :: (ParamType v) => StateVector v -> KalmanFilter StateVector v
 initKF s = KalmanFilter s initCov
 {-# INLINE initKF #-}
 
 
-runEstimator :: forall a. (ParamType a) => BatteryParams a -> a -> SensorVector a -> KF a -> (KF a, KI a)
-runEstimator battery dt sensorReadings@SensorVector{..} prior =
+estimatorStep' :: forall a. (ParamType a) => BatteryParams a -> a -> SensorVector a -> KF a -> (KF a, KI a)
+estimatorStep' battery dt sensorReadings@SensorVector{..} prior =
   let
     w_k = 0.5
     procNoise = processNoise
@@ -325,8 +354,28 @@ runEstimator battery dt sensorReadings@SensorVector{..} prior =
     --model :: _
     model noise = EKFProcess $ processModel (auto <$> battery) (auto noise) (auto dt)
     --testInno = KalmanInnovation
-{-# INLINE runEstimator #-}
+{-# INLINEABLE estimatorStep' #-}
 
+
+estimatorStep :: forall m a. (ParamType a, MonadSample m) => BatteryParams a -> a -> SensorVector a -> KF a -> m (KF a, KI a)
+estimatorStep battery dt sensorReadings@SensorVector{..} prior = do
+  procNoise <- procDist
+  senNoise <- senDist
+  let
+    w_k = 0.5
+    processPosterior = --prior --processModel battery w_k dt
+      augmentProcess (model w_k) sensorReadings (scaled procNoise) (scaled senNoise) prior
+    (innovation, measurePosterior) = ic processPosterior
+  return $ (measurePosterior, innovation)
+  where
+    ic processPosterior = --(testInno (pure 0) (pure . pure $ 0), processPosterior)
+      innovationCorrection sensorPred initSensorCov processPosterior
+    sensorPred = sensorPrediction battery sensorReadings
+    --pm = processModel battery 0.5 dt
+    --model :: _
+    model noise = EKFProcess $ processModel (auto <$> battery) (auto noise) (auto dt)
+{-# INLINEABLE estimatorStep #-}
+    --testInno = KalmanInnovation
 
 -- runEstimator' :: forall m a. (MonadSample m, ParamType a) => BatteryParams a -> a -> SensorVector a -> KalmanState m a (KI a)
 -- runEstimator' battery dt sensorReadings@SensorVector{..} = do
@@ -390,3 +439,12 @@ sensorPrediction battery SensorVector{..} = SensorVector
 innovationCorrection :: (ParamType a) => SensorVector (a, KM a) -> CovM a -> KF a -> (KI a, KF a)
 innovationCorrection measurementModel obsCov prior = measure measurementModel obsCov prior
 {-# INLINE innovationCorrection #-}
+
+
+runTime :: ParamType a => Battery a p -> SensorVector a -> a
+runTime !Battery{soc} !SensorVector{..} = soc / ((normC sensorCurrent) * sensorTerminalV)
+  where
+    normC c
+      | c >= 0 = c
+      | c < 0 = 0.05
+      | otherwise = error "neither greater nor less than nor equal to zero"

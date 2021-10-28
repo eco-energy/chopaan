@@ -41,6 +41,7 @@ import Chopaan.Types
 import Chopaan.Graph
 import Chopaan.Node.NodeId
 import Chopaan.Node.Metrics
+import Chopaan.Node.Storage.Battery
 import Chopaan.Node.Mesh
 import Chopaan.Kibbutz.Transactor
 import Chopaan.Comm.S3

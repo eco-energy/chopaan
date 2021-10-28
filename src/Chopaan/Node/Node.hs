@@ -22,9 +22,10 @@ module Chopaan.Node.Node (
   ) where
 
 
+import Control.Monad.Bayes.Class
 import Proto.NodeMessageSchema.NodeMessages
 
-import Streamly
+import Streamly.Prelude (MonadAsync, IsStream)
 import qualified Streamly.Prelude as S
 
 
@@ -37,19 +38,19 @@ import Chopaan.Node.Metrics
 ---------------------------------------------------------------------------------------------------------------}
 
 
-powerS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m PowerNR
+powerS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m PowerNR
 powerS = S.postscan powerFold
 {-# INLINE powerS #-}
 
 
-energyS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m EnergyNR
+energyS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m EnergyNR
 energyS = S.postscan energyFold
 {-# INLINE energyS #-}
 
-nodeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m SensorR
+nodeS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m SensorR
 nodeS = S.postscan sensorFold
 {-# INLINE nodeS #-}
 
-timeS :: (MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
+timeS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
 timeS = S.postscan timeFold
 {-# INLINE timeS #-}

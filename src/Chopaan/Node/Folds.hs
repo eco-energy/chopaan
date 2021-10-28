@@ -10,16 +10,18 @@ LANGUAGE ScopedTypeVariables
 , QuantifiedConstraints
 , CPP
 , StrictData
+, MultiParamTypeClasses
+, FunctionalDependencies
 #-}
 module Chopaan.Node.Folds where
 
-import qualified Streamly.Data.Fold as FL
-import qualified Streamly.Data.Fold as FL
+import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Data.Fold.Tee as FL
 
 import Data.Time
 import Data.Bifunctor
 import Numeric.Estimator (KalmanFilter(..))
+import Control.Monad.Bayes.Class hiding (gamma)
 
 #ifndef ghcjs_HOST_OS
 import ConCat.Misc (R)
@@ -27,6 +29,7 @@ import ConCat.Misc (R)
 
 import Chopaan.Node.NodeId (NodeMAC)
 import Chopaan.Node.Storage
+import Chopaan.Node.Storage.Battery
 import Chopaan.Node.Metrics
 import Chopaan.Utils.Time
 
@@ -102,40 +105,54 @@ energyFold = fmap fst $ FL.foldl' step begin
         Node{..} = p
 {-# INLINE energyFold #-}
 
-batteryFold :: forall m e p. (Monad m)
+type Unop a = a -> a
+
+batteryFold :: forall m e p. (MonadSample m)
   => BatteryParams R -> FL.Fold m EnergyState (Battery WattSeconds Watts)
-batteryFold !bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts) $ fmap end $ FL.foldl' step begin
+batteryFold !bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts)
+  $ fmap (flip end emptyB)
+  $ FL.foldlM' step begin
   where
     {-# INLINE step #-}
     step :: (Maybe UTCTime, Maybe (KF R))
       -> EnergyState
-      -> (Maybe UTCTime, Maybe (KF R))
-    step (!t, !pkf) !sensorReadings = let
-        (!kf, _) = runEstimator bat (tdiff t) (storageSensors sensorReadings)
-          (guestimateInitialSOC pkf)
-      in (Just tnow, Just kf)
+      -> m (Maybe UTCTime, Maybe (KF R))
+    step (!t, !pkf) !sensorReadings = (\kf -> return (Just tnow, Just (fst kf)))
+      =<< (estimatorStep bat (tdiff t) (storageSensors sensorReadings) (initialSOC' pkf))
       where
-        guestimateInitialSOC (Just !k) = k
-        guestimateInitialSOC Nothing = initKF (initDynamic {
-          soC = ocvToSoC bat (sensorTerminalV . storageSensors $ sensorReadings)
-          })
+        initialSOC' (Just !k) = k
+        initialSOC' Nothing = initialSOC bat (sensorTerminalV . storageSensors $ sensorReadings)
         !tnow = utcTimeES sensorReadings
         tdiff (!Just t') = realToFrac $ diffUTCTime tnow t'
         tdiff Nothing = 0
     {-# INLINE begin #-}
-    begin :: (Maybe UTCTime, Maybe (KF R))
-    begin = (Nothing, Nothing)
+    begin :: m (Maybe UTCTime, Maybe (KF R))
+    begin = pure (Nothing, Nothing)
     {-# INLINE end #-}
-    end :: (Maybe UTCTime, Maybe (KF R)) -> Battery R R
-    end (_, (!Just (KalmanFilter (StateVector{..}) _))) = (emptyB @R @R)
-        { soc = clamp 0 99.9 soC
-        , totalCapacity = chargeCapacity bat
-        }
-    end (_, (Nothing)) = emptyB @R @R
+    end :: (Maybe UTCTime, Maybe (KF R)) -> Unop (Battery R R)
+    end (_, (!Just kf)) = \b -> runKF b kf
+    end (_, (Nothing)) = const (emptyB @R @R)
 {-# INLINE batteryFold #-}
 
+newtype Likelihood = Likelihood Double
 
-sensorFold :: forall m. (Monad m) => FL.Fold m (EnergyState) (SensorMetrics WattSeconds Watts) 
+class FilterState s a | s -> a where
+  initialState :: s
+  singleStep :: a -> Filter s a
+  likelihood :: s -> a -> Likelihood
+
+type Filter s a = s -> a -> (s, a)
+
+filterF :: forall m s a. (Monad m, Monoid a) => Int -> Filter s a -> s -> FL.Fold m a (s, a)
+filterF session f s = (FL.take session (FL.mkFold_ step start))
+  where
+    start :: FL.Step (s, a) (s, a)
+    start = FL.Partial (s, mempty) 
+    step :: (s, a) -> a -> FL.Step (s, a) (s, a)
+    step (s', _) a''' = FL.Partial (f s' a''')
+
+
+sensorFold :: forall m. (Monad m, MonadSample m) => FL.Fold m (EnergyState) (SensorMetrics WattSeconds Watts) 
 sensorFold = FL.toFold $ SensorMetrics
              <$> FL.Tee (fst <$> timeFold)
              <*> FL.Tee (snd <$> timeFold)

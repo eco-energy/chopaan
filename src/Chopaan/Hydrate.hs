@@ -46,6 +46,8 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Catch
 import Control.Monad.IO.Class
+import Control.Monad.Bayes.Class
+import Control.Monad.Bayes.Sampler
 import Control.Lens
 import Control.Concurrent
 import Control.Concurrent.Async
@@ -234,17 +236,17 @@ mkKbtzConf (HydrationConf{s3Bucket
   KbtzConf env (S3.BucketName s3Bucket) store name manOrSesh (toUTC startDate) lifetime wp (pastRes, futureRes) parHow
 
 runHydration :: TinkerConf -> HydrationConf -> IO ()
-runHydration tk conf = do
-  kns <- runGraphM (PoolConf 1 1 1) tk getKNs
-  manConf <- parseManagerConf
+runHydration tk conf = runGraphM (PoolConf 1 1 1) tk $ do
+  kns <- getKNs
+  manConf <- liftIO $ parseManagerConf
   sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
-  parConf <- parseParStrategy
-  kbtzim <- atomically $ mkTKbtz kns
+  parConf <- liftIO $ parseParStrategy
+  kbtzim <- liftIO $ atomically $ mkTKbtz kns
   aws <- getAwsEnv S3.s3
   man <- newManager manConf
   let hydrationDB = "chopaanS3"
   let p = DB.queryParams hydrationDB
-  DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) hydrationDB
+  liftIO $ DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) hydrationDB
   let
     configureH (kId, kNodes) = do
       let
@@ -365,7 +367,7 @@ nodePrefixes kbtzId mkDirs ns ps = do
   return (n, p)
 
 
-hydrateKbtz :: forall m. (HConM m)
+hydrateKbtz :: forall m. (HConM m, MonadSample m)
   => KbtzConf
   -> TNodes
   -> UF.Unfold m KbtzName NodeMAC
@@ -524,7 +526,7 @@ nodeDirUF store stage = uf
     uf = UF.many ps File.read
 
 
-inFrame :: forall m. (HConM m)
+inFrame :: forall m. (HConM m, MonadSample m)
   => KbtzStore
   -> Http.WriteParams
   -> FL.Fold m (NodeMAC, Prefix) (M.Map NodeMAC ()) 

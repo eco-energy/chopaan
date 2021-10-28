@@ -17,6 +17,7 @@ import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.STM
 import Control.Monad.IO.Unlift
+import Control.Monad.Bayes.Class
 import Control.Concurrent.STM.TVar
 import Control.Concurrent (forkIO)
 import Control.Lens
@@ -135,11 +136,11 @@ mqttStreams qs opts name ns = do
 
 
 
-runKibbutz' :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
+runKibbutz' :: forall t m. (IsStream t, MonadAsync m, MonadSample m, MonadCatch m)
   => DBPools -> KbtzC NodeMAC -> t m (KbtzScene NodeMAC)
 runKibbutz' poo = S.concatM . (runKibbutzM poo)
 
-runKibbutzM :: forall t m. (IsStream t, MonadAsync m, MonadCatch m)
+runKibbutzM :: forall t m. (IsStream t, MonadAsync m, MonadSample m, MonadCatch m)
   => DBPools -> KbtzC NodeMAC -> m (t m (KbtzScene NodeMAC))
 runKibbutzM poo = (pure . S.adapt . S.hoist (runGraphWithDB poo)) <=< (runGraphWithDB poo . runKibbutz)
 

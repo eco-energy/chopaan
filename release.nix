@@ -7,21 +7,14 @@ let
   # import nixpkgs with overlays
   pkgs = import nixpkgsSrc nixpkgsArgs;
 
-  chopaan = import(./default.nix);
-  raspiArgs = nixpkgsArgs // {
+  raspi = import(./default.nix) {
     crossSystem = pkgs.lib.systems.examples.raspberryPi;
   };
-  #ghcjsArgs = nixpkgsArgs // {
-  #  crossSystem = pkgs.lib.systems.examples.ghcjs;
-  #};
-  pkgsNative = pkgs;
-  pkgsRaspberryPi = import nixpkgsSrc raspiArgs; 
-  #pkgsGhcjs = import nixpkgsSrc ghcjsArgs;
-  native = chopaan { pkgs = pkgsNative; };
-  crossRaspberryPi = chopaan { pkgs = pkgsRaspberryPi; };
+  native = (import ./default.nix) {};
   #crossGhcjs = chopaan { pkgs = pkgsGhcjs; };
 in {
-  chopaan-native = native.chopaan.components.exes.chopaan-exe;
-  chopaan-raspberry-pi = crossRaspberryPi.chopaan.components.exes.chopaan-exe;
+  # inherit native raspi;
+  kbtzim-native = native.chopaan.kbtzim;
+  kbtzim-raspi = raspi.chopaan.kbtzim;
   #chopaan-ghcjs = crossGhcjs.chopaan.components.exes.ui;
 }

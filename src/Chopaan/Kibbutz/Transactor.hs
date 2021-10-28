@@ -35,6 +35,7 @@ import Control.DeepSeq (NFData)
 
 import Chopaan.Utils.Streamly
 import Chopaan.Node.Node (SensorR)
+import Chopaan.Node.Storage.Battery (Battery(..))
 import Chopaan.Node.Metrics (toWattSeconds, toWatts
                             , fromWattSeconds, fromWatts
                             , Watts, WattSeconds
@@ -43,7 +44,6 @@ import Chopaan.Node.Metrics (toWattSeconds, toWatts
                             , BatteryR
                             , PowerNR
                             , pToE
-                            , Battery(..)
                             )
 
 import GHC.Generics (Generic)

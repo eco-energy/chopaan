@@ -19,7 +19,6 @@ import Data.Either
 import Data.Bifunctor
 
 import qualified Data.HashMap.Strict as HM
-import qualified Data.Csv as Csv hiding (encode)
 import qualified Data.Vector as Vec (fromList)
 
 import Data.ByteString.Char8 (pack)
@@ -58,6 +57,7 @@ import NetSpider.Snapshot (nodeId, nodeTimestamp)
 
 import Chopaan.Node.NodeId
 import Chopaan.Node.Storage
+import Chopaan.Node.Storage.Battery
 import Chopaan.Utils.JSON
 import Chopaan.Utils.Time
 import Chopaan.Graph.Greskell
@@ -65,10 +65,6 @@ import Chopaan.Graph.Greskell
 
 default(T.Text)
 
-
-toField = Csv.toField
-toNamedRecord = Csv.toNamedRecord
-headerOrder = Csv.headerOrder
 
 {----- Basic Types ------}
 
@@ -114,11 +110,6 @@ toWattSeconds !a = WS $ add a 0 compensated
 pToE :: (Real t) => t -> Watts -> WattSeconds
 pToE !t (W !p') = WS $ (*^) (realToFrac t) p'
 
-instance Csv.ToField (Watts) where
-  toField = toField . uncompensated . unW
-
-instance Csv.ToField (WattSeconds) where
-  toField = toField . uncompensated . unWs
 
 instance ToJSON WattSeconds where
   toJSON = toJSON . uncompensated . unWs
@@ -150,10 +141,6 @@ data Node a = Node
 instance (Typeable a) => Selectors (Node a) where
   selectors = selectorsRep @(Node a)
 
-instance (Csv.ToField a) => Csv.ToNamedRecord (Node a)
-
-instance Csv.DefaultOrdered (Node a) where
-  headerOrder _ = Vec.fromList ["tx", "consumed", "generated"]
 
 instance Applicative Node where
   pure v = Node
@@ -334,78 +321,6 @@ instance FromJSON (EnergyState) where
         s <- mv
         a .~ mv
         return a
-  --parseJSON _ = error "MUST BE OBJECT"
-  
-
-esFieldNamesJSON :: [T.Text]
-esFieldNamesJSON = ["batteryVoltage",
-                     "gridVoltage",
-                     "batteryToLoadCurrent",
-                     "batteryToGridCurrent",
-                     "gridToBatteryCurrent",
-                     "solarInputCurrent",
-                     "temperature",
-                     "dutyCycle",
-                     "cpu_time",
-                     "status",
-                     "gridCurrent",
-                     "solarVoltage" 
-                   ]
-
-fieldAccessorsJSON es = es ^.. ( batteryVoltage
-                          <> gridVoltage
-                          <> batteryToLoadCurrent
-                          <> batteryToGridCurrent
-                          <> gridToBatteryCurrent
-                          <> solarInputCurrent
-                          <> temperature
-                          <> dutyCycle
-                          <> cpuTime
-                          <> status
-                          <> gridCurrent
-                          <> solarVoltage
-                        )
-#ifndef ghcjs_HOST_OS
-esFieldNamesCSV :: [Csv.Name]
-esFieldNamesCSV = ["batteryV",
-                   "gridV",
-                   "battery2LoadC",
-                   "battery2GridC",
-                   "grid2BatteryC",
-                   "solarC",
-                   "dutyC"
-                  ]
-fieldAccessorsCSV es = es ^.. ( batteryVoltage
-                          <> gridVoltage
-                          <> batteryToLoadCurrent
-                          <> batteryToGridCurrent
-                          <> gridToBatteryCurrent
-                          <> solarInputCurrent
-                          <> dutyCycle
-                        )
-
-instance Csv.ToNamedRecord EnergyState where
-  toNamedRecord es = HM.fromList $
-                zip esFieldNamesCSV $
-                map (pack . show) $
-                fieldAccessorsCSV es
-
-
-instance Csv.DefaultOrdered EnergyState where
-  headerOrder _ = Vec.fromList esFieldNamesCSV
-
-instance Csv.ToField UTCTime where
-  toField t = pack (show t)
-
-instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (SensorMetrics e p) where
-  toNamedRecord (SensorMetrics {..}) = foldl (HM.union) (HM.fromList [("time", toField _time)])
-    [ toNamedRecord _battery,
-      toNamedRecord _powerT,
-      toNamedRecord _energyT,
-      --toNamedRecord _sensorsT,
-      HM.fromList [("demand", toField _demand)]
-    ]
-#endif
 
 
 showDec :: Double -> String
@@ -429,78 +344,12 @@ secsToMinutes = (* 60)
 nmFilter :: (NodeId a) -> SensorMetrics e p -> Bool
 nmFilter _ = isJust . _time
 
-#ifndef ghcjs_HOST_OS
-instance Csv.DefaultOrdered (SensorMetrics e p)
-#endif
 
 type Timestamp = (Maybe UTCTime, DiffTime)
 
 type BatteryR = Battery WattSeconds Watts
 
-data Battery e p = Battery
-  { soc :: !e
-  , chargeLim :: !p
-  , dischargeLim :: !p
-  , totalCapacity :: !e
-  } deriving (Eq, Ord, Show, Binary, Generic, NFData, Functor, Humanize)
 
-instance (Typeable e, Typeable p) => Selectors (Battery e p) where
-  selectors = selectorsRep @(Battery e p)
-
-instance Bifunctor Battery where
-  bimap f g Battery{soc, chargeLim, dischargeLim, totalCapacity} = Battery
-    { soc = f soc
-    , chargeLim = g chargeLim
-    , dischargeLim = g dischargeLim
-    , totalCapacity = f totalCapacity
-    } 
-
-
-instance (ToJSON e, ToJSON p) => ToJSON (Battery e p)
-instance (FromJSON e, FromJSON p) => FromJSON (Battery e p)
-
-#ifndef ghcjs_HOST_OS
-instance (GreskellC e, GreskellC p) => FromGraphSON (Battery e p) where
-  parseGraphSON = parseJSON . unwrapAll
-
-batKey :: Key VFoundNode BL.ByteString
-batKey = "battKey"
-
-instance (GreskellC e, GreskellC p) => NodeAttributes (Battery e p) where
-  writeNodeAttributes bat = fmap writeKeyValues $ sequence $
-    [ batKey <=:> A.encode bat ]
-  parseNodeAttributes props = pMapToFail $ decodeBin "battery: battery" $ lookupAs batKey props
-#endif
-
-emptyB :: (Fractional e, Fractional p) => Battery e p
-emptyB = Battery 0 0 0 0
-
-#ifndef ghcjs_HOST_OS
-instance Csv.DefaultOrdered (Battery e p)
-instance (Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (Battery e p)
-#endif
-
-instance (Fractional e, Fractional p, Ord e, Ord p) => Semigroup (Battery e p) where
-  b <> b' = (emptyB @e @p) { soc = min (soc b)  (soc b')
-                           , chargeLim = min (chargeLim b) (chargeLim b')
-                           , dischargeLim = min (dischargeLim b) (dischargeLim b')
-                           , totalCapacity = min (totalCapacity b) (totalCapacity b')
-                           }
-
-instance (Fractional e, Fractional p, Ord e, Ord p) => Monoid (Battery e p) where
-  mempty = emptyB
-
-runTime :: ParamType a => Battery a p -> SensorVector a -> a
-runTime !Battery{soc} !SensorVector{..} = soc / ((normC sensorCurrent) * sensorTerminalV)
-  where
-    normC c
-      | c >= 0 = c
-      | c < 0 = 0.05
-      | otherwise = error "neither greater nor less than nor equal to zero"
-      
-
-socPercentage :: Fractional e => Battery e p -> e
-socPercentage !Battery{soc, totalCapacity} = (soc * 100 / totalCapacity)
 
 
 
@@ -561,23 +410,3 @@ zeroMsg = defMessage
                & dutyCycle .~ 0
                & cpuTime .~ 0
 
-
-{----------------------------------------------------------
-
-                CSV Conversion
-----------------------------------------------------------}
-
-
-#ifndef ghcjs_HOST_OS
--- Identified sensor type for monitoring
-newtype TaggedNode n e p = TaggedNode (n, SensorMetrics e p) deriving (Generic)
-
-instance (Csv.ToField n, Csv.ToField e, Csv.ToField p) => Csv.ToNamedRecord (TaggedNode n e p) where
-  toNamedRecord (TaggedNode (n, ns)) = (HM.fromList [("NodeId", toField n)]) <> toNamedRecord ns
-
-instance Csv.DefaultOrdered (TaggedNode n e p) where
-  headerOrder _ = (Vec.fromList $ ["NodeId", "time"])
-                  <> (headerOrder (undefined :: EnergyState))
-                  <> (headerOrder (undefined :: PowerNR))
-                  <> (headerOrder (undefined :: EnergyNR))
-#endif

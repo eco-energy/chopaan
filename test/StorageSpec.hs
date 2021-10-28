@@ -2,6 +2,7 @@
 module StorageSpec where
 
 import Chopaan.Node.Storage
+import Chopaan.Node.Storage.Battery
 import Numeric.Estimator
 import Common
 

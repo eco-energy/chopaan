@@ -46,9 +46,11 @@ import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
 import ConCat.Scan
 import ConCat.Misc
 import System.IO
+import Control.Monad.Bayes.Class
+
 #endif
 
-type KbtzConn t m n = (IsStream t, MonadAsync m, Ord n, Show n, Address n)
+type KbtzConn t m n = (IsStream t, MonadAsync m, Ord n, Show n, Address n, MonadSample m)
 
 
 data KbtzActions n = CreateKbtz [n]

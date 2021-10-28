@@ -86,15 +86,15 @@ foldSpec :: Spec
 foldSpec = do
   describe "Validate ES processing folds and their composition" $ do
     it "Check each fold" $ do
-      es <- orderedES Source nMessages
       let
-        tf = S.postscan timeFold es
-        pf = S.postscan powerFold es
-        ef = S.postscan energyFold es
-        bf = S.postscan (batteryFold defBatteryParams) es
-        df = S.postscan demandFold es
+        es = orderedES Source nMessages
+        tf = sampleStream $ S.postscan timeFold es
+        pf = sampleStream $ S.postscan powerFold es
+        ef = sampleStream $ S.postscan energyFold es
+        bf = sampleStream $ S.postscan (batteryFold defBatteryParams) es
+        df = sampleStream $ S.postscan demandFold es
         lc f = do
-          l <- S.length f
+          l <- S.length $ f
           l `shouldBe` nMessages
       lc tf
       lc pf
@@ -103,47 +103,19 @@ foldSpec = do
       lc df
     it "Sensor Fold works" $ do
       ns <- liftIO $ arbs @NodeMAC nNodes
-      es <- do
-        xs'' <- mapM (\(i, n) ->
-                        (return . (S.map (\x -> (n, x))))
-                       =<<
-                       orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
-                $ zip [1..nNodes] ns
-        return $ foldl S.wSerial S.nil xs''
-      let s = S.postscan (FL.classify sensorFold) es
-      l <- S.length s
+      l <- S.length
+           $ sampleStream
+           $ S.postscan (FL.classify sensorFold) $ esStreams nMessages nNodes ns
       l `shouldBe` (nMessages * nNodes)
-
-
-runWithDBPools :: (TC.MonadDocker m) => m ([NodeMAC], DBPools)
-runWithDBPools = do
-  (host, port) <- runJanus "kbtzSpec"
-  let c = mkConfG (host, port)
-  let pc = PoolConf 1 20000 1
-  sp <- mkDBPools pc host port
-  let kp = gremlinPool sp
-  -- Create Influx DB!
-  liftIO $ createDB "chopaanMQTT"
-  ns <- liftIO $ arbs @NodeMAC nNodes
-  liftIO $ withResource kp  (\c -> addKbtz c kId)
-  liftIO $ mapM_ (\n -> withResource kp (\c -> addNodeToKbtz c kId n)) ns
-  return (ns, sp)
+      
 
 kbtzSpec :: Spec
 kbtzSpec = do
   aroundAll (TC.withContainers (runWithDBPools)) $ describe "Spiders are great" $ do
     it "qKbtz processor processes all messages!" $ \(ns, db) -> do
       let sp = (spools db)
-      es <- do
-        xs'' <- mapM (\i ->
-                         orderedES (if (mod i 2 == 0) then Source else Sink) nMessages)
-                $ [1..nNodes]
-        return $ foldl S.wAsync S.nil xs''
-      rs <- do
-        xs'' <- mapM (\i ->
-                        orderedRS (if (i == 1) then Root else Child) nMessages (head ns))
-                $ [1..nNodes]
-        return $ foldl S.wAsync S.nil xs''
+          es = sampleStream $ esStreams nMessages nNodes ns 
+          rs = rsStreams nMessages nNodes ns
       qs <- initQs
       k <- S.hoist (runGraphWithDB db) <$> (runGraphWithDB db $ do
         runKibbutz KbtzC { name = kId
@@ -151,10 +123,9 @@ kbtzSpec = do
                          , channelOpts = (Right qs)
                          , s3Opts = Nothing 
                          })
-      let ns' = S.fromList $ cycle ns
       forkIO $ do
-        S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e)  $ S.zipWith (,) ns' es
-        S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r)  $ S.zipWith (,) ns' rs
+        S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e) es
+        S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r) rs
         print "Messages Queued"
       l <- S.length $ S.take ((2 * nNodes * nMessages) + 0) k
       l `shouldBe` (2 * nNodes * nMessages)
@@ -228,26 +199,20 @@ chkNodeQs nq = do
     mkQ q = liftIO $ withQueryResponse (qp "chopaanMQTT") Nothing q countm
        --(V.length (fst rs)) `shouldBe` nMessages
 
+runWithDBPools :: (TC.MonadDocker m) => m ([NodeMAC], DBPools)
+runWithDBPools = do
+  (host, port) <- runJanus "kbtzSpec"
+  let c = mkConfG (host, port)
+  let pc = PoolConf 1 20000 1
+  sp <- mkDBPools pc host port
+  let kp = gremlinPool sp
+  -- Create Influx DB!
+  liftIO $ createDB "chopaanMQTT"
+  ns <- liftIO $ arbs @NodeMAC nNodes
+  liftIO $ withResource kp  (\c -> addKbtz c kId)
+  liftIO $ mapM_ (\n -> withResource kp (\c -> addNodeToKbtz c kId n)) ns
+  return (ns, sp)
 
--- hydrationSpec :: Spec
--- hydrationSpec = aroundAll (TC.withContainers (runJanus "hydrationSpec")) $ describe "hydration tests" $ do
---   it "Hydration Works" $ \(host, port) -> do
---     let labNodes = [ "7c:9e:bd:f5:ec:74", "c4:4f:33:67:ea:69"
---                      , "ac:67:b2:11:e5:c4", "7c:9e:bd:f6:43:88" ]
---         s3op = "dosti-datastream"
---     qs <- initQs
---     ps <- mkDBPools host port
---     let kc = KbtzC { name = KbtzId "labKbtz"
---                    , nodes = labNodes
---                    , channelOpts = Right qs
---                    , s3Opts = Just s3op }
---     h <- hydrateKbtzM ps kc (t0, tn)
---           --h = s3Stream (zip labNodes (repeat Nothing)) s3op
---     S.drain h
---     1 `shouldBe` 1
---     where
---       t0 = Ti.UTCTime (Ti.fromGregorian 2021 8 9) (Ti.secondsToDiffTime 0)
---       tn = Ti.UTCTime (Ti.fromGregorian 2021 8 11) (Ti.secondsToDiffTime 0)
 
 oneNodePerMACPlusRoot sn nNodes = ((length $ sn)
                                     `shouldBe` (nNodes + 1))
@@ -256,17 +221,10 @@ constHypergraphLinks sl nNodes = ((length $ sl)
 treePlusStructure sl nNodes = ((length $ sl)
                                   `shouldBe` (nNodes + 1))
 
--- snapDebug :: (Show n, Show v, Show l)
---   => ([n] -> Ti.UTCTime -> Ti.UTCTime -> IO (SnapshotGraph n v l))
---   -> [n] -> Ti.UTCTime -> Ti.UTCTime -> IO (SnapshotGraph n v l) 
 snapDebug snapfn sp ns t0 tn = do
-  --print $ "Total Nodes: " <> (show . length $ ns)
   (gotNs, gotLs) <-  runSpider sp (snapfn ns t0 tn)
   print $ "Num Nodes: " <> (show . length  $ gotNs)
   print $ "Num Links: " <> (show . length  $ gotLs)
-  -- print $ (fmap nodeId gotNs)
-  -- print $ (fmap nodeAttributes gotNs)
-  -- print $ (fmap linkNodeTuple gotLs)
   return $ (gotNs, gotLs)
 
 
@@ -275,8 +233,29 @@ data ESType = Source | Sink deriving (Eq, Ord, Show, Bounded, Enum)
 data RSType = Root | Child deriving (Eq, Ord, Show, Bounded, Enum)
 
 
-orderedES :: ESType -> Int -> IO (S.Serial NM.EnergyState)
-orderedES et n = do
+esStreams :: forall m. (S.MonadAsync m, MonadSample m) => Int -> Int -> [NodeMAC] -> S.SerialT m (NodeMAC, NM.EnergyState) 
+esStreams nMessages nNodes ns = S.concatMapWith S.wSerial es
+                  (S.fromList (zip [1..nNodes] ns))
+  where
+    es :: (Int, NodeMAC) -> S.SerialT m (NodeMAC, NM.EnergyState)
+    es (i, n) = withTag <$> (orderedES ty nMessages)
+      where
+        ty = if (mod i 2 == 0) then Source else Sink
+        withTag x = (n, x)
+
+rsStreams :: forall m. (S.MonadAsync m) => Int -> Int -> [NodeMAC] -> S.SerialT m (NodeMAC, NM.RuntimeStats) 
+rsStreams nMessages nNodes ns = S.concatMapWith S.wSerial rs
+                  (S.fromList (zip [1..nNodes] ns))
+  where
+    rs :: (Int, NodeMAC) -> S.SerialT m (NodeMAC, NM.RuntimeStats)
+    rs (i, n) = withTag <$> (orderedRS ty nMessages (head ns))
+      where
+        ty = (if (i == 1) then Root else Child)
+        withTag x = (n, x)
+
+
+orderedES :: MonadIO m => ESType -> Int -> S.SerialT m NM.EnergyState
+orderedES et n = S.concatM . liftIO $ do
   xs <- arbs n
   let xs' = map updateT $ (zip xs tsL)
   return $ S.fromList xs'
@@ -302,8 +281,8 @@ orderedES et n = do
         sv Source = 50
         sv Sink = 0
         
-orderedRS :: RSType -> Int -> NodeMAC -> IO (S.Serial NM.RuntimeStats)
-orderedRS r n (NodeId root) = do
+orderedRS :: MonadIO m => RSType -> Int -> NodeMAC -> S.SerialT m NM.RuntimeStats
+orderedRS r n (NodeId root) = S.concatM . liftIO $ do
   xs <- arbs n
   let xs' = map updateT $ zip xs tsL
   return $ S.fromList xs'

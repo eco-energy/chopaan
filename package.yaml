@@ -120,6 +120,7 @@ dependencies:
 - generic-data
 - barbies
 - higgledy
+- mwc-random
 when:
   condition: "!impl(ghcjs)"
   then:

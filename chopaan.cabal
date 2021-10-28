@@ -36,6 +36,7 @@ library
   exposed-modules:
       Chopaan.API.Kbtz
       Chopaan.Graph.Algebraic
+      Chopaan.Node.Storage.Battery
   other-modules:
       Paths_chopaan
   hs-source-dirs:
@@ -102,6 +103,7 @@ library
     , monad-bayes
     , monad-control
     , mtl
+    , mwc-random
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -407,6 +409,7 @@ executable dashgen
     , monad-bayes
     , monad-control
     , mtl
+    , mwc-random
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -574,6 +577,7 @@ executable hydrate
     , monad-bayes
     , monad-control
     , mtl
+    , mwc-random
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -743,6 +747,7 @@ executable kbtzim
     , monad-bayes
     , monad-control
     , mtl
+    , mwc-random
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -910,6 +915,7 @@ executable server
     , monad-bayes
     , monad-control
     , mtl
+    , mwc-random
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -1092,6 +1098,7 @@ test-suite chopaan-test
     , monad-bayes
     , monad-control
     , mtl
+    , mwc-random
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
