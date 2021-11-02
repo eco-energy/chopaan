@@ -85,11 +85,11 @@ data KbtzAPI route = KbtzAPI
   , _reassociateNodeMAC :: route
                           :- QPR "originNodeId" NodeMAC
                           :> QPR "newNodeId" NodeMAC
-                          :> Post '[JSON] ()
+                          :> Post '[JSON] Bool
   , _removeNodeFromKbtz :: route
                           :- QPR "originKbtz" KbtzName
                           :> QPR "nodeId" NodeMAC
-                          :> Post '[JSON] ()
+                          :> Post '[JSON] Bool
   , _getKbtzim :: route :- Get '[JSON] [KbtzName]
   , _getKbtz :: route
                :- QPR "kbtzId" KbtzName
@@ -127,8 +127,19 @@ record = KbtzAPI
           K.removeNodeFromKbtz c k n
           K.addNodeToKbtz c k' n
           return True
+        _ -> error "duplicate Node!"
+  , _reassociateNodeMAC = \n n' -> do
+      ns <- withKbtzPool $ \c -> K.getNode c n
+      case length ns of
+        0 -> return False
+        1 -> withKbtzPool $ \c -> do
+          --K.modifyNodeMAC c k' n
+          -- undefined
+          return True
+        _ -> error "duplicate Node!"
   , _removeNodeFromKbtz = \k n -> withKbtzPool $ \c -> do
       K.removeNodeFromKbtz c k n
+      return True
   , _getKbtzim = withKbtzPool $ \c -> do
       K.getKbtzim c
   , _getKbtz = \k -> withKbtzPool $ \c -> do

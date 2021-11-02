@@ -304,36 +304,35 @@ showText :: (Show a) => a -> Text
 showText = T.replace "\"" "" . T.pack . show
 
 
-
 class FieldType f where
   getField :: f -> Maybe (Field n)
 
-instance {-# OVERLAPPING #-} FieldType Int64 where
+instance FieldType Int64 where
   getField = Just . fromInt
 
-instance {-# OVERLAPPING #-} FieldType Int where
+instance FieldType Int where
   getField = Just . fromInt . fromIntegral
 
 
-instance {-# OVERLAPPING #-} FieldType Double where
+instance FieldType Double where
   getField = Just . fromDouble
 
-instance {-# OVERLAPPING #-} FieldType Bool where
+instance FieldType Bool where
   getField = Just . fromBool
 
-instance {-# OVERLAPPING #-} FieldType NodeMAC where
+instance FieldType NodeMAC where
   getField = Just . fromText . unNodeId
 
-instance {-# OVERLAPPING #-} FieldType Text where
+instance FieldType Text where
   getField = Just . fromText
 
-instance {-# OVERLAPPING #-} FieldType Watts where
+instance FieldType Watts where
   getField = getField . fromWatts
 
-instance {-# OVERLAPPING #-} FieldType WattSeconds where
+instance FieldType WattSeconds where
   getField = getField . fromWattSeconds
 
-instance {-# OVERLAPPING #-} (FieldType a) => FieldType (Maybe a) where
+instance (FieldType a) => FieldType (Maybe a) where
   getField a = getField =<< a
 
 fromInt :: Int64 -> Field n

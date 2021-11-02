@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, DeriveFunctor, DeriveFoldable, DeriveDataTypeable #-}
 
 {-# LANGUAGE OverloadedStrings, NamedFieldPuns, ScopedTypeVariables, TypeApplications, FlexibleContexts, TypeOperators, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, OverloadedLabels #-}
 module Chopaan.Graph.Kbtz where
 
 import Prelude hiding ((.), id)
@@ -16,7 +17,7 @@ import Control.Exception (bracket)
 
 import Data.Function ((&))
 import qualified Data.Text as T hiding (zip)
-import Data.Aeson (ToJSON(..), FromJSON(..), encode)
+
 import Data.Text.Encoding (decodeUtf8)
 import Data.ByteString.Lazy (toStrict)
 import qualified Data.Vector as V
@@ -29,11 +30,7 @@ import Data.Greskell.Binder
 import Data.Greskell.GTraversal
   ( ToGTraversal(..), GTraversal, Walk, Transform, SideEffect, Filter, gAddV, gAddE, gOut, gOutE, gId, gIn, gInV, gInE, gHasLabel, gProperty, gCoalesce, WalkType, gHasId
   , source, sV, sV', gV, ($.), (&.), unsafeCastStart, unsafeCastEnd, (<*.>), sAddV, gHas2, liftWalk, gFrom, gTo, gSideEffect, gValueMap, gDrop, gUnfold, gFold )
-import Data.Greskell.Extra (writeKeyValues, (<=:>), gWhenEmptyInput, writePropertyKeyValues)
-import Data.Greskell.PMap
-  ( PMap, Multi, Single, PMapLookupException,
-    lookupAs, lookupAs', pMapToFail
-  )
+import Data.Greskell.Extra (gWhenEmptyInput)
 
 import Network.Greskell.WebSocket
   ( connect, close, submitPair,
@@ -42,35 +39,20 @@ import Network.Greskell.WebSocket
 
 
 import NetSpider.Graph (writeNodeAttributes)
+import Data.Pool
 
 import Chopaan.Utils.Retry
-import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.HW
+import Chopaan.Graph.Kbtz.Types
 
-import Data.Pool
+
 
 -- $ Actual DB interactions
 
 type KbtzPool = (Pool Client)
 
-
-{--
-newtype KbtzM m = KbtzM { runKbtzM :: ReaderT KbtzPool IO }
-
-data NTy = KbtzN | NodeN | HwN
-
-data ETy = KbtzE | HwE
-
-data GNode n where
-
-data GEdge n where
-
-instance Monoid GEdge
-
-newtype G e n = G { unG :: G.Graph (GEdge e) (GNode n) }
-
---}
 
 
 getKbtzim :: MonadIO m => Client -> m [KbtzName]
@@ -123,17 +105,6 @@ runTraversal c = (liftIO . drainResults) <=< (liftIO . submitPair c . runBinder)
 
 
 
-newtype VKbtz = VKbtz AVertex
-  deriving (Eq, Show)
-  deriving newtype (FromGraphSON, ElementData, Element, Vertex)
-
-newtype EKbtzIncludes = EKbtzIncludes AEdge
-  deriving (Eq, Show)
-  deriving newtype (FromGraphSON, ElementData, Element, Edge)
-
-newtype VHH = VHH AVertex
-  deriving (Eq, Show)
-  deriving newtype (FromGraphSON, ElementData, Element, Vertex)
 
 
 
@@ -150,40 +121,6 @@ kbtzIncludesSrc :: Walk Transform VHH VKbtz
 kbtzIncludesSrc = gIn ["kbtzIncludes"]
 
 
-
--- A Kbtz is not a node, it's a graph where the vertices are households
--- and the edges are dunno. But AKbtz is a hypergraph node.
-data AKbtz = AKbtz
-  { akId :: KbtzName
-  --, akLocation :: T.Text
-  --, createdOn :: UTCTime
-  --, createdBy :: User
-  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
-
-parseAKbtz :: PMap Multi GValue -> Either PMapLookupException AKbtz
-parseAKbtz pm = AKbtz
-                <$> (lookupAs kbtzId pm)
-  where
-    --locKey :: Key VKbtz T.Text
-    --locKey = undefined
-
-instance FromGraphSON AKbtz where
-  parseGraphSON gv = (pMapToFail . parseAKbtz) =<< parseGraphSON gv
-
-data ANode = ANode
-  { -- anDBId :: Maybe ElementID
-  anId :: NodeMAC
-  -- , anName :: T.Text
-  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
-
-
-  
-
-parseANode :: PMap Multi GValue -> Either PMapLookupException ANode
-parseANode pm = ANode <$> (lookupAs hhId pm)
-
-instance FromGraphSON ANode where
-  parseGraphSON gv = (pMapToFail . parseANode) =<< parseGraphSON gv
 
 removeHHFromKbtz :: KbtzName -> NodeMAC -> Binder (GTraversal SideEffect () EKbtzIncludes)
 removeHHFromKbtz ak an = do
@@ -453,32 +390,3 @@ getNodeHW' :: NodeMAC -> Binder (GTraversal Transform () (HW Double))
 getNodeHW' n = do
   n' <- newBind n
   return $ getVHHById n' &. (toHW <<< hhHasHW)
-
-
-
-
-{--
-
-newtype VPerson = VPerson AVertex
-  deriving (Eq, Show)
-  deriving newtype (FromGraphSON, ElementData, Element, Vertex)
-
-newtype EOwnsHW = EOwnsHW AEdge
-  deriving (Eq, Show)
-  deriving newtype (FromGraphSON, ElementData, Element, Edge)
-
-gOutHasHW :: Walk Transform VHH VHW
-gOutHasHW = gOut ["hasHW"]
-
-gInOwnsHW :: Walk Transform VHW VPerson
-gInOwnsHW = gIn ["ownsHW"]
-
-
-
-
-addHWConfig :: KbtzName -> NodeMAC -> (HW Double) -> Binder (GTraversal SideEffect () VHW)
-addHWConfig k n s = (writeHWConfig s)
-  <*.> (pure $ sAddV "hwConfig" $ source "g")
-
-
---}

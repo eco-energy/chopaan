@@ -102,7 +102,7 @@ options = info (parser <**> helper) $
 
 application :: FilePath -> Env -> FilePath -> TinkerConf -> IO Application
 application optsPath e assetsPath (TinkerConf h p) = do
-  Options{hydrationOpts, poolConf} <- D.input D.auto $ T.pack optsPath
+  Options{poolConf} <- D.input D.auto $ T.pack optsPath
   poo <- mkDBPools poolConf h p
   return $ simpleCors $ app e assetsPath poo 
 

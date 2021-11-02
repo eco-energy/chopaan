@@ -120,6 +120,7 @@ dependencies:
 - generic-data
 - barbies
 - higgledy
+- named
 - mwc-random
 when:
   condition: "!impl(ghcjs)"
@@ -249,6 +250,8 @@ library:
         - Chopaan.Comm.Monitor
         - Chopaan.Comm.Socket
         - Chopaan.Graph.Kbtz
+        - Chopaan.Graph.Kbtz.Types
+        - Chopaan.Graph.Kbtz.Schema
         - Chopaan.Graph.Spider
         - Chopaan.Graph.VI
         - Chopaan.Haxl.Kbtz

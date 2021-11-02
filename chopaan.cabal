@@ -104,6 +104,7 @@ library
     , monad-control
     , mtl
     , mwc-random
+    , named
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -245,6 +246,8 @@ library
         Chopaan.Comm.Monitor
         Chopaan.Comm.Socket
         Chopaan.Graph.Kbtz
+        Chopaan.Graph.Kbtz.Types
+        Chopaan.Graph.Kbtz.Schema
         Chopaan.Graph.Spider
         Chopaan.Graph.VI
         Chopaan.Haxl.Kbtz
@@ -410,6 +413,7 @@ executable dashgen
     , monad-control
     , mtl
     , mwc-random
+    , named
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -578,6 +582,7 @@ executable hydrate
     , monad-control
     , mtl
     , mwc-random
+    , named
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -748,6 +753,7 @@ executable kbtzim
     , monad-control
     , mtl
     , mwc-random
+    , named
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -916,6 +922,7 @@ executable server
     , monad-control
     , mtl
     , mwc-random
+    , named
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
@@ -1099,6 +1106,7 @@ test-suite chopaan-test
     , monad-control
     , mtl
     , mwc-random
+    , named
     , network >=3.1.2.1
     , newtype-generics
     , one-liner
