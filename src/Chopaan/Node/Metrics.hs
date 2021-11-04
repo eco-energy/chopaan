@@ -209,12 +209,12 @@ initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0 zeroMsg
   
 
 -- instance (Binary e, Binary p) => ToJSON (SensorMetrics e p) where
---     toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
---     toEncoding = binaryJSONEncode
+--     toJSON = wineryJSONWrite --genericToJSON pvEncodingOpts
+--     toEncoding = wineryJSONEncode
 
 
 -- instance (Binary e, Binary p) => FromJSON (SensorMetrics e p) where
---   parseJSON = binaryJSONRead "SensorMetrics"
+--   parseJSON = wineryJSONRead "SensorMetrics"
 
 #ifndef ghcjs_HOST_OS
 timeKey :: Key VFoundNode (Maybe UTCTime)

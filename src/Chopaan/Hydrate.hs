@@ -17,6 +17,7 @@ module Chopaan.Hydrate
   , mapToStream
   , HConM
   , HConS
+  , hConfDef
   ) where
 
 
@@ -235,15 +236,14 @@ mkKbtzConf (HydrationConf{s3Bucket
                          , pastRes, futureRes}) env name store manOrSesh wp parHow =
   KbtzConf env (S3.BucketName s3Bucket) store name manOrSesh (toUTC startDate) lifetime wp (pastRes, futureRes) parHow
 
-runHydration :: TinkerConf -> HydrationConf -> IO ()
-runHydration tk conf = runGraphM (PoolConf 1 1 1) tk $ do
+runHydration :: HydrationConf -> GraphM ()
+runHydration conf = do
   kns <- getKNs
   manConf <- liftIO $ parseManagerConf
   sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
   parConf <- liftIO $ parseParStrategy
   kbtzim <- liftIO $ atomically $ mkTKbtz kns
   aws <- getAwsEnv S3.s3
-  man <- newManager manConf
   let hydrationDB = "chopaanS3"
   let p = DB.queryParams hydrationDB
   liftIO $ DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) hydrationDB
@@ -444,12 +444,20 @@ type S3Body = (S3Idx (BS.ByteString))
 
 type GetObjError = (S3Idx RespStatus)
 
-newtype RespStatus = RespStatus (Int, BS.ByteString)
+data ResponseState = Normal | Throttling | Error GetObjError
+  deriving (Eq, Ord, Show, Generic)
+  deriving W.Serialise via (W.WineryVariant ResponseState)
+
+newtype RespStatus = RespStatus (Int, BS.ByteString, ResponseState)
   deriving (Eq, Ord, Show, Generic)
   deriving W.Serialise via (W.WineryProduct RespStatus)
 
 wrapStatus :: NC.Status -> RespStatus
-wrapStatus s = RespStatus (NC.statusCode s, NC.statusMessage s)
+wrapStatus s = RespStatus (NC.statusCode s, NC.statusMessage s, state)
+  where
+    state = case NC.statusCode s of
+      503 -> Throttling
+      _ -> Normal
 
 type S3Resp = Either GetObjError S3Body
 
@@ -633,29 +641,6 @@ dlFramesParFS st manOrSesh sw getPath = S.maxThreads (sourceGenThreads st) . S.m
               . S.rights
               . S.trace (logEither)
               . decodeS @S.AheadT @m @(Wino S3Key)
-    -- dlM = mapToStream dlF
-    -- dlF :: NodeMAC -> A.Array Prefix -> m (Maybe (Prefix, Int))
-    -- dlF n s = do
-    --   px <- latestPrefix s
-    --   case px of
-    --     Nothing -> return Nothing
-    --     Just comPref -> do
-    --       liftIO $ print $ "Starting Download for: " <> (show n) <> (show s)
-    --       liftIO $ print $ "Common Prefix: " <> (show comPref)
-    --       r <- download man sw (n, comPref) (frameSink comPref) (errSink comPref) keySource
-    --       return $ Just r
-    --   where
-    --     frameSink p = saveWithLength p (encodeFold (getPath Frames n p))
-    --     errSink p = encodeFold (getPath Errors n p)
-    --     keySource :: forall t1. (S.IsStream t1) => t1 m (S3Key)
-    --     keySource = decodeKeys (S.unfold readAll s)
-    --       where
-    --         readAll = UF.many ((getPath Keys n) <$> A.read) File.read
-    --         decodeKeys :: t1 m Word8 -> t1 m (S3Key)
-    --         decodeKeys = S.map (fromWino)
-    --           . S.rights
-    --           . S.trace (logEither)
-    --           . decodeS @t1 @m @(Wino S3Key)
 {-# INLINE dlFramesParFS #-}
 
 saveWithLength :: (MonadIO m) => b -> FL.Fold m a () -> FL.Fold m a (b, Int) 
@@ -796,7 +781,7 @@ fileSaver :: (HConM m) => StoreType -> KbtzStore -> NodeMAC -> Prefix -> FL.Fold
 fileSaver ty store n t = saveWithLength (n, t) (FL.lmap toWino (encodeFold path))
   where
     path = (getKbtzPath store ty n t)
-
+{-# INLINE fileSaver #-}
 
 getKeysUF :: forall t m r. (HConS t m, Show r)
   => Env

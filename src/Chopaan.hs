@@ -14,6 +14,14 @@ import Data.Influxable (createDB)
 import Data.Bifunctor
 import Data.Pool (stats)
 
+import qualified Streamly.Prelude as S
+import qualified Streamly.Internal.Data.Unfold as UF
+import qualified Streamly.Internal.Data.Fold as FL
+import qualified Streamly.Internal.Data.Pipe as Pipe
+import qualified Streamly.Internal.FileSystem.Handle as H
+import qualified Streamly.Internal.FileSystem.File as File
+
+
 import System.Remote.Monitoring (forkServer)
 
 import Network.AWS.S3 (BucketName(..))
@@ -41,12 +49,13 @@ runKbtzim mq hydrationOpts = do
       liftIO . print $ "Adding " <> (show (fst deployKbtz))
       addzim [deployKbtz]
     False -> getKNs
+  let kbtzim = mkTKbtz kns
   let confss = S.fromList $ fmap sConf kns
-      -- past = S.concatMapWith S.wAsync
-      --   (hydrateKbtz' hydrationOpts) confss
-      present = S.concatMapWith S.wAsync (S.concatM . runKibbutz @t) confss
-  return $ S.mapM (pure . const True) $ present
-  where
+      s3Hydration = S.fromEffect ((pure . (const True)) =<< (runHydration hConfDef))
+      mqttStream = S.map (const True)
+        $ S.concatMapWith S.wAsync (S.concatM . runKibbutz @t) confss
+  return $ mqttStream `S.parallel` s3Hydration
+  where 
     deployKbtz = (KbtzId "Bismillah_Mor", fmap fst deployNodes)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
                           , nodes = ns
@@ -55,6 +64,8 @@ runKbtzim mq hydrationOpts = do
                           }
 
 type NodeKey = NodeId Int
+
+newtype DispatchNodes m n x = DispatchNodes (UF.Unfold m n x) 
 
 deployNodes :: [(NodeMAC, NodeKey)]
 deployNodes = (bimap NodeId NodeId) <$>

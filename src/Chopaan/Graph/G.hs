@@ -5,11 +5,13 @@
 
 module Chopaan.Graph.G where
 
-import Prelude hiding (id, (.), curry, uncurry)
+import Prelude hiding (id, (.), curry, uncurry, const)
 import GHC.Generics (Generic)
 import Data.Generics.Sum
 import Data.Generics.Labels
+import qualified Algebra.Graph.Labelled as G
 
+import Control.Arrow
 import Control.Lens (preview)
 
 #ifndef ghcjs_HOST_OS
@@ -61,14 +63,14 @@ prismMap PlanG = #_Transactor
 prismMap StatusG = #_Status
 prismMap FlowG = #_Flow
 
-getMesh :: G k n -> Maybe (k n MeshNode RxSignal)
-getMesh = preview #_Mesh
-getTransactor :: G k n -> Maybe (k n Stake TxStatus)
-getTransactor = preview #_Transactor
-getStatus :: G k n -> Maybe (k n SensorR Stake)
-getStatus = preview #_Status
-getFlow :: G k n -> Maybe (k n BatteryR PowerNR)
-getFlow = preview #_Flow
+mesh :: G k n -> Maybe (k n MeshNode RxSignal)
+mesh = preview #_Mesh
+transactor :: G k n -> Maybe (k n Stake TxStatus)
+transactor = preview #_Transactor
+status :: G k n -> Maybe (k n SensorR Stake)
+status = preview #_Status
+flow :: G k n -> Maybe (k n BatteryR PowerNR)
+flow = preview #_Flow
 
 
 deriving instance (forall a b. (Eq a, Eq b) => Eq (k n a b)) => Eq (G k n)
@@ -87,6 +89,8 @@ newtype SG' n v e = SG { unSnapshot :: SnapshotGraph n v e }
   deriving (Eq, Ord, Show, Generic)
   deriving anyclass (ToJSON, FromJSON, NFData)
   deriving newtype (Semigroup, Monoid)
+
+newtype Gr' n v e = Gr' { unGr' :: G.Graph e (n, v)}
 
 type SG n = G SG' n
 
@@ -112,6 +116,8 @@ type CGr n v e = G' CG' n v e
 
 type SpGr n v e = G' SpoolG' n v e
 
+type KbtzGraph = G' 
+
 #endif
 
 data G'' k n = G''
@@ -125,7 +131,51 @@ data G'' k n = G''
 
 
 data G' k n v e where
+  Id' :: G' k n v v
+  Compose' :: G' k n w x -> G' k n x y -> G' k n w y
+  Product' :: G' k n w x -> G' k n w y -> G' k n w (x :* y)
+  Sum' :: G' k n w x -> G' k n w y -> G' k n w (x :+ y)
+  Exl' :: G' k n (x :* y) x
+  Exr' :: G' k n (x :* y) y
   Mesh' :: k n MeshNode RxSignal -> G' k n MeshNode RxSignal
-  Transactor' :: k n Stake TxStatus -> G' k n Stake TxStatus
+  Transactor' :: k n TxStatus Stake  -> G' k n TxStatus Stake
   Status' :: k n SensorR Stake -> G' k n SensorR Stake
   Flow' :: k n BatteryR PowerNR -> G' k n BatteryR PowerNR
+
+instance Category (G' Gr' n) where
+  id = Id'
+  x . y = Compose' y x
+
+
+instance ProductCat (G' Gr' n) where
+  dup = Product' Id' Id'
+  exl = Exl'
+  exr = Exr'
+
+instance MonoidalPCat (G' Gr' n) where
+  -- dup = Product' Id' Id'
+  -- exl = Exl'
+  -- exr = Exr'
+
+
+instance BraidedPCat (G' Gr' n)
+
+
+evalG :: G' Gr' n v e -> ()
+evalG Id' = ()
+evalG (Compose' i j) = const () (compositionG i j)
+evalG (Product' i j) = const () (prodG i j)
+evalG (Sum' i j) = ()
+evalG (Exl') = ()
+evalG (Exr') = ()
+evalG (Mesh' g) = ()
+evalG (Transactor' g) = ()
+evalG (Status' g) = ()
+evalG (Flow' g) = ()
+
+compositionG ::  G' Gr' n w x -> G' Gr' n x y -> G' Gr' n w y
+compositionG = undefined
+
+prodG ::  G' Gr' n w x -> G' Gr' n w y -> G' Gr' n w (x :* y)
+prodG = undefined
+

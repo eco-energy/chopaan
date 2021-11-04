@@ -93,10 +93,10 @@ defGView = GView (KbtzId "Lab_TestGrid") StatusG Ten5 t0 t1 (t0, t1) Nothing
 
 requestGView :: forall m. (CRUDChopaan m, Monad m) => GView -> m (SG NodeMAC) 
 requestGView (GView k g r t0 t1 _ _) = case g of
-  MeshG -> getL Mesh getMesh
-  PlanG -> getL Transactor getTransactor
-  StatusG -> getL Status getStatus
-  FlowG -> getL Flow getFlow
+  MeshG -> getL Mesh mesh
+  PlanG -> getL Transactor transactor
+  StatusG -> getL Status status
+  FlowG -> getL Flow flow
   where
     getL :: forall a b. (SG' NodeMAC a b -> SG NodeMAC)
          -> (SG NodeMAC -> Maybe (SG' NodeMAC a b))

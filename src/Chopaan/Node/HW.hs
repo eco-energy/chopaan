@@ -63,11 +63,11 @@ data HW a = HW
   } deriving (Eq, Ord, Show, Generic, Binary, NFData, Functor, Foldable, Traversable)
 
 instance (Binary a) => ToJSON (HW a) where
-  toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
-  toEncoding = binaryJSONEncode
+  toJSON = wineryJSONWrite --genericToJSON pvEncodingOpts
+  toEncoding = wineryJSONEncode
 
 instance (Binary a) => FromJSON (HW a) where
-  parseJSON = binaryJSONRead "HW"
+  parseJSON = wineryJSONRead "HW"
 
 
 

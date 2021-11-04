@@ -91,11 +91,11 @@ ldEncodingOpts = optSumEncoding "loadTag" "loadContent"
 
 
 instance (Binary a) => ToJSON (BatteryTop a) where
-  toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
-  toEncoding = binaryJSONEncode
+  toJSON = wineryJSONWrite --genericToJSON pvEncodingOpts
+  toEncoding = wineryJSONEncode
 
 instance (Binary a) => FromJSON (BatteryTop a) where
-  parseJSON = binaryJSONRead "BatteryTop"
+  parseJSON = wineryJSONRead "BatteryTop"
 
 
 instance (GreskellC a, Num a, Read a) => FromGraphSON (BatteryTop a) where
@@ -145,11 +145,11 @@ data PVTop a = ParPC (PVConf a) (PVConf a)
 
 
 instance (Binary a) => ToJSON (PVTop a) where
-  toJSON = binaryJSONWrite
-  toEncoding = binaryJSONEncode
+  toJSON = wineryJSONWrite
+  toEncoding = wineryJSONEncode
 
 instance (Binary a) => FromJSON (PVTop a) where
-  parseJSON = binaryJSONRead "PVTop"
+  parseJSON = wineryJSONRead "PVTop"
 
 instance (GreskellC a, Num a) => FromGraphSON (PVTop a) where
   parseGraphSON = parseJSON . unwrapAll
@@ -198,11 +198,11 @@ data LoadTop a = ParLC (LoadConf a) (LoadConf a)
 
 
 instance (Binary a, Show a) => ToJSON (LoadTop a) where
-  toJSON = binaryJSONWrite --genericToJSON pvEncodingOpts
-  toEncoding = binaryJSONEncode
+  toJSON = wineryJSONWrite --genericToJSON pvEncodingOpts
+  toEncoding = wineryJSONEncode
 
 instance (Binary a, Show a) => FromJSON (LoadTop a) where
-  parseJSON = binaryJSONRead "LoadTop"
+  parseJSON = wineryJSONRead "LoadTop"
 
 instance (GreskellC a, Num a) => FromGraphSON (LoadTop a) where
   parseGraphSON = parseJSON . unwrapAll

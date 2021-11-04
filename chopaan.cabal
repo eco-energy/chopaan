@@ -36,7 +36,9 @@ library
   exposed-modules:
       Chopaan.API.Kbtz
       Chopaan.Graph.Algebraic
+      Chopaan.Kibbutz.Graph
       Chopaan.Node.Storage.Battery
+      S
   other-modules:
       Paths_chopaan
   hs-source-dirs:
