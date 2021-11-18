@@ -90,7 +90,7 @@ newtype SG' n v e = SG { unSnapshot :: SnapshotGraph n v e }
   deriving anyclass (ToJSON, FromJSON, NFData)
   deriving newtype (Semigroup, Monoid)
 
-newtype Gr' n v e = Gr' { unGr' :: G.Graph e (n, v)}
+newtype Gr' n v e = Gr' { unGr' :: G.Graph e (n, v) }
 
 type SG n = G SG' n
 
