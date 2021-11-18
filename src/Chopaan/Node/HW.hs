@@ -17,7 +17,7 @@ import Control.Monad.Except (MonadError (throwError))
 import Control.DeepSeq (NFData)
 
 import Data.Text
-import Data.Binary (Binary(..))
+import qualified Codec.Winery as W
 import Data.Aeson (ToJSON(..), FromJSON(..))
 import Data.Greskell (Key, lookupAs, lookupM, lookup, pMapToFail
                      , FromGraphSON(..), PMap(..)
@@ -60,13 +60,13 @@ data HW a = HW
   { storage :: BatteryTop a
   , generation :: PVTop a
   , loads :: LoadTop a
-  } deriving (Eq, Ord, Show, Generic, Binary, NFData, Functor, Foldable, Traversable)
+  } deriving (Eq, Ord, Show, Generic, W.Serialise, NFData, Functor, Foldable, Traversable)
 
-instance (Binary a) => ToJSON (HW a) where
+instance (W.Serialise a) => ToJSON (HW a) where
   toJSON = wineryJSONWrite --genericToJSON pvEncodingOpts
   toEncoding = wineryJSONEncode
 
-instance (Binary a) => FromJSON (HW a) where
+instance (W.Serialise a) => FromJSON (HW a) where
   parseJSON = wineryJSONRead "HW"
 
 
