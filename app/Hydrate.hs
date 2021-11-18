@@ -1,8 +1,11 @@
 module Main where
 
+import Control.Monad
 import qualified Data.Text as T
+
 import Chopaan.Hydrate
-import Chopaan.Graph (tkOptions)
+import Chopaan.Graph (tkOptions, runGraphM)
+import Chopaan.Types (PoolConf(..))
 import Options.Applicative
 
 --import Dhall hiding (newManager, void)
@@ -17,9 +20,5 @@ import Options.Applicative
 main :: IO ()
 main = do
   tc <- execParser tkOptions
-  runHydration tc =<< parseHConf
-  -- case conf of
-  --   Left e -> do
-  --     print e
-  --     return ()
-  --   Right c -> runHydration c
+  hc <- parseHConf
+  runGraphM (PoolConf 1 10 10) tc $ runHydration hc
