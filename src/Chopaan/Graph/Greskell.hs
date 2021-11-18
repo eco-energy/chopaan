@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, PackageImports, ExplicitForAll, StandaloneDeriving, DeriveAnyClass, DeriveGeneric, OverloadedStrings, TypeApplications, ScopedTypeVariables #-}
+{-# LANGUAGE ConstraintKinds, PackageImports, ExplicitForAll, StandaloneDeriving, DeriveAnyClass, DeriveGeneric, OverloadedStrings, TypeApplications, ScopedTypeVariables, DerivingVia #-}
 module Chopaan.Graph.Greskell where
 
 import GHC.Generics
@@ -107,10 +107,10 @@ instance FromGraphSON DiffTime where
 
 deriving instance Generic UTCTime
 deriving instance Generic Day
-deriving instance W.Serialise Day
+deriving via (W.WineryRecord Day) instance W.Serialise Day
 
 --instance W.Serialise UTCTime
-instance W.Serialise DiffTime
+deriving via (W.WineryRecord DiffTime) instance W.Serialise DiffTime
 
 instance FromJSON B.ByteString where
   parseJSON (Aeson.String t) = pure $ (either (fail "ByteString Parse Failed!") id . B.decodeBase64 . T.encodeUtf8) t

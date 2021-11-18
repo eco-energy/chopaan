@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction, ScopedTypeVariables, PackageImports #-}
+{-# LANGUAGE RecordWildCards, NamedFieldPuns, TypeApplications, DeriveFunctor, OverloadedStrings, FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction, ScopedTypeVariables, PackageImports, FlexibleInstances #-}
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveAnyClass, DeriveFoldable, DeriveFunctor, DeriveTraversable, DerivingStrategies, DerivingVia, StandaloneDeriving, PackageImports, CPP, ExtendedDefaultRules, BangPatterns, StrictData #-}
 module Chopaan.Node.Metrics where
 
@@ -9,8 +9,8 @@ import Control.Lens
 
 import Data.Typeable
 import Data.Selectors
-import Data.Binary (Binary)
-import qualified Data.Binary as B
+
+import qualified Codec.Winery as W
 import qualified "base64" Data.ByteString.Base64 as B64
 import Data.Time
 import Data.Aeson hiding (encode, decode)
@@ -69,11 +69,15 @@ default(T.Text)
 {----- Basic Types ------}
 
 
+--deriving via (W.WineryRecord (Compensated Double)) instance W.Serialise (Compensated Double) 
+
+deriving via (W.WineryRecord (WattSeconds)) instance W.Serialise (Compensated Double)
 
 newtype WattSeconds = WS { unWs :: Compensated Double }
   deriving stock (Eq, Ord, Generic, Typeable)
-  deriving newtype (Num, Fractional, Binary, Real, RealFrac, NFData)
+  deriving newtype (Num, Fractional, Real, RealFrac, NFData)
   deriving anyclass (Humanize)
+  deriving (W.Serialise) via (W.WineryRecord (WattSeconds))
 
 instance Selectors WattSeconds where
   selectors = selectorsRep @(WattSeconds)
@@ -81,8 +85,9 @@ instance Selectors WattSeconds where
 
 newtype Watts = W { unW :: Compensated Double }
   deriving stock (Eq, Ord, Generic, Typeable)
-  deriving newtype (Num, Fractional, Real, Binary, RealFrac, NFData)
+  deriving newtype (Num, Fractional, Real, RealFrac, NFData)
   deriving anyclass (Humanize)
+  deriving (W.Serialise) via (W.WineryRecord Watts)
 
 instance Selectors Watts where
   selectors = selectorsRep @(Watts)
@@ -135,7 +140,10 @@ data Node a = Node
   { tx :: !a
   , consumed :: !a
   , generated :: !a
-  } deriving (Eq, Ord, Show, Binary, Generic, Functor, NFData, ToJSON, FromJSON, Humanize, Foldable, Traversable)
+  }
+  deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
+  deriving anyclass (NFData, ToJSON, FromJSON, Humanize)
+  deriving W.Serialise via (W.WineryRecord (Node a))
   
 
 instance (Typeable a) => Selectors (Node a) where
