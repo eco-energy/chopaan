@@ -143,5 +143,5 @@ record = KbtzAPI
   --              :> Get '[JSON] (APINode) 
   }
 
-app :: DBPools -> Application
-app p = genericServeT (runGraphWithDB p) record
+kbtzApp :: DBPools -> Application
+kbtzApp p = genericServeT (runGraphWithDB p) record

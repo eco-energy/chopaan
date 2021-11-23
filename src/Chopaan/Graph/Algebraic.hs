@@ -11,7 +11,7 @@ import qualified Codec.Winery as W
 
 import qualified Data.Map as Map
 import Chopaan.Graph.Snapshot
-import Shpadoinkle.Widgets.Types (Humanize)
+-- import Shpadoinkle.Widgets.Types (Humanize)
 import Algebra.Graph.Labelled as AG
 
 

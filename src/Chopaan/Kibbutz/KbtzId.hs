@@ -11,7 +11,7 @@ import Diagrams.Names
 import Data.Typeable
 import Data.Aeson
 import Control.DeepSeq (NFData)
-import Shpadoinkle.Widgets.Types (Humanize (..))
+-- import Shpadoinkle.Widgets.Types (Humanize (..))
 import Data.Greskell (FromGraphSON)
 import qualified Codec.Winery as W
 
@@ -38,4 +38,4 @@ instance (ToHttpApiData a) => ToHttpApiData (KbtzId a) where
 
 instance (Typeable a, Ord a, Show a) => IsName (KbtzId a)
 
-deriving instance (Show a, Humanize a) => Humanize (KbtzId a)
+--deriving instance (Show a a) => Humanize (KbtzId a)

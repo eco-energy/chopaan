@@ -9,7 +9,7 @@ import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 import qualified "base64" Data.ByteString.Base64 as B
-import Data.Time (UTCTime(..), DiffTime(..), Day(..), secondsToDiffTime)
+import Data.Time (UTCTime(..), NominalDiffTime(..), Day(..), secondsToDiffTime)
 --import qualified "base64" Data.Text.Encoding.Base64 as BT
 import Data.Aeson (ToJSON(..), FromJSON(..), parseJSON)
 import qualified Data.Aeson as Aeson
@@ -26,14 +26,12 @@ import Data.Binary
 type GreskellC a = (ToJSON a, FromJSON a, FromGraphSON a, W.Serialise a, Show a)
 
 
-decodeBin :: (FromJSON a)
+decodeBin :: (W.Serialise a)
           => T.Text
-          -> Either PMapLookupException BL.ByteString
-          -> Either PMapLookupException a 
-decodeBin _ (Left a) = (Left a)
-decodeBin tag (Right x) = case Aeson.eitherDecode x of
-  (Left e) -> Left (PMapParseError tag e)
-  (Right x') -> Right x'
+          -> Either PMapLookupException Aeson.Value
+          -> Parser a 
+decodeBin tag (Left a) = fail $ (show tag) <> ":- " <> (show a)
+decodeBin tag (Right x) = wineryJSONRead tag x
 
 
 parseUnwrapTraversable :: (Traversable t, FromJSON (t GValue), FromGraphSON a)
@@ -101,7 +99,7 @@ decB =  either (fail . show) (pure) . join . dec' . (B.decodeBase64 . T.encodeUt
 instance FromGraphSON UTCTime where
   parseGraphSON = parseJSON . unwrapOne
 
-instance FromGraphSON DiffTime where
+instance FromGraphSON NominalDiffTime where
   parseGraphSON = parseJSON . unwrapOne
 
 
@@ -109,24 +107,23 @@ deriving instance Generic UTCTime
 deriving instance Generic Day
 deriving via (W.WineryRecord Day) instance W.Serialise Day
 
---instance W.Serialise UTCTime
-deriving via (W.WineryRecord DiffTime) instance W.Serialise DiffTime
 
-instance FromJSON B.ByteString where
-  parseJSON (Aeson.String t) = pure $ (either (fail "ByteString Parse Failed!") id . B.decodeBase64 . T.encodeUtf8) t
-  parseJSON _ = fail "ByteString should always be an Aeson.String!"
+-- instance FromJSON B.ByteString where
+--   parseJSON (Aeson.String t) = pure $
+--     ((either (fail "ByteString Parse Failed!") id) . B.decodeBase64 . T.encodeUtf8) t
+--   parseJSON _ = fail "ByteString should always be an Aeson.String!"
 
-instance ToJSON B.ByteString where
-  toJSON = Aeson.String . T.decodeUtf8 . B.encodeBase64'
+-- instance ToJSON B.ByteString where
+--   toJSON = Aeson.String . T.decodeUtf8 . B.encodeBase64'
 
-instance FromJSON BL.ByteString where
-  parseJSON a = (pure . BL.fromStrict) =<< Aeson.parseJSON a
+-- instance FromJSON BL.ByteString where
+--   parseJSON a = (pure . BL.fromStrict) =<< Aeson.parseJSON a
 
-instance ToJSON BL.ByteString where
-  toJSON = Aeson.String . T.decodeUtf8 . B.encodeBase64' . BL.toStrict
+-- instance ToJSON BL.ByteString where
+--   toJSON = Aeson.String . T.decodeUtf8 . B.encodeBase64' . BL.toStrict
 
-instance FromGraphSON BL.ByteString where
-  parseGraphSON = parseJSON . unwrapOne
+-- instance FromGraphSON BL.ByteString where
+--   parseGraphSON = parseJSON . unwrapOne
  
 
 

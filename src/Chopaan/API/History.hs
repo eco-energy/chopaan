@@ -98,17 +98,6 @@ type HistoryConn n a e =
   , FromGraphSON n, IsoGConn n a e)
 
 
-instance CRUDChopaan (GraphM) where
-  listKibbutzim = do
-    ks <- withKbtzPool getKbtzim
-    return $ KbtzList ks  
-  listNodezim k = do
-    ns <- withKbtzPool ((flip getKbtzNodes) k)
-    return . NodeList $ ns
-  getGraph :: (IsStream t) => KbtzName -> GraphType -> Resolution -> UTCTime -> UTCTime -> t GraphM (SG NodeMAC)
-  getGraph k g r t t' = S.concatM (getHistoryForGraph k g r t t')
-  --createKbtz k ns t t' = S.concatM (createKbtzWithHydration k ns t t')
-
 daytimeRange s e = zip r (tail r)
   where
     r = dayRange s e

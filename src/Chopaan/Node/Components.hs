@@ -1,21 +1,17 @@
-{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia, FlexibleInstances, OverloadedStrings, ScopedTypeVariables, FlexibleContexts, DeriveTraversable, TypeApplications, CPP #-}
+{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia, DerivingStrategies, FlexibleInstances, OverloadedStrings, ScopedTypeVariables, FlexibleContexts, DeriveTraversable, TypeApplications, CPP #-}
 
 module Chopaan.Node.Components where
 
 import GHC.Generics
 import Control.DeepSeq (NFData)
-import Data.Aeson (ToJSON(..), FromJSON(..), genericParseJSON, genericToEncoding, genericToJSON)
-import qualified Data.Aeson as Aeson
+import Data.Aeson (ToJSON(..), FromJSON(..))
 import qualified Data.Text as T
 
-import Shpadoinkle.Widgets.Types (Humanize(..), Present)
+-- import Shpadoinkle.Widgets.Types (Humanize(..), Present)
 
 import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
 
-import Data.Greskell (FromGraphSON(..), Key(..), PMap
-                     , GValue, Single, Parser
-                     , parseUnwrapList, parseJSONViaGValue, (.:)
-                     , lookup, lookupM)
+import Data.Greskell (FromGraphSON(..), Key(..))
 import Chopaan.Graph.Greskell
 
 #ifndef ghcjs_HOST_OS
@@ -23,18 +19,17 @@ import NetSpider.Graph (NodeAttributes(..), VFoundNode)
 #endif
 
 import Data.Greskell.Extra (writeKeyValues, (<=:>), pMapToFail, lookupAs)
-import Data.Text.Encoding (encodeUtf8)
-import Data.ByteString.Lazy (fromStrict)
 import qualified Codec.Winery as W
 
 
 data BatteryType = LeadAcidFlooded | LeadAcidSealed | LithiumIon
-  deriving (Eq, Ord, Enum, Bounded, Read, Show, Humanize, Present,
-            Generic, W.Serialise, ToJSON, FromJSON, NFData)
+  deriving (Eq, Ord, Enum, Bounded, Read, Show,
+            Generic, ToJSON, FromJSON, NFData)
+  deriving W.Serialise via (W.WineryVariant BatteryType)
 
 
-instance Humanize (Maybe BatteryType) where
-  humanize = maybe "select battery" humanize
+-- instance Humanize (Maybe BatteryType) where
+--   humanize = maybe "select battery" humanize
 
 instance Semigroup BatteryType where (<>) = min
 instance Monoid BatteryType where mempty = minBound
@@ -47,7 +42,9 @@ data BatteryConf a = BatteryConf
   , maxV :: a
   , capacityAH :: a
   , batType :: BatteryType
-  } deriving (Eq, Ord, Show, Read, Generic, W.Serialise, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
+  }
+  deriving (Eq, Ord, Show, Read, Generic, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
+  deriving W.Serialise via (W.WineryRecord (BatteryConf a))
 
 instance (GreskellC a, Num a) => FromGraphSON (BatteryConf a) where
   parseGraphSON = parseUnwrapTraversable
@@ -83,11 +80,9 @@ defBC = BatteryConf 0 0 0 LeadAcidFlooded
 data BatteryTop a = ParBC (BatteryConf a) (BatteryConf a)
                   | SeqBC (BatteryConf a) (BatteryConf a)
                   | SingBC (BatteryConf a)
-                  deriving (Eq, Ord, Show, Read, Generic, W.Serialise, NFData, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Read, Generic, NFData, Functor, Foldable, Traversable)
+  deriving W.Serialise via (W.WineryVariant (BatteryTop a))
 
-batEncodingOpts = optSumEncoding
-pvEncodingOpts = optSumEncoding
-ldEncodingOpts = optSumEncoding
 
 
 instance (W.Serialise a) => ToJSON (BatteryTop a) where
@@ -129,7 +124,9 @@ data PVConf a = PVConf
   , vAtMPP :: a
   , iAtMPP :: a
   , pvPower :: a
-  } deriving (Eq, Ord, Show, Read, Generic, W.Serialise, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
+  }
+  deriving (Eq, Ord, Show, Read, Generic, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
+  deriving W.Serialise via (W.WineryRecord (PVConf a))
 
 instance (GreskellC a, Num a) => FromGraphSON (PVConf a) where
   parseGraphSON = parseUnwrapTraversable
@@ -141,8 +138,8 @@ defPC = PVConf 0 0 0 0
 data PVTop a = ParPC (PVConf a) (PVConf a)
              | SeqPC (PVConf a) (PVConf a)
              | SingPC (PVConf a)
-             deriving (Eq, Ord, Show, Read, Generic, W.Serialise, NFData, Functor, Foldable, Traversable)
-
+  deriving (Eq, Ord, Show, Read, Generic, NFData, Functor, Foldable, Traversable)
+  deriving W.Serialise via (W.WineryVariant (PVTop a))
 
 instance (W.Serialise a) => ToJSON (PVTop a) where
   toJSON = wineryJSONWrite
@@ -176,7 +173,10 @@ runPV (APV bConf evolve) p = evolve bConf p
 data LoadConf a = LoadConf
   { loadPower :: a
   , loadName :: T.Text
-  } deriving (Eq, Ord, Show, Read, Generic, W.Serialise, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
+  }
+  deriving (Eq, Ord, Show, Read, Generic, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
+  deriving W.Serialise via (W.WineryRecord (LoadConf a))
+
 
 instance (GreskellC a, Num a) => FromGraphSON (LoadConf a) where
   parseGraphSON = parseUnwrapTraversable
@@ -188,13 +188,13 @@ defLC = LoadConf 0 "No_LC"
 data Load a where
   ParLoad :: Load a -> Load a -> Load a
   ALoad :: LoadConf a -> Load a
-  deriving (Generic, W.Serialise, NFData, ToJSON, FromJSON)
-
+  deriving (Generic, NFData, ToJSON, FromJSON)
+  deriving W.Serialise via (W.WineryVariant (Load a))
 
 data LoadTop a = ParLC (LoadConf a) (LoadConf a)
                | SingLC (LoadConf a)
-  deriving (Eq, Ord, Show, Read, Generic, W.Serialise, NFData, Functor, Foldable, Traversable)
-
+  deriving (Eq, Ord, Show, Read, Generic, NFData, Functor, Foldable, Traversable)
+  deriving W.Serialise via (W.WineryVariant (LoadTop a))
 
 
 instance (W.Serialise a, Show a) => ToJSON (LoadTop a) where

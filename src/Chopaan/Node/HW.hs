@@ -32,35 +32,36 @@ import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), VFoundNode, EFin
 import Data.Monoid (Sum(..))
 
 import Chopaan.Node.Components
-import Chopaan.Ui.FormCommon
 import Chopaan.Graph.Greskell
 
-import Shpadoinkle (MonadJSM, Html)
-import qualified Shpadoinkle.Html as H
+-- import Shpadoinkle (MonadJSM, Html)
+-- import qualified Shpadoinkle.Html as H
 
-import Shpadoinkle.Widgets.Types (Field, Humanize (..)
-                                 , Hygiene (Clean)
-                                 , Input (Input)
-                                 , Status (Edit, Errors, Valid)
-                                 , Validate(..), Validated(..), Present
-                                 , Pick (AtleastOne, One)
-                                 , fullOptions
-                                 )
+-- -- import Shpadoinkle.Widgets.Types (Field (..)
+--                                  , Hygiene (Clean)
+--                                  , Input (Input)
+--                                  , Status (Edit, Errors, Valid)
+--                                  , Validate(..), Validated(..), Present
+--                                  , Pick (AtleastOne, One)
+--                                  , fullOptions
+--                                  )
 
-import Shpadoinkle.Widgets.Form.Dropdown as Dropdown (Dropdown)
+-- import Shpadoinkle.Widgets.Form.Dropdown as Dropdown (Dropdown)
 
 
-import Shpadoinkle.Widgets.Validation ( between
-                                      , nonMEmpty
-                                      , nonZero
-                                      , positive)
+-- import Shpadoinkle.Widgets.Validation ( between
+                                      -- , nonMEmpty
+                                      -- , nonZero
+                                      -- , positive)
 
 
 data HW a = HW
   { storage :: BatteryTop a
   , generation :: PVTop a
   , loads :: LoadTop a
-  } deriving (Eq, Ord, Show, Generic, W.Serialise, NFData, Functor, Foldable, Traversable)
+  }
+  deriving (Eq, Ord, Show, Generic, NFData, Functor, Foldable, Traversable)
+  deriving W.Serialise via (W.WineryRecord (HW a))
 
 instance (W.Serialise a) => ToJSON (HW a) where
   toJSON = wineryJSONWrite --genericToJSON pvEncodingOpts
@@ -74,7 +75,6 @@ instance (W.Serialise a) => FromJSON (HW a) where
 defHW :: Num a => HW a
 defHW = HW (SingBC defBC) (SingPC defPC) (SingLC defLC)
 
-instance (Show a) => Humanize (HW a)
 
 #ifndef ghcjs_HOST_OS
 storageKey :: (Num a) => Key VFoundNode (BatteryTop a)
@@ -115,192 +115,192 @@ instance (GreskellC a, Num a, Read a) => FromGraphSON (HW a) where
 newtype WattHours = WattHours Double
   deriving stock (Generic)
   deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
-  deriving anyclass (Humanize, Present, NFData)
+  deriving anyclass (NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 newtype Volts = Volts Double
   deriving stock (Generic)
   deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
-  deriving anyclass (Humanize, Present, NFData)
+  deriving anyclass (NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 newtype Amperes = Amperes Double
   deriving stock (Generic)
   deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
-  deriving anyclass (Humanize, Present, NFData)
+  deriving anyclass (NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 newtype Watts = Watts Double
   deriving stock (Generic)
   deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
-  deriving anyclass (Humanize, Present, NFData)
+  deriving anyclass (NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
 newtype Hours = Hours Double
   deriving stock (Generic)
   deriving newtype (Fractional, Real, Enum, Eq, Ord, Show, Read, Num, ToJSON, FromJSON)
-  deriving anyclass (Humanize, Present, NFData)
+  deriving anyclass (NFData)
   deriving (Semigroup, Monoid) via (Sum Double)
 
-data StorageUpdate (s :: Status) = StorageUpdate
-  { capacity :: Field s Text Input WattHours
-  , minVoltage :: Field s Text Input Volts
-  , maxVoltage :: Field s Text Input Volts
-  , batteryType :: Field s Text (Dropdown 'One) BatteryType
-  } deriving (Generic)
+-- data StorageUpdate (s :: Status) = StorageUpdate
+--   { capacity :: Field s Text Input WattHours
+--   , minVoltage :: Field s Text Input Volts
+--   , maxVoltage :: Field s Text Input Volts
+--   , batteryType :: Field s Text (Dropdown 'One) BatteryType
+--   } deriving (Generic)
 
-UpdateInstances(StorageUpdate)
+-- UpdateInstances(StorageUpdate)
 
-instance ( NFData (Field s Text Input (WattHours))
-         , NFData (Field s Text Input (Volts))
-         , NFData (Field s Text Input (Watts))
-         , NFData (Field s Text (Dropdown 'One) (BatteryType))
-         ) => NFData (StorageUpdate s)
+-- instance ( NFData (Field s Text Input (WattHours))
+--          , NFData (Field s Text Input (Volts))
+--          , NFData (Field s Text Input (Watts))
+--          , NFData (Field s Text (Dropdown 'One) (BatteryType))
+--          ) => NFData (StorageUpdate s)
 
-instance Validate StorageUpdate where
-  rules = StorageUpdate
-    { capacity = positive
-    , minVoltage = positive
-    , maxVoltage = positive
-    , batteryType = maybe (throwError "Cannot be empty") pure
-    }
+-- instance Validate StorageUpdate where
+--   rules = StorageUpdate
+--     { capacity = positive
+--     , minVoltage = positive
+--     , maxVoltage = positive
+--     , batteryType = maybe (throwError "Cannot be empty") pure
+--     }
 
-storageForm :: StorageUpdate 'Edit
-storageForm = StorageUpdate
-    { capacity = Input Clean 0
-    , minVoltage = Input Clean 0
-    , maxVoltage = Input Clean 0
-    , batteryType = fullOptions
-    }
+-- storageForm :: StorageUpdate 'Edit
+-- storageForm = StorageUpdate
+--     { capacity = Input Clean 0
+--     , minVoltage = Input Clean 0
+--     , maxVoltage = Input Clean 0
+--     , batteryType = fullOptions
+--     }
 
-addBattery :: (MonadJSM m) => StorageUpdate 'Edit -> Html m (StorageUpdate 'Edit)
-addBattery bc = H.div [ ]
-      [ realControl @WattHours #capacity "Battery Capacity" errs bc
-      , realControl @Volts #minVoltage "Minimum Battery Voltage" errs bc
-      , realControl @Volts #maxVoltage "Maximum Battery Voltage" errs bc
-      , selectControl @'One @BatteryType #batteryType "Battery Type" errs bc
-      ]
-  where
-    errs = validate bc
-
-
-data GenerationUpdate (s :: Status) = GenerationUpdate
-  { genPower :: Field s Text Input Watts
-  , openCircuitVoltage :: Field s Text Input Volts
-  , voltageAtMPP :: Field s Text Input Volts
-  , currentAtMPP :: Field s Text Input Amperes 
-  } deriving (Generic)
-
-instance ( NFData (Field s Text Input (Amperes))
-         , NFData (Field s Text Input (Volts))
-         , NFData (Field s Text Input (Watts))
-         ) => NFData (GenerationUpdate s)
-
-UpdateInstances(GenerationUpdate)
-
-instance Validate GenerationUpdate where
-  rules = GenerationUpdate
-    { genPower = positive
-    , openCircuitVoltage = positive
-    , voltageAtMPP = positive
-    , currentAtMPP = positive
-    }
-
-generationForm :: GenerationUpdate 'Edit
-generationForm = GenerationUpdate
-  { genPower = Input Clean 0
-  , openCircuitVoltage = Input Clean 0
-  , voltageAtMPP = Input Clean 0
-  , currentAtMPP = Input Clean 0 
-  }
+-- addBattery :: (MonadJSM m) => StorageUpdate 'Edit -> Html m (StorageUpdate 'Edit)
+-- addBattery bc = H.div [ ]
+--       [ realControl @WattHours #capacity "Battery Capacity" errs bc
+--       , realControl @Volts #minVoltage "Minimum Battery Voltage" errs bc
+--       , realControl @Volts #maxVoltage "Maximum Battery Voltage" errs bc
+--       , selectControl @'One @BatteryType #batteryType "Battery Type" errs bc
+--       ]
+--   where
+--     errs = validate bc
 
 
-addGeneration :: (MonadJSM m) => GenerationUpdate 'Edit -> Html m (GenerationUpdate 'Edit)
-addGeneration ef = H.div genProps [
-  realControl @Watts #genPower "Panel Power" errs ef
-  , realControl @Volts #openCircuitVoltage "Open Circuit Voltage" errs ef
-  , realControl @Volts #voltageAtMPP "Voltage @ Max Power Point" errs ef
-  , realControl @Amperes #currentAtMPP "Current @ Max Power Point" errs ef
-  ]
-  where
-    genProps = []
-    errs = validate ef
+-- data GenerationUpdate (s :: Status) = GenerationUpdate
+--   { genPower :: Field s Text Input Watts
+--   , openCircuitVoltage :: Field s Text Input Volts
+--   , voltageAtMPP :: Field s Text Input Volts
+--   , currentAtMPP :: Field s Text Input Amperes 
+--   } deriving (Generic)
 
-data LoadUpdate (s :: Status) = LoadUpdate
-  { loadPowerU :: Field s Text Input Watts
-  , loadDuration :: Field s Text Input Hours
-  } deriving (Generic)
+-- instance ( NFData (Field s Text Input (Amperes))
+--          , NFData (Field s Text Input (Volts))
+--          , NFData (Field s Text Input (Watts))
+--          ) => NFData (GenerationUpdate s)
 
+-- UpdateInstances(GenerationUpdate)
 
-instance ( NFData (Field s Text Input (Watts))
-         , NFData (Field s Text Input (Hours))
-         ) => NFData (LoadUpdate s)
+-- instance Validate GenerationUpdate where
+--   rules = GenerationUpdate
+--     { genPower = positive
+--     , openCircuitVoltage = positive
+--     , voltageAtMPP = positive
+--     , currentAtMPP = positive
+--     }
 
-UpdateInstances(LoadUpdate)
-
-instance Validate LoadUpdate where
-  rules = LoadUpdate { loadPowerU = positive
-                     , loadDuration = positive
-                     }
-
-loadForm :: LoadUpdate 'Edit
-loadForm = LoadUpdate
-  { loadPowerU = Input Clean 0
-  , loadDuration = Input Clean 0
-  }
-
-addLoad :: (MonadJSM m) => LoadUpdate 'Edit -> Html m (LoadUpdate 'Edit) 
-addLoad ef = H.div loadProps 
-  [ realControl @Watts (#loadPowerU) "Load Power" errs ef
-  , realControl @Hours (#loadDuration) "Load Duration" errs ef
-  ]
-  where
-    loadProps = []
-    errs = validate ef
+-- generationForm :: GenerationUpdate 'Edit
+-- generationForm = GenerationUpdate
+--   { genPower = Input Clean 0
+--   , openCircuitVoltage = Input Clean 0
+--   , voltageAtMPP = Input Clean 0
+--   , currentAtMPP = Input Clean 0 
+--   }
 
 
-data HWUpdate (s :: Status) = HWUpdate
-  { storageU :: StorageUpdate s
-  , generationU :: GenerationUpdate s
-  , loadU :: LoadUpdate s
-  } deriving (Generic)
+-- addGeneration :: (MonadJSM m) => GenerationUpdate 'Edit -> Html m (GenerationUpdate 'Edit)
+-- addGeneration ef = H.div genProps [
+--   realControl @Watts #genPower "Panel Power" errs ef
+--   , realControl @Volts #openCircuitVoltage "Open Circuit Voltage" errs ef
+--   , realControl @Volts #voltageAtMPP "Voltage @ Max Power Point" errs ef
+--   , realControl @Amperes #currentAtMPP "Current @ Max Power Point" errs ef
+--   ]
+--   where
+--     genProps = []
+--     errs = validate ef
+
+-- data LoadUpdate (s :: Status) = LoadUpdate
+--   { loadPowerU :: Field s Text Input Watts
+--   , loadDuration :: Field s Text Input Hours
+--   } deriving (Generic)
+
+
+-- instance ( NFData (Field s Text Input (Watts))
+--          , NFData (Field s Text Input (Hours))
+--          ) => NFData (LoadUpdate s)
+
+-- UpdateInstances(LoadUpdate)
+
+-- instance Validate LoadUpdate where
+--   rules = LoadUpdate { loadPowerU = positive
+--                      , loadDuration = positive
+--                      }
+
+-- loadForm :: LoadUpdate 'Edit
+-- loadForm = LoadUpdate
+--   { loadPowerU = Input Clean 0
+--   , loadDuration = Input Clean 0
+--   }
+
+-- addLoad :: (MonadJSM m) => LoadUpdate 'Edit -> Html m (LoadUpdate 'Edit) 
+-- addLoad ef = H.div loadProps 
+--   [ realControl @Watts (#loadPowerU) "Load Power" errs ef
+--   , realControl @Hours (#loadDuration) "Load Duration" errs ef
+--   ]
+--   where
+--     loadProps = []
+--     errs = validate ef
+
+
+-- data HWUpdate (s :: Status) = HWUpdate
+--   { storageU :: StorageUpdate s
+--   , generationU :: GenerationUpdate s
+--   , loadU :: LoadUpdate s
+--   } deriving (Generic)
 
 
 
 
-type NFDataHW s = (NFData (Field s Text Input (WattHours))
-         , NFData (Field s Text Input (Amperes))
-         , NFData (Field s Text Input (Volts))
-         , NFData (Field s Text Input (Watts))
-         , NFData (Field s Text Input (Hours))
-         , NFData (Field s Text (Dropdown 'One) (BatteryType)))
+-- type NFDataHW s = (NFData (Field s Text Input (WattHours))
+--          , NFData (Field s Text Input (Amperes))
+--          , NFData (Field s Text Input (Volts))
+--          , NFData (Field s Text Input (Watts))
+--          , NFData (Field s Text Input (Hours))
+--          , NFData (Field s Text (Dropdown 'One) (BatteryType)))
 
-instance ( NFDataHW s
-         ) => NFData (HWUpdate s)
+-- instance ( NFDataHW s
+--          ) => NFData (HWUpdate s)
 
-UpdateInstances(HWUpdate)
+-- UpdateInstances(HWUpdate)
 
-instance Validate HWUpdate where
-  rules = HWUpdate { storageU = rules, generationU = rules, loadU = rules }
-  validate (HWUpdate{storageU, generationU, loadU}) = HWUpdate
-    { storageU = validate storageU
-    , generationU = validate generationU
-    , loadU = validate loadU
-    }
-  getValid (HWUpdate{storageU,generationU, loadU}) = case getValid storageU of
-    Nothing -> Nothing
-    Just x -> case getValid generationU of
-      Nothing -> Nothing
-      Just y -> case getValid loadU of
-        Nothing -> Nothing
-        Just z -> Just (HWUpdate { storageU = x
-                                 , generationU = y
-                                 , loadU = z})
+-- instance Validate HWUpdate where
+--   rules = HWUpdate { storageU = rules, generationU = rules, loadU = rules }
+--   validate (HWUpdate{storageU, generationU, loadU}) = HWUpdate
+--     { storageU = validate storageU
+--     , generationU = validate generationU
+--     , loadU = validate loadU
+--     }
+--   getValid (HWUpdate{storageU,generationU, loadU}) = case getValid storageU of
+--     Nothing -> Nothing
+--     Just x -> case getValid generationU of
+--       Nothing -> Nothing
+--       Just y -> case getValid loadU of
+--         Nothing -> Nothing
+--         Just z -> Just (HWUpdate { storageU = x
+--                                  , generationU = y
+--                                  , loadU = z})
 
-emptyHWForm :: HWUpdate 'Edit
-emptyHWForm = HWUpdate
-  { storageU = storageForm
-  , generationU = generationForm
-  , loadU = loadForm
-  }
+-- emptyHWForm :: HWUpdate 'Edit
+-- emptyHWForm = HWUpdate
+--   { storageU = storageForm
+--   , generationU = generationForm
+--   , loadU = loadForm
+--   }
 

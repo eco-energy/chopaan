@@ -52,10 +52,10 @@ import Chopaan.Kibbutz
 import Chopaan.Graph.Spider
 import Chopaan.Graph.Snapshot
 
-import Chopaan.Ui.Interaction
-import Chopaan.Ui.Base
-import Chopaan.Ui.Events
-import Chopaan.Ui.ThreeD
+-- import Chopaan.Ui.Interaction
+-- import Chopaan.Ui.Base
+-- import Chopaan.Ui.Events
+-- import Chopaan.Ui.ThreeD
 
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
@@ -78,10 +78,10 @@ runDBs name = do
 runJanus :: (TC.MonadDocker m) => T.Text -> m (String, Int)
 runJanus name = do
   c <- ask
-  let t = TC.newTracer print
+  --let t = TC.newTracer print
   --let c' = c { TC.configTracer = t }
   jC <- (flip runReaderT $ c) $ TC.run =<< (janus name)
-  --tr jC
+  tr jC
   --liftIO . print $ c
   pure ("localhost", TC.containerPort jC 8182)
 
@@ -92,6 +92,11 @@ runInflux name = do
   iC <- (flip runReaderT $ c) $ TC.run (influx name)
   pure ("localhost", TC.containerPort iC 8182)
 
+withTC :: (forall a. (ReaderT TC.Config ResIO a) -> IO a)
+withTC a = TC.runResourceT $ runReaderT a TC.defaultDockerConfig
+
+janusC :: (TC.MonadDocker m) => T.Text -> m (TC.Container)
+janusC n = TC.run =<< janus n
 
 influx :: T.Text -> TC.ContainerRequest
 influx name = TC.containerRequest (TC.fromTag "influxdb:1.8")
@@ -116,7 +121,7 @@ janus name = do
                        & TC.setName ("janus-test-" <> name)          
                        & TC.setVolume vols
                        & TC.setExpose [ 8182 ]
-                       & TC.setWaitingFor waiter
+                     --  & TC.setWaitingFor waiter
       where
         waiter = TC.waitUntilTimeout 120 $ TC.waitForLogLine TC.Stdout (TL.isInfixOf readyLog)
         readyLog = "Channel started at port 8182"
@@ -208,14 +213,14 @@ instance (Arbitrary n, Arbitrary v, Arbitrary e) => Arbitrary (SG' n v e) where
 instance (forall a b. (Arbitrary a, Arbitrary b) => Arbitrary (k n a b)) => Arbitrary (G k n) where
   arbitrary = genericArbitrary
 
-instance Arbitrary Button where
-  arbitrary = genericArbitrary
+-- instance Arbitrary Button where
+--   arbitrary = genericArbitrary
 
-instance Arbitrary PointerType where
-  arbitrary = genericArbitrary
+-- instance Arbitrary PointerType where
+--   arbitrary = genericArbitrary
 
-instance Arbitrary Pointer where
-  arbitrary = genericArbitrary
+-- instance Arbitrary Pointer where
+--   arbitrary = genericArbitrary
 
 instance (Arbitrary a) => Arbitrary (V2 a) where
   arbitrary = genericArbitrary

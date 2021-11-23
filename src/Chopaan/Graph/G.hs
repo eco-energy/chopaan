@@ -33,7 +33,7 @@ import Chopaan.Node.Mesh
 import Chopaan.Kibbutz.Transactor
 import Chopaan.Graph.Snapshot
 
-import Shpadoinkle.Widgets.Types (Humanize)
+-- import Shpadoinkle.Widgets.Types (Humanize)
 #ifndef ghcjs_HOST_OS
 import NetSpider.Spider.Config
 import Data.Pool
@@ -42,7 +42,7 @@ import NetSpider.Spider
 
 
 data GraphType = MeshG | PlanG | StatusG | FlowG
-  deriving (Eq, Ord, Show, Read, Bounded, Enum, Generic, ToJSON, FromJSON, NFData, Humanize)
+  deriving (Eq, Ord, Show, Read, Bounded, Enum, Generic, ToJSON, FromJSON, NFData)
 
 
 data G k n = Mesh (k n MeshNode RxSignal) -- -> G k n

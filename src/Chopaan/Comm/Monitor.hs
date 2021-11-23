@@ -10,7 +10,7 @@ import System.Metrics.Gauge as G
 import System.Metrics.Counter as C
 import System.Metrics hiding (Counter, Gauge)
 import Data.Vinyl
-import Composite.Ekg
+--import Composite.Ekg
 import qualified Data.Text as T
 import Data.Selectors
 

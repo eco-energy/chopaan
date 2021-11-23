@@ -16,12 +16,12 @@ import qualified Data.Text as T
 import Data.Text.Encoding
 
 
-import Shpadoinkle.Widgets.Types (Field, Humanize (..)
+-- import Shpadoinkle.Widgets.Types (Field (..)
                                  , Hygiene (Clean)
                                  , Input (Input), getValue
                                  , Status (Edit, Errors, Valid)
                                  , Validate (..), Validated(..), ValidateG(..))
-import Shpadoinkle.Widgets.Validation ( between
+-- import Shpadoinkle.Widgets.Validation ( between
                                       , nonMEmpty
                                       , nonZero
                                       , positive)

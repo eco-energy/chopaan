@@ -9,9 +9,6 @@ import Data.Word
 import Data.Int
 import Data.Ix
 import qualified Data.Text as T
-import GHC.Read
-import Text.ParserCombinators.ReadP
-import Text.ParserCombinators.ReadPrec
 
 fromPico :: Pico -> Integer
 fromPico (MkFixed i) = i
@@ -41,17 +38,10 @@ parseUTCTime = utcTimeNow . read . T.unpack
 parseUTCTimeMS :: T.Text -> UTCTime
 parseUTCTimeMS = utcTimeNow . (flip div 1000) . read . T.unpack
 
-diffUTC :: UTCTime -> UTCTime -> DiffTime
-diffUTC a b = realToFrac $ diffUTCTime a b
+diffUTC :: UTCTime -> UTCTime -> NominalDiffTime
+diffUTC a b = diffUTCTime a b
 
 dayRange :: UTCTime -> UTCTime -> [UTCTime]
 dayRange start end = r
   where
     r = (flip UTCTime $ 0) <$> range (utctDay start, succ $ utctDay end)
-
-
-instance Read DiffTime where
-  readPrec = do
-    t <- readPrec
-    _ <- lift $ char 's'
-    return $ fromInteger t

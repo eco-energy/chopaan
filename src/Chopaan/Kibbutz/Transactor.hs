@@ -1,5 +1,5 @@
 {-# LANGUAGE NamedFieldPuns, OverloadedStrings, TupleSections #-}
-{-# LANGUAGE DeriveFunctor, DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE DeriveFunctor, DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveFoldable, DeriveTraversable, DerivingVia #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
@@ -51,6 +51,7 @@ import GHC.Generics (Generic)
 import qualified Algebra.Graph.Labelled as G
 import Algebra.Graph.Labelled (Graph(..))
 
+import qualified Codec.Winery as W
 import qualified Data.Time as Time
 import qualified Data.Text as Text
 import Data.Word
@@ -64,7 +65,6 @@ import Lens.Micro
 import Data.ProtoLens
 import Data.Convertible
 import Data.Convertible.Instances ()
-import Data.ULID
 import Data.Aeson as A
 import qualified Data.ByteString.Lazy as BL
 
@@ -81,7 +81,7 @@ import qualified Data.Map.Strict as M
 import Data.Key hiding (Key)
 import qualified Data.List as L
 
-import Shpadoinkle.Widgets.Types (Humanize(..))
+-- import Shpadoinkle.Widgets.Types (Humanize(..))
 
 #ifndef ghcjs_HOST_OS
 import Chopaan.Kibbutz.LinOpt
@@ -102,7 +102,7 @@ import Chopaan.Graph.Greskell
 newtype Tx n a = Tx { unTx :: M.Map n a }
   deriving stock (Eq, Ord, Show, Generic, Traversable)
   deriving newtype (ToJSON, FromJSON, NFData, Functor, Foldable)
-  deriving anyclass (Humanize)
+  deriving W.Serialise via (W.WineryRecord (Tx n a))
 
 instance (Ord n) => Semigroup (Tx n a) where
   (Tx m) <> (Tx m') = Tx (m <> m')
@@ -129,11 +129,12 @@ data TxStatus' e = TxStatus'
   , energyRemaining :: !e
   , lossPerWattSecond :: !e
   , totalLoss :: !e
-  , timeRemaining :: !Time.DiffTime
-  , startLag :: !Time.DiffTime
-  , endLag :: !Time.DiffTime
-  } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData, Humanize)
-
+  , timeRemaining :: !Time.NominalDiffTime
+  , startLag :: !Time.NominalDiffTime
+  , endLag :: !Time.NominalDiffTime
+  }
+  deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
+  deriving W.Serialise via (W.WineryRecord (TxStatus' e))
 
 type TxStatus = TxStatus' WattSeconds
 
@@ -164,7 +165,7 @@ instance  (Ord e, RealFrac e) => Monoid (TxStatus' e) where
     }
 
 #ifndef ghcjs_HOST_OS
-planTx :: (MonadAsync m, MonadCatch m,  Ord n, Show n, IsStream t) => Time.DiffTime -> t m (NodeStates n) -> t m (Maybe (TxPlan n))
+planTx :: (MonadAsync m, MonadCatch m,  Ord n, Show n, IsStream t) => Time.NominalDiffTime -> t m (NodeStates n) -> t m (Maybe (TxPlan n))
 planTx !horizon k = S.postscan (transactionPlanner horizon) k 
 {-# INLINE planTx #-}
 
@@ -202,14 +203,6 @@ foldTxState (Tx gt) = let
       lossPerWS = loss / (energyDispatched gridTx)
       in gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
 {-# INLINE foldTxState #-}
--- The state will just be carried across as a FLTxStatus
-
---idFold' :: (Monad m) => FL.Fold m a (Maybe a)
---idFold' = FL.lcatMaybes idFold 
-
---composeFold :: FL.Fold m a b -> FL.Fold m b c -> FL.Fold m a c
---composeFold f g = g . f
-  
 
 txFold :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
        => TxPlan n
@@ -306,17 +299,17 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
 
 
 -- planPipe :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
---   => Time.DiffTime -> P.Pipe m (NodeStates n) (Maybe (TxPlan n))
+--   => Time.NominalDiffTime -> P.Pipe m (NodeStates n) (Maybe (TxPlan n))
 -- planPipe = P.mapM . txn
 
 -- planToStatus :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
 --              => P.Pipe m (Maybe (TxPlan n)) (Maybe (TxPlan n, TxState n)) 
 -- planToStatus = P.zipWith (\x y -> (,) <$> x <*> y) C.id (P.map (fmap planToState))
 
--- ntos :: (MonadIO m, MonadCatch m,  Ord n) => Time.DiffTime ->  P.Pipe m (NodeStates n) (Maybe (TxPlan n, TxState n))
+-- ntos :: (MonadIO m, MonadCatch m,  Ord n) => Time.NominalDiffTime ->  P.Pipe m (NodeStates n) (Maybe (TxPlan n, TxState n))
 -- ntos t = planToStatus C.. (planPipe t)
 
--- statePipe :: (MonadIO m, MonadCatch m,  Ord n) => Time.DiffTime -> P.Pipe m (NodeStates n) (Maybe (NodeStates n, TxPlan n, TxState n))
+-- statePipe :: (MonadIO m, MonadCatch m,  Ord n) => Time.NominalDiffTime -> P.Pipe m (NodeStates n) (Maybe (NodeStates n, TxPlan n, TxState n))
 -- statePipe t = (P.zipWith status (ntos t) (P.map Just))
 
 -- statePipeWithId h = P.zipWith (,) (P.map fst) (P.compose (statePipe h) (P.map snd))
@@ -340,7 +333,7 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
 -- statusS = fmap status
 
 
-transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Ord n) => Time.DiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
+transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Ord n) => Time.NominalDiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
 transactionPlanner !timeHorizon = FL.foldlM' (\_ n -> txn timeHorizon n) (pure mempty)
 {-# INLINE transactionPlanner#-}
 
@@ -349,11 +342,8 @@ txn' h t = (pure . (fromMaybe mempty)) =<< txn h t
 {-# INLINE txn' #-}
 
 
-txn :: forall m n. (MonadIO m, MonadCatch m, Ord n, Show n) => Time.DiffTime -> NodeStates n -> m (TxPlan' n)
+txn :: forall m n. (MonadIO m, MonadCatch m, Ord n, Show n) => Time.NominalDiffTime -> NodeStates n -> m (TxPlan' n)
 txn !h !(Tx ns) = do
-  -- liftIO . print $ (better mkSources sources)
-  -- liftIO . print $ (better mkSinks sinks)
-  -- liftIO . print $ d
   let nodes = M.keys ns
   let indexer = M.fromList $ zip [1..] nodes
       getAtI i = indexer M.! i
@@ -376,8 +366,7 @@ txn !h !(Tx ns) = do
         schedule =  (fmap join) . tryForMaybe $ (solveTP h)
                     (better mkSources sources)
                     (better mkSinks sinks)
-          [[1 -- (fromIntegral $ mod j 2) * 1000
-           | i <- [1..length sources]] | j <- [1..length sinks]]
+          [[1 | i <- [1..length sources]] | j <- [1..length sinks]]
 {-# INLINE txn #-}
 
 tryForMaybe :: (MonadIO m, MonadCatch m) => m a -> m (Maybe a) 
@@ -393,21 +382,11 @@ expToMaybe (Right a) = return $ Just a
 type TxPlan' n = Maybe (TxPlan n)
 
 
-solveTP :: forall m . (MonadIO m, MonadCatch m) => Time.DiffTime -> Sources Int -> Sinks Int -> [[Double]] -> m (TxPlan' Int)
+solveTP :: forall m . (MonadIO m, MonadCatch m) => Time.NominalDiffTime -> Sources Int -> Sinks Int -> [[Double]] -> m (TxPlan' Int)
 solveTP timeHorizon sources sinks cs = do
   liftIO $ do
     (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs
-    -- let
-    --   pSol (Unsatisfiable _ x) = print "Unsatisfiable"-- >> print x
-    --   pSol (Satisfiable _ m) = print "Satisfiable!"-- >> print m
-    --   pSol (SatExtField _ m) = print "Satisfies Extension Field Only!" >> print m
-    --   pSol (Unknown _ s) = print "Unknown!" >> print s
-    --   pSol (ProofError _ s _) = print "Proof Error!" >> print s
-      
-      
-    -- liftIO . pSol $ sol
     let dict = getModelDictionary sol
-    --liftIO . print $ "Plan:\n" <> (show dict)
     if not . modelExists $ sol then return Nothing else do
       let (ns, cvs) = unzip $ M.toAscList dict
       --liftIO . print $ dict
@@ -438,7 +417,7 @@ solveTP timeHorizon sources sinks cs = do
         Nothing -> []
       toSourceStake t (i, e) = (i, Stake (Source, (e2p t e), t))
       toSinkStake t (i, e) = (i, Stake (Sink, (- e2p t e), t))
-      e2p :: Time.DiffTime -> WattSeconds -> Watts
+      e2p :: Time.NominalDiffTime -> WattSeconds -> Watts
       e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
 {-# INLINE solveTP #-}
 #endif
@@ -450,6 +429,7 @@ solveTP timeHorizon sources sinks cs = do
 
 data Role = Source | Sink
   deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
+  deriving W.Serialise via (W.WineryVariant (Role))
 
 #ifndef ghcjs_HOST_OS
 instance FromGraphSON Role where
@@ -457,29 +437,29 @@ instance FromGraphSON Role where
 #endif
 
 newtype Stake' p = Stake
-  { unStake :: (Role, p, Time.DiffTime) }
+  { unStake :: (Role, p, Time.NominalDiffTime) }
   deriving stock (Eq, Ord, Show, Generic)
   deriving newtype (NFData, ToJSON, FromJSON)
-  deriving anyclass (Humanize)
+  deriving W.Serialise via (W.WineryRecord (Stake' p))
 
 type Stake = Stake' Watts
 
 #ifndef ghcjs_HOST_OS
-stakeKey :: forall n. Key n BL.ByteString
+stakeKey :: forall n a. Key n a
 stakeKey = "txStake"
 
-instance (ToJSON n, FromJSON n) => NodeAttributes (Stake' n) where
+instance (W.Serialise n) => NodeAttributes (Stake' n) where
   writeNodeAttributes s = fmap writeKeyValues $
-    sequence [ (stakeKey @VFoundNode <=:> A.encode s)
+    sequence [ (stakeKey @VFoundNode <=:> wineryJSONWrite s)
              ]
-  parseNodeAttributes props = pMapToFail (decodeBin "Stake' Node" $ lookupAs stakeKey props)
+  parseNodeAttributes props = (decodeBin "Stake' Node" $ lookupAs stakeKey props)
 
 
-instance (ToJSON n, FromJSON n) => LinkAttributes (Stake' n) where
+instance (W.Serialise n) => LinkAttributes (Stake' n) where
   writeLinkAttributes s = fmap writeKeyValues $
-    sequence [ (stakeKey @EFinds <=:> A.encode s)
+    sequence [ (stakeKey @EFinds <=:> wineryJSONWrite s)
              ]
-  parseLinkAttributes props = pMapToFail (decodeBin "Stake' Link" $ lookupAs stakeKey props)
+  parseLinkAttributes props = (decodeBin "Stake' Link" $ lookupAs stakeKey props)
 
 roleLinkDir :: Role -> LinkState
 roleLinkDir r = case r of
@@ -492,7 +472,6 @@ stakeLinkDir (Stake (r, _, _)) = roleLinkDir r
 {-# INLINE stakeLinkDir #-}
 
 txStatusLinkDir :: TxStatus -> LinkState
---txStatusLinkDir = const LinkBidirectional
 txStatusLinkDir TxStatus'{energyDispatched, energyReceived} = if energyDispatched > 0 && energyDispatched == 0
   then LinkToTarget
   else if energyReceived > 0 && energyDispatched == 0
@@ -529,24 +508,24 @@ fromStake (Stake (role, watts, duration)) = defMessage
   where
     toPDir Source = NM.Outgoing
     toPDir Sink = NM.Incoming
-    timeToWord :: Time.DiffTime -> Word64
-    timeToWord = (convert @Int @Word64) . (round @Time.DiffTime @Int)
+    timeToWord :: Time.NominalDiffTime -> Word64
+    timeToWord = (convert @Int @Word64) . (round @Time.NominalDiffTime @Int)
 {-# INLINE fromStake #-}
 
 #ifndef ghcjs_HOST_OS
-txStatusKey :: forall n. Key n BL.ByteString
+txStatusKey :: forall n a. Key n a
 txStatusKey = "txStatusKey"
 
 
-instance (ToJSON n, FromJSON n) => LinkAttributes (TxStatus' n) where
+instance (W.Serialise n) => LinkAttributes (TxStatus' n) where
   writeLinkAttributes s = fmap writeKeyValues $
-    sequence [ (txStatusKey @EFinds <=:> A.encode s)
+    sequence [ (txStatusKey @EFinds <=:> wineryJSONWrite s)
              ]
-  parseLinkAttributes props = pMapToFail (decodeBin "TxStatus' Link" $ lookupAs txStatusKey props)
+  parseLinkAttributes props = (decodeBin "TxStatus' Link" $ lookupAs txStatusKey props)
 
-instance (ToJSON n, FromJSON n) => NodeAttributes (TxStatus' n) where
+instance (W.Serialise n) => NodeAttributes (TxStatus' n) where
   writeNodeAttributes s = fmap writeKeyValues $
-    sequence [ (txStatusKey @VFoundNode <=:> A.encode s)
+    sequence [ (txStatusKey @VFoundNode <=:> wineryJSONWrite s)
              ]
-  parseNodeAttributes props = pMapToFail (decodeBin "TxStatus' Node" $ lookupAs txStatusKey props)
+  parseNodeAttributes props = (decodeBin "TxStatus' Node" $ lookupAs txStatusKey props)
 #endif

@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-14.17
+resolver: lts-18.16
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -36,7 +36,7 @@ packages:
 #
 extra-deps:
  - git: https://github.com/faezs/concat.git
-   commit: 58dd9e82914bd1eaa2ff048f5477510892598a00
+   commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
    subdirs:
      - inline
      - known
@@ -46,7 +46,6 @@ extra-deps:
      - examples
      - graphics
      - hardware
-   # nix-sha256: 1a3z21n0ispcc4irggkwsclfbv87z1gb52lfafwx09n8bszr8c19
  - git: https://github.com/faezs/net-spider.git
    commit: 831f10df821a299e6a79331dee8931e517bdffd4
    subdirs:
@@ -87,17 +86,14 @@ extra-deps:
      - amazonka-iot
      - core
      - amazonka-s3
-   
- - base64-0.4.2.3@sha256:d8a82b0f446e89d1d3b3e7c8fc5b3cd2f5063c43309bd3c971050d9c0eb74783,2867
- - net-mqtt-0.7.0.1
- - ulid-0.2.0.0@sha256:ac415298b0272479909ca576f4444862ae942ed85c7849fa0675e3bf496be6f3,2485
- - crockford-0.2@sha256:6ec593711a20bd4b81a0fc13f3d850d2d890690941d777230fbf980c483e434a,553
+ - git: https://github.com/faezs/monad-bayes.git
+   commit: 42089c7cc0598192d549ca922d0f71400571e33b
+
+ - aeson-1.5.6.0
+ - ulid-0.3.0.0@sha256:f0eff432ed0f0d0b71be0fd7f45acb54d87aebc4e1e153d2c2e1be4b09eb20b5,2918    
  - cursor-0.2.0.0@sha256:9071e1029efc634bab63c8b3fd970bbd133475749ec918138a9e7304b0a7e696,1637
  - stm-containers-1.1.0.4@sha256:f83a683357b6e3b1dda3e70d2077a37224ed534df1f74c4e11f3f6daa7945c5b,3248
  - stm-hamt-1.2.0.4@sha256:7957497c022554b7599e790696d1a3e56359ad99e5da36a251894c626ca1f60a,3970
- - primitive-0.7.0.0@sha256:c45abc68bec080e3f1ab347dd331617d43fded94a473086bf21aeda69a6e20bc,3552
- - primitive-extras-0.8@sha256:fca0310150496867f5b9421fe1541ecda87fae17eae44885a29f9c52dd00c8ff,2963
- - primitive-unlifted-0.1.3.0@sha256:a98f827740f5dcf097d885b3a47c32f4462204449620abc9d51b8c4f8619f9e6,1427
  - random-fu-multivariate-0.1.2.1@sha256:b8b3adcdb01269480b3d28dae1e9c9a040834b9974c434d6996d3e1545c4d4f7,1439
  - estimator-1.2.0.0@sha256:44c85267299ea1e3eeb3e4eb9f317e4972563c84ba8220924c834a99b9048960,2424
  - language-glsl-0.3.0@sha256:85c1e7bf2cf5d6e604b7a2899c27e2935033425944db200798e57849e64d4c81,1636
@@ -106,9 +102,6 @@ extra-deps:
  - semiring-num-1.6.0.4@sha256:ea73b7ec4980add625dedfe159dbeea9a37aa540a2a9df0f36263455b1654cc1,2943
  - key-0.1.2.0@sha256:3bdfda94f99b8f2e01498ddf5f704cd84ce93315b532df50420ded94cbf5ba2e,1767
  - fusion-plugin-types-0.1.0@sha256:0f11bbc445ab8ae3dbbb3d5d2ea198bdb1ac020518b7f4f7579035dc89182438,1506
- - dependent-map-0.2.4.0@sha256:21d35c1eba3f2afa3af3c4c5d8998fd14ac76f596f951c280bd83d1d5a19ae28,1739
- - dependent-sum-0.4
- - monad-bayes-0.1.1.0@sha256:57d96f530a37a1c8efed0830c7f2bcf86da05d0d53324aebdd5b5aa165d72829,5132
  - geodetics-0.1.0@sha256:699c10cd8d69222b125d054cdc8e2bcee7cb0558c78fa1b4fa06b2d3ecf29f5c,2387
  - hgeometry-0.9.0.0@sha256:43043574d2ce39c543dfadb629ab3a41fe65d7bf68a1426d8d01312818bc6e4e,9702
  - hgeometry-combinatorial-0.9.0.0@sha256:a03b48302d8c542ff2ff90ba5d45f2742cc21ed1a676c8fa4870cd461a273354,7367
@@ -187,8 +180,6 @@ extra-deps:
  - statistics-linreg-0.3@sha256:95c6efe6c7f6b26bc6e9ada90ab2d18216371cf59a6ef2b517b4a6fd35d9a76f,2544
  - trie-simple-0.4.1.1@sha256:f5a377053f869f34196178475932732242f73351a7f52c81df2f1d340e6f070a,2581
  - influxdb-1.9.2
- - composite-ekg-0.7.5.0@sha256:f211845509635f614f18a4b10e96701649c2ea098033099e0c1c2a97b10619fe,1375
- - composite-base-0.7.5.0@sha256:3c754bca3a1a673e1f0ba9fa88850dd8c650b5a7140dc5afca09bb86e4843c17,2955
  - cas-store-1.1.0@sha256:00175fd67f55582c593a57673f2c02d30b63ed9716a6fe415c6fbe3c9fd996d9,2752
  - cas-hashable-1.0.1@sha256:fa10169aa9c58566eb3bfcda3fb62d76390ea43d8cdcc0878ab0dae2c93ba325,1548
  - store-0.7.12
@@ -196,13 +187,28 @@ extra-deps:
  - higgledy-0.4.1.1@sha256:103701c8080ec345a21edd3ef149b4d3b8ec66a12a82d3d0b5c5e4a0d7d6ac26,2238
  - generic-lens-2.2.0.0@sha256:4008a39f464e377130346e46062e2ac1211f9d2e256bbb1857216e889c7196be,3867
  - generic-lens-core-2.2.0.0@sha256:b6b69e992f15fa80001de737f41f2123059011a1163d6c8941ce2e3ab44f8c03,2913
- # Override default flag values for local packages and extra-deps
+ - dear-imgui-1.2.2@sha256:15bebd870853e375840d18f4f9ee54c67328601a749f5a2214d7a197b294fbad,6942
+ - fast-builder-0.1.3.0@sha256:301a50188856ee88706c432c7d5c8c20f744a64a3cbf00346b8c84015c5ecac4,2802
+ - haxl-2.3.0.0@sha256:4c9a7371a2c21df910628d582776cf52db72bcd6c808daa02823be0ab06f1eb9,3974
+ - named-0.3.0.1@sha256:418543272f0c844a77639b05276ee3906d5f305cd4cab46fafcb4f15b7f1e60d,2312
+ - proto-lens-0.7.1.0@sha256:b151890929e71db5b8c2ad86cd758bcdf1dfcf25f34eb6c9ce19e3d7cd4eae39,2959
+ - proto-lens-runtime-0.7.0.1@sha256:703f327422b2e204f8ea13c5e178edd8ab42ccd01c7a5a89fcb1b37ab474c68a,3038
+ - svg-builder-0.1.1@sha256:22de54d326a6b6912e461e1302edb9108b02aac0b6a6368fcdc3c4a224d487fd,1440
+ - mwc-random-0.14.0.0@sha256:6ae33e246e91f66f621caabb2323b431c8dab57427a417a98f5cac3d82eb7b21,1810
+ - proto-lens-arbitrary-0.1.2.10@sha256:14012d7783d4f589cba8b7d72b904a48c42d43bb4d9469f871886a1fac2249aa,1197
+
+ # # Override default flag values for local packages and extra-deps
 
 flags:
   concat-examples:
     smt: False
+#   dear-imgui:
+#     sdl: true
+#     opengl3: true
 
-allow-newer: false
+
+  
+#allow-newer: true
 
     
 # Extra package databases containing global packages

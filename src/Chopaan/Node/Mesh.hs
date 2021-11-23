@@ -31,6 +31,7 @@ import qualified Proto.NodeMessageSchema.NodeMessages as N
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N
 import GHC.Generics
 
+import qualified Codec.Winery as W
 import Data.Selectors
 import Data.Monoid (Last(..))
 import Data.Int
@@ -44,7 +45,7 @@ import qualified Streamly.Internal.Data.Fold as FL
 
 import Data.Greskell (newBind, gProperty, lookupAs, lookupAs', Key, pMapToFail, FromGraphSON(..))
 import Data.Greskell.Extra (writeKeyValues, (<=:>), (<=?>))
-import Shpadoinkle.Widgets.Types (Humanize(..))
+-- import Shpadoinkle.Widgets.Types (Humanize(..))
 
 import Data.Time (UTCTime(..), fromGregorian)
 --import Foreign.Storable.Generic
@@ -67,8 +68,9 @@ data RxSignal = RxSignal
   }
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (ToJSON, FromJSON, NFData, Binary)
+  deriving (W.Serialise) via (W.WineryRecord RxSignal)
   --deriving (Semigroup, Monoid) via (Last Double)
-  deriving anyclass (Humanize)
+  --deriving anyclass (Humanize)
 
 instance Selectors (RxSignal) where
   selectors = selectorsRep @(RxSignal)
@@ -76,15 +78,15 @@ instance Selectors (RxSignal) where
 noSignal = RxSignal Nothing Nothing
 
 #ifndef ghcjs_HOST_OS
-signalKey :: Key n (BL.ByteString)
+signalKey :: Key n a
 signalKey = "rxSignal"
 
 instance LinkAttributes RxSignal where
   writeLinkAttributes !n = fmap writeKeyValues $
                           sequence $
-                          [ signalKey <=:> A.encode n]
+                          [ signalKey <=:> wineryJSONWrite n]
                           
-  parseLinkAttributes !props = pMapToFail $ decodeBin "RxSignal" $ lookupAs signalKey props
+  parseLinkAttributes !props = decodeBin "RxSignal" $ lookupAs signalKey props
 #endif
 
 data MeshLink = MeshLink
@@ -95,7 +97,8 @@ instance Selectors (MeshLink) where
 
 newtype NodeVersion = NodeVersion (Text)
   deriving (Eq, Ord, Show, Generic)
-  deriving newtype (ToJSON, FromJSON, NFData, FromGraphSON, Humanize)
+  deriving newtype (ToJSON, FromJSON, NFData, FromGraphSON)
+  deriving (W.Serialise) via (W.WineryRecord NodeVersion)
 
 instance Selectors (NodeVersion) where
   selectors = selectorsRep @NodeVersion
@@ -107,8 +110,8 @@ data MeshNode = MeshNode
   , version :: !(Maybe NodeVersion)
   , nodeTime :: !(UTCTime)
   }
-  deriving (Eq, Ord, Show, Generic, NFData, Humanize)
-
+  deriving (Eq, Ord, Show, Generic, NFData)
+  deriving (W.Serialise) via (W.WineryRecord (MeshNode))
 instance Selectors (MeshNode) where
   selectors = selectorsRep @(MeshNode)
 
@@ -161,7 +164,7 @@ meshF n = FL.mkFold_ (\_ r -> FL.Partial $ meshNodeLink n $ r) (FL.Partial (init
 
 #ifndef ghcjs_HOST_OS
 
-meshNodeKey :: Key VFoundNode (BL.ByteString)
+meshNodeKey :: Key VFoundNode a
 meshNodeKey = "meshNode"
 
 --instance FromGraphSON UTCTime where
@@ -170,9 +173,9 @@ meshNodeKey = "meshNode"
 instance NodeAttributes MeshNode where
   writeNodeAttributes n = fmap writeKeyValues $
                           sequence $
-                          [ meshNodeKey <=:> A.encode n]
+                          [ meshNodeKey <=:> wineryJSONWrite n]
                           
-  parseNodeAttributes props = pMapToFail $ decodeBin "MeshNode" $ lookupAs meshNodeKey props
+  parseNodeAttributes props = decodeBin "MeshNode" $ lookupAs meshNodeKey props
 
 addRTS :: (MonadIO m)
         => Spider NodeMAC MeshNode RxSignal

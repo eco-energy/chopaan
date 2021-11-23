@@ -37,7 +37,7 @@ import Text.Printf
 import Proto.NodeMessageSchema.NodeMessages
 import Proto.NodeMessageSchema.NodeMessages_Fields
 
-import Shpadoinkle.Widgets.Types (Humanize(..))
+-- import Shpadoinkle.Widgets.Types (Humanize(..))
 
 #ifndef ghcjs_HOST_OS
 import ConCat.Misc (R)
@@ -76,7 +76,6 @@ deriving via (W.WineryRecord (WattSeconds)) instance W.Serialise (Compensated Do
 newtype WattSeconds = WS { unWs :: Compensated Double }
   deriving stock (Eq, Ord, Generic, Typeable)
   deriving newtype (Num, Fractional, Real, RealFrac, NFData)
-  deriving anyclass (Humanize)
   deriving (W.Serialise) via (W.WineryRecord (WattSeconds))
 
 instance Selectors WattSeconds where
@@ -86,7 +85,6 @@ instance Selectors WattSeconds where
 newtype Watts = W { unW :: Compensated Double }
   deriving stock (Eq, Ord, Generic, Typeable)
   deriving newtype (Num, Fractional, Real, RealFrac, NFData)
-  deriving anyclass (Humanize)
   deriving (W.Serialise) via (W.WineryRecord Watts)
 
 instance Selectors Watts where
@@ -142,7 +140,7 @@ data Node a = Node
   , generated :: !a
   }
   deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
-  deriving anyclass (NFData, ToJSON, FromJSON, Humanize)
+  deriving anyclass (NFData, ToJSON, FromJSON)
   deriving W.Serialise via (W.WineryRecord (Node a))
   
 
@@ -178,19 +176,19 @@ instance (Num a) => Monoid (Node a) where
 
 
 #ifndef ghcjs_HOST_OS
-nodeKey :: Key n BL.ByteString
+nodeKey :: Key n a
 nodeKey = "nodeKey"
 
                
 instance (GreskellC a) => LinkAttributes (Node a) where
   writeLinkAttributes node = fmap writeKeyValues $ sequence $
-    [ nodeKey <=:> A.encode node ]
-  parseLinkAttributes props = pMapToFail $ decodeBin "Node As Link" $ lookupAs nodeKey props
+    [ nodeKey <=:> wineryJSONWrite node ]
+  parseLinkAttributes props = decodeBin "Node As Link" $ lookupAs nodeKey props
                
 instance (GreskellC a) => NodeAttributes (Node a) where
   writeNodeAttributes node = fmap writeKeyValues $ sequence $
-    [ nodeKey <=:> A.encode node ]
-  parseNodeAttributes props = pMapToFail $ decodeBin "Node as Node" $ lookupAs nodeKey props
+    [ nodeKey <=:> wineryJSONWrite node ]
+  parseNodeAttributes props = decodeBin "Node as Node" $ lookupAs nodeKey props
 
 instance (GreskellC a) => FromGraphSON (Node a) where
   parseGraphSON = parseJSON . unwrapAll
@@ -201,13 +199,13 @@ instance (GreskellC a) => FromGraphSON (Node a) where
 
 data SensorMetrics e p = SensorMetrics
   { _time :: !(Maybe UTCTime)
-  , lastTimeDiff :: !DiffTime
+  , lastTimeDiff :: !NominalDiffTime
   , _powerT :: !(Node p)
   , _energyT :: !(Node e)
   , _battery :: !(Battery e p)
   , _demand :: !e
   , _sensors :: !EnergyState
-  } deriving (Eq, Ord, Generic, Show, NFData, ToJSON, FromJSON, Humanize)
+  } deriving (Eq, Ord, Generic, Show, NFData, ToJSON, FromJSON)
 
 instance (Typeable e, Typeable p) => Selectors (SensorMetrics e p) where
   selectors = selectorsRep @(SensorMetrics e p)
@@ -228,22 +226,22 @@ initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0 zeroMsg
 timeKey :: Key VFoundNode (Maybe UTCTime)
 timeKey = "timeKey"
 
-timeDiffKey :: Key VFoundNode (DiffTime)
+timeDiffKey :: Key VFoundNode (NominalDiffTime)
 timeDiffKey = "timeDiffKey"
 
-powerKey :: Key VFoundNode (BL.ByteString)
+powerKey :: Key VFoundNode (a)
 powerKey = "powerKey"
 
-energyKey :: Key VFoundNode (BL.ByteString)
+energyKey :: Key VFoundNode (a)
 energyKey = "energyKey"
 
-batteryKey :: Key VFoundNode (BL.ByteString)
+batteryKey :: Key VFoundNode (a)
 batteryKey = "batteryKey"
 
-demandKey :: Key VFoundNode (BL.ByteString)
+demandKey :: Key VFoundNode (a)
 demandKey = "demandKey"
 
-esMsgKey :: Key VFoundNode (BL.ByteString)
+esMsgKey :: Key VFoundNode (a)
 esMsgKey = "esMsg"
 
 
@@ -251,21 +249,21 @@ instance (GreskellC e, GreskellC p) => NodeAttributes (SensorMetrics e p) where
   writeNodeAttributes SensorMetrics{..} = fmap writeKeyValues $ sequence $
     [ timeKey <=?> _time
     , timeDiffKey <=:> lastTimeDiff
-    , powerKey <=:> A.encode _powerT
-    , energyKey <=:> A.encode _energyT
-    , batteryKey <=:> A.encode _battery
-    , demandKey <=:> A.encode _demand
-    , esMsgKey <=:> A.encode _sensors
+    , powerKey <=:> wineryJSONWrite _powerT
+    , energyKey <=:> wineryJSONWrite _energyT
+    , batteryKey <=:> wineryJSONWrite _battery
+    , demandKey <=:> wineryJSONWrite _demand
+    , esMsgKey <=:> wineryJSONWrite _sensors
     ]
-  parseNodeAttributes props = pMapToFail (SensorMetrics
-                                          <$> lookupAs' timeKey props
-                                          <*> lookupAs timeDiffKey props
-                                          <*> (decodeBin "sensorM: power" $ lookupAs powerKey props)
-                                          <*> (decodeBin "sensorM: energy" $ lookupAs energyKey props)
-                                          <*> (decodeBin "sensorM: battery" $ lookupAs batteryKey props)
-                                          <*> (decodeBin "sensorM: demand" $ lookupAs demandKey props)
-                                          <*> (decodeBin "sensorM: message" $ lookupAs esMsgKey props)
-                                         )
+  parseNodeAttributes props = (SensorMetrics
+                                <$> (pMapToFail $ lookupAs' timeKey props)
+                                <*> (pMapToFail $ lookupAs timeDiffKey props)
+                                <*> (decodeBin "sensorM: power" $ lookupAs powerKey props)
+                                <*> (decodeBin "sensorM: energy" $ lookupAs energyKey props)
+                                <*> (decodeBin "sensorM: battery" $ lookupAs batteryKey props)
+                                <*> (decodeBin "sensorM: demand" $ lookupAs demandKey props)
+                                <*> (decodeBin "sensorM: message" $ lookupAs esMsgKey props)
+                              )
 #endif
 --instance Binary EnergyState where
 --  encode = undefined
@@ -278,6 +276,8 @@ instance FromJSON (StreamState) where
 
 --instance Selectors (EnergyState) where
 --  selectors = selectorsRep @(EnergyState)
+
+deriving instance W.Serialise (EnergyState)
 
 instance ToJSON (EnergyState) where
   toJSON a = object $ [
@@ -353,7 +353,7 @@ nmFilter :: (NodeId a) -> SensorMetrics e p -> Bool
 nmFilter _ = isJust . _time
 
 
-type Timestamp = (Maybe UTCTime, DiffTime)
+type Timestamp = (Maybe UTCTime, NominalDiffTime)
 
 type BatteryR = Battery WattSeconds Watts
 

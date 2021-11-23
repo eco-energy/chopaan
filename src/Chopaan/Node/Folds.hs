@@ -96,7 +96,7 @@ energyFold = fmap fst $ FL.foldl' step begin
     begin :: (EnergyNR, Maybe UTCTime)
     begin = (mempty, Nothing)
     {-# INLINE eAtT #-}
-    eAtT :: PowerNR -> DiffTime -> (EnergyNR)
+    eAtT :: PowerNR -> NominalDiffTime -> (EnergyNR)
     eAtT !p !t = Node { tx = (pToE t tx)
                     , consumed = (pToE t consumed)
                     , generated = (pToE t generated)

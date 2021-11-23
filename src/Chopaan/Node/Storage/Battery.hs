@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, OverloadedStrings, TypeApplications, BangPatterns, DeriveAnyClass, GeneralisedNewtypeDeriving, NamedFieldPuns, DeriveGeneric, ScopedTypeVariables, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE CPP, OverloadedStrings, TypeApplications, BangPatterns, DeriveAnyClass, GeneralisedNewtypeDeriving, NamedFieldPuns, DeriveGeneric, ScopedTypeVariables, DeriveFunctor, DeriveFoldable, DeriveTraversable, DerivingStrategies, DerivingVia #-}
 module Chopaan.Node.Storage.Battery where
 
 import GHC.Generics
@@ -9,7 +9,7 @@ import Data.Selectors
 import Data.Bifunctor
 import Data.Aeson (ToJSON(..), FromJSON(..))
 import qualified Data.Aeson as A
-
+import qualified Codec.Winery as W
 
 import qualified Data.ByteString.Lazy as BL
 
@@ -19,7 +19,7 @@ import Data.Greskell (Key, lookupAs, pMapToFail
                      , FromGraphSON(..), parseGraphSON)
 import Data.Greskell.Extra (writeKeyValues, (<=:>))
 import Data.Greskell.GraphSON.GValue (unwrapAll)
-import Shpadoinkle.Widgets.Types (Humanize(..))
+-- import Shpadoinkle.Widgets.Types (Humanize(..))
 #ifndef ghcjs_HOST_OS
 import NetSpider.Graph (NodeAttributes(..), VFoundNode, LinkAttributes(..), EFinds)
 #endif
@@ -30,7 +30,9 @@ data Battery e p = Battery
   , chargeLim :: !p
   , dischargeLim :: !p
   , totalCapacity :: !e
-  } deriving (Eq, Ord, Show, Generic, NFData, Functor, Foldable, Traversable, Humanize)
+  }
+  deriving (Eq, Ord, Show, Generic, NFData, Functor, Foldable, Traversable)
+  deriving W.Serialise via (W.WineryRecord (Battery e p))
 
 instance (Typeable e, Typeable p) => Selectors (Battery e p) where
   selectors = selectorsRep @(Battery e p)
@@ -51,13 +53,13 @@ instance (FromJSON e, FromJSON p) => FromJSON (Battery e p)
 instance (GreskellC e, GreskellC p) => FromGraphSON (Battery e p) where
   parseGraphSON = parseJSON . unwrapAll
 
-batKey :: Key VFoundNode BL.ByteString
+batKey :: Key VFoundNode a
 batKey = "battKey"
 
 instance (GreskellC e, GreskellC p) => NodeAttributes (Battery e p) where
   writeNodeAttributes bat = fmap writeKeyValues $ sequence $
-    [ batKey <=:> A.encode bat ]
-  parseNodeAttributes props = pMapToFail $ decodeBin "battery: battery" $ lookupAs batKey props
+    [ batKey <=:> wineryJSONWrite bat ]
+  parseNodeAttributes props = decodeBin "battery: battery" (lookupAs batKey props)
 #endif
 
 emptyB :: (Fractional e, Fractional p) => Battery e p

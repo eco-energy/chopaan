@@ -33,7 +33,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader hiding (ask)
 import Control.Monad.Reader.Class
 import Control.Monad.Catch
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Base
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Unlift
@@ -50,9 +50,9 @@ import qualified System.Random.MWC.Distributions as MWC
 import Options.Applicative
 --import Servant.Server (ServerError)
 #endif
-import qualified Streamly as S
+import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
-import Shpadoinkle.Widgets.Types (Humanize)
+-- import Shpadoinkle.Widgets.Types (Humanize)
 
 import Chopaan.Graph.G
 

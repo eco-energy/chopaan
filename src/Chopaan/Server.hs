@@ -39,10 +39,6 @@ import           Servant.API
 import           Servant.Server            (Server, serve)
 import           Servant.Server.StaticFiles (serveDirectoryWebApp)
 
-import           Shpadoinkle               (JSM)
-import           Shpadoinkle.Router        (MonadJSM)
-import           Shpadoinkle.Router.Server (serveUI)
-import           Shpadoinkle.Run           (Env (Prod))
 
 
 import           Options.Applicative       (Parser, ParserInfo, auto,
@@ -53,9 +49,8 @@ import           Options.Applicative       (Parser, ParserInfo, auto,
 import qualified Dhall as D
 
 import Chopaan.Types
---import Chopaan.UiTypes
-import Chopaan.CRUD
 import Chopaan.API.History
+import Chopaan.API.Kbtz
 import Chopaan.Graph
 -- import Chopaan.View (view, template, onRouteChange)
 
@@ -69,8 +64,8 @@ import Chopaan.Graph
 
 type Static = Raw
 
-app :: Env -> FilePath -> DBPools -> Application
-app ev root poo = serve (Proxy @ (HistoryAPI AheadT)) (serveHistoryAPI poo)
+app :: FilePath -> DBPools -> Application
+app root poo = serve (Proxy @ (HistoryAPI AheadT)) (serveHistoryAPI poo)
         --  :<|> SPA Noop :<|> Static))
           -- :<|> (serveSPA) :<|> (serveDirectoryWebApp root))
   -- where
@@ -100,14 +95,14 @@ options = info (parser <**> helper) $
     fullDesc <> progDesc "Chopaan Server"
              <> header "Servers the SPA and the Backend API"
 
-application :: FilePath -> Env -> FilePath -> TinkerConf -> IO Application
-application optsPath e assetsPath (TinkerConf h p) = do
+application :: FilePath -> FilePath -> TinkerConf -> IO Application
+application optsPath assetsPath (TinkerConf h p) = do
   Options{hydrationOpts, poolConf} <- D.input D.auto $ T.pack optsPath
   poo <- mkDBPools poolConf h p
-  return $ simpleCors $ app e assetsPath poo 
+  return $ simpleCors $ app assetsPath poo 
 
 
 main :: FilePath -> IO ()
 main optionsPath = do
   ServerOpts{..} <- execParser options
-  run port =<< application optionsPath Prod assets tinkerOpts
+  run port =<< application optionsPath assets tinkerOpts
