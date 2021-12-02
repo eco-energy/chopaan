@@ -54,8 +54,8 @@ let
     #  
     chopaan = (haskellPackages.chopaan.components.exes);
 
-    passthru = (chopaanHaskellPackages.plan-nix.passthru);
-    gcroot = pkgs.haskell-nix.roots "ghc865";
+    passthru = (chopaanHaskellPackages.stack-nix.passthru);
+    gcroot = pkgs.haskell-nix.roots "ghc8107";
     projectCross = (chopaanHaskellPackages.projectCross);
     # `tests` are the test suites which have been built.
     tests = collectComponents' "tests" haskellPackages;

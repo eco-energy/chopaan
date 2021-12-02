@@ -1,9 +1,9 @@
-index-state: 2021-08-01T00:00:00Z
+index-state: 2021-11-05T00:00:00Z
 
 packages:
   ./
 
-with-compiler: ghc-8.6.5
+with-compiler: ghc-8.10.7
 
 package chopaan
   ghc-options: -Wall -fwarn-redundant-constraints
@@ -11,7 +11,7 @@ package chopaan
 source-repository-package
     type: git
     location: https://github.com/faezs/concat
-    tag: 58dd9e82914bd1eaa2ff048f5477510892598a00
+    tag: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
     subdir: inline
     subdir: known
     subdir: satisfy
@@ -19,36 +19,13 @@ source-repository-package
     subdir: plugin
     subdir: examples
     subdir: graphics
-    --sha256: 0savkim89mplld2xpfi65j17kdhv5n9dspyggqvvm7lxgivkispq
-
-source-repository-package
-    type: git
-    location: https://github.com/faezs/ghcjs-three
-    tag: 2b4b1c6867c09aaec430cba39a98a765b5b79437
-    --sha256: 0q5g6s6m706apm3cc9r77rjx0wznzyc30xi40vkv838c7gn1j011
-
-source-repository-package
-    type: git
-    location: https://github.com/Fresheyeball/Shpadoinkle.git
-    tag: 34cfee8702c8c104a211686e9c6c078315b65c0a
-    subdir: core
-    subdir: backends/snabbdom
-    subdir: backends/pardiff
-    subdir: backends/static
-    subdir: html
-    subdir: widgets
-    subdir: router
-    subdir: lens
-    subdir: disembodied
-    subdir: template
-    subdir: console
-    --sha256: 14aajxpr14506qj2hxnjy6iz4c2w8ch5dchqhy81a5i1s0nylid6
+    --sha256: 0savkim89mplld2xpfi65j17kdhv5n9dspyggqvvm7lxgivkispa
 
 source-repository-package
     type: git
     location: https://github.com/composewell/streamly.git
-    tag: 4f629b8cb36bd03b480edc08b77c9a0187ce2206
-    --sha256: 1ag6lqr74c1ml0vmai7a1b28dyf149pv3mhpg06kp27sawl71sy2
+    tag: a0206907dab8cf2d5d339e794bd4d61bba37a634
+    --sha256: 1ag6lqr74c1ml0vmai7a1b28dyf149pv3mhpg06kp27sawl71sya
 
 source-repository-package
     type: git

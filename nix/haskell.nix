@@ -16,7 +16,7 @@
 
 , config ? {}
 # GHC attribute name
-, compiler ? "ghc865"
+, compiler ? "ghc8107"
 # Enable profiling
 , profiling ? config.haskellNix.profiling or false
 , cudaSupport ? true
@@ -32,13 +32,12 @@ let
 
   # This creates the Haskell package set.
   # https://input-output-hk.github.io/haskell.nix/user-guide/projects/
-  pkgSet = haskell-nix.cabalProject  {
+  pkgSet = haskell-nix.stackProject  {
     src = cleanGitHaskell { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
-    index-state = "2021-08-01T00:00:00Z";
-    plan-sha256 = "1y24mr2aryy7arlr9afppas92f30mzc13q3g9km8ca77ahqda5xz";
+    stack-sha256 = "1m87dldg8w2jzkxrfy7870ylqdy08i9r4jk7kq6kpsvf6fbpxxyj";
     materialized = ./chopaan.materialized;
-    #checkMaterialization = true;
+    checkMaterialization = false;
     # these extras will provide additional packages
     # ontop of the package set derived from cabal resolution.
     pkg-def-extras = [(hackage: {
@@ -46,7 +45,6 @@ let
           # Win32 = hackage.Win32."2.8.3.0".revisions.default;
       };
     })];
-    cleanHpack = true;
     modules = [
       {
         compiler.nix-name = compiler;
@@ -58,7 +56,7 @@ let
       {
         
         packages.chopaan = {
-          package.cleanHpack = true;
+          #package.cleanHpack = true;
           doCheck = false;
           flags.prod = false;
           components.exes.kbtzim.dontStrip = false;

@@ -18,7 +18,7 @@ let
   };
   # use our own nixpkgs if it exist in our sources,
   # otherwise use iohkNix default nixpkgs.
-  nixpkgs = haskellNix.sources.nixpkgs-2009 or
+  nixpkgs = haskellNix.sources.nixpkgs-unstable or
     (builtins.trace "Using IOHK default nixpkgs" iohKNix.nixpkgs);
 
   nixUnstable = import (haskellNix.sources.nixpkgs-unstable) {};
@@ -79,21 +79,6 @@ let
       )
   ];
 
-  shpadoinkle = builtins.fetchGit { 
-    url    = https://gitlab.com/platonic/shpadoinkle.git;
-    rev    = "8e0efbb11857a1af47038dae07b8140291c251ed";
-  };
-
-  shpadoinkle-overlay = 
-    import (shpadoinkle + "/nix/overlay.nix") {
-      chan = nixpkgs.rev;
-      compiler = "ghc865";
-      isJS = false;
-      enableLibraryProfiling = false;
-      enableExecutableProfiling = false;
-    };
-
-  shpadoinkleOverlays = [ shpadoinkle-overlay ];
   
   # stackhack = [
   #     (pkgsNew: pkgsOld: let inherit (pkgsNew) lib; in {
@@ -114,7 +99,6 @@ let
     ++ iohKNix.overlays.iohkNix
     # hasktorch
     ++ hasktorchOverlays
-    ++ shpadoinkleOverlays
     ++ podmanOverlay
     # our own overlays:
     ++ [
