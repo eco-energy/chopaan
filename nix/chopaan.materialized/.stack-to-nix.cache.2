@@ -1,0 +1,38 @@
+{ system
+  , compiler
+  , flags
+  , pkgs
+  , hsPkgs
+  , pkgconfPkgs
+  , errorHandler
+  , config
+  , ... }:
+  {
+    flags = {};
+    package = {
+      specVersion = "1.18";
+      identifier = { name = "concat-satisfy"; version = "0.1.0.0"; };
+      license = "BSD-3-Clause";
+      copyright = "(c) 2018 by Conal Elliott";
+      maintainer = "conal@conal.net";
+      author = "Conal Elliott";
+      homepage = "";
+      url = "";
+      synopsis = "GHC plugin for forcing constraint satisfaction";
+      description = "GHC plugin for forcing constraint satisfaction";
+      buildType = "Simple";
+      };
+    components = {
+      "library" = {
+        depends = [
+          (hsPkgs."base" or (errorHandler.buildDepError "base"))
+          (hsPkgs."ghc" or (errorHandler.buildDepError "ghc"))
+          (hsPkgs."syb" or (errorHandler.buildDepError "syb"))
+          (hsPkgs."concat-inline" or (errorHandler.buildDepError "concat-inline"))
+          ];
+        buildable = true;
+        };
+      };
+    } // rec {
+    src = (pkgs.lib).mkDefault /nix/store/5597z8b60ix5smswlbgq9vq7n6jl9z5y-concat-5dd5014/satisfy;
+    }
