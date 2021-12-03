@@ -24,7 +24,9 @@
 }:
 
 let
-
+  branchmap = {
+      "https://github.com/faezs/net-spider.git" = "bidirectional-neighborhood";
+    };
   cleanGitHaskell = {src, name } :
     let
       clean = haskell-nix.haskellLib.cleanGit { inherit name src; };
@@ -35,9 +37,9 @@ let
   pkgSet = haskell-nix.stackProject  {
     src = cleanGitHaskell { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
-    stack-sha256 = "1m87dldg8w2jzkxrfy7870ylqdy08i9r4jk7kq6kpsvf6fbpxxyj";
+    #stack-sha256 = "0d7i8h4n2jh6cd3za1iz7ix776c0ans2z218798rdzl4d1xnjhqq";
     materialized = ./chopaan.materialized;
-    checkMaterialization = false;
+    #checkMaterialization = true;
     # these extras will provide additional packages
     # ontop of the package set derived from cabal resolution.
     pkg-def-extras = [(hackage: {
@@ -45,6 +47,8 @@ let
           # Win32 = hackage.Win32."2.8.3.0".revisions.default;
       };
     })];
+    branchMap = branchmap;
+    lookupBranch = { location, ... }: (branchmap."${location}" or null);
     modules = [
       {
         compiler.nix-name = compiler;

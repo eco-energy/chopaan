@@ -107,7 +107,6 @@
         "mwc-random" = (((hackage.mwc-random)."0.14.0.0").revisions)."6ae33e246e91f66f621caabb2323b431c8dab57427a417a98f5cac3d82eb7b21";
         "proto-lens-arbitrary" = (((hackage.proto-lens-arbitrary)."0.1.2.10").revisions)."14012d7783d4f589cba8b7d72b904a48c42d43bb4d9469f871886a1fac2249aa";
         "unicode-data" = (((hackage.unicode-data)."0.1.0.1").revisions)."57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe";
-        "net-spider" = (((hackage.net-spider)."0.4.3.6").revisions)."d6f08b83ca14144bfc3bf033df563ae5329d1a4fd97bc521d5ab20649560c27a";
         chopaan = ./chopaan.nix;
         concat-inline = ./.stack-to-nix.cache.0;
         concat-known = ./.stack-to-nix.cache.1;
@@ -127,6 +126,7 @@
         amazonka-core = ./.stack-to-nix.cache.15;
         amazonka-s3 = ./.stack-to-nix.cache.16;
         monad-bayes = ./.stack-to-nix.cache.17;
+        net-spider = ./.stack-to-nix.cache.18;
         };
       };
   resolver = "lts-18.16";

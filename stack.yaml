@@ -73,7 +73,12 @@ extra-deps:
  - git: https://github.com/faezs/monad-bayes.git
    commit: 42089c7cc0598192d549ca922d0f71400571e33b
    # nix-sha256 035cy2302k1x5a41ag3f65r8sc93pc3shjx1z5mdz5dpy1p9azra
-
+ - git: https://github.com/faezs/net-spider.git
+   branch: bidirectional-neighborhood
+   commit: 831f10df821a299e6a79331dee8931e517bdffd4
+   subdirs:
+     - net-spider
+   # nix-sha256 1dg2vv5ci2s1m6qx37mhgqpjv8xqp9c4w7cv2dvk4db5gnd6svay
  - aeson-1.5.6.0
  - ulid-0.3.0.0@sha256:f0eff432ed0f0d0b71be0fd7f45acb54d87aebc4e1e153d2c2e1be4b09eb20b5,2918    
  - cursor-0.2.0.0@sha256:9071e1029efc634bab63c8b3fd970bbd133475749ec918138a9e7304b0a7e696,1637
@@ -181,7 +186,7 @@ extra-deps:
  - mwc-random-0.14.0.0@sha256:6ae33e246e91f66f621caabb2323b431c8dab57427a417a98f5cac3d82eb7b21,1810
  - proto-lens-arbitrary-0.1.2.10@sha256:14012d7783d4f589cba8b7d72b904a48c42d43bb4d9469f871886a1fac2249aa,1197
  - unicode-data-0.1.0.1@sha256:57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe,3637
- - net-spider-0.4.3.6@sha256:d6f08b83ca14144bfc3bf033df563ae5329d1a4fd97bc521d5ab20649560c27a,6198
+ #- net-spider-0.4.3.6@sha256:d6f08b83ca14144bfc3bf033df563ae5329d1a4fd97bc521d5ab20649560c27a,6198
  # # Override default flag values for local packages and extra-deps
 
 flags:

@@ -109,172 +109,27 @@ packages:
     git: https://github.com/faezs/concat.git
     commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
 - completed:
-    subdir: net-spider
-    name: net-spider
-    version: 0.4.3.6
-    git: https://github.com/faezs/net-spider.git
-    pantry-tree:
-      size: 2918
-      sha256: 1546a85b558d6e5686e3b7c1b38133230aa316bd4e469132d935ea92dfe573f0
-    commit: 831f10df821a299e6a79331dee8931e517bdffd4
-  original:
-    subdir: net-spider
-    git: https://github.com/faezs/net-spider.git
-    commit: 831f10df821a299e6a79331dee8931e517bdffd4
-- completed:
-    subdir: core
-    name: Shpadoinkle
-    version: 0.3.2.0
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 558
-      sha256: c0bdf2b7842295309a09ff9ec59607a32ff88739f5f4048ae49555867ec6b465
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: core
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: backends/pardiff
-    name: Shpadoinkle-backend-pardiff
-    version: 0.3.0.1
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 348
-      sha256: cec2b0f50f8cf5f9efadd1d9068bf1d477ffeb62c22f9f8cc8cbb39fe40a87a4
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: backends/pardiff
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: backends/static
-    name: Shpadoinkle-backend-static
-    version: 0.2.0.1
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 292
-      sha256: 2ef3d68060f0ea32844f55ce3ffe65c29dc34f4ff05e17ec6b74cf3facbf8ca8
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: backends/static
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: html
-    name: Shpadoinkle-html
-    version: 0.3.0.2
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 1355
-      sha256: d14d08511d7b1427971a6530518dbabd136da3251f2fd5289e643c06427e44b3
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: html
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: widgets
-    name: Shpadoinkle-widgets
-    version: 0.2.0.1
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 1480
-      sha256: 1964c77820903337c29af268da04a677a31b5e72caa563a26b7d2f7b96017984
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: widgets
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: router
-    name: Shpadoinkle-router
-    version: 0.3.0.1
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 415
-      sha256: 092f45b321f999b748c9e2d69e7ef07857a7f690fd47552a1f79106b29c29e27
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: router
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: lens
-    name: Shpadoinkle-lens
-    version: 0.0.0.4
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 317
-      sha256: 392e5eff6de4f4da6829b7e687e65877b89bcb8a8c2e2e624a7a603192c050b0
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: lens
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: disembodied
-    name: Shpadoinkle-disembodied
-    version: 0.0.0.2
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 359
-      sha256: f51069d8a83709738a61f38aac3e4c48d194bead346a028ff9452afc9a482a25
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: disembodied
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: template
-    name: Shpadoinkle-template
-    version: 0.0.0.2
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 488
-      sha256: 83e9e19ff9116c1cedb2b1b5be650942af520226c060fa2a93fd2b0593890fc2
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: template
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: backends/snabbdom
-    name: Shpadoinkle-backend-snabbdom
-    version: 0.3.0.2
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 458
-      sha256: bfd01e74ee2b9c241581d5ee281b8973ac6a8b9951e2c5b664c98aaf6555f138
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: backends/snabbdom
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
-    subdir: console
-    name: Shpadoinkle-console
-    version: 0.0.1.4
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    pantry-tree:
-      size: 278
-      sha256: 7f14b28b95b2b79b48ff649fe39c2aec5b0e2e33da6e5c8bb5c4e8678069c1be
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-  original:
-    subdir: console
-    git: https://github.com/Fresheyeball/Shpadoinkle.git
-    commit: 34cfee8702c8c104a211686e9c6c078315b65c0a
-- completed:
     name: streamly
-    version: 0.8.0
+    version: 0.8.1
     git: https://github.com/composewell/streamly.git
     pantry-tree:
-      size: 22320
-      sha256: 7d7920737f64688311cbe2e2e368a4ad231bae6e66bcaca8a1a30a2d49b8214a
-    commit: 4f629b8cb36bd03b480edc08b77c9a0187ce2206
+      size: 25035
+      sha256: 33c9d358ebbc99d8a076635ac735bfbd66a643563ad8a63358245ed539fca1e3
+    commit: a0206907dab8cf2d5d339e794bd4d61bba37a634
   original:
     git: https://github.com/composewell/streamly.git
-    commit: 4f629b8cb36bd03b480edc08b77c9a0187ce2206
+    commit: a0206907dab8cf2d5d339e794bd4d61bba37a634
+- completed:
+    name: streamly-bytestring
+    version: 0.1.3
+    git: https://github.com/psibi/streamly-bytestring.git
+    pantry-tree:
+      size: 1140
+      sha256: 5c027362e6cc856b74f81b8fafc4ff0743bf74c8321659eb9afc74578d8403b1
+    commit: 9294e9bad34aea63c951cba808af00745805ef18
+  original:
+    git: https://github.com/psibi/streamly-bytestring.git
+    commit: 9294e9bad34aea63c951cba808af00745805ef18
 - completed:
     name: testcontainers
     version: 0.3.0.1
@@ -308,17 +163,6 @@ packages:
   original:
     git: https://github.com/faezs/grafana.git
     commit: 5589a62c3a54638446a93d18c703ba5f7e2e22b3
-- completed:
-    name: generic-recursion-schemes
-    version: 0.1.0.0
-    git: https://github.com/Lysxia/generic-recursion-schemes.git
-    pantry-tree:
-      size: 1207
-      sha256: edcea478c208965f42a1367e0087cbcf250fe3d634709a4b176dd73b1291b06d
-    commit: 692505969c5774ab5f6c26be3c9b53c2d19d46c3
-  original:
-    git: https://github.com/Lysxia/generic-recursion-schemes.git
-    commit: 692505969c5774ab5f6c26be3c9b53c2d19d46c3
 - completed:
     subdir: amazonka
     name: amazonka
@@ -382,6 +226,19 @@ packages:
   original:
     git: https://github.com/faezs/monad-bayes.git
     commit: 42089c7cc0598192d549ca922d0f71400571e33b
+- completed:
+    subdir: net-spider
+    name: net-spider
+    version: 0.4.3.6
+    git: https://github.com/faezs/net-spider.git
+    pantry-tree:
+      size: 2918
+      sha256: 1546a85b558d6e5686e3b7c1b38133230aa316bd4e469132d935ea92dfe573f0
+    commit: 831f10df821a299e6a79331dee8931e517bdffd4
+  original:
+    subdir: net-spider
+    git: https://github.com/faezs/net-spider.git
+    commit: 831f10df821a299e6a79331dee8931e517bdffd4
 - completed:
     hackage: aeson-1.5.6.0@sha256:72c170b9fa0a4d1eaf47098902c621d0d95331cda1ebc4d86582bd557756b3ff,6791
     pantry-tree:
@@ -929,13 +786,6 @@ packages:
   original:
     hackage: hspec-discover-2.8.3@sha256:b94758b375b5a810ea4c4c187381211c3acc77007f6f795c4e79f206ed6da56a,2025
 - completed:
-    hackage: streamly-bytestring-0.1.3@sha256:a13ddf464ead0f4d66a8ca7f8cd60e3a8198067a2e7ff98d662023bc220ebdd2,2477
-    pantry-tree:
-      size: 532
-      sha256: b9cb120ba06ed5ea51b39d8f6a5c068db28d2e9a34beb28a2c7ee410c42ba1f3
-  original:
-    hackage: streamly-bytestring-0.1.3
-- completed:
     hackage: winery-1.3.2@sha256:c2289c82301a69df026c86ea31f14d76509309c30fb29fe7e7712ec45d36c2cc,2677
     pantry-tree:
       size: 992
@@ -1117,6 +967,13 @@ packages:
       sha256: 4f8672178938f4fdfe50e49914c6c8a2830c7af433e772a0e43c85aa1bf326b5
   original:
     hackage: proto-lens-arbitrary-0.1.2.10@sha256:14012d7783d4f589cba8b7d72b904a48c42d43bb4d9469f871886a1fac2249aa,1197
+- completed:
+    hackage: unicode-data-0.1.0.1@sha256:57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe,3637
+    pantry-tree:
+      size: 1678
+      sha256: 04163fc72c5b7430664669f23c66214b9699cd4be2c7a74551d58ce428f7be41
+  original:
+    hackage: unicode-data-0.1.0.1@sha256:57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe,3637
 snapshots:
 - completed:
     size: 586286
