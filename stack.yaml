@@ -74,7 +74,6 @@ extra-deps:
    commit: 42089c7cc0598192d549ca922d0f71400571e33b
    # nix-sha256 035cy2302k1x5a41ag3f65r8sc93pc3shjx1z5mdz5dpy1p9azra
  - git: https://github.com/faezs/net-spider.git
-   branch: bidirectional-neighborhood
    commit: 831f10df821a299e6a79331dee8931e517bdffd4
    subdirs:
      - net-spider
