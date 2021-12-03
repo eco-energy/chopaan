@@ -4,12 +4,14 @@ module SpiderSpec (spec) where
 
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
+import qualified Streamly.Internal.Data.Unfold as UF
 import Test.Hspec
 import Test.QuickCheck.Checkers
 import Test.QuickCheck
 import Test.QuickCheck.Classes
 import qualified TestContainers as TC
 import qualified TestContainers.Hspec as TC
+import Control.Arrow
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Concurrent.STM.TBQueue
@@ -76,8 +78,8 @@ spec = do
   kbtzSpec
   --hydrationSpec
 
-nNodes = 10
-nMessages = 10
+nNodes = 1000
+nMessages = 1000
 kId = KbtzId "test"
 t0 = t
 tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
@@ -87,7 +89,7 @@ foldSpec = do
   describe "Validate ES processing folds and their composition" $ do
     it "Check each fold" $ do
       let
-        es = orderedES Source nMessages
+        es = S.unfold orderedES ((Source, nMessages))
         tf = sampleStream $ S.postscan timeFold es
         pf = sampleStream $ S.postscan powerFold es
         ef = sampleStream $ S.postscan energyFold es
@@ -134,12 +136,12 @@ kbtzSpec = do
       (gotNs, gotLs) <- snapDebug meshNodesSnapshot (spools db) ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       
-    xit "Stake snapshot graph has the right number of nodes and links" $ \(ns, db) -> do
+    it "Stake snapshot graph has the right number of nodes and links" $ \(ns, db) -> do
       (gotNs, gotLs) <- snapDebug txNodesSnapshot (spools db) ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
 
-    xit "Status snapshot graph has the right number of nodes and links" $ \(ns, db) -> do
+    it "Status snapshot graph has the right number of nodes and links" $ \(ns, db) -> do
       (gotNs, gotLs) <- snapDebug statusNodesSnapshot (spools db) ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
@@ -201,7 +203,7 @@ chkNodeQs nq = do
 
 runWithDBPools :: (TC.MonadDocker m) => m ([NodeMAC], DBPools)
 runWithDBPools = do
-  (host, port) <- runJanus "kbtzSpec"
+  let (host, port) = ("localhost", 8182) --  <- runJanus "kbtzSpec"
   let c = mkConfG (host, port)
   let pc = PoolConf 1 20000 1
   sp <- mkDBPools pc host port
@@ -234,14 +236,15 @@ data RSType = Root | Child deriving (Eq, Ord, Show, Bounded, Enum)
 
 
 esStreams :: forall m. (S.MonadAsync m, MonadSample m) => Int -> Int -> [NodeMAC] -> S.SerialT m (NodeMAC, NM.EnergyState) 
-esStreams nMessages nNodes ns = S.concatMapWith S.wSerial es
-                  (S.fromList (zip [1..nNodes] ns))
+esStreams nMessages nNodes ns = S.unfoldManyRoundRobin es
+                  (S.fromList (zip ns [1..nNodes]))
   where
-    es :: (Int, NodeMAC) -> S.SerialT m (NodeMAC, NM.EnergyState)
-    es (i, n) = withTag <$> (orderedES ty nMessages)
+    es :: UF.Unfold m (NodeMAC, Int) (NodeMAC, NM.EnergyState)
+    es = UF.supplyFirst (\(n, _) a -> pure (n, a))
+      (UF.many (UF.function (\(_, i) -> (ty i, i))) (UF.function orderedES))
       where
-        ty = if (mod i 2 == 0) then Source else Sink
-        withTag x = (n, x)
+        ty i = if (mod i 2 == 0) then Source else Sink
+        --withTag x = (n, x)
 
 rsStreams :: forall m. (S.MonadAsync m) => Int -> Int -> [NodeMAC] -> S.SerialT m (NodeMAC, NM.RuntimeStats) 
 rsStreams nMessages nNodes ns = S.concatMapWith S.wSerial rs
@@ -254,23 +257,24 @@ rsStreams nMessages nNodes ns = S.concatMapWith S.wSerial rs
         withTag x = (n, x)
 
 
-orderedES :: MonadIO m => ESType -> Int -> S.SerialT m NM.EnergyState
-orderedES et n = S.concatM . liftIO $ do
-  xs <- arbs n
-  let xs' = map updateT $ (zip xs tsL)
-  return $ S.fromList xs'
+orderedES :: forall m. MonadIO m => (ESType, Int) -> UF.Unfold m Ti.NominalDiffTime NM.EnergyState
+orderedES (et, n) = UF.mapM updateT $ UF.take n (tsUF t)
   where
-    updateT (m, t') = m
-      & NM.cpuTime .~ (timeToUIntSeconds t')
-      & NM.batteryVoltage .~ v et
-      & NM.solarVoltage .~ sv et
-      & NM.solarInputCurrent .~ si et
-      & NM.batteryToLoadCurrent .~ li et
-      -- & NM.gridToBatteryCurrent .~ 0
-      -- & NM.batteryToGridCurrent .~ 0
-      & NM.gridCurrent .~ 0
-      & NM.gridVoltage .~ 60
-      & NM.temperature .~ 0
+    updateT :: Ti.UTCTime -> m (NM.EnergyState) 
+    updateT now = do
+      m <- liftIO $ generate arbitrary
+      let m' = m
+            & NM.cpuTime .~ (timeToUIntSeconds now)
+            & NM.batteryVoltage .~ v et
+            & NM.solarVoltage .~ sv et
+            & NM.solarInputCurrent .~ si et
+            & NM.batteryToLoadCurrent .~ li et
+            -- & NM.gridToBatteryCurrent .~ 0
+            -- & NM.batteryToGridCurrent .~ 0
+            & NM.gridCurrent .~ 0
+            & NM.gridVoltage .~ 60
+            & NM.temperature .~ 0
+      return $ m'
       where
         v Source = 14.8
         v Sink = 7.0
@@ -298,6 +302,8 @@ orderedRS r n (NodeId root) = S.concatM . liftIO $ do
         x (Child) = False
 
 tsL = iterate (Ti.addUTCTime d) t
+tsUF :: Ti.UTCTime -> UF.Unfold m Ti.NominalDiffTime Ti.UTCTime
+tsUF t' = UF.map ((flip Ti.addUTCTime) t') $ UF.enumerateFromStepNum d
 t = Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 0)
 et = Ti.UTCTime (Ti.fromGregorian 2021 8 10) (Ti.secondsToDiffTime 0)
 d = Ti.diffUTCTime (Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime 60)) t

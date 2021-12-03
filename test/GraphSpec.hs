@@ -72,7 +72,7 @@ gremlinSpec = do
 
 integrationSpec :: Spec
 integrationSpec = do
-  aroundAll (TC.withContainers (runJanus "graphSpec")) $ describe "Janusgraph roundtrips" $ do
+  aroundAll (\f -> f ("localhost", 8182)) $ describe "Janusgraph roundtrips" $ do
     it "round-tripping a Kbtz works" $ \(host, port) -> do
       bracket (connect host port) close $ \client -> do
         drainResults =<< submit client (gDrop $. liftWalk $ sV' [] $ source "g") Nothing
