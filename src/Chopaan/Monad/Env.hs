@@ -18,8 +18,8 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 import GHC.Generics
 
-import Streamly
-import Streamly.Internal.Data.Stream.StreamK (hoist)
+import Streamly.Prelude
+import Streamly.Internal.Data.Stream.IsStream (hoist)
 
 
 newtype MonadEnv a = MonadEnv { runMonadEnv :: SamplerIO a } deriving (Functor, Applicative, Monad, MonadIO, Generic)
@@ -43,4 +43,4 @@ sampleIOE :: (forall a. MonadEnv a -> IO a)
 sampleIOE = sampleIO . runMonadEnv
 
 sampleStream :: (IsStream t) => (forall a. t MonadEnv a -> t IO a)
-sampleStream = hoist sampleIOE
+sampleStream = adapt . hoist sampleIOE . adapt

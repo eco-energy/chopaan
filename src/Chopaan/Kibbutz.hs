@@ -63,7 +63,7 @@ import Chopaan.Comm.Mqtt (runKibbutzGateway)
 import Chopaan.Comm.Comm (MessageQs(..)
                          , Address(..)
                          , mkCallback
-                         , mkCallback'
+                         -- , mkCallback'
                          , PubQueue
                          , unfoldChan
                          , initMessageQs
@@ -116,19 +116,19 @@ mqttQs qs opts name ns = do
     (runKibbutzGateway name ns qs mkCallback opts))
 {-# INLINE mqttQs #-}
 
-mqttStreams :: (IsStream t, MonadAsync m, MonadUnliftIO m, Address n)
-  => MessageQs n
-  -> MQTTOpts
-  -> KbtzName
-  -> [n]
-  -> m (() -> m (), (t m (n, EnergyState), t m (n, RuntimeStats)))
-mqttStreams qs opts name ns = do
-  (cb, (es, rs))<- mkCallback'
-  lg <- liftIO $ newLogger Info stdout
-  let c () = (liftIO $ withMqttAuth lg name
-              (runKibbutzGateway name ns qs (const cb) opts))
-  return (c, (es, rs))
-{-# INLINE mqttStreams #-}
+-- mqttStreams :: (IsStream t, MonadAsync m, MonadUnliftIO m, Address n)
+--   => MessageQs n
+--   -> MQTTOpts
+--   -> KbtzName
+--   -> [n]
+--   -> m (() -> m (), (t m (n, EnergyState), t m (n, RuntimeStats)))
+-- mqttStreams qs opts name ns = do
+--   (cb, (es, rs))<- mkCallback'
+--   lg <- liftIO $ newLogger Info stdout
+--   let c () = (liftIO $ withMqttAuth lg name
+--               (runKibbutzGateway name ns qs (const cb) opts))
+--   return (c, (es, rs))
+-- {-# INLINE mqttStreams #-}
 
 -- mqttSrc :: forall t m. (KbtzConn t m NodeMAC) => KbtzName -> [NodeMAC] -> MQTTOpts
 --  -> m ((t m (NodeMAC, EnergyState), t m (NodeMAC, RuntimeStats), PubQueue))
@@ -177,7 +177,7 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
                 S.|$ S.map (second (meshNodeLink $ getGridRoot name))
                 S.|$ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
     liveStream g m es rs = (Left <$> (processES g es))
-                 `S.wAsync` (Right <$> (processRS m rs))
+                 `S.parallel` (Right <$> (processRS m rs))
   case channelOpts of
     (Left mqopts) -> do
       qs <- liftIO initMessageQs

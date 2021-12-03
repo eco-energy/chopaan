@@ -22,7 +22,7 @@ module Chopaan.Comm.Comm (Chopaan.Comm.Dispatch.Dispatch(..)
                          , writeToPubQ
                          , readPubQ
                          , mkCallback
-                         , mkCallback'
+                         --, mkCallback'
                          , trivialCallback
                          , subStream
                          , writeChan
@@ -47,6 +47,7 @@ import Streamly (IsStream, MonadAsync)
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Unfold as UF
 import qualified Streamly.Internal.Data.Stream.Parallel as S
+import qualified Streamly.Internal.Data.Stream.IsStream as S
 
 import Chopaan.Node.NodeId
 import Chopaan.Comm.Queues
@@ -135,32 +136,37 @@ mkCallback (MessageQs { stateChan, statsChan })  = MQ.SimpleCallback $ writer
         nodeId = fromStateTopic $ t
 
 
-mkCallback' :: forall t m n. (S.IsStream t, MonadAsync m, Address n, MonadUnliftIO m)
-            => m (MQ.MessageCallback, (t m (n, EnergyState), t m (n, RuntimeStats)))
-mkCallback' = do
-  (meshCB, meshS) <- S.newCallbackStream
-  (gridCB, gridS) <- S.newCallbackStream
-  let
-    writer' :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> m ()
-    writer' _ t msg _ = do
-      liftIO . print $ "Message Recieved"
-      case nodeId of
-        Nothing -> liftIO $ print $ "MQTT Topic Decode error: " <> (show t)
-        (Just n) ->
-          case parseDispatch msg of
-            (Left err) -> error err
-            (Right mf) -> do
-              case (accessEnergyState mf) of
-                (Just a) -> gridCB (n, a)
-                Nothing -> case (accessRTS mf) of
-                  (Just a) -> meshCB (n, a)
-                  Nothing -> liftIO $ print ("Not RTS AND NOT ES" <> showMessage mf) >> return ()
-      where
-        nodeId :: Maybe n
-        nodeId = fromStateTopic $ t
-  nt <- askRunInIO
-  let w a b c d = nt (writer' a b c d) 
-  return $ (MQ.SimpleCallback (w), (gridS, meshS))
+-- mkCallback' :: forall t m n. (IsStream t, MonadAsync m, Address n, MonadUnliftIO m)
+--             => m (MQ.MessageCallback, (t m (n, EnergyState), t m (n, RuntimeStats)))
+-- mkCallback' = do
+--   (meshCB, meshS) <- S.newCallbackStream
+--   (gridCB, gridS) <- S.newCallbackStream
+--   let
+--     writer' :: MQ.MQTTClient -> MQ.Topic -> BL.ByteString -> [MQ.Property] -> m ()
+--     writer' _ t msg _ = do
+--       liftIO . print $ "Message Recieved"
+--       case nodeId of
+--         Nothing -> liftIO $ print $ "MQTT Topic Decode error: " <> (show t)
+--         (Just n) ->
+--           case parseDispatch msg of
+--             (Left err) -> error err
+--             (Right mf) -> do
+--               case (accessEnergyState mf) of
+--                 (Just a) -> gridCB (n, a)
+--                 Nothing -> case (accessRTS mf) of
+--                   (Just a) -> meshCB (n, a)
+--                   Nothing -> liftIO $ print ("Not RTS AND NOT ES" <> showMessage mf) >> return ()
+--       where
+--         nodeId :: Maybe n
+--         nodeId = fromStateTopic $ t
+--   nt <- askRunInIO
+--   let w a b c d = nt (writer' a b c d)
+--       -- asS :: S.Stream m a -> t m a
+--       -- asS = S.fromStreamS . S.toStreamK
+--   return $ (MQ.SimpleCallback (w), (gridS, meshS))
+-- {-# INLINE mkCallback' #-}
+
+
 
 {------------------------- Streaming from Queues ---------------------------}
 
