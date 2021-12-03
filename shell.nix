@@ -23,8 +23,8 @@ chopaanHaskellPackages.shellFor {
     tools = {
       cabal =
         {  version = "3.2.0.0";
-           index-state = "2021-08-13T00:00:00Z";
-           plan-sha256 = "1hxjlk1fmx9q89wxrbbfsz4g56ldaak2vf52blnv2vrk18ycla32";
+           index-state = "2021-12-02T00:00:00Z";
+           plan-sha256 = "1l3561ifzhz25i2izivv89lqb1ya1rl2qnxa5hgy75xqaj8bxdaq";
            materialized = ./nix/chopaan.materialized/cabal;
         };
     };
