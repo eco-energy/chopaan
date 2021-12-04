@@ -157,7 +157,7 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
   liftIO . print $ show kc
   t0 <- liftIO $ getCurrentTime
   gridFold <- withSpider $ saveTx name
-  meshFold <- withSpider addMeshNode
+  meshFold <- withSpider (addMeshNode @GraphM)
   let
     plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
     status = S.postscan (secondF (txFold (Tx . M.fromList $ [(n, mempty @Stake) | n <- nodes])))
@@ -165,7 +165,7 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
               -> t GraphM (NodeMAC, EnergyState) -> t GraphM (GridScene NodeMAC)
     processES gridFold s = S.tapRate 60 (\x -> liftIO . print $ "Grid Processed Rate: " <> show x)
                 S.|$ S.map snd
-                S.|$ S.tap (FL.lmap getLatest gridFold)
+                -- S.|$ S.tap (FL.lmap getLatest gridFold)
                 S.|$ status
                 S.|$ plan
                 S.|$ S.mapM (pure . second Tx)
@@ -173,7 +173,7 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
                 S.|$ gridSensorR nodes
                 S.|$ S.tapRate 60 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
     processRS meshFold s = S.tapRate 60 (\x -> liftIO . print $ "Mesh Processed Rate: " <> show x)
-                S.|$ S.tap (FL.tee mLineF meshFold)
+                S.|$ S.tap (mLineF)
                 S.|$ S.map (second (meshNodeLink $ getGridRoot name))
                 S.|$ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
     liveStream g m es rs = (Left <$> (processES g es))
