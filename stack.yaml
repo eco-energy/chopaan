@@ -191,6 +191,8 @@ extra-deps:
 flags:
   concat-examples:
     smt: False
+  streamly:
+    use-c-malloc: true
 #   dear-imgui:
 #     sdl: true
 #     opengl3: true
