@@ -37,9 +37,9 @@ let
   pkgSet = haskell-nix.stackProject  {
     src = cleanGitHaskell { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
-    #stack-sha256 = "0d7i8h4n2jh6cd3za1iz7ix776c0ans2z218798rdzl4d1xnjhqq";
+    stack-sha256 = "0pb6hvrnl519n3c8xp3d160syl747b2d2z3ah5y9flspqscc3l2p";
     materialized = ./chopaan.materialized;
-    #checkMaterialization = true;
+    checkMaterialization = false;
     # these extras will provide additional packages
     # ontop of the package set derived from cabal resolution.
     pkg-def-extras = [(hackage: {

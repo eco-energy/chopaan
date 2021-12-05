@@ -134,6 +134,9 @@
     ({ lib, ... }:
       {
         packages = {
+          "streamly" = {
+            flags = { "use-c-malloc" = lib.mkOverride 900 true; };
+            };
           "concat-examples" = {
             flags = { "smt" = lib.mkOverride 900 false; };
             };
