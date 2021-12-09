@@ -1,0 +1,28 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "chopaan:lib"
+
+    - path: "./app/DashGen.hs"
+      component: "chopaan:exe:dashgen"
+
+    - path: "./app/Hydrate.hs"
+      component: "chopaan:exe:hydrate"
+
+    - path: "./app/Paths_chopaan.hs"
+      component: "chopaan:exe:hydrate"
+
+    - path: "./app/Main.hs"
+      component: "chopaan:exe:kbtzim"
+
+    - path: "./app/Paths_chopaan.hs"
+      component: "chopaan:exe:kbtzim"
+
+    - path: "./app/Server.hs"
+      component: "chopaan:exe:server"
+
+    - path: "./app/Paths_chopaan.hs"
+      component: "chopaan:exe:server"
+
+    - path: "./test"
+      component: "chopaan:test:chopaan-test"
