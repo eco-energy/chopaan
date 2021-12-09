@@ -28,6 +28,7 @@ import ConCat.Misc (R)
 #endif
 
 import Chopaan.Node.NodeId (NodeMAC)
+import Chopaan.Node.NodeSensors (fromNodeMessage, NodeT')
 import Chopaan.Node.Storage
 import Chopaan.Node.Storage.Battery
 import Chopaan.Node.Metrics
@@ -172,14 +173,14 @@ demandFold = FL.foldl' (\_ nes -> (d $ power nes)) 0
 {-# INLINE demandFold #-}
 
 
-sensors :: (Monad m) => FL.Fold m EnergyState EnergyState
-sensors = FL.foldl' (flip const) zeroMsg 
+sensors :: (Monad m) => FL.Fold m EnergyState (NodeT' Double)
+sensors = FL.foldl' (\_ e -> fromNodeMessage e) (fromNodeMessage zeroMsg) 
 {-# INLINE sensors #-}
 
 type SensorR = SensorMetrics WattSeconds Watts 
 
 defSensorR :: SensorR
-defSensorR = SensorMetrics Nothing 0 mempty mempty mempty 0 zeroMsg
+defSensorR = SensorMetrics Nothing 0 mempty mempty mempty 0 (fromNodeMessage zeroMsg)
 {-# INLINE defSensorR #-}
 
 

@@ -56,6 +56,7 @@ import NetSpider.Snapshot (nodeId, nodeTimestamp)
 #endif
 
 import Chopaan.Node.NodeId
+import Chopaan.Node.NodeSensors
 import Chopaan.Node.Storage
 import Chopaan.Node.Storage.Battery
 import Chopaan.Utils.JSON
@@ -204,14 +205,14 @@ data SensorMetrics e p = SensorMetrics
   , _energyT :: !(Node e)
   , _battery :: !(Battery e p)
   , _demand :: !e
-  , _sensors :: !EnergyState
+  , _sensors :: !(NodeT' Double)
   } deriving (Eq, Ord, Generic, Show, NFData, ToJSON, FromJSON)
 
 instance (Typeable e, Typeable p) => Selectors (SensorMetrics e p) where
   selectors = selectorsRep @(SensorMetrics e p)
 
 initSM :: (Fractional e, Fractional p) => SensorMetrics e p
-initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0 zeroMsg 
+initSM = SensorMetrics Nothing 0 mempty mempty emptyB 0 (fromNodeMessage zeroMsg) 
   
 
 -- instance (Binary e, Binary p) => ToJSON (SensorMetrics e p) where
@@ -277,8 +278,6 @@ instance FromJSON (StreamState) where
 --instance Selectors (EnergyState) where
 --  selectors = selectorsRep @(EnergyState)
 
-deriving instance W.Serialise (EnergyState)
-
 instance ToJSON (EnergyState) where
   toJSON a = object $ [
     "batteryVoltage" A..= (a ^. batteryVoltage)
@@ -342,7 +341,7 @@ prettyShow SensorMetrics{..} = ("last connection: " <> show _time)
     <> sep <> ("current demand (Ws): " <> show _demand)
     <> sep <> ("current power:" <> sep <> show _powerT)
     <> sep <> ("current energy:" <> sep <> show _energyT)
-    -- <> sep <> ("sensor readings:" <> sep <> (show (pprintMessage _sensorsT)))
+    <> sep <> ("sensor readings:" <> sep <> (show _sensors))
     where
       sep = "\n"
 
