@@ -3,7 +3,7 @@
   UndecidableInstances, GeneralizedNewtypeDeriving,
   MultiParamTypeClasses, FlexibleContexts, FlexibleInstances,
   PatternSynonyms, MagicHash, NoImplicitPrelude, DataKinds,
-  BangPatterns, TypeApplications #-}
+  BangPatterns, TypeApplications, DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports#-}
 {-# OPTIONS_GHC -fno-warn-duplicate-exports#-}
 module Proto.NodeMessageSchema.NodeMessages
@@ -26,6 +26,7 @@ module Proto.NodeMessageSchema.NodeMessages
        where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq
        as Control.DeepSeq
+import qualified GHC.Generics
 import qualified Data.ProtoLens.Runtime.Data.ProtoLens.Prism
        as Data.ProtoLens.Prism
 import qualified Data.ProtoLens.Runtime.Prelude as Prelude
@@ -80,7 +81,7 @@ import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 data Actions = Actions{_Actions'restartEsp :: !Prelude.Bool,
                        _Actions'forceUpdate :: !Prelude.Bool,
                        _Actions'_unknownFields :: !Data.ProtoLens.FieldSet}
-                 deriving (Prelude.Eq, Prelude.Ord)
+                 deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show Actions where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -216,7 +217,7 @@ data BatteryParameters = BatteryParameters{_BatteryParameters'cutOffVoltage
                                            !BatteryParameters'BatteryType,
                                            _BatteryParameters'_unknownFields ::
                                            !Data.ProtoLens.FieldSet}
-                           deriving (Prelude.Eq, Prelude.Ord)
+                           deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show BatteryParameters where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -413,12 +414,12 @@ instance Control.DeepSeq.NFData BatteryParameters where
                           (Control.DeepSeq.deepseq (_BatteryParameters'type' x__) (()))))))
 newtype BatteryParameters'BatteryType'UnrecognizedValue = BatteryParameters'BatteryType'UnrecognizedValue Data.Int.Int32
                                                             deriving (Prelude.Eq, Prelude.Ord,
-                                                                      Prelude.Show)
+                                                                      Prelude.Show, GHC.Generics.Generic)
 data BatteryParameters'BatteryType = BatteryParameters'LAflooded
                                    | BatteryParameters'LAsealed
                                    | BatteryParameters'LithiumIon
                                    | BatteryParameters'BatteryType'Unrecognized !BatteryParameters'BatteryType'UnrecognizedValue
-                                       deriving (Prelude.Show, Prelude.Eq, Prelude.Ord)
+                                       deriving (Prelude.Show, Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Data.ProtoLens.MessageEnum BatteryParameters'BatteryType
          where
         maybeToEnum 0 = Prelude.Just BatteryParameters'LAflooded
@@ -517,7 +518,7 @@ data EnergyState = EnergyState{_EnergyState'batteryVoltage ::
                                _EnergyState'gridCurrent :: !Prelude.Double,
                                _EnergyState'solarVoltage :: !Prelude.Double,
                                _EnergyState'_unknownFields :: !Data.ProtoLens.FieldSet}
-                     deriving (Prelude.Eq, Prelude.Ord)
+                     deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show EnergyState where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -1036,7 +1037,7 @@ data EnergyTransactionRequest = EnergyTransactionRequest{_EnergyTransactionReque
                                                          !PDirection,
                                                          _EnergyTransactionRequest'_unknownFields ::
                                                          !Data.ProtoLens.FieldSet}
-                                  deriving (Prelude.Eq, Prelude.Ord)
+                                  deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show EnergyTransactionRequest where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -1221,7 +1222,7 @@ data EnergyTransactionStatus = EnergyTransactionStatus{_EnergyTransactionStatus'
                                                        :: !Data.Word.Word64,
                                                        _EnergyTransactionStatus'_unknownFields ::
                                                        !Data.ProtoLens.FieldSet}
-                                 deriving (Prelude.Eq, Prelude.Ord)
+                                 deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show EnergyTransactionStatus where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -1371,7 +1372,7 @@ data HardwareConfig = HardwareConfig{_HardwareConfig'battery ::
                                      !(Prelude.Maybe BatteryParameters),
                                      _HardwareConfig'solar :: !(Prelude.Maybe PVParameters),
                                      _HardwareConfig'_unknownFields :: !Data.ProtoLens.FieldSet}
-                        deriving (Prelude.Eq, Prelude.Ord)
+                        deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show HardwareConfig where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -1538,7 +1539,7 @@ data MeshConfig = MeshConfig{_MeshConfig'wifiUname ::
                              _MeshConfig'parentJoiningRssi :: !Data.Word.Word32,
                              _MeshConfig'maxChildNodesPerLayer :: !Data.Word.Word32,
                              _MeshConfig'_unknownFields :: !Data.ProtoLens.FieldSet}
-                    deriving (Prelude.Eq, Prelude.Ord)
+                    deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show MeshConfig where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -1962,7 +1963,7 @@ instance Control.DeepSeq.NFData MeshConfig where
 data MeshFrame = MeshFrame{_MeshFrame'time :: !Data.Word.Word64,
                            _MeshFrame'payload :: !(Prelude.Maybe MeshFrame'Payload),
                            _MeshFrame'_unknownFields :: !Data.ProtoLens.FieldSet}
-                   deriving (Prelude.Eq, Prelude.Ord)
+                   deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show MeshFrame where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -1982,7 +1983,7 @@ data MeshFrame'Payload = MeshFrame'Control !NodeControl
                        | MeshFrame'ForcedActions !Actions
                        | MeshFrame'Otastatus !UpdateStatus
                        | MeshFrame'NodeTxRequest !EnergyTransactionRequest
-                           deriving (Prelude.Show, Prelude.Eq, Prelude.Ord)
+                           deriving (Prelude.Show, Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Data.ProtoLens.Field.HasField MeshFrame "time"
            (Data.Word.Word64)
          where
@@ -2993,7 +2994,7 @@ _MeshFrame'NodeTxRequest
  -}
 data NodeAddr = NodeAddr{_NodeAddr'macAddr :: !Data.Text.Text,
                          _NodeAddr'_unknownFields :: !Data.ProtoLens.FieldSet}
-                  deriving (Prelude.Eq, Prelude.Ord)
+                  deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show NodeAddr where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -3098,7 +3099,7 @@ data NodeControl = NodeControl{_NodeControl'disconnectGrid ::
                                _NodeControl'disconnectLoad :: !Prelude.Bool,
                                _NodeControl'disconnectSolar :: !Prelude.Bool,
                                _NodeControl'_unknownFields :: !Data.ProtoLens.FieldSet}
-                     deriving (Prelude.Eq, Prelude.Ord)
+                     deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show NodeControl where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -3273,7 +3274,7 @@ data NodeQueueGauge = NodeQueueGauge{_NodeQueueGauge'serialOutboxQc
                                      _NodeQueueGauge'meshOutboxQc :: !Data.Word.Word32,
                                      _NodeQueueGauge'meshInboxQc :: !Data.Word.Word32,
                                      _NodeQueueGauge'_unknownFields :: !Data.ProtoLens.FieldSet}
-                        deriving (Prelude.Eq, Prelude.Ord)
+                        deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show NodeQueueGauge where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -3480,7 +3481,7 @@ instance Control.DeepSeq.NFData NodeQueueGauge where
 data OTAConfig = OTAConfig{_OTAConfig'endpoint :: !Data.Text.Text,
                            _OTAConfig'timeOfDay :: !Data.Word.Word32,
                            _OTAConfig'_unknownFields :: !Data.ProtoLens.FieldSet}
-                   deriving (Prelude.Eq, Prelude.Ord)
+                   deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show OTAConfig where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -3611,12 +3612,12 @@ instance Control.DeepSeq.NFData OTAConfig where
                  (Control.DeepSeq.deepseq (_OTAConfig'endpoint x__)
                     (Control.DeepSeq.deepseq (_OTAConfig'timeOfDay x__) (()))))
 newtype PDirection'UnrecognizedValue = PDirection'UnrecognizedValue Data.Int.Int32
-                                         deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
+                                         deriving (Prelude.Eq, Prelude.Ord, Prelude.Show, GHC.Generics.Generic)
 data PDirection = Incoming
                 | Outgoing
                 | Load
                 | PDirection'Unrecognized !PDirection'UnrecognizedValue
-                    deriving (Prelude.Show, Prelude.Eq, Prelude.Ord)
+                    deriving (Prelude.Show, Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Data.ProtoLens.MessageEnum PDirection where
         maybeToEnum 0 = Prelude.Just Incoming
         maybeToEnum 1 = Prelude.Just Outgoing
@@ -3687,7 +3688,7 @@ data PVParameters = PVParameters{_PVParameters'vOC ::
                                  _PVParameters'iMPPT :: !Prelude.Float,
                                  _PVParameters'ratedPower :: !Prelude.Float,
                                  _PVParameters'_unknownFields :: !Data.ProtoLens.FieldSet}
-                      deriving (Prelude.Eq, Prelude.Ord)
+                      deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show PVParameters where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -3885,7 +3886,7 @@ data ReconciliationChild = ReconciliationChild{_ReconciliationChild'needsRecon
                                                _ReconciliationChild'nodeMac :: !Data.Text.Text,
                                                _ReconciliationChild'_unknownFields ::
                                                !Data.ProtoLens.FieldSet}
-                             deriving (Prelude.Eq, Prelude.Ord)
+                             deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show ReconciliationChild where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -4026,7 +4027,7 @@ data ReconciliationParent = ReconciliationParent{_ReconciliationParent'parentver
                                                  :: !Data.Text.Text,
                                                  _ReconciliationParent'_unknownFields ::
                                                  !Data.ProtoLens.FieldSet}
-                              deriving (Prelude.Eq, Prelude.Ord)
+                              deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show ReconciliationParent where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -4155,7 +4156,7 @@ data RuntimeStats = RuntimeStats{_RuntimeStats'minFreeHeap ::
                                  _RuntimeStats'cpuTime :: !Data.Word.Word64,
                                  _RuntimeStats'counters :: !(Prelude.Maybe NodeQueueGauge),
                                  _RuntimeStats'_unknownFields :: !Data.ProtoLens.FieldSet}
-                      deriving (Prelude.Eq, Prelude.Ord)
+                      deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show RuntimeStats where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -4643,7 +4644,7 @@ instance Control.DeepSeq.NFData RuntimeStats where
 data SetVersion = SetVersion{_SetVersion'version ::
                              !Data.Text.Text,
                              _SetVersion'_unknownFields :: !Data.ProtoLens.FieldSet}
-                    deriving (Prelude.Eq, Prelude.Ord)
+                    deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show SetVersion where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -4738,11 +4739,11 @@ instance Control.DeepSeq.NFData SetVersion where
                Control.DeepSeq.deepseq (_SetVersion'_unknownFields x__)
                  (Control.DeepSeq.deepseq (_SetVersion'version x__) (())))
 newtype StreamState'UnrecognizedValue = StreamState'UnrecognizedValue Data.Int.Int32
-                                          deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
+                                          deriving (Prelude.Eq, Prelude.Ord, Prelude.Show, GHC.Generics.Generic)
 data StreamState = Normal
                  | Debiasing
                  | StreamState'Unrecognized !StreamState'UnrecognizedValue
-                     deriving (Prelude.Show, Prelude.Eq, Prelude.Ord)
+                     deriving (Prelude.Show, Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Data.ProtoLens.MessageEnum StreamState where
         maybeToEnum 0 = Prelude.Just Normal
         maybeToEnum 1 = Prelude.Just Debiasing
@@ -4809,7 +4810,7 @@ data Transaction = Transaction{_Transaction'start ::
                                _Transaction'etrs ::
                                !(Data.Map.Map Data.Text.Text EnergyTransactionRequest),
                                _Transaction'_unknownFields :: !Data.ProtoLens.FieldSet}
-                     deriving (Prelude.Eq, Prelude.Ord)
+                     deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show Transaction where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -4959,7 +4960,7 @@ data Transaction'EtrsEntry = Transaction'EtrsEntry{_Transaction'EtrsEntry'key
                                                    !(Prelude.Maybe EnergyTransactionRequest),
                                                    _Transaction'EtrsEntry'_unknownFields ::
                                                    !Data.ProtoLens.FieldSet}
-                               deriving (Prelude.Eq, Prelude.Ord)
+                               deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show Transaction'EtrsEntry where
         showsPrec _ __x __s
           = Prelude.showChar '{'
@@ -5110,7 +5111,7 @@ data UpdateStatus = UpdateStatus{_UpdateStatus'updateStatus ::
                                  !Data.Word.Word32,
                                  _UpdateStatus'timeOfLastUpdate :: !Data.Text.Text,
                                  _UpdateStatus'_unknownFields :: !Data.ProtoLens.FieldSet}
-                      deriving (Prelude.Eq, Prelude.Ord)
+                      deriving (Prelude.Eq, Prelude.Ord, GHC.Generics.Generic)
 instance Prelude.Show UpdateStatus where
         showsPrec _ __x __s
           = Prelude.showChar '{'
