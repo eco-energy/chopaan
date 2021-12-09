@@ -12,9 +12,6 @@ module Chopaan.Hydrate
   , ufStream
   , prefixGen
   , nodePrefixes
---  , congregatePrefixes
-  , latestPrefix
-  , mapToStream
   , HConM
   , HConS
   , hConfDef
@@ -167,7 +164,7 @@ parseManagerConf :: IO (ManagerSettings)
 parseManagerConf = decodeWithDefaults manConfDef
 
 manConfDef :: ManagerSettings
-manConfDef = ManagerSettings 1000 128 90
+manConfDef = ManagerSettings 512 10 90
 
 hConfDef :: HydrationConf
 hConfDef = HydrationConf basePath bucket defDate Ten5 Ten2 Infinite 
@@ -218,10 +215,8 @@ data Control = Control
   , kbtzNodes :: TKbtzim
   }
 
-mkTKbtz :: [(KbtzName, [NodeMAC])] -> STM (TKbtzim)
-mkTKbtz kns = do
-  nSets <- traverse (newTVar . Set.fromList) (snd <$> kns)
-  newTVar (M.fromList (zip (fst <$> kns) nSets))
+mkTKbtz :: KbtzNodes -> STM (TKbtzim)
+mkTKbtz kns = newTVar =<< traverse (newTVar . Set.fromList) kns
 
 mkKbtzConf :: HydrationConf
   -> Env
@@ -236,13 +231,11 @@ mkKbtzConf (HydrationConf{s3Bucket
                          , pastRes, futureRes}) env name store manOrSesh wp parHow =
   KbtzConf env (S3.BucketName s3Bucket) store name manOrSesh (toUTC startDate) lifetime wp (pastRes, futureRes) parHow
 
-runHydration :: HydrationConf -> GraphM ()
-runHydration conf = do
-  kns <- getKNs
+runHydration :: HydrationConf -> TKbtzim -> GraphM ()
+runHydration conf kbtzim = do
   manConf <- liftIO $ parseManagerConf
   sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
   parConf <- liftIO $ parseParStrategy
-  kbtzim <- liftIO $ atomically $ mkTKbtz kns
   aws <- getAwsEnv S3.s3
   let hydrationDB = "chopaanS3"
   let p = DB.queryParams hydrationDB
@@ -601,12 +594,6 @@ commonPref (Prefix p) (Prefix p') = T.commonPrefixes (T.pack . show $ p) (T.pack
 latestPrefix :: (HConM m) => A.Array Prefix -> m (Maybe Prefix)
 latestPrefix a = A.fold (FL.maximum) a
 
--- congregatePrefixes :: HConM m => FL.Fold m (NodeMAC, Prefix) (M.Map NodeMAC (A.Array Prefix))
--- congregatePrefixes = --- FL.lmapM (\a -> (liftIO . print $ a) >> (return a)) $
---   --  FL.rmapM (\a -> (liftIO . print $ a) >> (return a))
---   -- (FL.demuxDefault mempty ((FL.lmap snd A.write)))
-
-
 mapToStream :: (HConS t m, Ord k) => (k -> ar -> m (Maybe pi)) -> M.Map k ar -> m (t m (k, pi))
 mapToStream f = (fmap (S.fromList
                        . map (second fromJust)
@@ -622,7 +609,7 @@ dlFramesParFS ::
   -> (StoreType -> NodeMAC -> Prefix -> FilePath)
   -> t m (NodeMAC, Prefix)
   -> t m ((NodeMAC, Prefix), Int)
-dlFramesParFS st manOrSesh sw getPath = S.maxThreads (sourceGenThreads st) . S.mapM (uncurry dlF') --  $ --S.trace (liftIO . print) $ S.foldMany congregatePrefixes ps
+dlFramesParFS st manOrSesh sw getPath = S.maxThreads (sourceGenThreads st) . S.mapM (uncurry dlF')
   where
     dler = case manOrSesh of
       Left man -> dlHttpClient (dlThreads st) man sw
@@ -791,18 +778,11 @@ getKeysUF :: forall t m r. (HConS t m, Show r)
   -> t m r
 getKeysUF env bucket ns prefixFold = S.mapM (uncurry prefixKeys) ns
   where
-    -- logPrefGen p = liftIO . print $ "prefix: " <> (show p)
     prefixKeys :: NodeMAC -> Prefix -> m r
-    prefixKeys n t = do
-      -- liftIO . print $ ("starting ting" <> (show (n, t)))
-      r <- ((UF.fold
-              (prefixFold n t)
-              (UF.map (toS3Idx . (toS3Id &&& id) . fst) (s3Paths'' env (req n)))) t)
-      -- liftIO . print $ ("finished writing keys" <> (show (n, t, r)))
-      --recoverC (show n <> " " <> show t) 3 
-      return $ r
+    prefixKeys n t = UF.fold (prefixFold n t)
+              (UF.map keyed (s3Paths'' env (req n))) t
       where
-        -- FL.lmapM (\a -> (liftIO . print $ a) >> (return a)) $ 
+        keyed = (toS3Idx . (toS3Id &&& id) . fst)
         req n' prefix = S3.listObjectsV2 bucket & S3.lovPrefix .~ (timedPrefix n' prefix)
 {-# INLINE getKeysUF #-}
 
@@ -818,8 +798,8 @@ ourSettings ManagerSettings{..} = cachingSettings
       }
 
 
-newManager :: (MonadIO m) => ManagerSettings -> m NC.Manager
-newManager ms = liftIO $ NC.newManager (ourSettings ms) 
+-- newManager :: (MonadIO m) => ManagerSettings -> m NC.Manager
+-- newManager ms = liftIO $ NC.newManager (ourSettings ms) 
 
 
 logNothing :: forall m a. (MonadIO m, Show a) => Maybe a -> m ()
@@ -831,29 +811,3 @@ logEither x = case x of
   Left a -> liftIO $ print a
   Right _ -> return ()
 {-# INLINE logEither #-}
-
-
-
-
--- data Metadata = Metadata
---   { mKeys :: !Int
---   , mFrame :: !Int
---   , mError :: !Int
---   --, mLoad :: !Int
---   }
---   deriving (Eq, Ord, Show, Generic)
---   deriving (W.Serialise) via (W.WineryRecord Metadata) 
-
-
--- mkMetadata :: forall m. (S.MonadAsync m, MonadCatch m)
---            => KbtzStore -> NodeMAC -> Prefix -> m Metadata
--- mkMetadata s n p = Metadata
---                    <$> (fileLen $ loadPrefixKeys s n p)
---                    <*> (fileLen $ loadPrefixFrames s n p)
---                    <*> (fileLen $ loadPrefixErrors s n p)
---   where
---     fileLen = S.fold FL.length
-
-
-
-

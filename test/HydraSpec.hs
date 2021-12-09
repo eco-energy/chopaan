@@ -13,6 +13,7 @@ import Test.QuickCheck.Instances.Time
 import Test.QuickCheck.Instances.Text
 
 import Data.List
+import qualified Data.Map.Strict as M
 import Control.Monad.IO.Class
 import qualified Data.Time as Time
 import qualified Data.Text as T
@@ -81,7 +82,7 @@ pipelineSpec = do
     it "prefix congregation works" $ do
       k <- liftIO $ generate (arbitrary @KbtzName)
       ns <- S.toList $ S.replicateM 10 (liftIO . generate $ (arbitrary @NodeMAC))
-      tk <- liftIO . atomically $ mkTKbtz [(k, ns)]
+      tk <- liftIO . atomically $ mkTKbtz $ M.fromList [(k, ns)]
       (InAMinute (t0, t1, _)) <- liftIO $ generate $ (arbitrary @InAMinute)
       let ufN = unfoldNodes Finite tk
           ps = ufStream (prefixGen Infinite (\_ -> pure True) (Ten2, Second) t0 t1)

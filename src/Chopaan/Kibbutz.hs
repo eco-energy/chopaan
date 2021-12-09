@@ -164,20 +164,20 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts} = do
     processES :: FL.Fold GraphM (NodeMAC, GridEv) Bool
               -> t GraphM (NodeMAC, EnergyState) -> t GraphM (GridScene NodeMAC)
     processES gridFold s = S.tapRate 60 (\x -> liftIO . print $ "Grid Processed Rate: " <> show x)
-                S.|$ S.map snd
-                -- S.|$ S.tap (FL.lmap getLatest gridFold)
-                S.|$ status
-                S.|$ plan
-                S.|$ S.mapM (pure . second Tx)
-                S.|$ S.tap (FL.lmap glS sLineF)
-                S.|$ gridSensorR nodes
-                S.|$ S.tapRate 60 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
+                $ S.map snd
+                --  $ S.tap (FL.lmap getLatest gridFold)
+                $ status
+                $ plan
+                $ S.map (second Tx)
+                $ S.tap (FL.lmap glS sLineF)
+                $ gridSensorR nodes
+                $ S.tapRate 60 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
     processRS meshFold s = S.tapRate 60 (\x -> liftIO . print $ "Mesh Processed Rate: " <> show x)
-                S.|$ S.tap (mLineF)
-                S.|$ S.map (second (meshNodeLink $ getGridRoot name))
-                S.|$ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
+                $ S.tap mLineF -- meshFold)
+                $ S.map (second (meshNodeLink $ getGridRoot name))
+                $ S.tapRate 30 (\x -> liftIO . print $ "Mesh Incoming Rate: " <> show x) s
     liveStream g m es rs = (Left <$> (processES g es))
-                 `S.parallel` (Right <$> (processRS m rs))
+                 `S.async` (Right <$> (processRS m rs))
   case channelOpts of
     (Left mqopts) -> do
       qs <- liftIO initMessageQs

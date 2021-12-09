@@ -23,6 +23,7 @@ import Control.Monad.Bayes.Sampler
 import Control.DeepSeq
 import Data.Aeson (ToJSON, FromJSON)
 import Data.Text (pack, Text)
+import qualified Data.Map.Strict as M
 
 import Chopaan.Kibbutz.KbtzId (KbtzName)
 import Chopaan.Node.NodeId (NodeMAC)
@@ -137,13 +138,15 @@ tkOptions = info (tkParser <**> helper) $
     fullDesc <> progDesc "Chopaan"
              <> header "Control and Monitor Kbtzim"
 
-getKNs :: GraphM ([(KbtzName, [NodeMAC])])
+type KbtzNodes = M.Map KbtzName [NodeMAC]
+
+getKNs :: GraphM KbtzNodes
 getKNs = withKbtzPool $ \c -> do
   ks' <- getKbtzim c
   nss <- mapM (\k -> withKbtzPool (flip getKbtzNodes k)) ks'
-  return $ zip ks' nss
+  return . M.fromList $ zip ks' nss
   
-addzim :: [(KbtzName, [NodeMAC])] -> GraphM ([(KbtzName, [NodeMAC])]) 
+addzim :: [(KbtzName, [NodeMAC])] -> GraphM KbtzNodes 
 addzim kns = withKbtzPool $ \c -> do
   mapM_ (addKbtz c) (fst <$> kns)
   sequence_ $ an c

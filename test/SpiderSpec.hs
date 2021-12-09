@@ -77,7 +77,7 @@ spec = do
   --hydrationSpec
 
 nNodes = 10
-nMessages = 10
+nMessages = 1000
 kId = KbtzId "test"
 t0 = t
 tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
@@ -147,11 +147,11 @@ kbtzSpec = do
       (gotNs, gotLs) <- snapDebug flowNodesSnapshot (spools db) ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
-    xit "NodeQueries should yield errythang" $ \(ns, db) -> do
+    it "NodeQueries should yield errythang" $ \(ns, db) -> do
        let kns = asKbtzNode kId <$> ns
            qgp = QueryGenParams "chopaanMQTT" "\"autogen\"" Nothing Nothing 
            nqs = nodeQueries qgp <$> kns
-           eqNM = (== nMessages)
+           eqNM l = (abs (l - nMessages)) < 2
        t <- qResultTest eqNM nqs
        t `shouldBe` (True)
 
@@ -203,7 +203,7 @@ runWithDBPools :: (TC.MonadDocker m) => m ([NodeMAC], DBPools)
 runWithDBPools = do
   let (host, port) = ("localhost", 8182) -- <- runJanus "kbtzSpec"
   --let c = mkConfG (host, port)
-  let pc = PoolConf 1 100 1
+  let pc = PoolConf 10 100 20
   sp <- mkDBPools pc host port
   let kp = gremlinPool sp
   -- Create Influx DB!
@@ -254,14 +254,11 @@ rsStreams nMessages nNodes ns = S.concatMapWith S.wSerial rs
         withTag x = (n, x)
 
 
-orderedES :: MonadIO m => ESType -> Int -> S.SerialT m NM.EnergyState
-orderedES et n = S.concatM . liftIO $ do
-  xs <- arbs n
-  let xs' = map updateT $ (zip xs tsL)
-  return $ S.fromList xs'
+orderedES :: (S.MonadAsync m, MonadSample m) => ESType -> Int -> S.SerialT m NM.EnergyState
+orderedES et n = S.take n $ S.map snd $ S.iterateM nodeStep (pure (t, start))
   where
-    updateT (m, t') = m
-      & NM.cpuTime .~ (timeToUIntSeconds t')
+    start = defMessage
+      & NM.cpuTime .~ (timeToUIntSeconds t)
       & NM.batteryVoltage .~ v et
       & NM.solarVoltage .~ sv et
       & NM.solarInputCurrent .~ si et
@@ -311,41 +308,41 @@ d = Ti.diffUTCTime (Ti.UTCTime (Ti.fromGregorian 2021 4 6) (Ti.secondsToDiffTime
 --                                         nodeStep @MonadEnv xs) (pure (startDay $ TimeOfDay 0 0 0, defMessage))
 
 
--- nodeStep :: forall m. (MonadSample m) => (Ti.UTCTime, NM.EnergyState) -> m (Ti.UTCTime, NM.EnergyState)
--- nodeStep (t, oldState) = do
---   -- note that outflow of current is assumed to be positive 
---   loadCurrent <- abs <$> normal 30 20
---   gridCurrent <- normal 0 20
---   solarCurrent <- biGauss daytime (30, 10) (0, 0.3) t
---   --solarVoltage <- biGauss daytime (17, 3) (0, 1) t
---   batteryVoltageDiff <- normal 0.01 0.001
---   gridVoltageDiff <- normal 0.03 0.03 
+nodeStep :: forall m. (MonadSample m) => (Ti.UTCTime, NM.EnergyState) -> m (Ti.UTCTime, NM.EnergyState)
+nodeStep (t, oldState) = do
+  -- note that outflow of current is assumed to be positive 
+  loadCurrent <- abs <$> normal 30 20
+  gridCurrent <- normal 0 20
+  solarCurrent <- biGauss daytime (30, 10) (0, 0.3) t
+  --solarVoltage <- biGauss daytime (17, 3) (0, 1) t
+  batteryVoltageDiff <- normal 0.01 0.001
+  gridVoltageDiff <- normal 0.03 0.03 
   
---   let
---     t' = addUTCTime (1 :: Ti.NominalDiffTime) t
---     batteryV = oldState ^. NM.batteryVoltage + batteryVoltageDiff
---     gridV = oldState ^. NM.gridVoltage + gridVoltageDiff
+  let
+    t' = Ti.addUTCTime (1 :: Ti.NominalDiffTime) t
+    batteryV = oldState ^. NM.batteryVoltage + batteryVoltageDiff
+    gridV = oldState ^. NM.gridVoltage + gridVoltageDiff
     
---     newState = (defMessage :: NM.EnergyState)
---       & NM.batteryVoltage .~ batteryV
---       & NM.gridVoltage .~ gridV
---       & NM.batteryToLoadCurrent .~ loadCurrent
---       & NM.batteryToGridCurrent .~ (if gridCurrent > 0 then gridCurrent else 0)
---       & NM.gridToBatteryCurrent .~ (if gridCurrent < 0 then gridCurrent else 0)
---       & NM.solarInputCurrent    .~ solarCurrent
---       & NM.temperature          .~ (26 :: Double)
---       & NM.cpuTime             .~  timeToUIntSeconds t
---   return $ (t', newState)
---   where
---     biGauss :: (MonadSample m) => (t -> Bool) -> (Double, Double) -> (Double, Double) -> t -> m Double 
---     biGauss choice (mu, theta) (mu', theta') chooser = case choice chooser of
---       True -> normal mu theta
---       False -> normal mu' theta'
---     daytime :: Ti.UTCTime -> Bool
---     daytime tx = t' > sunrise && t' < sunset
---       where
---         t' = Ti.utcTimeOfDay tx
---     (sunrise, sunset) = (TimeOfDay 6 0 0, TimeOfDay 18 0 0)
+    newState = (defMessage :: NM.EnergyState)
+      & NM.batteryVoltage .~ batteryV
+      & NM.gridVoltage .~ gridV
+      & NM.batteryToLoadCurrent .~ loadCurrent
+      & NM.batteryToGridCurrent .~ (if gridCurrent > 0 then gridCurrent else 0)
+      & NM.gridToBatteryCurrent .~ (if gridCurrent < 0 then gridCurrent else 0)
+      & NM.solarInputCurrent    .~ solarCurrent
+      & NM.temperature          .~ (26 :: Double)
+      & NM.cpuTime             .~  timeToUIntSeconds t
+  return $ (t', newState)
+  where
+    biGauss :: (MonadSample m) => (t -> Bool) -> (Double, Double) -> (Double, Double) -> t -> m Double 
+    biGauss choice (mu, theta) (mu', theta') chooser = case choice chooser of
+      True -> normal mu theta
+      False -> normal mu' theta'
+    daytime :: Ti.UTCTime -> Bool
+    daytime tx = t' > sunrise && t' < sunset
+      where
+        t' = Ti.timeToTimeOfDay (Ti.utctDayTime tx)
+    (sunrise, sunset) = (Ti.TimeOfDay 6 0 0, Ti.TimeOfDay 18 0 0)
 
 
 -- startDay :: TimeOfDay -> Ti.UTCTime

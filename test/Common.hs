@@ -40,6 +40,7 @@ import Chopaan.Hydration.Prefix
 import Chopaan.Types
 import Chopaan.Graph
 import Chopaan.Node.NodeId
+import Chopaan.Node.NodeSensors
 import Chopaan.Node.Metrics
 import Chopaan.Node.Storage.Battery
 import Chopaan.Node.Mesh
@@ -164,6 +165,21 @@ instance (Arbitrary v) => Arbitrary (Node v) where
 instance (Arbitrary e, Arbitrary p) => Arbitrary (Battery e p) where
   arbitrary = genericArbitrary
 
+instance Arbitrary s => Arbitrary (Sec s) where
+  arbitrary = genericArbitrary
+instance Arbitrary s => Arbitrary (I s) where
+  arbitrary = genericArbitrary
+instance Arbitrary s => Arbitrary (V s) where
+  arbitrary = genericArbitrary
+instance Arbitrary s => Arbitrary (Res s) where
+  arbitrary = genericArbitrary
+
+
+instance Arbitrary a => Arbitrary (NodeSensors a) where
+  arbitrary = genericArbitrary
+
+instance Arbitrary a => Arbitrary (NodeT' a) where
+  arbitrary = genericArbitrary
 
 instance (Arbitrary e, Arbitrary p) => Arbitrary (SensorMetrics e p) where
   arbitrary = genericArbitrary

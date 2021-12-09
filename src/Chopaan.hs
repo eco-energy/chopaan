@@ -13,6 +13,7 @@ import Chopaan.Graph
 import Data.Influxable (createDB)
 import Data.Bifunctor
 import Data.Pool (stats)
+import qualified Data.Map.Strict as M
 
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Unfold as UF
@@ -49,12 +50,12 @@ runKbtzim mq hydrationOpts = do
       liftIO . print $ "Adding " <> (show (fst deployKbtz))
       addzim [deployKbtz]
     False -> getKNs
-  let kbtzim = mkTKbtz kns
-  let confss = S.fromList $ fmap sConf kns
-      s3Hydration = S.fromEffect ((pure . (const True)) =<< (runHydration hConfDef))
+  kbtzim <- liftIO . atomically $ mkTKbtz kns
+  let confss = S.fromList $ fmap sConf $ M.toList kns
+      s3Hydration = S.fromEffect ((pure . (const True)) =<< (runHydration hConfDef kbtzim))
       mqttStream = S.map (const True)
         $ S.concatMapWith S.wAsync (S.concatM . runKibbutz @t) confss
-  return $ mqttStream `S.parallel` s3Hydration
+  return $ s3Hydration `S.async` mqttStream
   where 
     deployKbtz = (KbtzId "Bismillah_Mor", fmap fst deployNodes)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
