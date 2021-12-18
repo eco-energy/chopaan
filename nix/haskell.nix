@@ -25,7 +25,8 @@
 
 let
   branchmap = {
-      "https://github.com/faezs/net-spider.git" = "bidirectional-neighborhood";
+    "https://github.com/faezs/net-spider.git" = "bidirectional-neighborhood";
+    "https://github.com/brendanhay/amazonka.git" = "main";
     };
   cleanGitHaskell = {src, name } :
     let

@@ -25,13 +25,14 @@ chopaanHaskellPackages.shellFor {
         {  version = "3.2.0.0";
            index-state = "2021-12-02T00:00:00Z";
            plan-sha256 = "1l3561ifzhz25i2izivv89lqb1ya1rl2qnxa5hgy75xqaj8bxdaq";
-           materialized = ./nix/chopaan.materialized/cabal;
+           materialized = ./nix/materialized/cabal;
+           checkMaterialization = false;
         };
       haskell-language-server = {
         version = "latest";
         index-state = "2021-12-02T00:00:00Z";
         plan-sha256 = "1gjx7xi508yn2lrwl7ic1pnyhxzl38ylzy5v9pi9v2q8a6vxi3dd";
-        materialized = ./nix/chopaan.materialized/hls;
+        materialized = ./nix/materialized/hls;
         checkMaterialization = false;
       };
     };
