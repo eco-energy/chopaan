@@ -107,6 +107,7 @@
         "mwc-random" = (((hackage.mwc-random)."0.14.0.0").revisions)."6ae33e246e91f66f621caabb2323b431c8dab57427a417a98f5cac3d82eb7b21";
         "proto-lens-arbitrary" = (((hackage.proto-lens-arbitrary)."0.1.2.10").revisions)."14012d7783d4f589cba8b7d72b904a48c42d43bb4d9469f871886a1fac2249aa";
         "unicode-data" = (((hackage.unicode-data)."0.1.0.1").revisions)."57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe";
+        "rel8" = (((hackage.rel8)."1.2.0.0").revisions)."d540fbfb967bf7eed23a1e7df24ef17424ed25575ab05a86a2cf213b2e6d6940";
         chopaan = ./chopaan.nix;
         concat-inline = ./.stack-to-nix.cache.0;
         concat-known = ./.stack-to-nix.cache.1;

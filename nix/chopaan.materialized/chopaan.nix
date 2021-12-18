@@ -127,6 +127,7 @@
           (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
           (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))
           (hsPkgs."regex-applicative" or (errorHandler.buildDepError "regex-applicative"))
+          (hsPkgs."rel8" or (errorHandler.buildDepError "rel8"))
           (hsPkgs."resource-pool" or (errorHandler.buildDepError "resource-pool"))
           (hsPkgs."resourcet" or (errorHandler.buildDepError "resourcet"))
           (hsPkgs."retry" or (errorHandler.buildDepError "retry"))
@@ -166,80 +167,7 @@
           (hsPkgs."x509-validation" or (errorHandler.buildDepError "x509-validation"))
           ];
         buildable = true;
-        modules = [
-          "Chopaan"
-          "Chopaan/API/History"
-          "Chopaan/API/Kbtz"
-          "Chopaan/Graph"
-          "Chopaan/Graph/Greskell"
-          "Chopaan/Graph/G"
-          "Chopaan/Graph/Snapshot"
-          "Chopaan/CRUD"
-          "Chopaan/Monad/Env"
-          "Chopaan/Node/Calibration"
-          "Chopaan/Node/Components"
-          "Chopaan/Node/Folds"
-          "Chopaan/Node/HW"
-          "Chopaan/Node/Mesh"
-          "Chopaan/Node/Metrics"
-          "Chopaan/Node/Node"
-          "Chopaan/Node/NodeId"
-          "Chopaan/Node/NodeOpts"
-          "Chopaan/Node/NodeSensors"
-          "Chopaan/Node/SoC"
-          "Chopaan/Node/Storage"
-          "Chopaan/Node/Storage/Battery"
-          "Chopaan/Node/Structure"
-          "Chopaan/Node/Tf"
-          "Chopaan/Comm/Address"
-          "Chopaan/Comm/Dispatch"
-          "Chopaan/Comm/Comm"
-          "Chopaan/Comm/Mqtt"
-          "Chopaan/Comm/Mqtt/AWS"
-          "Chopaan/Comm/Queues"
-          "Chopaan/Comm/S3"
-          "Chopaan/Comm/Monitor"
-          "Chopaan/Comm/Socket"
-          "Chopaan/Graph/Kbtz"
-          "Chopaan/Graph/Spider"
-          "Chopaan/Graph/VI"
-          "Chopaan/Haxl/Kbtz"
-          "Chopaan/Kibbutz"
-          "Chopaan/Hydrate"
-          "Chopaan/Hydration/Store"
-          "Chopaan/Hydration/Prefix"
-          "Chopaan/Kibbutz/KbtzId"
-          "Chopaan/Kibbutz/Kibbutz"
-          "Chopaan/Kibbutz/DataSource"
-          "Chopaan/Kibbutz/Transactor"
-          "Chopaan/Kibbutz/Allocate"
-          "Chopaan/Kibbutz/AWS/Common"
-          "Chopaan/Kibbutz/AWS/Things"
-          "Chopaan/Kibbutz/LinOpt"
-          "Chopaan/Kibbutz/Registry"
-          "Chopaan/Run"
-          "Chopaan/Server"
-          "Chopaan/Testing"
-          "Chopaan/Types"
-          "Chopaan/Utils/JSON"
-          "Chopaan/Utils/Retry"
-          "Chopaan/Utils/Streamly"
-          "Chopaan/Utils/StreamsInterop"
-          "Chopaan/Utils/Time"
-          "Chopaan/Utils/API"
-          "Data/Selectors"
-          "Data/Influxable"
-          "Data/HList"
-          "Data/BTreeIndex"
-          "Data/BTreeIndex/Types"
-          "Kbtz"
-          "Proto/NodeMessageSchema/NodeMessages"
-          "Proto/NodeMessageSchema/NodeMessages_Fields"
-          "Servant/Streamly"
-          "SimNode"
-          "Streamly/Binary"
-          "TxModel"
-          ];
+        modules = [ "Paths_chopaan" ];
         hsSourceDirs = [ "src" ];
         };
       exes = {
@@ -334,6 +262,7 @@
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
             (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))
             (hsPkgs."regex-applicative" or (errorHandler.buildDepError "regex-applicative"))
+            (hsPkgs."rel8" or (errorHandler.buildDepError "rel8"))
             (hsPkgs."resource-pool" or (errorHandler.buildDepError "resource-pool"))
             (hsPkgs."resourcet" or (errorHandler.buildDepError "resourcet"))
             (hsPkgs."retry" or (errorHandler.buildDepError "retry"))
@@ -474,6 +403,7 @@
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
             (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))
             (hsPkgs."regex-applicative" or (errorHandler.buildDepError "regex-applicative"))
+            (hsPkgs."rel8" or (errorHandler.buildDepError "rel8"))
             (hsPkgs."resource-pool" or (errorHandler.buildDepError "resource-pool"))
             (hsPkgs."resourcet" or (errorHandler.buildDepError "resourcet"))
             (hsPkgs."retry" or (errorHandler.buildDepError "retry"))
@@ -616,6 +546,7 @@
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
             (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))
             (hsPkgs."regex-applicative" or (errorHandler.buildDepError "regex-applicative"))
+            (hsPkgs."rel8" or (errorHandler.buildDepError "rel8"))
             (hsPkgs."resource-pool" or (errorHandler.buildDepError "resource-pool"))
             (hsPkgs."resourcet" or (errorHandler.buildDepError "resourcet"))
             (hsPkgs."retry" or (errorHandler.buildDepError "retry"))
@@ -758,6 +689,7 @@
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
             (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))
             (hsPkgs."regex-applicative" or (errorHandler.buildDepError "regex-applicative"))
+            (hsPkgs."rel8" or (errorHandler.buildDepError "rel8"))
             (hsPkgs."resource-pool" or (errorHandler.buildDepError "resource-pool"))
             (hsPkgs."resourcet" or (errorHandler.buildDepError "resourcet"))
             (hsPkgs."retry" or (errorHandler.buildDepError "retry"))
@@ -900,6 +832,7 @@
             (hsPkgs."proto-lens-runtime" or (errorHandler.buildDepError "proto-lens-runtime"))
             (hsPkgs."raw-strings-qq" or (errorHandler.buildDepError "raw-strings-qq"))
             (hsPkgs."regex-applicative" or (errorHandler.buildDepError "regex-applicative"))
+            (hsPkgs."rel8" or (errorHandler.buildDepError "rel8"))
             (hsPkgs."resource-pool" or (errorHandler.buildDepError "resource-pool"))
             (hsPkgs."resourcet" or (errorHandler.buildDepError "resourcet"))
             (hsPkgs."retry" or (errorHandler.buildDepError "retry"))

@@ -37,7 +37,7 @@ let
   pkgSet = haskell-nix.stackProject  {
     src = cleanGitHaskell { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
-    stack-sha256 = "0pb6hvrnl519n3c8xp3d160syl747b2d2z3ah5y9flspqscc3l2p";
+    stack-sha256 = "1ivf0740r3s43bb89rvn0q95nmsrlqfgndc72mj9wyggvz0v1i98";
     materialized = ./chopaan.materialized;
     checkMaterialization = false;
     # these extras will provide additional packages
