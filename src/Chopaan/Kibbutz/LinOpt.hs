@@ -1,62 +1,52 @@
-{-# LANGUAGE TypeApplications, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE TypeApplications, MultiParamTypeClasses, FlexibleInstances, GeneralizedNewtypeDeriving, DeriveAnyClass, DerivingStrategies, DerivingVia, DeriveGeneric, DeriveFunctor #-}
 module Chopaan.Kibbutz.LinOpt where
 
+import GHC.Generics
 import Data.SBV
 import Data.List
+import qualified Algebra.Graph.Labelled as AG
+import qualified Algebra.Graph as G
+import Algebra.Graph.Label (Distance(..), Capacity(..), getDistance, getCapacity)
+import qualified Numeric.Units.Dimensional.Prelude as D
+--class 
 
-
-newtype Sources n = Sources { unSource :: [(n, Double)] } deriving (Eq, Ord, Show)
-
-newtype Sinks n = Sinks { unSink :: [(n, Double)] } deriving (Eq, Ord, Show)
-
-type NSources = Sources String
-type NSinks = Sinks String
-
-instance Semigroup (Sources n) where
-  (Sources a) <> (Sources b) = Sources (a <> b)
-
-instance Semigroup (Sinks n) where
-  (Sinks a) <> (Sinks b) = Sinks (a <> b)
-
-instance Monoid (Sources n) where
-  mempty = Sources []
-
-instance Monoid (Sinks n) where
-  mempty = Sinks []
-  
-class NamedF a n where
+class TP a n where
   getVals :: a n -> [Double]
   getNames :: a n -> [n]
 
-instance (Show n) => NamedF Sources n where
-  getVals = (snd <$>) . unSource
-  {-# INLINE getVals #-}
-  getNames = (fst <$>) . unSource
-  {-# INLINE getNames #-}
-  
-instance (Show n) => NamedF Sinks n where
-  getVals = (snd <$>) . unSink
-  {-# INLINE getVals #-}
-  getNames = (fst <$>) . unSink
-  {-# INLINE getNames #-}
 
-mkSources :: Show n => [n] -> [Double] -> Sources n
-mkSources ns vs = Sources $ zip ns vs
-{-# INLINE mkSources #-}
+type OptGraph a = AG.Graph (Distance a) (Capacity a)
 
-mkSinks :: Show n => [n] -> [Double] -> Sinks n
-mkSinks ns vs = Sinks $ zip ns vs
-{-# INLINE mkSinks #-}
+newtype Cost a = Cost a
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype (Num, Fractional, Real, RealFrac)
 
-transportProblem :: Show n => Sources n -> Sinks n -> [[Double]] -> Goal
-transportProblem ss ds cs = do
+cost :: Num a => Distance a -> Capacity a -> Cost a
+cost d g = Cost $ (getDistance d) * (getCapacity g) 
+
+type CostGraph a = G.Graph (Cost a)
+
+constrainDemand :: (Foldable f, Functor f, Num a) => f a -> a -> Goal 
+constrainDemand nodeIncomings nodeDemand = constrain $ sum nodeIncomings .>= nodeDemand
+
+constrainSupply :: (Foldable f, Functor f, Num a) => f a -> a -> Goal 
+constrainSupply nodeOutgoings nodeSpareCapacity = constrain
+                                                  $ sum nodeOutgoings .<= nodeSpareCapacity
+
+
+
+txF :: OptGraph a -> Goal
+txF g = undefined
+
+transportProblem :: Num a => OptGraph a -> Goal
+transportProblem g = do
   vars <- txVars
-  mapM_ (\(xs, t) -> constrain $ sum xs .>= t) $ zip vars (fromDouble <$> (getVals ds))
-  mapM_ (\(xs, t) -> constrain $ sum xs .<= t) $ zip (transpose vars) (fromDouble <$> (getVals ss))
+  mapM_ 
+  mapM_ 
   minimize "goal" $ sum $ (fmap sum) $ hadmard vars (fmap (fmap fromDouble) cs)
   where
-    txVars :: Symbolic [[SReal]]
-    txVars = sequence . (fmap sequence) $ [[sReal $ tName i j
+    txGraph :: AG.Graph (Distance a) (Capacity a) -> Symbolic (G.Graph SReal)
+    txGraph = sequence . (fmap sequence) $ [[sReal $ tName i j
                                            |i <- getNames ss]
                                           | j <- getNames ds]
     fromDouble :: Double -> SReal

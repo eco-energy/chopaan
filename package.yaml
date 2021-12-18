@@ -154,15 +154,16 @@ dependencies:
 - cas-store >= 1.1.0
 - cas-hashable
 - dear-imgui
+- rel8
 when:
   - condition: flag(prod)
     then:
       ghc-options:
         - -fdicts-strict
         - -fplugin Fusion.Plugin
-        - -fmax-worker-args=12
-        - -fspec-constr-recursive=2
-        #- -fplugin-opt=Fusion.Plugin:verbose=1
+        - -fmax-worker-args=16
+        - -fspec-constr-recursive=16
+        - -fplugin-opt=Fusion.Plugin:verbose=1
         #- -fplugin-opt=Fusion.Plugin:dump-core
         - -O2
     else:
@@ -173,80 +174,6 @@ when:
       
 library:
   source-dirs: src
-  exposed-modules:
-    - Chopaan
-    - Chopaan.API.History
-    - Chopaan.API.Kbtz
-    - Chopaan.Graph
-    - Chopaan.Graph.Greskell
-    - Chopaan.Graph.G
-    - Chopaan.Graph.Snapshot
-    - Chopaan.CRUD
-    - Chopaan.Monad.Env
-    - Chopaan.Node.Calibration
-    - Chopaan.Node.Components
-    - Chopaan.Node.Folds
-    - Chopaan.Node.HW
-    - Chopaan.Node.Mesh
-    - Chopaan.Node.Metrics
-    - Chopaan.Node.Node
-    - Chopaan.Node.NodeId
-    - Chopaan.Node.NodeOpts
-    - Chopaan.Node.NodeSensors
-    - Chopaan.Node.SoC
-    - Chopaan.Node.Storage
-    - Chopaan.Node.Storage.Battery
-    - Chopaan.Node.Structure
-    - Chopaan.Node.Tf
-    - Chopaan.Comm.Address
-    - Chopaan.Comm.Dispatch
-    - Chopaan.Comm.Comm
-    - Chopaan.Comm.Mqtt
-    - Chopaan.Comm.Mqtt.AWS
-    - Chopaan.Comm.Queues
-    - Chopaan.Comm.S3
-    - Chopaan.Comm.Monitor
-    - Chopaan.Comm.Socket
-    - Chopaan.Graph.Kbtz
-    - Chopaan.Graph.Spider
-    - Chopaan.Graph.VI
-    - Chopaan.Haxl.Kbtz
-    - Chopaan.Kibbutz
-    - Chopaan.Hydrate
-    - Chopaan.Hydration.Store
-    - Chopaan.Hydration.Prefix
-    - Chopaan.Kibbutz.KbtzId
-    - Chopaan.Kibbutz.Kibbutz
-    - Chopaan.Kibbutz.DataSource
-    - Chopaan.Kibbutz.Transactor
-    - Chopaan.Kibbutz.Allocate
-    - Chopaan.Kibbutz.AWS.Common
-    - Chopaan.Kibbutz.AWS.Things
-    - Chopaan.Kibbutz.LinOpt
-    - Chopaan.Kibbutz.Registry
-    - Chopaan.Run
-    - Chopaan.Server
-    - Chopaan.Testing
-    - Chopaan.Types
-    - Chopaan.Utils.JSON
-    - Chopaan.Utils.Retry
-    - Chopaan.Utils.Streamly
-    - Chopaan.Utils.StreamsInterop
-    - Chopaan.Utils.Time
-    - Chopaan.Utils.API
-    - Data.Selectors
-    - Data.Influxable
-    - Data.HList
-    - Data.BTreeIndex
-    - Data.BTreeIndex.Types
-    - Kbtz
-    - Proto.NodeMessageSchema.NodeMessages
-    - Proto.NodeMessageSchema.NodeMessages_Fields
-    - Servant.Streamly
-    - SimNode
-    - Streamly.Binary
-    - TxModel
-  other-modules: []
   install-includes: src/Chopaan/Node/UpdateInst.inc
 
 executables:

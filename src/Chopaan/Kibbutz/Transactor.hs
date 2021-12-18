@@ -95,6 +95,8 @@ import Data.Greskell.GraphSON.GValue (unwrapOne)
 import NetSpider.Found (LinkState(..))
 import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), EFinds, VFoundNode)
 import Chopaan.Graph.Greskell
+import qualified Chopaan.Graph.Algebraic as AG
+import Algebra.Graph.Label (Distance(..))
 #endif
 
 
@@ -117,11 +119,6 @@ type TxState n = Tx n (Role, TxStatus) --Graph (TxStatus) (n, Role)
 
 type NodeStates n = Tx n SensorR --Graph PowerNR (n, SensorR)
 
-
-
-curryTx :: forall n a. (Ord n) => a -> Tx n a -> n -> a
-curryTx defA (Tx p) n = fromMaybe defA $ M.lookup n p
-{-# INLINE curryTx #-}
 
 data TxStatus' e = TxStatus'
   { energyDispatched :: !e
@@ -288,58 +285,10 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
         eta = 0.5
 {-# INLINE incTxState #-}
     
--- transactor :: forall m n. P.Pipe m (NodeStates n) (TxPlan n, TxState)
--- transactor = P.Pipe consumer producer i
---   where
---     i = undefined
---     consumer :: TxState n -> (NodeStates n) -> m (P.Step (P.PipeState x TxState n)) (TxPlan, TxState)
---     consumer p n = pure $ P.Yield () 
---     producer :: y -> m (P.Step (P.PipeState TxPlan y) (TxPlan, TxState))
---     producer = undefined
-
-
--- planPipe :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
---   => Time.NominalDiffTime -> P.Pipe m (NodeStates n) (Maybe (TxPlan n))
--- planPipe = P.mapM . txn
-
--- planToStatus :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
---              => P.Pipe m (Maybe (TxPlan n)) (Maybe (TxPlan n, TxState n)) 
--- planToStatus = P.zipWith (\x y -> (,) <$> x <*> y) C.id (P.map (fmap planToState))
-
--- ntos :: (MonadIO m, MonadCatch m,  Ord n) => Time.NominalDiffTime ->  P.Pipe m (NodeStates n) (Maybe (TxPlan n, TxState n))
--- ntos t = planToStatus C.. (planPipe t)
-
--- statePipe :: (MonadIO m, MonadCatch m,  Ord n) => Time.NominalDiffTime -> P.Pipe m (NodeStates n) (Maybe (NodeStates n, TxPlan n, TxState n))
--- statePipe t = (P.zipWith status (ntos t) (P.map Just))
-
--- statePipeWithId h = P.zipWith (,) (P.map fst) (P.compose (statePipe h) (P.map snd))
-
--- statusPipe :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
---   => P.Pipe m (TxState n) (NodeStates n -> TxState n)
--- statusPipe = P.map incTxState
-
---stateP = P.zipWith statusPipe 
---applyInPipe = 
-
--- status :: ( Ord n)
---   => Maybe (TxPlan n, TxState n)
---   -> Maybe (NodeStates n)
---   -> Maybe (NodeStates n, TxPlan n, TxState n)
--- status x y = (,,) <$> y <*> (fst <$> x) <*> (liftA2 incTxState (snd <$> x) y)
-
--- statusS :: (IsStream t, MonadAsync m,  Ord n)
---         => t m (n, NodeStates n, TxPlan n)
---         -> t m (n, NodeStates n, TxPlan n, TxState n)
--- statusS = fmap status
-
-
 transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Ord n) => Time.NominalDiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
-transactionPlanner !timeHorizon = FL.foldlM' (\_ n -> txn timeHorizon n) (pure mempty)
+transactionPlanner !timeHorizon = FL.foldMapM (txn timeHorizon)
 {-# INLINE transactionPlanner#-}
 
-
-txn' h t = (pure . (fromMaybe mempty)) =<< txn h t
-{-# INLINE txn' #-}
 
 
 txn :: forall m n. (MonadIO m, MonadCatch m, Ord n, Show n) => Time.NominalDiffTime -> NodeStates n -> m (TxPlan' n)
@@ -350,7 +299,6 @@ txn !h !(Tx ns) = do
       reindexTx (Tx n) = Tx $ M.fromList $
                          fmap (\(i, a) -> (getAtI i, a)) $ M.toList n
   sched <- schedule
-  --liftIO . print $ sched
   return $ fmap reindexTx sched
       where
         consumption = M.toAscList $ fmap _demand ns
@@ -363,15 +311,11 @@ txn !h !(Tx ns) = do
         (sources, sinks) = L.partition (\x -> snd x > 0) d
         better f ss = uncurry f $ unzip $ (second fromWattSeconds) <$> ss
         schedule :: m (TxPlan' Int)
-        schedule =  (fmap join) . tryForMaybe $ (solveTP h)
+        schedule =  (solveTP h)
                     (better mkSources sources)
                     (better mkSinks sinks)
           [[1 | i <- [1..length sources]] | j <- [1..length sinks]]
-{-# INLINE txn #-}
 
-tryForMaybe :: (MonadIO m, MonadCatch m) => m a -> m (Maybe a) 
-tryForMaybe m = expToMaybe =<< (try m)
-{-# INLINE tryForMaybe #-}
 
 expToMaybe :: (MonadIO m) => Either SomeException a -> m (Maybe a)
 expToMaybe (Left e) = (liftIO . print $ e) >> return Nothing
@@ -382,7 +326,7 @@ expToMaybe (Right a) = return $ Just a
 type TxPlan' n = Maybe (TxPlan n)
 
 
-solveTP :: forall m . (MonadIO m, MonadCatch m) => Time.NominalDiffTime -> Sources Int -> Sinks Int -> [[Double]] -> m (TxPlan' Int)
+solveTP :: forall m . (MonadIO m, MonadCatch m) => Time.NominalDiffTime -> AG.Graph (Distance Double) (Node WattSeconds) -> [[Double]] -> m (TxPlan' Int)
 solveTP timeHorizon sources sinks cs = do
   liftIO $ do
     (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs

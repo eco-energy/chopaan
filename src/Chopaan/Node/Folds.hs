@@ -56,7 +56,7 @@ type MeshR = (MeshNode, RxSignal)
 
 meshFold :: forall m. Monad m => NodeMAC -> FL.Fold m (RuntimeStats) (MeshNode, RxSignal)
 meshFold = meshF
-{-# INLINE meshFold #-}
+{--# INLINE meshFold #-}
 
 timeFold :: forall m. Monad m => FL.Fold m (EnergyState) Timestamp
 timeFold = FL.foldl' step' begin'
@@ -77,7 +77,7 @@ timeFold = FL.foldl' step' begin'
 
 powerFold :: forall m. Monad m => FL.Fold m EnergyState (PowerNR)
 powerFold = FL.foldl' (\_ !b -> power b) mempty 
-{-# INLINE powerFold #-}
+{--# INLINE powerFold #-}
 
 energyFold :: forall m. Monad m => FL.Fold m (EnergyState) (EnergyNR)
 energyFold = fmap fst $ FL.foldl' step begin
@@ -104,7 +104,7 @@ energyFold = fmap fst $ FL.foldl' step begin
                     }
       where
         Node{..} = p
-{-# INLINE energyFold #-}
+{--# INLINE energyFold #-}
 
 type Unop a = a -> a
 
@@ -133,7 +133,7 @@ batteryFold !bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts)
     end :: (Maybe UTCTime, Maybe (KF R)) -> Unop (Battery R R)
     end (_, (!Just kf)) = \b -> runKF b kf
     end (_, (Nothing)) = const (emptyB @R @R)
-{-# INLINE batteryFold #-}
+{--# INLINE batteryFold #-}
 
 newtype Likelihood = Likelihood Double
 
@@ -162,7 +162,7 @@ sensorFold = FL.toFold $ SensorMetrics
              <*> FL.Tee (batteryFold defBatteryParams)
              <*> FL.Tee demandFold
              <*> FL.Tee sensors 
-{-# INLINE sensorFold #-}
+{--# INLINE sensorFold #-}
 
 demandFold :: (Monad m) => FL.Fold m (EnergyState) WattSeconds
 demandFold = FL.foldl' (\_ nes -> (d $ power nes)) 0
@@ -170,7 +170,7 @@ demandFold = FL.foldl' (\_ nes -> (d $ power nes)) 0
     {-# INLINE d #-}
     d (!Node{..}) = pToE horizon consumed
     horizon = (60 * 10)
-{-# INLINE demandFold #-}
+{--# INLINE demandFold #-}
 
 
 sensors :: (Monad m) => FL.Fold m EnergyState (NodeT' Double)

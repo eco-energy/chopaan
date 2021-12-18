@@ -176,7 +176,10 @@ addFN :: MonadIO m
       => MonadCatch m
       => SpiderConn n v e
       => Spider n v e -> FoundNode n v e -> m (Either SpiderException Bool) 
-addFN s f = fmap (either (Left . AddFNExp) (const (Right True)))  (liftIO $ (try (addFoundNode s f)))
+addFN s f = toE =<<  (liftIO $ (try (addFoundNode s f)))
+  where
+    toE (Left err) = (liftIO . print $ err) >> (return (Left . AddFNExp $ err))
+    toE (Right yay) = (liftIO . print $ yay) >> (return (Right $ True)) 
 {-# INLINE addFN #-}
 
 
@@ -216,13 +219,13 @@ toLink' n' e dir = FoundLink
 addFNMaybe :: forall m n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
            => Pool (Spider n v e) -> Maybe (FoundNode n v e) -> m (Bool)
 addFNMaybe _ Nothing = return True
-addFNMaybe p (Just n) = expToBool =<< withResource p ((flip addFN) n)
+addFNMaybe p (Just n) = expToBool =<< withResourceOnEither p ((flip addFN) n)
 {-# INLINE addFNMaybe #-}
 
 addFNE :: forall m n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
            => Pool (Spider n v e) -> Maybe (FoundNode n v e) -> m (Either SpiderException Bool)
 addFNE _ Nothing = return (Right True)
-addFNE p (Just n) = withResource p ((flip addFN) n)
+addFNE p (Just n) = withResourceOnEither p ((flip addFN) n)
 {-# INLINE addFNE #-}
 
 spiderFold :: forall m a n v e. (MonadAsync m, MonadCatch m, SpiderConn n v e)
@@ -277,9 +280,9 @@ hasConfig (h, p) label = defConfig
   }
 {-# INLINE hasConfig #-}
 
-    
-withResourceOnEither :: Pool resource -> (resource -> IO (Either failure success)) -> IO (Either failure success)
-withResourceOnEither pool act = mask_ $ do
+
+withResourceOnEither :: (MonadIO m) => Pool resource -> (resource -> IO (Either failure success)) -> m (Either failure success)
+withResourceOnEither pool act = liftIO $ mask_ $ do
   (resource, localPool) <- takeResource pool
   failureOrSuccess <- act resource `onException` destroyResource pool localPool resource
   case failureOrSuccess of

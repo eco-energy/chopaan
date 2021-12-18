@@ -107,10 +107,8 @@ api = genericApi (Proxy :: Proxy KbtzAPI)
 links :: KbtzAPI (AsLink Link)
 links = allFieldLinks
 
-client :: KbtzAPI (AsClientT IO)
-client = genericClientHoist (\x -> runClientM x env >>= either throwIO return)
-  where
-    env = error "undefined environment"
+client :: ClientEnv -> KbtzAPI (AsClientT IO)
+client env = genericClientHoist (\x -> runClientM x env >>= either throwIO return)
 
 
 record :: KbtzAPI (AsServerT GraphM)
@@ -127,6 +125,9 @@ record = KbtzAPI
           K.removeNodeFromKbtz c k n
           K.addNodeToKbtz c k' n
           return True
+        _ -> return False
+  , _reassociateNodeMAC = \n n' -> do
+      withKbtzPool $ \c -> K.updateNodeMAC c n n'
   , _removeNodeFromKbtz = \k n -> withKbtzPool $ \c -> do
       K.removeNodeFromKbtz c k n
   , _getKbtzim = withKbtzPool $ \c -> do
@@ -137,10 +138,11 @@ record = KbtzAPI
       let vs = zip ns nsHw
           g = undefined
       return $ g
-  -- , _getNode :: route
-  --              :- QPR "kbtzId" KbtzName
-  --              :> QPR "nodeId" NodeMAC
-  --              :> Get '[JSON] (APINode) 
+  , _getNode = \k n -> do
+      nx <- withKbtzPool (\c -> K.getNode c n)
+      -- case length nx of
+      --   0 ->
+      return undefined
   }
 
 kbtzApp :: DBPools -> Application

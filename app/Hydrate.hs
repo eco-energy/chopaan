@@ -7,7 +7,7 @@ import qualified Data.Text as T
 import Chopaan.Hydrate
 import Chopaan.Graph (tkOptions, runGraphM, getKNs)
 import Control.Concurrent.STM (atomically)
-import Chopaan.Types (PoolConf(..))
+import Chopaan.Types (PoolConf(..), icOptions)
 import Options.Applicative
 
 --import Dhall hiding (newManager, void)
@@ -22,6 +22,7 @@ import Options.Applicative
 main :: IO ()
 main = do
   tc <- execParser tkOptions
+  ic <- execParser icOptions
   hc <- parseHConf
-  runGraphM (PoolConf 1 10 10) tc $ runHydration hc
+  runGraphM (PoolConf 1 10 10) tc $ runHydration ic hc
     =<< (liftIO . atomically . mkTKbtz =<< getKNs)

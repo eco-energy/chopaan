@@ -27,6 +27,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Network.HTTP.Client as NC (brConsume, responseBody)
 import Database.InfluxDB.Query (Query, withQueryResponse)
+import Database.InfluxDB (WriteParams, QueryParams)
 import Database.InfluxDB.JSON (parseSeriesObject, parseSeriesBody, parseResultsObject, parseErrorObject)
 import qualified Data.Vector as V
 import Data.Influxable
@@ -48,15 +49,16 @@ import Chopaan.Graph
 import Chopaan.Graph.Kbtz
 import Chopaan.API.History
 import Chopaan.Kibbutz.KbtzId
-import Chopaan.Types (PoolConf(..))
+import Chopaan.Types (PoolConf(..), InfluxConn(..))
+import Streamly.Binary (encodeFold, toWino)
 
 import qualified Data.Text as T
 import qualified Data.Time as Ti
 
 import qualified Network.Wai.Handler.Warp         as Warp
 
-import           Servant
-import           Servant.Client
+--import           Servant
+--import           Servant.Client
 
 import qualified Streamly.Internal.Data.Fold as FL
 import Common
@@ -76,9 +78,9 @@ spec = do
   kbtzSpec
   --hydrationSpec
 
-nNodes = 10
+nNodes = 100
 nMessages = 1000
-kId = KbtzId "test"
+kId = KbtzId "testK"
 t0 = t
 tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
 
@@ -104,15 +106,15 @@ foldSpec = do
     it "Sensor Fold works" $ do
       ns <- liftIO $ arbs @NodeMAC nNodes
       l <- S.length
-           $ sampleStream
-           $ S.postscan (FL.classify sensorFold) $ esStreams nMessages nNodes ns
+           $ S.tapRate 1 (\r -> liftIO $ print ("sensorFold rate: " <> (show r)))
+           $ (sampleStream $ S.postscan (FL.classify sensorFold) (esStreams nMessages nNodes ns))
       l `shouldBe` (nMessages * nNodes)
       
 
 kbtzSpec :: Spec
 kbtzSpec = do
   aroundAll (TC.withContainers (runWithDBPools)) $ describe "Spiders are great" $ do
-    it "qKbtz processor processes all messages!" $ \(ns, db) -> do
+    it "qKbtz processor processes all messages!" $ \(ns, db, ic) -> do
       let sp = (spools db)
           es = sampleStream $ esStreams nMessages nNodes ns 
           rs = rsStreams nMessages nNodes ns
@@ -121,52 +123,60 @@ kbtzSpec = do
         runKibbutz KbtzC { name = kId
                          , nodes = ns
                          , channelOpts = (Right qs)
-                         , s3Opts = Nothing 
+                         , s3Opts = Nothing
+                         , influxCon = ic
                          })
       forkIO $ do
-        S.mapM_ (\(n, e) -> writeChan (stateChan qs) n e) es
-        S.mapM_ (\(n, r) -> writeChan (statsChan qs) n r) rs
+        S.drain $
+          S.mapM (\(n, e) -> writeChan (stateChan qs) n e) es
+          `S.wAsync`
+          S.mapM (\(n, r) -> writeChan (statsChan qs) n r) rs
         print "Messages Queued"
-      l <- S.length $ S.take ((2 * nNodes * nMessages) + 0) k
+      l <- S.length -- S.fold (FL.tee FL.length (encodeFold "testFile"))
+           --- $ fmap toWino
+           $ S.take ((2 * nNodes * nMessages) + 0) k
       l `shouldBe` (2 * nNodes * nMessages)
 
-    xit "RS snapshot graph has the right number of nodes and links" $ \(ns, db) -> do
+    xit "RS snapshot graph has the right number of nodes and links" $ \(ns, db, _) -> do
       (gotNs, gotLs) <- snapDebug meshNodesSnapshot (spools db) ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       
-    xit "Stake snapshot graph has the right number of nodes and links" $ \(ns, db) -> do
+    xit "Stake snapshot graph has the right number of nodes and links" $ \(ns, db, _) -> do
       (gotNs, gotLs) <- snapDebug txNodesSnapshot (spools db) ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
 
-    xit "Status snapshot graph has the right number of nodes and links" $ \(ns, db) -> do
+    xit "Status snapshot graph has the right number of nodes and links" $ \(ns, db, _) -> do
       (gotNs, gotLs) <- snapDebug statusNodesSnapshot (spools db) ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
-    xit "Flow snapshot graph has the right number of nodes and links" $ \(ns, db) -> do
+    xit "Flow snapshot graph has the right number of nodes and links" $ \(ns, db, _) -> do
       (gotNs, gotLs) <- snapDebug flowNodesSnapshot (spools db) ns t0 tn
       oneNodePerMACPlusRoot gotNs nNodes
       constHypergraphLinks gotLs nNodes
-    it "NodeQueries should yield errythang" $ \(ns, db) -> do
+    it "NodeQueries should yield errythang" $ \(ns, db, ic) -> do
        let kns = asKbtzNode kId <$> ns
-           qgp = QueryGenParams "chopaanMQTT" "\"autogen\"" Nothing Nothing 
+           mqttDB = "chopaanMQTT"
+           wp' = wp ic mqttDB
+           qp' = qp ic mqttDB
+           qgp = QueryGenParams mqttDB "\"autogen\"" Nothing Nothing 
            nqs = nodeQueries qgp <$> kns
            eqNM l = (abs (l - nMessages)) < 2
-       t <- qResultTest eqNM nqs
+       t <- qResultTest qp' eqNM nqs
        t `shouldBe` (True)
 
-qResultTest :: forall m. (S.MonadAsync m) => (Int -> Bool) -> [NodeQueries] -> m (Bool)
-qResultTest eqNM nqs = do
-  ls <- mapM chkNodeQs nqs
+qResultTest :: forall m. (S.MonadAsync m) => QueryParams -> (Int -> Bool) -> [NodeQueries] -> m (Bool)
+qResultTest qp' eqNM nqs = do
+  ls <- mapM (chkNodeQs qp') nqs
   return $ all (\(a, b, c, d) -> eqNM a && eqNM b && eqNM c && eqNM d) ls
 
-chkNodeQs :: forall m. (S.MonadAsync m) => NodeQueries -> m (Int, Int, Int, Int)
-chkNodeQs nq = do
+chkNodeQs :: forall m. (S.MonadAsync m) => QueryParams -> NodeQueries -> m (Int, Int, Int, Int)
+chkNodeQs qp nq = do
   ps <- resLen (powerQ nq)
   es <- resLen (energyQ nq)
   bs <- resLen (batteryQ nq)
   ms <- resLen (meshQ nq)
-  liftIO . print $ (ps, es, bs, ms)
+  --liftIO . print $ (ps, es, bs, ms)
   return (ps, es, bs, ms)
   where
     resLen = (pure . fromMaybe 0) <=< (S.the . S.mapM mkQ . S.fromList)
@@ -196,22 +206,26 @@ chkNodeQs nq = do
             A.Success veclen -> return $ veclen
             A.Error message -> error message
     mkQ :: Query -> m Int
-    mkQ q = liftIO $ withQueryResponse (qp "chopaanMQTT") Nothing q countm
+    mkQ q = liftIO $ withQueryResponse qp Nothing q countm
        --(V.length (fst rs)) `shouldBe` nMessages
 
-runWithDBPools :: (TC.MonadDocker m) => m ([NodeMAC], DBPools)
+runWithDBPools :: (TC.MonadDocker m) => m ([NodeMAC], DBPools, InfluxConn)
 runWithDBPools = do
-  let (host, port) = ("localhost", 8182) -- <- runJanus "kbtzSpec"
+  -- ((tHost, tPort), (iHost, iPort)) <- runDBs "kbtzSpec" --
+  let (tHost, tPort) = ("localhost", 8182)
+      (iHost, iPort) = ("localhost", 8086) 
   --let c = mkConfG (host, port)
   let pc = PoolConf 10 100 20
-  sp <- mkDBPools pc host port
+  sp <- mkDBPools pc tHost tPort
   let kp = gremlinPool sp
+      mqttDB = "chopaanMQTT"
+      ic = (InfluxConn (T.pack iHost) iPort)
   -- Create Influx DB!
-  liftIO $ createDB "chopaanMQTT"
+  liftIO $ createDB ic mqttDB
   ns <- liftIO $ arbs @NodeMAC nNodes
   liftIO $ withResource kp  (\c -> addKbtz c kId)
   liftIO $ mapM_ (\n -> withResource kp (\c -> addNodeToKbtz c kId n)) ns
-  return (ns, sp)
+  return (ns, sp, ic)
 
 
 oneNodePerMACPlusRoot sn nNodes = ((length $ sn)

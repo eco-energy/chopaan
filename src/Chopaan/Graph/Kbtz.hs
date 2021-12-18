@@ -109,6 +109,9 @@ addHHToKbtz c k n = do
         1 -> return ()
         _ -> return ()
 
+updateNodeMAC :: Client -> NodeMAC -> NodeMAC -> m ()
+updateNodeMAC = undefined
+
 addNodeToKbtz :: MonadIO m => Client -> KbtzName -> NodeMAC -> m ()
 addNodeToKbtz c k n = addHHToKbtz c k (ANode n)
 

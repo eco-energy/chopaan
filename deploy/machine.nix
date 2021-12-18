@@ -46,7 +46,7 @@ in
   
   boot.loader.grub.device = lib.mkForce grubDevice;
   networking.firewall.enable = true;
-  networking.firewall.allowedTCPPorts = [ 443 ];
+  networking.firewall.allowedTCPPorts = [ 80 443 ];
   environment.variables = { REGION = region; };
   security.pam.loginLimits = [
     { domain = "@chopaan";
@@ -61,30 +61,32 @@ in
     }
   ];
 
+  virtualisation.oci-containers.containers = {
+    janusgraph = {
+      image = "docker.io/janusgraph/janusgraph:0.6.0";
+      ports = [ "${toString janusPort}:${toString janusPort}" ];
+      volumes = [
+        "janusgraph-default-data:/var/lib/janusgraph"
+        "${janusConf}/config/janusgraph.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
+        "${janusConf}/config/gremlin-server-0.6.yaml:/etc/opt/janusgraph/janusgraph-server.yaml:ro"
+        "${janusConf}/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
+        # "${janusConf}/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
+      ];
+    };
 
-  docker-containers.janusgraph = {
-    image = "docker.io/janusgraph/janusgraph:0.6.0";
-    ports = [ "${toString janusPort}:${toString janusPort}" ];
-    volumes = [
-      "janusgraph-default-data:/var/lib/janusgraph"
-      "${janusConf}/config/janusgraph.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
-      "${janusConf}/config/gremlin-server-0.6.yaml:/etc/opt/janusgraph/janusgraph-server.yaml:ro"
-      "${janusConf}/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
-      # "${janusConf}/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
-    ];
+    # chronograf = {
+    #   image = "docker.io/chronograf:1.9.0-alpine";
+    #   ports = [ "8888:8888" ];
+    #   cmd = [ "--influxdb-url=http://localhost:8086" ];
+    #   extraDockerOptions = [ "--network=host" ];
+    # };
   };
-
-  docker-containers.chronograf = {
-    image = "docker.io/chronograf:1.9.0-alpine";
-    ports = [ "8888:8888" ];
-    cmd = [ "--influxdb-url=http://localhost:8086" ];
-    extraDockerOptions = [ "--network=host" ];
-  };
-
+  
   systemd.extraConfig = "DefaultLimitNOFILE=6400000\nDefaultStandardError='journal'\nDefaultStandardOut='journal'";
 
   services.postgresql = {
     enable = true;
+    package = pkgs.postgresql_13;
     extraPlugins = [ pkgs.timescaledb ];
     settings = {
       shared_preload_libraries = "timescaledb";
@@ -103,10 +105,10 @@ in
       PAST_RES = "Ten4";
       FUTURE_RES = "Ten2";
       LIFETIME = "Infinite";
-      MAN_CONN_COUNT = "1024";
-      MAN_IDLE_CONN = "512";
+      MAN_CONN_COUNT = "128";
+      MAN_IDLE_CONN = "64";
       MAN_TIMEOUT = "90";
-      DL_THREADS = "100";
+      DL_THREADS = "30";
       SOURCE_GEN_THREADS = "12";
     };
     path = [ pkgs.z3 ];
@@ -208,29 +210,29 @@ in
     };
   };
     
-  virtualisation.virtualbox.guest.enable = lib.mkForce false;
+  virtualisation.virtualbox.guest.enable = lib.mkIf (!isHttps) (lib.mkForce false);
   users.users.nginx.extraGroups = [ "acme" ];
   security.acme.acceptTerms = true;
   security.acme.email = "faez@ecoenergy.global";
   security.acme.server = lib.mkIf (!isHttps) "https://acme-staging-v02.api.letsencrypt.org/directory";
   services.nginx = {
     enable = true;
-    logError = "stdout info";
+    logError = "stderr info";
     recommendedTlsSettings = isHttps;
     recommendedOptimisation = true;
     recommendedGzipSettings = true;
     recommendedProxySettings = true;
-    appendHttpConfig = ''
-        proxy_cache_path /tmp/cache/ levels=1:2 keys_zone=chop-cache:100m max_size=1g inactive=60m use_temp_path=off;
-        # Cache only success status codes; in particular we don't want to cache 404s.
-        # See https://serverfault.com/a/690258/128321
-        map $status $cache_header {
-        200     "public";
-        302     "public";
-        default "no-cache";
-        }
-        access_log logs/access.log;
-      '';
+    # appendHttpConfig = ''
+    #     proxy_cache_path /tmp/cache/ levels=1:2 keys_zone=chop-cache:100m max_size=1g inactive=60m use_temp_path=off;
+    #     # Cache only success status codes; in particular we don't want to cache 404s.
+    #     # See https://serverfault.com/a/690258/128321
+    #     map $status $cache_header {
+    #     200     "public";
+    #     302     "public";
+    #     default "no-cache";
+    #     }
+    #     access_log logs/access.log;
+    #   '';
 
     virtualHosts.${hostName} = {
       forceSSL = isHttps;
@@ -245,18 +247,6 @@ in
           "proxy_pass_header Authorization;"
         ;
       };
-      # locations."/chronograf" = {
-      #   proxyPass = "http://127.0.0.1:${toString 8888}/";
-      #   #proxyWebsockets = true;
-      #   extraConfig =
-      #     # required when the target is also TLS server with multiple hosts
-      #     "proxy_ssl_server_name on;" +
-      #     # required when the server wants to use HTTP Authentication
-      #     #"proxy_pass_header Authorization;" +
-      #     #"proxy_set_header Host $host;" +
-      #     "proxy_ignore_client_abort on;"
-      #   ;
-      # };
     };
     
     # virtualHosts.${hostName} = {

@@ -29,7 +29,7 @@ let
     };
   cleanGitHaskell = {src, name } :
     let
-      clean = haskell-nix.haskellLib.cleanGit { inherit name src; };
+      clean = haskell-nix.haskellLib.cleanGit { name = "${name}-gitClean"; inherit src; };
     in haskell-nix.cleanSourceHaskell { inherit name; src = clean; };
 
   # This creates the Haskell package set.

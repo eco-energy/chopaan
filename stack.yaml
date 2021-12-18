@@ -185,6 +185,7 @@ extra-deps:
  - mwc-random-0.14.0.0@sha256:6ae33e246e91f66f621caabb2323b431c8dab57427a417a98f5cac3d82eb7b21,1810
  - proto-lens-arbitrary-0.1.2.10@sha256:14012d7783d4f589cba8b7d72b904a48c42d43bb4d9469f871886a1fac2249aa,1197
  - unicode-data-0.1.0.1@sha256:57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe,3637
+ - rel8-1.2.0.0@sha256:d540fbfb967bf7eed23a1e7df24ef17424ed25575ab05a86a2cf213b2e6d6940,5045
  #- net-spider-0.4.3.6@sha256:d6f08b83ca14144bfc3bf033df563ae5329d1a4fd97bc521d5ab20649560c27a,6198
  # # Override default flag values for local packages and extra-deps
 

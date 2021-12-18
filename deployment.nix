@@ -20,8 +20,8 @@ in
     deployment.ec2 = {
       inherit accessKeyId region;
 
-      instanceType = "m6i.xlarge";
-      spotInstancePrice = 07;
+      instanceType = "r5b.large";
+      spotInstancePrice = 04;
       ebsBoot = true;
       ebsInitialRootDiskSize = 100;
 
@@ -35,7 +35,7 @@ in
       elasticIPv4 = resources.elasticIPs.chopaan-ip;
     };
     deployment.route53 = {
-      inherit accessKeyId region;
+      inherit accessKeyId;
       hostName = hostName;
       usePublicDNSName = true;
     };

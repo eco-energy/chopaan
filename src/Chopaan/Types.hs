@@ -20,6 +20,7 @@ import RIO.Time (UTCTime(..), fromGregorian, secondsToDiffTime)
 import Dhall
 import System.Envy
 import Chopaan.Node.NodeOpts
+import Options.Applicative
 #else
 import Prelude
 import Control.DeepSeq (NFData(..))
@@ -115,6 +116,22 @@ data PoolConf = PoolConf
 
 instance FromDhall PoolConf
 
+data InfluxConn = InfluxConn { influxHost :: !T.Text, influxPort :: !Int }
+  deriving (Eq, Ord, Show, Generic)
+
+instance FromDhall InfluxConn
+
+icParser :: Options.Applicative.Parser InfluxConn
+icParser = InfluxConn
+  <$> strOption (long "influxHost" <> metavar "INFLUXHOST")
+  <*> option Options.Applicative.auto (long "influxPort" <> metavar "INFLUXPORT" <> showDefault <> value 8086)
+
+icOptions :: ParserInfo InfluxConn
+icOptions = info (icParser <**> helper) $
+    fullDesc <> progDesc "Chopaan"
+             <> header "InfluxDB options"
+
+
 -- | Command line arguments
 data Options = Options
   { logVerbose :: !Bool
@@ -124,6 +141,7 @@ data Options = Options
   , dbOpts :: !DBOpts
   , hydrationOpts :: !HydrationOpts
   , poolConf :: !PoolConf
+  , influxConn :: !InfluxConn 
   } deriving (Generic, Show)
 
 instance FromDhall Options

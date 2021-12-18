@@ -1,10 +1,11 @@
 {-# LANGUAGE ConstraintKinds, ExplicitForAll #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, DerivingVia #-}
-module Chopaan.Graph.Algebraic where
+module Chopaan.Graph.Algebraic (module AG, GrConn, Gr, fromSnapshot, castLinks) where
 
 import GHC.Generics
 import Control.Newtype.Generics as N
 import Data.Bifunctor
+import Data.Maybe
 import Data.Typeable
 import Data.Aeson (ToJSON, FromJSON)
 import qualified Codec.Winery as W
@@ -38,16 +39,15 @@ emptyGr = Gr AG.empty
 
 instance N.Newtype (Gr flow state)
 
--- $ Shpadoinkle Instances
-instance (Show state, Show flow) => Humanize (Gr flow state)
 
+fromSnapshot :: forall n l v. (Monoid l, Ord n) => SnapshotGraph n v l -> Gr l (n, v)
+fromSnapshot = Gr . AG.edges . castLinks
 
-fromSnapshot :: forall n l v. (Monoid l, Ord n) => SnapshotGraph n v l -> Gr l (Maybe v)
-fromSnapshot g = Gr . AG.edges $ fmap (\(x, (_, y), (_, z)) -> (x, y, z)) $ castLinks g
-
-castLinks :: forall n v l. (Monoid l, Ord n) => SnapshotGraph n v l -> [(l, (n, Maybe v), (n, Maybe v))]
-castLinks (nodes, links) = (\l -> (_linkAttributes l, sourceAttrs l, destAttrs l)) <$> links
+castLinks :: forall n v l. (Monoid l, Ord n) => SnapshotGraph n v l -> [(l, (n, v), (n, v))]
+castLinks (nodes, links) = filterJust $ (\l -> (_linkAttributes l, sourceAttrs l, destAttrs l)) <$> links
   where
+    filterJust = fmap (\(a, x, y) -> (a, second fromJust x, second fromJust y))
+                 . filter (\(_, (_, v), (_, v')) -> (isJust v && isJust v'))
     nmap = Map.fromList $ zip (_nodeId <$> nodes) (_nodeAttributes <$> nodes)
     sourceAttrs l = (_sourceNode l, nmap Map.! (_sourceNode l))
     destAttrs l = (_destinationNode l, nmap Map.! (_destinationNode l))

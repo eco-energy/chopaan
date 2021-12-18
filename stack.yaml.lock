@@ -974,6 +974,13 @@ packages:
       sha256: 04163fc72c5b7430664669f23c66214b9699cd4be2c7a74551d58ce428f7be41
   original:
     hackage: unicode-data-0.1.0.1@sha256:57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe,3637
+- completed:
+    hackage: rel8-1.2.0.0@sha256:d540fbfb967bf7eed23a1e7df24ef17424ed25575ab05a86a2cf213b2e6d6940,5045
+    pantry-tree:
+      size: 9027
+      sha256: a037ef16fed5785e57d68a83721fa2b0cfc47ce8ed7a128be0149455797c2d76
+  original:
+    hackage: rel8-1.2.0.0@sha256:d540fbfb967bf7eed23a1e7df24ef17424ed25575ab05a86a2cf213b2e6d6940,5045
 snapshots:
 - completed:
     size: 586286

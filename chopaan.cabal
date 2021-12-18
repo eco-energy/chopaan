@@ -37,11 +37,40 @@ library
       Chopaan
       Chopaan.API.History
       Chopaan.API.Kbtz
-      Chopaan.Graph
-      Chopaan.Graph.Greskell
-      Chopaan.Graph.G
-      Chopaan.Graph.Snapshot
+      Chopaan.Comm.Address
+      Chopaan.Comm.Comm
+      Chopaan.Comm.Dispatch
+      Chopaan.Comm.Monitor
+      Chopaan.Comm.Mqtt
+      Chopaan.Comm.Mqtt.AWS
+      Chopaan.Comm.Queues
+      Chopaan.Comm.S3
+      Chopaan.Comm.Socket
       Chopaan.CRUD
+      Chopaan.Graph
+      Chopaan.Graph.Algebraic
+      Chopaan.Graph.G
+      Chopaan.Graph.Greskell
+      Chopaan.Graph.Kbtz
+      Chopaan.Graph.Snapshot
+      Chopaan.Graph.Spider
+      Chopaan.Graph.VI
+      Chopaan.Haxl.Kbtz
+      Chopaan.Hydrate
+      Chopaan.Hydration.Prefix
+      Chopaan.Hydration.Store
+      Chopaan.Kibbutz
+      Chopaan.Kibbutz.Allocate
+      Chopaan.Kibbutz.AWS.Common
+      Chopaan.Kibbutz.AWS.Things
+      Chopaan.Kibbutz.DataSource
+      Chopaan.Kibbutz.Graph
+      Chopaan.Kibbutz.KbtzId
+      Chopaan.Kibbutz.Kibbutz
+      Chopaan.Kibbutz.LinOpt
+      Chopaan.Kibbutz.Registry
+      Chopaan.Kibbutz.Topology
+      Chopaan.Kibbutz.Transactor
       Chopaan.Monad.Env
       Chopaan.Node.Calibration
       Chopaan.Node.Components
@@ -58,54 +87,31 @@ library
       Chopaan.Node.Storage.Battery
       Chopaan.Node.Structure
       Chopaan.Node.Tf
-      Chopaan.Comm.Address
-      Chopaan.Comm.Dispatch
-      Chopaan.Comm.Comm
-      Chopaan.Comm.Mqtt
-      Chopaan.Comm.Mqtt.AWS
-      Chopaan.Comm.Queues
-      Chopaan.Comm.S3
-      Chopaan.Comm.Monitor
-      Chopaan.Comm.Socket
-      Chopaan.Graph.Kbtz
-      Chopaan.Graph.Spider
-      Chopaan.Graph.VI
-      Chopaan.Haxl.Kbtz
-      Chopaan.Kibbutz
-      Chopaan.Hydrate
-      Chopaan.Hydration.Store
-      Chopaan.Hydration.Prefix
-      Chopaan.Kibbutz.KbtzId
-      Chopaan.Kibbutz.Kibbutz
-      Chopaan.Kibbutz.DataSource
-      Chopaan.Kibbutz.Transactor
-      Chopaan.Kibbutz.Allocate
-      Chopaan.Kibbutz.AWS.Common
-      Chopaan.Kibbutz.AWS.Things
-      Chopaan.Kibbutz.LinOpt
-      Chopaan.Kibbutz.Registry
       Chopaan.Run
       Chopaan.Server
       Chopaan.Testing
       Chopaan.Types
+      Chopaan.Utils.API
       Chopaan.Utils.JSON
       Chopaan.Utils.Retry
       Chopaan.Utils.Streamly
       Chopaan.Utils.StreamsInterop
       Chopaan.Utils.Time
-      Chopaan.Utils.API
-      Data.Selectors
-      Data.Influxable
-      Data.HList
       Data.BTreeIndex
       Data.BTreeIndex.Types
+      Data.HList
+      Data.Influxable
+      Data.Selectors
       Kbtz
       Proto.NodeMessageSchema.NodeMessages
       Proto.NodeMessageSchema.NodeMessages_Fields
+      S
       Servant.Streamly
       SimNode
       Streamly.Binary
       TxModel
+  other-modules:
+      Paths_chopaan
   hs-source-dirs:
       src
   install-includes:
@@ -200,6 +206,7 @@ library
     , proto-lens-runtime
     , raw-strings-qq
     , regex-applicative
+    , rel8
     , resource-pool
     , resourcet
     , retry
@@ -238,7 +245,7 @@ library
     , x509-store
     , x509-validation
   if flag(prod)
-    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin-opt=Fusion.Plugin:verbose=1 -O2
   else
     ghc-options: -fdicts-strict -O1
   default-language: Haskell2010
@@ -337,6 +344,7 @@ executable dashgen
     , proto-lens-runtime
     , raw-strings-qq
     , regex-applicative
+    , rel8
     , resource-pool
     , resourcet
     , retry
@@ -375,7 +383,7 @@ executable dashgen
     , x509-store
     , x509-validation
   if flag(prod)
-    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin-opt=Fusion.Plugin:verbose=1 -O2
   else
     ghc-options: -fdicts-strict -O1
   if impl(ghcjs)
@@ -486,6 +494,7 @@ executable hydrate
     , proto-lens-runtime
     , raw-strings-qq
     , regex-applicative
+    , rel8
     , resource-pool
     , resourcet
     , retry
@@ -524,7 +533,7 @@ executable hydrate
     , x509-store
     , x509-validation
   if flag(prod)
-    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin-opt=Fusion.Plugin:verbose=1 -O2
   else
     ghc-options: -fdicts-strict -O1
   if !impl(ghcjs)
@@ -637,6 +646,7 @@ executable kbtzim
     , proto-lens-runtime
     , raw-strings-qq
     , regex-applicative
+    , rel8
     , resource-pool
     , resourcet
     , retry
@@ -675,7 +685,7 @@ executable kbtzim
     , x509-store
     , x509-validation
   if flag(prod)
-    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin-opt=Fusion.Plugin:verbose=1 -O2
   else
     ghc-options: -fdicts-strict -O1
   if !impl(ghcjs)
@@ -786,6 +796,7 @@ executable server
     , proto-lens-runtime
     , raw-strings-qq
     , regex-applicative
+    , rel8
     , resource-pool
     , resourcet
     , retry
@@ -824,7 +835,7 @@ executable server
     , x509-store
     , x509-validation
   if flag(prod)
-    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin-opt=Fusion.Plugin:verbose=1 -O2
   else
     ghc-options: -fdicts-strict -O1
   if impl(ghcjs)
@@ -949,6 +960,7 @@ test-suite chopaan-test
     , proto-lens-runtime
     , raw-strings-qq
     , regex-applicative
+    , rel8
     , resource-pool
     , resourcet
     , retry
@@ -987,7 +999,7 @@ test-suite chopaan-test
     , x509-store
     , x509-validation
   if flag(prod)
-    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=12 -fspec-constr-recursive=2 -O2
+    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin-opt=Fusion.Plugin:verbose=1 -O2
   else
     ghc-options: -fdicts-strict -O1
   if impl(ghcjs)

@@ -206,7 +206,9 @@ data SensorMetrics e p = SensorMetrics
   , _battery :: !(Battery e p)
   , _demand :: !e
   , _sensors :: !(NodeT' Double)
-  } deriving (Eq, Ord, Generic, Show, NFData, ToJSON, FromJSON)
+  }
+  deriving (Eq, Ord, Generic, Show, NFData, ToJSON, FromJSON)
+  deriving (W.Serialise) via (W.WineryRecord (SensorMetrics e p))
 
 instance (Typeable e, Typeable p) => Selectors (SensorMetrics e p) where
   selectors = selectorsRep @(SensorMetrics e p)

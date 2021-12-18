@@ -22,6 +22,7 @@ module Data.Influxable (asKbtzNode
                        , QueryGenParams(..)
                        , Agg(..)
                        , defaultGenParams
+                       , Http.WriteParams
                        ) where
 
 import Prelude hiding ((.))
@@ -65,6 +66,7 @@ import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 import qualified Data.Vector as V
 import Data.Vector (Vector)
+import Chopaan.Types (InfluxConn(..))
 import Chopaan.Utils.Retry
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Node.NodeId
@@ -75,26 +77,28 @@ import Chopaan.Node.Mesh
 import Debug.Trace
 import System.IO.Unsafe
 
-data Grouping = GroupTime | GroupTag Key deriving (Eq)
+data Grouping = GroupTime | GroupTag Key
+  deriving (Eq, Ord, Show)
 
-data Agg = Mean | Count deriving (Eq, Show, Generic)
+data Agg = Mean | Count
+  deriving (Eq, Show, Generic)
 
 
 chopaanDB :: Database
 chopaanDB = F.formatDatabase "chopaan"
 
-createDB :: Database -> IO ()
-createDB d = DB.manage (qp d) $ F.formatQuery ("CREATE DATABASE "F.%F.database) d
+createDB :: InfluxConn -> Database -> IO ()
+createDB c d = DB.manage (qp c d) $ F.formatQuery ("CREATE DATABASE "F.%F.database) d
 
-deleteDB :: Database -> IO ()
-deleteDB d = DB.manage (qp d) $ F.formatQuery ("DELETE DATABASE "F.%F.database) d
+deleteDB :: InfluxConn -> Database -> IO ()
+deleteDB c d = DB.manage (qp c d) $ F.formatQuery ("DELETE DATABASE "F.%F.database) d
 
 
-wp :: Database -> Http.WriteParams
-wp = Http.writeParams
+wp :: InfluxConn -> Database -> Http.WriteParams
+wp (InfluxConn host port) db = (Http.writeParams db) & Http.server .~ (Server host port False)
 
-qp :: Database -> QueryParams
-qp = queryParams
+qp :: InfluxConn -> Database -> QueryParams
+qp (InfluxConn host port) db = (queryParams db) & Http.server .~ (Server host port False)
 
 lineFoldUdp :: forall m. (MonadIO m, MonadMask m) => Int -> UDP.WriteParams -> FL.Fold m [Line UTCTime] ()
 lineFoldUdp batchSize wp = FL.many (FL.take batchSize FL.mconcat) lineFold'

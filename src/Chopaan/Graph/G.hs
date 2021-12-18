@@ -100,23 +100,12 @@ newtype CG' n v e = CG { unConf :: Config n v e }
 
 newtype SpoolG' n v e = SpoolG { unSpool :: Pool (Spider n v e) }
 
-type SnapshotG = G' SG'
-
-type SpoolG = G' SpoolG'
-
 type ConfG n = G'' CG' n
 
 type SG'' n = G'' SG' n 
 
 type SpG'' n = G'' SpoolG' n
 
-type SnGr n v e = G' SG' n v e
-
-type CGr n v e = G' CG' n v e
-
-type SpGr n v e = G' SpoolG' n v e
-
-type KbtzGraph = G' 
 
 #endif
 
@@ -127,55 +116,4 @@ data G'' k n = G''
   , flowG :: k n BatteryR PowerNR
   } deriving (Generic)
 
-
-
-
-data G' k n v e where
-  Id' :: G' k n v v
-  Compose' :: G' k n w x -> G' k n x y -> G' k n w y
-  Product' :: G' k n w x -> G' k n w y -> G' k n w (x :* y)
-  Sum' :: G' k n w x -> G' k n w y -> G' k n w (x :+ y)
-  Exl' :: G' k n (x :* y) x
-  Exr' :: G' k n (x :* y) y
-  Mesh' :: k n MeshNode RxSignal -> G' k n MeshNode RxSignal
-  Transactor' :: k n TxStatus Stake  -> G' k n TxStatus Stake
-  Status' :: k n SensorR Stake -> G' k n SensorR Stake
-  Flow' :: k n BatteryR PowerNR -> G' k n BatteryR PowerNR
-
-instance Category (G' Gr' n) where
-  id = Id'
-  x . y = Compose' y x
-
-
-instance ProductCat (G' Gr' n) where
-  dup = Product' Id' Id'
-  exl = Exl'
-  exr = Exr'
-
-instance MonoidalPCat (G' Gr' n) where
-  -- dup = Product' Id' Id'
-  -- exl = Exl'
-  -- exr = Exr'
-
-
-instance BraidedPCat (G' Gr' n)
-
-
-evalG :: G' Gr' n v e -> ()
-evalG Id' = ()
-evalG (Compose' i j) = const () (compositionG i j)
-evalG (Product' i j) = const () (prodG i j)
-evalG (Sum' i j) = ()
-evalG (Exl') = ()
-evalG (Exr') = ()
-evalG (Mesh' g) = ()
-evalG (Transactor' g) = ()
-evalG (Status' g) = ()
-evalG (Flow' g) = ()
-
-compositionG ::  G' Gr' n w x -> G' Gr' n x y -> G' Gr' n w y
-compositionG = undefined
-
-prodG ::  G' Gr' n w x -> G' Gr' n w y -> G' Gr' n w (x :* y)
-prodG = undefined
 

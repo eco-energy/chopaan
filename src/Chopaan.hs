@@ -1,17 +1,28 @@
 {-# LANGUAGE TypeApplications, ScopedTypeVariables, RecordWildCards, FlexibleContexts, OverloadedStrings #-}
 module Chopaan where
 
-import Control.Monad.IO.Class
+import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Chopaan.Kibbutz
-import Chopaan.Hydrate
-import Chopaan.Kibbutz.KbtzId
-import Chopaan.Node.NodeId
-import Chopaan.API.History
+    ( KbtzC(KbtzC, name, nodes, channelOpts, s3Opts, influxCon),
+      runKibbutz )
+import Chopaan.Hydrate ( hConfDef, mkTKbtz, runHydration )
+import Chopaan.Kibbutz.KbtzId ( KbtzId(KbtzId) )
+import Chopaan.Node.NodeId ( NodeId(NodeId), NodeMAC )
+import Chopaan.API.History ()
 import Chopaan.Types
-import Chopaan.Graph.Kbtz
+    ( App(appOptions),
+      Options(Options, influxConn, poolConf, hydrationOpts, dbOpts,
+              kibbutzOpts, nodeOpts, mqttOpts, logVerbose),
+      HydrationOpts(s3BucketName),
+      KibbutzOpts(KibbutzOpts, name),
+      MQTTOpts,
+      InfluxConn,
+      icOptions )
+import Chopaan.Graph.Kbtz ( getKbtzim )
 import Chopaan.Graph
+    ( GraphM, runGraphM, withKbtzPool, tkOptions, getKNs, addzim )
 import Data.Influxable (createDB)
-import Data.Bifunctor
+import Data.Bifunctor ( Bifunctor(bimap) )
 import Data.Pool (stats)
 import qualified Data.Map.Strict as M
 
@@ -29,8 +40,16 @@ import Network.AWS.S3 (BucketName(..))
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
 
-import Options.Applicative
-import RIO hiding (view, async, withAsync, Async)
+import Options.Applicative ( execParser )
+import RIO
+    ( MonadIO(liftIO),
+      stdout,
+      ReaderT,
+      MonadReader(ask),
+      BufferMode(LineBuffering),
+      RIO,
+      hSetBuffering,
+      atomically )
 import qualified Data.Time as Ti
 
 
@@ -41,8 +60,9 @@ runKbtzim :: forall t.
   (S.IsStream t)
   => MQTTOpts
   -> HydrationOpts
+  -> InfluxConn
   -> GraphM (t GraphM Bool)
-runKbtzim mq hydrationOpts = do
+runKbtzim mq hydrationOpts influxCon = do
   tNow <- liftIO $ Ti.getCurrentTime
   ks' <- withKbtzPool getKbtzim
   kns <- case (length ks' < 1) of
@@ -52,16 +72,17 @@ runKbtzim mq hydrationOpts = do
     False -> getKNs
   kbtzim <- liftIO . atomically $ mkTKbtz kns
   let confss = S.fromList $ fmap sConf $ M.toList kns
-      s3Hydration = S.fromEffect ((pure . (const True)) =<< (runHydration hConfDef kbtzim))
+      s3Hydration = S.fromEffect ((pure . (const True)) =<< (runHydration influxCon hConfDef kbtzim))
       mqttStream = S.map (const True)
-        $ S.concatMapWith S.wAsync (S.concatM . runKibbutz @t) confss
-  return $ s3Hydration `S.async` mqttStream
+        $ S.concatMapWith S.parallel (S.concatM . runKibbutz @t) confss
+  return $ s3Hydration `S.parallel` mqttStream
   where 
     deployKbtz = (KbtzId "Bismillah_Mor", fmap fst deployNodes)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
                           , nodes = ns
                           , channelOpts = Left mq
                           , s3Opts = Just (BucketName (s3BucketName hydrationOpts))
+                          , influxCon = influxCon
                           }
 
 type NodeKey = NodeId Int
@@ -112,8 +133,9 @@ run = do
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
   tc <- liftIO $ execParser tkOptions
+  ic <- liftIO $ execParser icOptions
   liftIO $ forkServer "localhost" 8111
-  liftIO $ createDB "chopaanMQTT"
+  liftIO $ createDB influxConn "chopaanMQTT"
   liftIO $ runGraphM poolConf tc $
-    S.drain . S.fromAhead =<< (runKbtzim @S.AheadT mqttOpts hydrationOpts)
+    S.drain . S.fromAhead =<< (runKbtzim @S.AheadT mqttOpts hydrationOpts ic)
     

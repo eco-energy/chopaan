@@ -19,46 +19,75 @@ module Chopaan.Hydrate
 
 
 import Chopaan.Hydration.Prefix
-import Chopaan.Node.NodeId
-import Chopaan.Kibbutz.KbtzId
-import Chopaan.Comm.S3 hiding (pathFile)
-import Chopaan.Types
+    ( Resolution(Ten2, Ten5),
+      Prefix(Prefix),
+      posthence,
+      prefixRange,
+      asFileName )
+import Chopaan.Node.NodeId ( NodeMAC )
+import Chopaan.Kibbutz.KbtzId ( KbtzId(unKbtzId), KbtzName )
+import Chopaan.Comm.S3
+    ( s3Paths'',
+      timedPrefix,
+      nodeMACPath,
+      cd,
+      unObject,
+      fixGridTS,
+      fixMeshTS )
+import Chopaan.Types ( toUTC, Date(Date), InfluxConn )
 import Streamly.Binary
-import Chopaan.Kibbutz.AWS.Common hiding (preResolvingManager)
+    ( PB,
+      Wino,
+      HasEncoding(decodeA),
+      toWino,
+      fromWino,
+      fromPB,
+      decodeS,
+      encodeFold )
+import Chopaan.Kibbutz.AWS.Common ( Env, withAwsEnv, getAwsEnv )
 import Chopaan.Utils.Retry (recoverC, recoverOrNothing, recoverWith)
 import Chopaan.Comm.Dispatch (accessEnergyState, accessRTS)
 import Chopaan.Node.Folds (sensorFold, meshFold, SensorR, MeshR)
 import Chopaan.Utils.Time (utcTimeNow)
 import Data.Influxable (KbtzNode, asKbtzNode, lineSensorR
-                       , lineMesh, lineFoldHttp, showText, chopaanDB, wp)
-import Chopaan.Graph
+                       , lineMesh, lineFoldHttp, showText, chopaanDB, wp, qp)
+import Chopaan.Graph ( KbtzNodes, GraphM )
 
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N
 
-import GHC.Generics hiding (Prefix)
+import GHC.Generics ( Generic )
 
 import Control.Arrow ((&&&))
-import Control.Monad
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Reader
-import Control.Monad.Catch
-import Control.Monad.IO.Class
-import Control.Monad.Bayes.Class
-import Control.Monad.Bayes.Sampler
-import Control.Lens
-import Control.Concurrent
-import Control.Concurrent.Async
+import Control.Monad ( void )
+import Control.Monad.Trans.Class ()
+import Control.Monad.Trans.Reader ( ReaderT )
+import Control.Monad.Catch ( MonadMask, MonadThrow, MonadCatch )
+import Control.Monad.IO.Class ( MonadIO(..) )
+import Control.Monad.Bayes.Class ( MonadSample )
+import Control.Monad.Bayes.Sampler ()
+import Control.Lens ( (&), Bifunctor(bimap), (^.), (.~), (?~) )
+import Control.Concurrent ( threadDelay )
+import Control.Concurrent.Async ()
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
-import Control.Concurrent.STM.TQueue
-import Data.Bifunctor
-import Data.Word
+    ( STM,
+      TVar,
+      atomically,
+      retry,
+      newTVar,
+      readTVar,
+      TQueue,
+      modifyTVar,
+      modifyTVar' )
+import Control.Concurrent.STM.TVar ()
+import Control.Concurrent.STM.TQueue ()
+import Data.Bifunctor ( Bifunctor(second) )
+import Data.Word ( Word8 )
 import Data.IORef (readIORef)
 import qualified Data.Map.Strict as M
-import Data.Int
-import Data.Maybe
-import Data.Either
+import Data.Int ()
+import Data.Maybe ( isJust, fromJust, fromMaybe, isNothing )
+import Data.Either ()
 
 import qualified Data.Text as T
 import Text.Read (readMaybe)
@@ -70,11 +99,18 @@ import Data.Set (Set)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Encoding as T
-import Network.AWS hiding (Metadata)
+import Network.AWS
+    ( Auth(Auth, Ref),
+      HasEnv(envAuth),
+      AccessKey(AccessKey),
+      AuthEnv(_authAccess, _authSecret),
+      SecretKey(SecretKey),
+      presignURL,
+      MonadAWS(liftAWS) )
 import Network.AWS.Data.Sensitive (Sensitive(..))
 import qualified Network.AWS.S3 as S3
 
-import Network.DNS.Resolver
+import Network.DNS.Resolver ()
 import qualified Network.DNS.Cache as NC
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified Network.HTTP.Types as NC
@@ -90,12 +126,13 @@ import qualified Database.InfluxDB.Manage as DB
 import qualified Database.InfluxDB.Types as DB
 
 import qualified Codec.Winery as W
-import Data.ProtoLens
+import Data.ProtoLens ()
 
-import Data.Void
+import Data.Void ()
 
 import qualified Network.Wreq.Session as Session
 import Network.Wreq
+    ( AWSAuthVersion(AWSv4), Options, defaults, awsFullAuth, auth )
 
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Fold as FL
@@ -113,8 +150,9 @@ import qualified Streamly.Internal.Data.Array.Stream.Foreign as AS
 import qualified Streamly.Internal.Data.Time.Units as ST
 import Streamly.Internal.Data.IORef.Prim (Prim(..))
 --import Dhall hiding (newManager, void)
-import System.Directory
-import System.Envy hiding (env)
+import System.Directory ()
+import System.Envy
+    ( Var(..), FromEnv, decodeEnv, decodeWithDefaults )
 
 
 
@@ -169,7 +207,7 @@ manConfDef = ManagerSettings 512 10 90
 hConfDef :: HydrationConf
 hConfDef = HydrationConf basePath bucket defDate Ten5 Ten2 Infinite 
   where
-    defDate = Date 1 1 2021
+    defDate = Date 14 10 2021
     basePath = "./data/hydration"
     bucket = "dosti-datastream"
 
@@ -231,20 +269,20 @@ mkKbtzConf (HydrationConf{s3Bucket
                          , pastRes, futureRes}) env name store manOrSesh wp parHow =
   KbtzConf env (S3.BucketName s3Bucket) store name manOrSesh (toUTC startDate) lifetime wp (pastRes, futureRes) parHow
 
-runHydration :: HydrationConf -> TKbtzim -> GraphM ()
-runHydration conf kbtzim = do
+runHydration :: InfluxConn -> HydrationConf -> TKbtzim -> GraphM ()
+runHydration influxcon conf kbtzim = do
   manConf <- liftIO $ parseManagerConf
   sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
   parConf <- liftIO $ parseParStrategy
   aws <- getAwsEnv S3.s3
   let hydrationDB = "chopaanS3"
-  let p = DB.queryParams hydrationDB
+  let p = qp influxcon hydrationDB
   liftIO $ DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) hydrationDB
   let
     configureH (kId, kNodes) = do
       let
         store = initKbtzStore kId (storePath conf)
-        c = mkKbtzConf conf aws kId store (Right sesh) (wp hydrationDB) parConf 
+        c = mkKbtzConf conf aws kId store (Right sesh) (wp influxcon hydrationDB) parConf 
       hydrateKbtz c kNodes (unfoldNodes (lifetime conf) kbtzim)
   S.drain . S.fromWAsync $
     S.mapM configureH $ S.unfold (unfoldKbtzim (lifetime conf) kbtzim) ()
