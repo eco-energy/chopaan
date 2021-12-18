@@ -69,7 +69,6 @@ library
       Chopaan.Kibbutz.Kibbutz
       Chopaan.Kibbutz.LinOpt
       Chopaan.Kibbutz.Registry
-      Chopaan.Kibbutz.Topology
       Chopaan.Kibbutz.Transactor
       Chopaan.Monad.Env
       Chopaan.Node.Calibration
