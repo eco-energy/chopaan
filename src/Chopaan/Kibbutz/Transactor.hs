@@ -4,26 +4,9 @@
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances, CPP, BangPatterns #-}
-module Chopaan.Kibbutz.Transactor--  ( -- runTransactor
---                                   statePipe
---                                   , Stake(..)
---                                   , Tx(..)
---                                   , TxPlan
---                                   , TxState
---                                   , Role(..)
---                                   , TxStatus(..)
---                                   , foldTxState
---                                   , mkStake
---                                   , dispatchTx
--- --                                  , asKbtz
---                                   , planTx
---                                   --, monitorTx
---                                   , curryTx
---                                   , stakeLinkDir
---                                   , txStatusLinkDir
---                                   , dispatchNodeTx
---                                   ) 
-where
+module Chopaan.Kibbutz.Transactor where
+
+
 
 import Prelude hiding (zip, zipWith)
 import qualified Control.Category as C
@@ -48,8 +31,8 @@ import Chopaan.Node.Metrics (toWattSeconds, toWatts
 
 import GHC.Generics (Generic)
 
-import qualified Algebra.Graph.Labelled as G
-import Algebra.Graph.Labelled (Graph(..))
+import qualified Chopaan.Graph.Algebraic as AG
+import qualified Algebra.Graph as G
 
 import qualified Codec.Winery as W
 import qualified Data.Time as Time
@@ -57,8 +40,7 @@ import qualified Data.Text as Text
 import Data.Word
 import Data.Maybe
 import Data.Bifunctor
-import qualified Proto.NodeMessageSchema.NodeMessages as NM
-import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
+
 
 import Lens.Micro
 
@@ -71,7 +53,7 @@ import qualified Data.ByteString.Lazy as BL
 
 
 import qualified Streamly.Prelude as S
-import Streamly (IsStream, MonadAsync, adapt)
+import Streamly.Prelude (IsStream, MonadAsync, adapt)
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Pipe as P
@@ -120,78 +102,13 @@ type TxState n = Tx n (Role, TxStatus) --Graph (TxStatus) (n, Role)
 type NodeStates n = Tx n SensorR --Graph PowerNR (n, SensorR)
 
 
-data TxStatus' e = TxStatus'
-  { energyDispatched :: !e
-  , energyReceived :: !e
-  , energyRemaining :: !e
-  , lossPerWattSecond :: !e
-  , totalLoss :: !e
-  , timeRemaining :: !Time.NominalDiffTime
-  , startLag :: !Time.NominalDiffTime
-  , endLag :: !Time.NominalDiffTime
-  }
-  deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON, NFData)
-  deriving W.Serialise via (W.WineryRecord (TxStatus' e))
-
-type TxStatus = TxStatus' WattSeconds
-
-instance (Ord e, RealFrac e) => Semigroup (TxStatus' e) where
-  tx <> tx' = TxStatus'
-              { energyDispatched = energyDispatched tx + energyDispatched tx'
-              , energyReceived = energyReceived tx + energyReceived tx'
-              , timeRemaining = min (timeRemaining tx) (timeRemaining tx')
-              , energyRemaining = min (energyRemaining tx) (energyRemaining tx')
-              , lossPerWattSecond =  avg (lossPerWattSecond tx) (lossPerWattSecond tx')
-              , totalLoss = totalLoss tx + totalLoss tx'
-              , startLag = max (startLag tx) (startLag tx')
-              , endLag = max (endLag tx) (endLag tx)
-              }
-              where
-                avg a b = (a + b) / 2
-
-instance  (Ord e, RealFrac e) => Monoid (TxStatus' e) where
-  mempty = TxStatus'
-    { energyDispatched = 0
-    , energyReceived = 0
-    , timeRemaining = 0
-    , energyRemaining = 0
-    , lossPerWattSecond = 0
-    , totalLoss = 0
-    , startLag = 0
-    , endLag = 0
-    }
-
-#ifndef ghcjs_HOST_OS
-planTx :: (MonadAsync m, MonadCatch m,  Ord n, Show n, IsStream t) => Time.NominalDiffTime -> t m (NodeStates n) -> t m (Maybe (TxPlan n))
-planTx !horizon k = S.postscan (transactionPlanner horizon) k 
-{-# INLINE planTx #-}
-
-
-dispatchTx :: forall m n. (MonadIO m, MonadCatch m, Address n)
-  => PubQueue
-  -> TxPlan n
-  -> m ()
-dispatchTx = dispatchNodeTx
-{-# INLINE dispatchTx #-}
-
 dispatchNodeTx :: forall m n. (MonadIO m, MonadCatch m, Address n)
   => PubQueue
-  -> TxPlan n
+  -> G.Graph (n, Stake)
   -> m ()
 dispatchNodeTx q (Tx tx) = do
-  let txDispatches =  (\(nid, st) -> (stateTopic nid, fromStake st)) <$> (M.toList tx)
+  let txDispatches =  (\(nid, st) -> (stateTopic nid, stakeToETR st)) <$> (G.vertexList tx)
   sequence_ $ (\(t, s) -> liftIO $ writeToPubQ q t s) <$> txDispatches
-{-# INLINE dispatchNodeTx #-}
-
-mkTxDispatch :: (Address n) => Text.Text -> Time.UTCTime -> TxPlan n -> NM.Transaction
-mkTxDispatch uid stime (Tx txns) = defMessage
-                         & NM.start .~ (utcToWord64 stime)
-                         & NM.etrs .~ (M.mapKeys (toRemoteId) $ fromStake <$> txns) 
-  where
-    utcToWord64 :: Time.UTCTime -> Word64
-    utcToWord64 = (convert @Int @Word64) . (convert @Time.UTCTime @Int)
-
-
 
 foldTxState :: TxState n -> (TxStatus)
 foldTxState (Tx gt) = let
@@ -201,11 +118,6 @@ foldTxState (Tx gt) = let
       in gridTx{totalLoss = loss, lossPerWattSecond = lossPerWS}
 {-# INLINE foldTxState #-}
 
-txFold :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
-       => TxPlan n
-       -> FL.Fold m (NodeStates n, Maybe (TxPlan n)) ((NodeStates n, Maybe (TxPlan n)), TxState n)
-txFold = dupF . transactionFold
-{-# INLINE txFold #-}
 
 
 transactionFold :: forall m n. (MonadIO m, MonadCatch m,  Ord n)
@@ -232,58 +144,7 @@ zipWith3 :: (Ord n) => (a -> b -> c -> d) -> M.Map n a -> M.Map n b -> M.Map n c
 zipWith3 f a b c = M.intersectionWith ($) (M.intersectionWith f a b) c
 
 
-incTxState :: (Ord n) => TxState n -> (NodeStates n, Maybe (TxPlan n)) -> TxState n
-incTxState (Tx ts) (Tx ns, plan) = case plan of
-  Nothing -> Tx $ zipWith updateTS ts ns
-  Just (Tx p) ->
-    case (M.size p == 0) of
-      True -> Tx $ zipWith updateTS ts ns
-      False -> Tx $ zipWith updateTS (fmap stakeStatus p) ns 
-  where
-    {-# INLINE updateTS #-}
-    updateTS :: (Role, TxStatus) -> SensorR -> (Role, TxStatus)
-    updateTS (px, prevTx) SensorMetrics{..} = let
-      nextTS = case px of
-                 Source -> (mempty @TxStatus)
-                           { energyDispatched = txEnergy + energyDispatched prevTx
-                           , timeRemaining = timeRemaining prevTx - lastTimeDiff
-                           , energyRemaining = energyRemaining prevTx - txEnergy
-                           , startLag = if hasStarted px
-                                        then startLag prevTx
-                                        else (startLag prevTx + lastTimeDiff)
-                           , endLag = if not shouldHaveEnded
-                                      then 0
-                                      else (if hasEnded px
-                                             then endLag prevTx
-                                             else endLag prevTx + lastTimeDiff)
-                           }
-                 Sink -> (mempty @TxStatus)
-                   { energyReceived = txEnergy + energyReceived prevTx
-                   , timeRemaining = timeRemaining prevTx - lastTimeDiff
-                   , energyRemaining = energyRemaining prevTx - txEnergy
-                   , startLag = if hasStarted px
-                                then startLag prevTx
-                                else (startLag prevTx + lastTimeDiff)
-                   , endLag = if not shouldHaveEnded
-                              then 0
-                              else (if hasEnded px
-                                    then endLag prevTx
-                                    else endLag prevTx + lastTimeDiff)
-                   }
-      in (px, nextTS)
-      where
-        txEnergy :: WattSeconds
-        txEnergy = (pToE @Double) (realToFrac lastTimeDiff) (tx _powerT)
-        {-# INLINE hasStarted #-}
-        hasStarted Source = (abs $ tx _powerT) >= eta
-        hasStarted Sink = (abs $ tx _powerT) >= eta
-        {-# INLINE hasEnded #-}
-        hasEnded Source =  shouldHaveEnded && (abs $ tx _powerT) <= eta
-        hasEnded Sink = shouldHaveEnded && (abs $ tx _powerT) <= eta
-        shouldHaveEnded = (timeRemaining prevTx) <= 0
-        {-# INLINE eta #-}
-        eta = 0.5
-{-# INLINE incTxState #-}
+
     
 transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Ord n) => Time.NominalDiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
 transactionPlanner !timeHorizon = FL.foldMapM (txn timeHorizon)
@@ -291,8 +152,8 @@ transactionPlanner !timeHorizon = FL.foldMapM (txn timeHorizon)
 
 
 
-txn :: forall m n. (MonadIO m, MonadCatch m, Ord n, Show n) => Time.NominalDiffTime -> NodeStates n -> m (TxPlan' n)
-txn !h !(Tx ns) = do
+txn :: forall m n. (MonadIO m, MonadCatch m, Ord n, Show n) => AG.Graph (Distance R) n -> Time.NominalDiffTime -> G.Graph (n, WattSeconds) -> m (G.Graph (n, Stake))
+txn topology !h !(Tx ns) = do
   let nodes = M.keys ns
   let indexer = M.fromList $ zip [1..] nodes
       getAtI i = indexer M.! i
@@ -326,8 +187,8 @@ expToMaybe (Right a) = return $ Just a
 type TxPlan' n = Maybe (TxPlan n)
 
 
-solveTP :: forall m . (MonadIO m, MonadCatch m) => Time.NominalDiffTime -> AG.Graph (Distance Double) (Node WattSeconds) -> [[Double]] -> m (TxPlan' Int)
-solveTP timeHorizon sources sinks cs = do
+solveTP :: forall m . (MonadIO m, MonadCatch m) => Time.NominalDiffTime -> AG.Graph (Distance Double) (WattSeconds) -> m (TxPlan' Int)
+solveTP timeHorizon sources sinks = do
   liftIO $ do
     (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs
     let dict = getModelDictionary sol
@@ -363,113 +224,56 @@ solveTP timeHorizon sources sinks cs = do
       toSinkStake t (i, e) = (i, Stake (Sink, (- e2p t e), t))
       e2p :: Time.NominalDiffTime -> WattSeconds -> Watts
       e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
-{-# INLINE solveTP #-}
-#endif
 
 
-{---
-    Concretely
-----}
 
-data Role = Source | Sink
-  deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
-  deriving W.Serialise via (W.WineryVariant (Role))
-
-#ifndef ghcjs_HOST_OS
-instance FromGraphSON Role where
-  parseGraphSON = parseJSON . unwrapOne
-#endif
-
-newtype Stake' p = Stake
-  { unStake :: (Role, p, Time.NominalDiffTime) }
-  deriving stock (Eq, Ord, Show, Generic)
-  deriving newtype (NFData, ToJSON, FromJSON)
-  deriving W.Serialise via (W.WineryRecord (Stake' p))
-
-type Stake = Stake' Watts
-
-#ifndef ghcjs_HOST_OS
-stakeKey :: forall n a. Key n a
-stakeKey = "txStake"
-
-instance (W.Serialise n) => NodeAttributes (Stake' n) where
-  writeNodeAttributes s = fmap writeKeyValues $
-    sequence [ (stakeKey @VFoundNode <=:> wineryJSONWrite s)
-             ]
-  parseNodeAttributes props = (decodeBin "Stake' Node" $ lookupAs stakeKey props)
-
-
-instance (W.Serialise n) => LinkAttributes (Stake' n) where
-  writeLinkAttributes s = fmap writeKeyValues $
-    sequence [ (stakeKey @EFinds <=:> wineryJSONWrite s)
-             ]
-  parseLinkAttributes props = (decodeBin "Stake' Link" $ lookupAs stakeKey props)
-
-roleLinkDir :: Role -> LinkState
-roleLinkDir r = case r of
-  Source -> LinkToTarget
-  Sink -> LinkToSubject
-{-# INLINE roleLinkDir #-}
-
-stakeLinkDir :: Stake -> LinkState
-stakeLinkDir (Stake (r, _, _)) = roleLinkDir r
-{-# INLINE stakeLinkDir #-}
-
-txStatusLinkDir :: TxStatus -> LinkState
-txStatusLinkDir TxStatus'{energyDispatched, energyReceived} = if energyDispatched > 0 && energyDispatched == 0
-  then LinkToTarget
-  else if energyReceived > 0 && energyDispatched == 0
-       then LinkToSubject
-       else LinkBidirectional
-{-# INLINE txStatusLinkDir #-}
-
-#endif
-
-instance (RealFrac p) => Semigroup (Stake' p) where
-  (Stake (Source, w, t)) <> (Stake (Source, w', t')) = Stake (Source, w + w', t + t')
-  (Stake (Source, w, t)) <> (Stake (Sink, w', t')) = Stake (role, w'', t + t')
-    where
-      w'' = abs $ w - w'
-      role = if w - w' > 0 then Source else Sink
-  (Stake (Sink, w, t)) <> (Stake (Source, w', t')) = Stake (role, w'', t + t')
-    where
-      w'' = abs $ w - w'
-      role = if w - w' > 0 then Source else Sink
-  (Stake (Sink, w, t)) <> (Stake (Sink, w', t')) = Stake (Sink, abs $ w + w', t + t')
-
-instance (RealFrac p) => Monoid (Stake' p) where
-  mempty = Stake (Sink, 0, 0)
-
-mkStake :: Role -> Double -> Int -> Stake
-mkStake r p t = Stake (r, toWatts p, fromIntegral t)
-{-# INLINE mkStake #-}
-
-fromStake :: Stake -> NM.EnergyTransactionRequest
-fromStake (Stake (role, watts, duration)) = defMessage
-                                            & NM.powerInWatts .~ (fromWatts watts)
-                                            & NM.durationInSeconds .~ (timeToWord duration)
-                                            & NM.direction .~ (toPDir role) 
+incTxState :: (Ord n) => TxState n -> (NodeStates n, Maybe (TxPlan n)) -> TxState n
+incTxState (Tx ts) (Tx ns, plan) = case plan of
+  Nothing -> Tx $ zipWith updateTS ts ns
+  Just (Tx p) ->
+    case (M.size p == 0) of
+      True -> Tx $ zipWith updateTS ts ns
+      False -> Tx $ zipWith updateTS (fmap stakeStatus p) ns 
   where
-    toPDir Source = NM.Outgoing
-    toPDir Sink = NM.Incoming
-    timeToWord :: Time.NominalDiffTime -> Word64
-    timeToWord = (convert @Int @Word64) . (round @Time.NominalDiffTime @Int)
-{-# INLINE fromStake #-}
-
-#ifndef ghcjs_HOST_OS
-txStatusKey :: forall n a. Key n a
-txStatusKey = "txStatusKey"
-
-
-instance (W.Serialise n) => LinkAttributes (TxStatus' n) where
-  writeLinkAttributes s = fmap writeKeyValues $
-    sequence [ (txStatusKey @EFinds <=:> wineryJSONWrite s)
-             ]
-  parseLinkAttributes props = (decodeBin "TxStatus' Link" $ lookupAs txStatusKey props)
-
-instance (W.Serialise n) => NodeAttributes (TxStatus' n) where
-  writeNodeAttributes s = fmap writeKeyValues $
-    sequence [ (txStatusKey @VFoundNode <=:> wineryJSONWrite s)
-             ]
-  parseNodeAttributes props = (decodeBin "TxStatus' Node" $ lookupAs txStatusKey props)
-#endif
+    {-# INLINE updateTS #-}
+    updateTS :: (Role, TxStatus) -> SensorR -> (Role, TxStatus)
+    updateTS (px, prevTx) SensorMetrics{..} = (px, nextTx)
+      where
+        nextTS = case px of
+                 Source -> (mempty @TxStatus)
+                           { energyDispatched = txEnergy + energyDispatched prevTx
+                           , timeRemaining = timeRemaining prevTx - lastTimeDiff
+                           , energyRemaining = energyRemaining prevTx - txEnergy
+                           , startLag = if hasStarted px
+                                        then startLag prevTx
+                                        else (startLag prevTx + lastTimeDiff)
+                           , endLag = if not shouldHaveEnded
+                                      then 0
+                                      else (if hasEnded px
+                                             then endLag prevTx
+                                             else endLag prevTx + lastTimeDiff)
+                           }
+                 Sink -> (mempty @TxStatus)
+                   { energyReceived = txEnergy + energyReceived prevTx
+                   , timeRemaining = timeRemaining prevTx - lastTimeDiff
+                   , energyRemaining = energyRemaining prevTx - txEnergy
+                   , startLag = if hasStarted px
+                                then startLag prevTx
+                                else (startLag prevTx + lastTimeDiff)
+                   , endLag = if not shouldHaveEnded
+                              then 0
+                              else (if hasEnded px
+                                    then endLag prevTx
+                                    else endLag prevTx + lastTimeDiff)
+                   }
+        txEnergy :: WattSeconds
+        txEnergy = (pToE @Double) (realToFrac lastTimeDiff) (tx _powerT)
+        {-# INLINE hasStarted #-}
+        hasStarted Source = (abs $ tx _powerT) >= eta
+        hasStarted Sink = (abs $ tx _powerT) >= eta
+        {-# INLINE hasEnded #-}
+        hasEnded Source =  shouldHaveEnded && (abs $ tx _powerT) <= eta
+        hasEnded Sink = shouldHaveEnded && (abs $ tx _powerT) <= eta
+        shouldHaveEnded = (timeRemaining prevTx) <= 0
+        {-# INLINE eta #-}
+        eta = 0.5

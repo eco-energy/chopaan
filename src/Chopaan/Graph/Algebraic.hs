@@ -1,17 +1,20 @@
 {-# LANGUAGE ConstraintKinds, ExplicitForAll #-}
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, DerivingVia #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, DerivingVia, DeriveFoldable, DeriveTraversable, QuantifiedConstraints, InstanceSigs #-}
 module Chopaan.Graph.Algebraic (module AG, GrConn, Gr, fromSnapshot, castLinks) where
 
-import GHC.Generics
-import Control.Newtype.Generics as N
+import GHC.Generics ( Generic, Generic1, Rep, Rep1 )
+import Control.Newtype.Generics as N ( Newtype )
 import Data.Bifunctor
-import Data.Maybe
-import Data.Typeable
+import Data.Maybe ( fromJust, isJust )
+import Data.Typeable ( Typeable )
 import Data.Aeson (ToJSON, FromJSON)
 import qualified Codec.Winery as W
 
 import qualified Data.Map as Map
 import Chopaan.Graph.Snapshot
+    ( SnapshotNode(_nodeId, _nodeAttributes),
+      SnapshotLink(_sourceNode, _destinationNode, _linkAttributes),
+      SnapshotGraph )
 -- import Shpadoinkle.Widgets.Types (Humanize)
 import Algebra.Graph.Labelled as AG
 
@@ -24,14 +27,16 @@ type GrConnM m f s = (Monad m, GrConn f s)
 
 deriving instance Generic1 (AG.Graph flow)
 
+deriving instance Foldable (AG.Graph a)
+deriving instance Traversable (AG.Graph a)
 deriving instance (FromJSON e, FromJSON a) => FromJSON (AG.Graph e a)
 deriving instance (ToJSON e, ToJSON a) => ToJSON (AG.Graph e a)
 deriving via (W.WineryVariant (AG.Graph e a)) instance (W.Serialise e, W.Serialise a) => W.Serialise (AG.Graph e a)
 
-newtype Gr flow state = Gr { unGr :: (AG.Graph flow state) }
-  deriving stock (Eq, Ord, Show, Generic, Generic1)
-  deriving newtype (Num, Functor, Bifunctor, ToJSON, FromJSON, W.Serialise)
 
+newtype Gr flow state = Gr { unGr :: (AG.Graph flow state) }
+  deriving stock (Eq, Ord, Show, Generic, Generic1, Foldable, Traversable)
+  deriving newtype (Num, Functor, Bifunctor, ToJSON, FromJSON, W.Serialise)
 
 emptyGr :: (GrConn flow state) => Gr flow state
 emptyGr = Gr AG.empty

@@ -70,6 +70,8 @@ library
       Chopaan.Kibbutz.LinOpt
       Chopaan.Kibbutz.Registry
       Chopaan.Kibbutz.Transactor
+      Chopaan.Kibbutz.Transactor.Stake
+      Chopaan.Kibbutz.Transactor.Status
       Chopaan.Monad.Env
       Chopaan.Node.Calibration
       Chopaan.Node.Components
