@@ -63,10 +63,10 @@ import qualified Data.Map.Strict as M
 import Data.Key hiding (Key)
 import qualified Data.List as L
 
--- import Shpadoinkle.Widgets.Types (Humanize(..))
 
-#ifndef ghcjs_HOST_OS
 import Chopaan.Kibbutz.LinOpt
+import Chopaan.Kibbutz.Transactor.Stake
+import Chopaan.Kibbutz.Transactor.Status
 import Chopaan.Comm.Comm (Address(..), PubQueue, writeToPubQ)
 import Data.SBV
 import ConCat.Misc (R)
@@ -79,7 +79,6 @@ import NetSpider.Graph (LinkAttributes(..), NodeAttributes(..), EFinds, VFoundNo
 import Chopaan.Graph.Greskell
 import qualified Chopaan.Graph.Algebraic as AG
 import Algebra.Graph.Label (Distance(..))
-#endif
 
 
 
@@ -187,45 +186,6 @@ expToMaybe (Right a) = return $ Just a
 type TxPlan' n = Maybe (TxPlan n)
 
 
-solveTP :: forall m . (MonadIO m, MonadCatch m) => Time.NominalDiffTime -> AG.Graph (Distance Double) (WattSeconds) -> m (TxPlan' Int)
-solveTP timeHorizon sources sinks = do
-  liftIO $ do
-    (LexicographicResult sol) <- optimize Lexicographic $ transportProblem sources sinks cs
-    let dict = getModelDictionary sol
-    if not . modelExists $ sol then return Nothing else do
-      let (ns, cvs) = unzip $ M.toAscList dict
-      --liftIO . print $ dict
-      case ((M.lookup "goal" dict)) of
-        Nothing -> return Nothing
-        Just x -> do
-          let
-            vs' :: M.Map String Double
-            vs' = M.fromAscList $ zip ns (parseToDoubles cvs)
-            toTransferMat :: M.Map String Double -> [[Double]]
-            toTransferMat m = (zipWith (zipWith (+))) ((fmap (fmap (* (-1)))) . L.transpose $ x') x'
-              where
-                x' = [[zeroIfNone $ M.lookup (tName i j) m | i <- getNames sources] | j <- getNames sinks]
-            transferMat = toTransferMat vs'
-            sourceTransmit = (toWattSeconds . abs) <$> (fmap sum $ L.transpose transferMat)
-            sinkReceive = (toWattSeconds . abs) <$> (fmap sum $ transferMat)
-            asSources = toSourceStake timeHorizon <$> (zip (getNames sources) sourceTransmit)
-            asSinks = toSinkStake timeHorizon <$> (zip (getNames sinks) sinkReceive)
-            planDict = M.fromList $ (asSources) <> (asSinks)
-          --print ("Plan Dict: " <> show planDict)
-          return . Just . Tx $ planDict
-    where
-      isZeroStake (_, (Stake (_, a, t))) = a > 0 && t > 0 
-      zeroIfNone Nothing = 0
-      zeroIfNone (Just a) = a
-      parseToDoubles ys = case (parseCVs @Double) ys of
-        Just (a, rs) -> (a:parseToDoubles rs)
-        Nothing -> []
-      toSourceStake t (i, e) = (i, Stake (Source, (e2p t e), t))
-      toSinkStake t (i, e) = (i, Stake (Sink, (- e2p t e), t))
-      e2p :: Time.NominalDiffTime -> WattSeconds -> Watts
-      e2p t ws = toWatts $ (fromWattSeconds ws) / (realToFrac t)
-
-
 
 incTxState :: (Ord n) => TxState n -> (NodeStates n, Maybe (TxPlan n)) -> TxState n
 incTxState (Tx ts) (Tx ns, plan) = case plan of
@@ -237,7 +197,7 @@ incTxState (Tx ts) (Tx ns, plan) = case plan of
   where
     {-# INLINE updateTS #-}
     updateTS :: (Role, TxStatus) -> SensorR -> (Role, TxStatus)
-    updateTS (px, prevTx) SensorMetrics{..} = (px, nextTx)
+    updateTS (px, prevTx) SensorMetrics{..} = (px, nextTS)
       where
         nextTS = case px of
                  Source -> (mempty @TxStatus)

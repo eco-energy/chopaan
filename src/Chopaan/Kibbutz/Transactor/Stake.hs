@@ -20,15 +20,7 @@ import Data.Convertible
 import Data.Convertible.Instances ()
 
 
-import Chopaan.Node.Metrics (toWattSeconds, toWatts
-                            , fromWattSeconds, fromWatts
-                            , Watts, WattSeconds
-                            , SensorMetrics(..)
-                            , Node(..)
-                            , BatteryR
-                            , PowerNR
-                            , pToE
-                            )
+import Chopaan.Node.Metrics
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
 
