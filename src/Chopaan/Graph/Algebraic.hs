@@ -16,7 +16,8 @@ import Chopaan.Graph.Snapshot
       SnapshotLink(_sourceNode, _destinationNode, _linkAttributes),
       SnapshotGraph )
 -- import Shpadoinkle.Widgets.Types (Humanize)
-import Algebra.Graph.Labelled as AG
+import  Algebra.Graph.Labelled as AG
+import qualified Algebra.Graph as G
 
 
 -- $ Constraints for edge labels and nodes
@@ -24,6 +25,13 @@ type GrConn f s = (Bounded s, Show s, Ord s, Eq s, Enum s, Show f, Monoid f, Ord
 
 -- $ Constraints for edge labels and nodes, along with monad constraints
 type GrConnM m f s = (Monad m, GrConn f s)
+
+deriving instance Foldable (G.Graph)
+deriving instance Traversable (G.Graph)
+deriving instance (FromJSON a) => FromJSON (G.Graph a)
+deriving instance (ToJSON a) => ToJSON (G.Graph a)
+deriving via (W.WineryVariant (G.Graph a)) instance (W.Serialise a) => W.Serialise (G.Graph a)
+
 
 deriving instance Generic1 (AG.Graph flow)
 

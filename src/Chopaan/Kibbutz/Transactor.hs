@@ -37,6 +37,7 @@ import qualified Algebra.Graph as G
 import qualified Codec.Winery as W
 import qualified Data.Time as Time
 import qualified Data.Text as Text
+import Data.Monoid
 import Data.Word
 import Data.Maybe
 import Data.Bifunctor
@@ -105,7 +106,7 @@ dispatchNodeTx :: forall m n. (MonadIO m, MonadCatch m, Address n)
   => PubQueue
   -> G.Graph (n, Stake)
   -> m ()
-dispatchNodeTx q (Tx tx) = do
+dispatchNodeTx q tx = do
   let txDispatches =  (\(nid, st) -> (stateTopic nid, stakeToETR st)) <$> (G.vertexList tx)
   sequence_ $ (\(t, s) -> liftIO $ writeToPubQ q t s) <$> txDispatches
 
@@ -135,53 +136,34 @@ stakeStatus !(Stake (!px, !w, !t)) = (px, mempty{ timeRemaining = t
                                        })
 {-# INLINE stakeStatus #-}
 
-planToState :: TxPlan n -> TxState n
-planToState = fmap stakeStatus
-{-# INLINE planToState #-}
 
-zipWith3 :: (Ord n) => (a -> b -> c -> d) -> M.Map n a -> M.Map n b -> M.Map n c -> M.Map n d 
-zipWith3 f a b c = M.intersectionWith ($) (M.intersectionWith f a b) c
+newtype EnergyDemand = EnergyDemand (WattSeconds)
+  deriving (Eq, Ord, Show)
+  deriving newtype (Num, Fractional, Real, RealFrac)
 
+nodeDemand :: SensorR -> EnergyDemand
+nodeDemand SensorMetrics{_demand, _battery} = EnergyDemand ((stored _battery) - _demand)
+  where
+    stored Battery{totalCapacity, soc} = totalCapacity * soc
 
+txn :: forall m n. (MonadIO m, MonadCatch m, MonadFail m, Ord n, HasVarName n)
+  => Time.NominalDiffTime
+  -> AG.Graph (Distance R) n
+  -> G.Graph (n, SensorR)
+  -> m (AG.Graph Stake n)
+txn h topology state = (first toStake)
+                       <$> (solveTP h topology (fmap (second (realToFrac . nodeDemand)) state))
 
-    
-transactionPlanner :: forall m n. (MonadIO m, MonadCatch m, Show n, Ord n) => Time.NominalDiffTime -> FL.Fold m (NodeStates n) (Maybe (TxPlan n))
-transactionPlanner !timeHorizon = FL.foldMapM (txn timeHorizon)
-{-# INLINE transactionPlanner#-}
-
-
-
-txn :: forall m n. (MonadIO m, MonadCatch m, Ord n, Show n) => AG.Graph (Distance R) n -> Time.NominalDiffTime -> G.Graph (n, WattSeconds) -> m (G.Graph (n, Stake))
-txn topology !h !(Tx ns) = do
-  let nodes = M.keys ns
-  let indexer = M.fromList $ zip [1..] nodes
-      getAtI i = indexer M.! i
-      reindexTx (Tx n) = Tx $ M.fromList $
-                         fmap (\(i, a) -> (getAtI i, a)) $ M.toList n
-  sched <- schedule
-  return $ fmap reindexTx sched
-      where
-        consumption = M.toAscList $ fmap _demand ns
-        storage = M.toAscList $
-                  fmap (\n ->
-                          (totalCapacity . _battery $ n) * (soc . _battery $ n))
-                  ns
-        d = fmap (\(i, (c, s))
-                     -> (i, c - s)) $ zip [1..] $ zip (snd <$> consumption) (snd <$> storage)
-        (sources, sinks) = L.partition (\x -> snd x > 0) d
-        better f ss = uncurry f $ unzip $ (second fromWattSeconds) <$> ss
-        schedule :: m (TxPlan' Int)
-        schedule =  (solveTP h)
-                    (better mkSources sources)
-                    (better mkSinks sinks)
-          [[1 | i <- [1..length sources]] | j <- [1..length sinks]]
-
+toStake :: R -> Stake
+toStake = undefined
 
 expToMaybe :: (MonadIO m) => Either SomeException a -> m (Maybe a)
 expToMaybe (Left e) = (liftIO . print $ e) >> return Nothing
 expToMaybe (Right a) = return $ Just a
 {-# INLINE expToMaybe #-}
 
+--plan horizon = S.postscan (secondF (dupF (transactionPlanner horizon)))
+--status ns = S.postscan (secondF (txFold (Tx . M.fromList $ [(n, mempty @Stake) | n <- ns])))
 
 type TxPlan' n = Maybe (TxPlan n)
 

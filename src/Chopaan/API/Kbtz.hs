@@ -62,9 +62,6 @@ data APINode = APINode { nodeId :: NodeMAC
                        , nodeConfig :: HW Double
                        } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
 
-deriving instance (ToJSON a, ToJSON b) => ToJSON (G.Graph a b)
-deriving instance (FromJSON a, FromJSON b) => FromJSON (G.Graph a b)
-
 newtype APIKbtz = APIKbtz (G.Graph Double APINode)
   deriving (Show, Generic)
   deriving anyclass (ToJSON, FromJSON)

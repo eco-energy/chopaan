@@ -146,13 +146,11 @@ runKibbutzM :: forall t m. (IsStream t, MonadAsync m, MonadSample m, MonadCatch 
 runKibbutzM poo = (pure . S.adapt . S.hoist (runGraphWithDB poo)) <=< (runGraphWithDB poo . runKibbutz)
 
 
---type EnergyGraph = 
-
-type GridScene n = ((NodeStates n, Maybe (TxPlan n)), TxState n)
+type GridScene n = (M.Map n SensorR)--, Maybe (TxPlan n)), TxState n)
 
 type MeshScene n = (n, (MeshNode, RxSignal))
 type KbtzScene n = Either (GridScene n) (MeshScene n)
-type GridEv = (SensorR, Maybe Stake, Maybe TxStatus)
+type GridEv = (SensorR) -- , Maybe Stake, Maybe TxStatus)
 
 runKibbutz :: forall t. (IsStream t) => KbtzC NodeMAC -> GraphM (t GraphM (KbtzScene NodeMAC))
 runKibbutz kc@KbtzC{name, nodes, channelOpts, influxCon} = do
@@ -162,15 +160,13 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts, influxCon} = do
   --gridFold <- withSpider $ saveTx name
   meshFold <- withSpider (addMeshNode @GraphM)
   let
-    plan = S.postscan (secondF (dupF (transactionPlanner horizon)))
-    status = S.postscan (secondF (txFold (Tx . M.fromList $ [(n, mempty @Stake) | n <- nodes])))
     processES :: t GraphM (NodeMAC, EnergyState) -> t GraphM (GridScene NodeMAC)
     processES s = S.tapRate 60 (\x -> liftIO . print $ "Grid Processed Rate: " <> show x)
                 $ S.map snd
-                -- $ S.tap (FL.mapM (liftIO . print) (FL.lmap getLatest gridFold))
-                $ status
-                $ plan
-                $ S.map (second Tx)
+                --   $ S.tap (FL.mapM (liftIO . print) (FL.lmap getLatest gridFold))
+                --   $ status
+                --   $ plan
+                --  $ S.map (second Tx)
                 $ S.tap (FL.lmap glS sLineF)
                 $ gridSensorR nodes
                 $ S.tapRate 60 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
@@ -198,15 +194,15 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts, influxCon} = do
     mLineF :: FL.Fold GraphM (NodeMAC, (MeshNode, RxSignal)) ()
     mLineF = FL.lmap (\(n, x) -> lineMesh (asKbtzNode name n) x) (lineFoldHttp 10 wp')
       -- Stream Processors that run Folds
-    getLatest ::
-      (NodeMAC, ((NodeStates NodeMAC, Maybe (TxPlan NodeMAC)), (TxState NodeMAC)))
-      -> (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus))
-    getLatest (n, ((Tx a, b), c)) = let
-      a' = fromMaybe initSM (M.lookup n a)
-      b' = (\x -> M.lookup n (unTx x)) =<< b
-      c' = snd <$> (M.lookup n (unTx c))
-      in (n, (a', b', c'))
-    {-# INLINE getLatest #-}
+    -- getLatest ::
+    --   (NodeMAC, ((NodeStates NodeMAC, Maybe (TxPlan NodeMAC)), (TxState NodeMAC)))
+    --   -> (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus))
+    -- getLatest (n, ((Tx a, b), c)) = let
+    --   a' = fromMaybe initSM (M.lookup n a)
+    --   b' = (M.lookup n . unTx) =<< b
+    --   c' = snd <$> (M.lookup n (unTx c))
+    --   in (n, (a', b', c'))
+    -- {-# INLINE getLatest #-}
     horizon = 10 * 60
     {-# INLINE horizon #-}
     gridSensorR :: (KbtzConn t m n) => [n] -> t m (n, EnergyState) -> t m (n, M.Map n SensorR)

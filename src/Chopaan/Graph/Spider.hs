@@ -40,14 +40,16 @@ import Chopaan.Types (PoolConf(..))
 import Chopaan.Utils.Retry
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.Kibbutz
-import Chopaan.Kibbutz.Transactor ( TxStatus
-                                  , Stake
-                                  , NodeStates
+import Chopaan.Kibbutz.Transactor ( NodeStates
                                   , TxPlan
                                   , TxState
-                                  , stakeLinkDir
-                                  , txStatusLinkDir
                                   )
+import Chopaan.Kibbutz.Transactor.Status ( TxStatus
+                                         , txStatusLinkDir
+                                         )
+import Chopaan.Kibbutz.Transactor.Stake ( Stake
+                                         , stakeLinkDir
+                                         ) 
 import Chopaan.Graph.Greskell
 
 import qualified Network.Greskell.WebSocket.Client.Options as Gr

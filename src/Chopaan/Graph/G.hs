@@ -31,6 +31,8 @@ import Chopaan.Node.Folds
 import Chopaan.Node.Metrics
 import Chopaan.Node.Mesh
 import Chopaan.Kibbutz.Transactor
+import Chopaan.Kibbutz.Transactor.Stake (Stake)
+import Chopaan.Kibbutz.Transactor.Status (TxStatus)
 import Chopaan.Graph.Snapshot
 
 -- import Shpadoinkle.Widgets.Types (Humanize)

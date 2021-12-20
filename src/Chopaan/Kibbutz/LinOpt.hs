@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications, MultiParamTypeClasses, FlexibleInstances, GeneralizedNewtypeDeriving, DeriveAnyClass, DerivingStrategies, DerivingVia, DeriveGeneric, DeriveFunctor, ExplicitForAll, ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications, MultiParamTypeClasses, FlexibleInstances, GeneralizedNewtypeDeriving, DeriveAnyClass, DerivingStrategies, DerivingVia, DeriveGeneric, DeriveFunctor, ExplicitForAll, ScopedTypeVariables, TupleSections, ConstraintKinds, AllowAmbiguousTypes #-}
 module Chopaan.Kibbutz.LinOpt where
 
 import GHC.Generics
@@ -39,45 +39,104 @@ class HasVarName a where
 newtype SumSym = SumSym { getSym :: Sum SReal }
   deriving (Generic)
   deriving newtype (Semigroup, Monoid, Num)
+  deriving (Fractional, Floating, Mergeable, EqSymbolic, OrdSymbolic) via (SReal)
 
 instance Eq SumSym where
  a == b = isConcretely ((getSumSym a) .== (getSumSym b)) (== True) 
 
 getSumSym = getSum . getSym
+mkSumSym :: (Real a) => a -> SumSym
+mkSumSym = SumSym . pure . realToFrac
+
+type TPScalar a = (Num a, Real a, Fractional a, Floating a)
+type TPCon f a = (Functor f, Foldable f, Zip f, Applicative f, TPScalar a)
 
 -- $ The total inflow at a node must exceed the demand there
-constrainDemand :: (Foldable f, Functor f, Num a, Real a) => Int -> f SumSym -> a -> Goal 
-constrainDemand i nodeIncomings nodeDemand = do
-  constrain ((observe ("incoming_" <> (show i)) $ getSumSym $ sum nodeIncomings) .>= (observe ("demand_" <> (show i)) $ realToFrac $ nodeDemand))
-  -- assertWithPenalty "demandConstraint" (Penalty 1.05 Nothing)
-  --assertWithPenalty "excessDemand" ((abs . getSumSym $ sum nodeIncomings) .<= (realToFrac . abs $ nodeDemand)) (Penalty 2.0 Nothing)
+constrainDemand :: (TPCon f a) => f SumSym -> a -> Goal 
+constrainDemand nodeIncomings nodeDemand = do
+  assertWithPenalty "demandConstraint" dc (Penalty 0.5 $ Just "demandGroup")
+  where
+    dc = (getSumSym $ sum nodeIncomings) .>= (realToFrac $ nodeDemand)
 
 -- $ The total outflow at a node must be less than its spare capacity 
-constrainSupply :: (Foldable f, Functor f, Num a, Real a) => Int -> f SumSym -> a -> Goal 
-constrainSupply i nodeOutgoings nodeSpareCapacity = constrain $
-  (observe ("outgoing_" <> (show i)) $ getSumSym $ sum nodeOutgoings) .<= (observe ("spareCap_" <> (show i)) $ realToFrac nodeSpareCapacity)
-
-powerBalance :: (Foldable f, Functor f) => f SumSym -> Goal
-powerBalance = constrain . (.<= 10) . abs . getSumSym . sum
-
-transportCost' :: (Functor f, Zip f, Foldable f, Num a, Real a, Num b)
-  => (Distance a -> b) -> f (Distance a) -> f b -> f b -> b
-transportCost' toB distance tx demand = sum $ abs <$> (demand ^-^ tx) -- ((toB <$> distance) <.> tx) +  
-
--- $ This cost is fucked. We actually should have these SumSyms in the edges as well :(
-transportCost :: (Functor f, Zip f, Foldable f, Num a, Real a) => f (Distance a) -> f SumSym -> f a -> (SReal)
-transportCost dx tx demand = observe "txCost" . getSumSym $ (transportCost' getL dx tx (getDemand <$> demand))
+constrainSupply :: (TPCon f a) => f SumSym -> a -> Goal 
+constrainSupply nodeOutgoings nodeSpareCapacity = constrain c
+  -- assertWithPenalty "supplyConstraint" c (Penalty 0.5 (Just "supplyGroup"))
   where
-    getL = SumSym . Sum . realToFrac . fromMaybe 1 . getFinite . getDistance
-    getDemand = SumSym . Sum . realToFrac
+    c = (getSumSym $ sum nodeOutgoings) .<= (realToFrac nodeSpareCapacity)
 
-transportProblem :: forall n a. (HasVarName n, Ord n, Num a, Real a) => String -> AG.Graph (Distance a) n -> AG.Graph SumSym n -> G.Graph (n, a) -> Goal
+isPos :: SumSym -> Goal
+isPos x = constrain $ x .>= 0  
+
+iAt60v :: Fractional a => a -> a
+iAt60v p =  p / 60
+
+lossAt60v :: Fractional a => a -> a -> a
+lossAt60v p d = ((i * i) * (distanceToResistance d)) * 1000
+  where
+    i = iAt60v p
+    
+distanceToResistance :: (Num a, Fractional a) => a -> a
+distanceToResistance d = d * resistivity / crossSection
+  where
+    resistivity = 1.724e-8
+    crossSection = 4e-3
+    
+powerBalance :: (Foldable f, Functor f) => f SumSym -> Goal
+powerBalance = constrain . (.== 0) . abs . getSumSym . sum
+
+transportCost' :: (TPCon f a, Num b, Floating b)
+  => (Distance a -> b) -> f (Distance a) -> f b -> f b -> b
+transportCost' toB distance tx d = sum (Data.Key.zipWith lossAt60v tx (toB <$> distance)) -- + (sum $ d ^-^ tx)
+
+transportCost :: (TPCon f a, Floating a) => f (Distance a) -> f SumSym -> f (NodeType a) -> SReal
+transportCost dx tx d = getSumSym $ transportCost' getL (dx) tx (fmap (mkSumSym . unNT) d)
+  where
+    getL = SumSym . Sum . getD
+    getDemand = SumSym . Sum . realToFrac
+    unNT (Source a) = a
+    unNT (Sink a) = a
+    unNT (Passive a) = a
+
+getD :: (Real b, Floating b, Fractional a) => Distance b -> a
+getD = realToFrac . fromMaybe infinity . getFinite . getDistance
+
+data NodeType a = Source a | Sink a | Passive a
+  deriving (Eq, Ord, Show, Generic, Functor)
+  --deriving (Num, Fractional, Floating, Real, RealFrac) via (a)
+
+isSource (Source _) = True
+isSource _ = False
+isSink (Sink _) = False
+isSink _ = False
+
+toNodeType :: (Eq a, Ord a, Num a) => a -> NodeType a
+toNodeType a
+  | a == 0 = Passive 0
+  | a > 0 = Source a
+  | a < 0 = Sink (abs a)
+  | otherwise = Passive a
+  
+type TxG n = AG.Graph SumSym n
+
+type DistanceG n a = AG.Graph (Distance a) n
+
+type BipartiteTx n a = G.Graph (n, NodeType a)
+
+constrainNode :: forall n a. (TPScalar a, Ord n) => TxG n -> (n, NodeType a) -> Goal
+constrainNode g (n, Source a) = constrainSupply (getOutputs g n) a
+constrainNode g (n, Sink a) = constrainDemand (getInputs g n) a
+constrainNode g (n, Passive a) = pure () -- sequence_ $ fmap constrainZero ((getInputs g n) <> (getOutputs g n))
+  where
+    constrainZero x = constrain $ x .== 0
+    
+transportProblem :: forall n a. (HasVarName n, Ord n, Num a, Real a, Floating a)
+  => String -> DistanceG n a -> TxG n -> G.Graph (n, NodeType a) -> Goal
 transportProblem costName g gSym dx = do
-  let sources = G.vertexList $ G.induce ((> 0) . snd) dx
-      sinks = G.vertexList $ G.induce ((< 0) . snd) dx
-  sequenceA $ fmap (\(i, (n, a)) -> constrainSupply i (getOutputs gSym n) a) $ keyed sources
-  sequenceA $ fmap (\(i, (n, a)) -> constrainDemand i (getInputs gSym n) a) $ keyed sinks
-  powerBalance $ fmap ex $ AG.edgeList gSym
+  let
+    allVars = fmap ex $ AG.edgeList gSym
+  sequenceA $ fmap (constrainNode gSym) dx
+  sequenceA $ fmap isPos allVars
   minimize costName $ transportCost (ex <$> AG.edgeList g) (ex <$> AG.edgeList gSym) (G.vertexList $ fmap snd dx)
   where
     exS (l, _, _) = l
@@ -91,39 +150,82 @@ instance HasVarName TPKey where
   getVarName = show
   fromVarName = read
 
+sumEdges :: forall n a. (Ord n, Ord a, Num a) => AG.Graph a n -> G.Graph (n, a)
+sumEdges = AG.foldg G.empty (G.vertex . (, 0)) newG
+  where
+    newG :: a -> G.Graph (n, a) -> G.Graph (n, a) -> G.Graph (n, a)
+    newG l g@(G.Vertex (n, a)) g'@(G.Vertex (n', a')) = case (compare l 0) of
+      EQ -> G.connect g g'
+      GT -> G.connect (G.Vertex (n, a + l)) g'
+      LT -> G.connect g (G.Vertex (n', a' + l))
+      
 exampleTP :: AG.Graph (Distance Double) TPKey
-          -> G.Graph (TPKey, Double)
-          -> IO (AG.Graph (Sum Double) TPKey)
-exampleTP = solveTP 10 
+          -> (AG.Graph (Distance Double) TPKey -> G.Graph (TPKey, Double))
+          -> IO (AG.Graph Double TPKey)
+exampleTP g dx = do
+  ex <- solveTP 10 g (dx g)
+  return $ ex
+  
 
-dx = G.path $ fmap (\x -> if even x then (x, (600 :: Double)) else (x, (-500))) $ AG.vertexList pathG
+pathD = G.path . fmap (\x -> if even x then (x, (600 :: Double)) else (x, (-500))) . AG.vertexList
+
+spokeD :: AG.Graph (Distance Double) TPKey -> G.Graph (TPKey, Double) 
+spokeD = fmap w . G.edges . fmap (\(_, n, n') -> (n, n')) . AG.edgeList
+  where
+    w n
+      | mod n 10 == 0 = (n, 1000)
+      | otherwise = let (TPKey i) = n in (n, (- 25 * (realToFrac (i)))) 
+    
+spokeG' :: Distance Double -> TPKey -> TPKey -> AG.Graph (Distance Double) TPKey
+spokeG' d start n = AG.edges $ fmap ((d, start, )) [(start + 1)..n]
+
+spokeG :: AG.Graph (Distance Double) TPKey
+spokeG = spokeG' 10 0 9
+
+bigSpokeG :: AG.Graph (Distance Double) TPKey
+bigSpokeG = foldl (AG.connect 100) AG.empty
+  [
+  --AG.overlay
+    --((AG.vertex s) (AG.vertex (s + 10)))
+    (spokeG' (toD i) s (s + 9))
+  | i <- [10, 20..30], s <- [0, 10..30]]
+  where
+    toD = distance . fromMaybe 0 . finite
 
 pathG :: AG.Graph (Distance Double) TPKey
-pathG = AG.edges $ (uncurry toE) <$> (Prelude.zip [0, 1..100] [1, 2..101])
+pathG = AG.edges $ (uncurry toE) <$> (Prelude.zip [0, 1..3] [1, 2..4])
   where
     toE i j = (dis i j, toKey i, toKey j)
     toKey = TPKey . round
-    dis i j = distance . fromMaybe 10 . finite $ 5 * (realToFrac $ mod (round i) 5) 
+    dis i j = distance . fromMaybe 0 . finite $ 5 * (1 + (realToFrac $ mod (round i) 5)) 
 
-solveTP :: forall m n a. (MonadIO m, MonadFail m, HasVarName n, Ord n, Num a, Real a, SymVal a)
+solveTP :: forall m n a.
+  (MonadIO m, MonadFail m, HasVarName n, Ord n, Num a, Real a, Fractional a, SymVal a, Floating a)
   => NominalDiffTime
   -> AG.Graph (Distance a) n
   -> G.Graph (n, a)
-  -> m (AG.Graph (Sum a) n)
-solveTP timeHorizon g dx = do
-  let costName = "transactionCost"
+  -> m (AG.Graph a n)
+solveTP timeHorizon gSingle dx' = do
+  let dx = fmap (second toNodeType) dx'
+      g = AG.transitiveClosure gSingle
+      costName = "transactionCost"
   (LexicographicResult sol) <- liftIO $ (\a -> print a >> return a) =<< (optimize Lexicographic $
     (flip (transportProblem costName g) dx) =<< (txGraph g))
-  let
-    goalCost = M.lookup costName dict
-    dict = getModelDictionary sol
-    mkE (n, n') = (((Sum . fromCV) <$> M.lookup (tName n n') dict), n, n')
-    g'' :: AG.Graph (Maybe (Sum a)) n
-    g'' = AG.edges
+  return $ first getSum $ parseSol g sol
+
+parseSol :: forall n a. (Ord n, Ord a, Fractional a, HasVarName n)
+  => AG.Graph (Distance a) n -> SMTResult -> AG.Graph (Sum a) n
+parseSol g s = g''
+  where
+    dict = getModelDictionary s
+    mkE (_, n, n') = (((Sum . fromRational . toRational . (fromCV @AlgReal)) <$> M.lookup (tName n n') dict), n, n')
+    g'' :: AG.Graph (Sum a) n
+    g'' = first (fromMaybe mempty) $ AG.edges
       $ fmap mkE
-      $ G.edgeList . fmap fst
-      $ dx
-  return $ first (fromMaybe mempty) g''
+      $ AG.edgeList
+      $ g
+  
+-- parsePareto = -- first getSum $ foldl AG.overlay AG.empty $ 
 
 getInputs :: forall n. (Ord n)
   => AG.Graph SumSym n -> n -> [SumSym]
@@ -141,7 +243,7 @@ txGraph = (fmap AG.edges) . (sequenceA . fmap edgeSym) . AG.edgeList
   where
     edgeSym (l, n, n') = do
       let name = (tName n n')
-      l' <- observe name <$> (sReal name)
+      l' <- (sReal name) -- observe name <$> 
       return (SumSym $ Sum l', n, n')
 
 --vertexPairVar :: (Show v) => AG.Graph e v -> G.Graph (String, v)

@@ -1,12 +1,12 @@
 {-# LANGUAGE KindSignatures, FlexibleContexts, ScopedTypeVariables, TypeApplications, RankNTypes, FlexibleInstances, ConstraintKinds, InstanceSigs #-}
 {-# LANGUAGE DeriveGeneric, StandaloneDeriving, GeneralizedNewtypeDeriving, DerivingStrategies #-}
 {-# LANGUAGE TypeOperators, QuantifiedConstraints, TypeFamilies, CPP #-}
-module Chopaan.Kibbutz.Kibbutz where
+module Chopaan.Kibbutz.Kibbutz (KbtzConn) where
 
 import Prelude hiding (zipWith)
 
 import Control.Monad
-import Streamly -- (IsStream, MonadAsync)
+import Streamly.Prelude ( MonadAsync, IsStream, ahead, adapt )
 import qualified Streamly.Prelude as S
 import qualified Streamly.Data.Fold as FL
 import qualified Streamly.Internal.Data.Fold as FL
