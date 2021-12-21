@@ -105,6 +105,7 @@ data Battery a where
   SeqB :: Battery a -> Battery a -> Battery a
   ABattery :: BatteryConf a -> EvolveB a -> Battery a
   deriving (Generic, NFData)
+  -- deriving W.Serialise via (W.WineryVariant (Battery a))
 
 
 runBB :: (Fractional a) => Battery a -> VI a -> VI a

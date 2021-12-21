@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeApplications, MultiParamTypeClasses, FlexibleInstances, GeneralizedNewtypeDeriving, DeriveAnyClass, DerivingStrategies, DerivingVia, DeriveGeneric, DeriveFunctor, ExplicitForAll, ScopedTypeVariables, TupleSections, ConstraintKinds, AllowAmbiguousTypes #-}
-module Chopaan.Kibbutz.LinOpt where
+module Chopaan.Kibbutz.LinOpt (solveTP, HasVarName(..)) where
 
 import GHC.Generics
 import Control.Monad.IO.Class
@@ -138,7 +138,7 @@ constrainNode g (n, Passive a) = pure () -- sequence_ $ fmap constrainZero ((get
     constrainZero x = constrain $ x .== 0
     
 transportProblem :: forall n a. (HasVarName n, Ord n, Num a, Real a, Floating a)
-  => String -> DistanceG n a -> TxG n -> G.Graph (n, NodeType a) -> Goal
+  => String -> DistanceG n a -> TxG n -> BipartiteTx n a -> Goal
 transportProblem costName g gSym dx = do
   let
     allVars = fmap ex $ AG.edgeList gSym
@@ -166,8 +166,8 @@ sumEdges = AG.foldg G.empty (G.vertex . (, 0)) newG
       GT -> G.connect (G.Vertex (n, a + l)) g'
       LT -> G.connect g (G.Vertex (n', a' + l))
       
-exampleTP :: AG.Graph (Distance Double) TPKey
-          -> (AG.Graph (Distance Double) TPKey -> G.Graph (TPKey, Double))
+exampleTP :: DistanceG TPKey Double
+          -> (DistanceG TPKey Double -> G.Graph (TPKey, Double))
           -> IO (AG.Graph Double TPKey)
 exampleTP g dx = do
   ex <- solveTP 10 g (dx g)
@@ -176,20 +176,20 @@ exampleTP g dx = do
 
 pathD = G.path . fmap (\x -> if even x then (x, (600 :: Double)) else (x, (-500))) . AG.vertexList
 
-spokeD :: AG.Graph (Distance Double) TPKey -> G.Graph (TPKey, Double) 
+spokeD :: DistanceG TPKey Double -> G.Graph (TPKey, Double) 
 spokeD = fmap w . G.edges . fmap (\(_, n, n') -> (n, n')) . AG.edgeList
   where
     w n
       | mod n 10 == 0 = (n, 1000)
       | otherwise = let (TPKey i) = n in (n, (- 25 * (realToFrac (i)))) 
     
-spokeG' :: Distance Double -> TPKey -> TPKey -> AG.Graph (Distance Double) TPKey
+spokeG' :: Distance Double -> TPKey -> TPKey -> DistanceG TPKey Double
 spokeG' d start n = AG.edges $ fmap ((d, start, )) [(start + 1)..n]
 
-spokeG :: AG.Graph (Distance Double) TPKey
+spokeG :: DistanceG TPKey Double
 spokeG = spokeG' 10 0 9
 
-bigSpokeG :: AG.Graph (Distance Double) TPKey
+bigSpokeG :: DistanceG TPKey Double
 bigSpokeG = foldl (AG.connect 100) AG.empty
   [
   --AG.overlay
@@ -199,7 +199,7 @@ bigSpokeG = foldl (AG.connect 100) AG.empty
   where
     toD = distance . fromMaybe 0 . finite
 
-pathG :: AG.Graph (Distance Double) TPKey
+pathG :: DistanceG TPKey Double
 pathG = AG.edges $ (uncurry toE) <$> (Prelude.zip [0, 1..3] [1, 2..4])
   where
     toE i j = (dis i j, toKey i, toKey j)
@@ -209,30 +209,30 @@ pathG = AG.edges $ (uncurry toE) <$> (Prelude.zip [0, 1..3] [1, 2..4])
 solveTP :: forall m n a.
   (MonadIO m, MonadFail m, HasVarName n, Ord n, Num a, Real a, Fractional a, SymVal a, Floating a)
   => NominalDiffTime
-  -> AG.Graph (Distance a) n
+  -> DistanceG n a
   -> G.Graph (n, a)
   -> m (AG.Graph a n)
 solveTP timeHorizon gSingle dx' = do
   let dx = fmap (second toNodeType) dx'
       g = AG.transitiveClosure gSingle
       costName = "transactionCost"
-  (LexicographicResult sol) <- liftIO $ (\a -> print a >> return a) =<< (optimize Lexicographic $
-    (flip (transportProblem costName g) dx) =<< (txGraph g))
-  return $ first getSum $ parseSol g sol
+  (LexicographicResult sol) <- liftIO $
+    (\a -> print a >> return a)
+    =<< (optimize Lexicographic $
+         (flip (transportProblem costName g) dx) =<< (txGraph g))
+  return $ parseSol g sol
 
 parseSol :: forall n a. (Ord n, Ord a, Fractional a, HasVarName n)
-  => AG.Graph (Distance a) n -> SMTResult -> AG.Graph (Sum a) n
+  => AG.Graph (Distance a) n -> SMTResult -> AG.Graph a n
 parseSol g s = g''
   where
     dict = getModelDictionary s
     mkE (_, n, n') = (((Sum . fromRational . toRational . (fromCV @AlgReal)) <$> M.lookup (tName n n') dict), n, n')
-    g'' :: AG.Graph (Sum a) n
-    g'' = first (fromMaybe mempty) $ AG.edges
+    g'' :: AG.Graph a n
+    g'' = first (getSum . fromMaybe mempty) $ AG.edges
       $ fmap mkE
       $ AG.edgeList
       $ g
-  
--- parsePareto = -- first getSum $ foldl AG.overlay AG.empty $ 
 
 getInputs :: forall n. (Ord n)
   => AG.Graph SumSym n -> n -> [SumSym]

@@ -21,6 +21,8 @@ type ThingName = Text.Text
 
 type NodeMAC = NodeId ThingName
 
+type NodeIdx = NodeId Int
+
 newtype NodeId a = NodeId { unNodeId :: a }
   deriving stock (Generic, Functor)
   deriving newtype (Eq, Ord, Show, Read, IsString, Typeable, FromJSON, ToJSON, Semigroup, Monoid, FromGraphSON, ToJSONKey)

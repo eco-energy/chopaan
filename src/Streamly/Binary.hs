@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances, FlexibleContexts, TypeApplications, UndecidableInstances, QuantifiedConstraints, DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, AllowAmbiguousTypes, DefaultSignatures, ScopedTypeVariables, RankNTypes #-}
 module Streamly.Binary
   ( HasEncoding(..),
+    DecodeException(..),
     Bin,
     PB,
     Txt,
@@ -16,6 +17,7 @@ module Streamly.Binary
     fromWino,
     decodeFile,
     encodeFold,
+    encodeArray,
     decodeS,
     parseTextLines,
     prefixWithLength,
@@ -27,6 +29,7 @@ where
 
 import Unsafe.Coerce
 import GHC.Generics
+import Control.Monad ((<=<))
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Newtype.Generics
@@ -251,11 +254,20 @@ decodeProducer :: forall m a. (HasEncoding a, MonadAsync m, MonadCatch m)
   -> P.Producer m (FileSource Word8) (Either DecodeException a)
 decodeProducer = (fmap decodeA) . P.parseManyD (chunkBytes @a)
 
+encodeArray :: (HasEncoding a, MonadAsync m, MonadCatch m)
+  => FilePath -> a -> m ()
+encodeArray fp = liftIO . (File.putChunk fp <=< encodeA)
+{-# INLINE encodeArray #-}
 
 encodeFold :: (HasEncoding a, MonadAsync m, MonadCatch m)
   => FilePath -> FL.Fold m a ()
 encodeFold fp = FL.lmapM encodeA (File.writeChunks fp)
 {-# INLINE encodeFold #-}
+
+encodeFile :: (HasEncoding a, MonadAsync m, MonadCatch m)
+  => FilePath -> FL.Fold m a ()
+encodeFile fp = FL.lmapM encodeA (File.writeChunks fp)
+{-# INLINE encodeFile #-}
 
 -- encodeFold2 :: (HasEncoding a, MonadAsync m, MonadCatch m)
 --   => FilePath -> FL.Fold m a ()

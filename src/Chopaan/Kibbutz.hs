@@ -5,28 +5,30 @@
 module Chopaan.Kibbutz ( runKibbutz, runKibbutz', runKibbutzM
                        , KbtzC(..), mkKbtzConf, S3Opts) where
 
-import GHC.Generics
+import GHC.Generics ( Generic )
 
 import Network.AWS.S3 (BucketName, ObjectKey(..))
-import Chopaan.Types hiding (DBOpts)
+import Chopaan.Types ( InfluxConn, MQTTOpts )
 
-import Control.Applicative
-import Control.Arrow
-import Control.Monad.IO.Class
-import Control.Monad
-import Control.Monad.Catch
-import Control.Monad.STM
-import Control.Monad.IO.Unlift
-import Control.Monad.Bayes.Class
-import Control.Concurrent.STM.TVar
+import ConCat.Misc (R)
+import Control.Applicative ()
+import Control.Arrow ( Arrow(second, first) )
+import Control.Monad.IO.Class ( MonadIO(..) )
+import Control.Monad ( (<=<) )
+import Control.Monad.Catch ( MonadCatch )
+import Control.Monad.STM ()
+import Control.Monad.IO.Unlift ()
+import Control.Monad.Bayes.Class ( MonadSample )
+import Control.Concurrent.STM.TVar ()
 import Control.Concurrent (forkIO)
-import Control.Lens
+import Control.Lens ()
 
 import Data.Influxable
+    ( lineMesh, lineFoldHttp, asKbtzNode, lineSensorR, wp )
 import qualified Data.Map as M
-import Data.Time
+import Data.Time ( getCurrentTime )
 import Data.Text (pack)
-import Data.Maybe
+import Data.Maybe ( isJust, fromJust, fromMaybe )
 import Data.Bifunctor (bimap)
 import Data.Greskell (runBinder)
 import NetSpider.Graph (NodeAttributes(..))
@@ -46,19 +48,20 @@ import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, EnergyState)
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N (cpuTime)
 import System.IO (stdout)
 
-import Chopaan.Kibbutz.KbtzId
-import Chopaan.Kibbutz.Kibbutz
+import Chopaan.Kibbutz.KbtzId ( KbtzName )
+import Chopaan.Kibbutz.Kibbutz ( KbtzConn )
 
-import Chopaan.Comm.Mqtt.AWS (withMqttAuth)
-import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
-import Chopaan.Kibbutz.Transactor
+
+import Chopaan.Kibbutz.Transactor ()
 import Chopaan.Node.NodeId (NodeMAC)
 import Chopaan.Node.Folds (SensorR, sensorFold)
 import Chopaan.Node.Metrics (initSM)
 import Chopaan.Node.Mesh (MeshNode, RxSignal, meshNodeLink)
+import Chopaan.Node.HW (HW(..))
+import Chopaan.Node.Components ()
 
-
-
+import Chopaan.Comm.Mqtt.AWS (withMqttAuth)
+import Chopaan.Kibbutz.AWS.Common (newLogger, LogLevel(..))
 import Chopaan.Comm.Mqtt (runKibbutzGateway)
 import Chopaan.Comm.Comm (MessageQs(..)
                          , Address(..)
@@ -68,10 +71,17 @@ import Chopaan.Comm.Comm (MessageQs(..)
                          , unfoldChan
                          , initMessageQs
                          )
-import Chopaan.Utils.Streamly
-import Chopaan.Graph.Kbtz
+import Chopaan.Utils.Streamly ()
+import Chopaan.Graph.Kbtz ()
 import Chopaan.Graph
-
+    ( getGridRoot,
+      addMeshNode,
+      withSpider,
+      runGraphWithDB,
+      DBPools,
+      GraphM )
+import qualified Chopaan.Graph.Algebraic as AG
+import Algebra.Graph.Label (Distance(..))
 
 type S3Opts = BucketName
 
@@ -84,20 +94,32 @@ instance Ord (MessageQs n) where
 instance Show (MessageQs n) where
   show = const "SomeQueue"
 
+type KbtzG n = AG.Graph (Distance R) (n, HW R)
+
 data KbtzC n = KbtzC
   { name :: KbtzName
-  , nodes :: [n]
+  , structure :: KbtzG n
   , channelOpts :: Either MQTTOpts (MessageQs n)
   , s3Opts :: Maybe S3Opts
   , influxCon :: InfluxConn
   } deriving (Eq, Ord, Show, Generic)
 
 
+
+kbtzNs :: (Ord n) => KbtzG n -> [n]
+kbtzNs = fmap fst . AG.vertexList
+
+kbtzHW :: (Ord n) => KbtzG n -> [(n, HW R)]
+kbtzHW = AG.vertexList
+
+nodeHWs :: (Ord n) => KbtzG n -> M.Map n (HW R)
+nodeHWs = M.fromList . kbtzHW
+
 newtype Kbtzim = Kbtzim { unKbtzim :: S.SerialT GraphM (Either KbtzName (KbtzName, NodeMAC)) }
   deriving (Generic)
 
 
-mkKbtzConf :: KbtzName -> [n] -> Either MQTTOpts (MessageQs n) -> Maybe S3Opts -> InfluxConn -> KbtzC n
+mkKbtzConf :: KbtzName -> AG.Graph (Distance R) (n, HW R) -> Either MQTTOpts (MessageQs n) -> Maybe S3Opts -> InfluxConn -> KbtzC n
 mkKbtzConf = KbtzC
 {-# INLINE mkKbtzConf #-}
 
@@ -153,7 +175,7 @@ type KbtzScene n = Either (GridScene n) (MeshScene n)
 type GridEv = (SensorR) -- , Maybe Stake, Maybe TxStatus)
 
 runKibbutz :: forall t. (IsStream t) => KbtzC NodeMAC -> GraphM (t GraphM (KbtzScene NodeMAC))
-runKibbutz kc@KbtzC{name, nodes, channelOpts, influxCon} = do
+runKibbutz kc@KbtzC{name, structure, channelOpts, influxCon} = do
   -- Live Data
   liftIO . print $ show kc
   t0 <- liftIO $ getCurrentTime
@@ -186,6 +208,7 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts, influxCon} = do
       (es, rs, outbox) <- qSrc qs
       return $ liveStream es rs
   where
+    nodes = kbtzNs structure
     wp' = wp influxCon "chopaanMQTT" 
     glS :: (NodeMAC, (M.Map NodeMAC SensorR)) -> (NodeMAC, SensorR)
     glS (n, m) = (n, fromMaybe initSM (M.lookup n m))
@@ -209,5 +232,5 @@ runKibbutz kc@KbtzC{name, nodes, channelOpts, influxCon} = do
     gridSensorR ns s = S.map (first fromJust)
                        . S.filter (isJust . fst)
                        . S.postscan (FL.tee (FL.foldl' ((const (Just . fst))) Nothing)
-                                     (FL.demux $ M.fromList $ (, sensorFold) <$> ns)) $ s
+                                     (FL.demux $ fmap sensorFold (nodeHWs structure))) $ s
     {-# INLINE gridSensorR #-}

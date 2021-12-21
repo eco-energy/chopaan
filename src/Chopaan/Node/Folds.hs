@@ -29,6 +29,8 @@ import ConCat.Misc (R)
 
 import Chopaan.Node.NodeId (NodeMAC)
 import Chopaan.Node.NodeSensors (fromNodeMessage, NodeT')
+import Chopaan.Node.HW (HW(..))
+import qualified Chopaan.Node.Components as Comp
 import Chopaan.Node.Storage
 import Chopaan.Node.Storage.Battery
 import Chopaan.Node.Metrics
@@ -109,8 +111,8 @@ energyFold = fmap fst $ FL.foldl' step begin
 type Unop a = a -> a
 
 batteryFold :: forall m e p. (MonadSample m)
-  => BatteryParams R -> FL.Fold m EnergyState (Battery WattSeconds Watts)
-batteryFold !bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts)
+  => (Comp.BatteryTop R) -> BatteryParams R -> FL.Fold m EnergyState (Battery WattSeconds Watts)
+batteryFold cBat !bat@BatteryParams{} = fmap (bimap toWattSeconds toWatts)
   $ fmap (flip end emptyB)
   $ FL.foldlM' step begin
   where
@@ -153,15 +155,15 @@ filterF session f s = (FL.take session (FL.mkFold_ step start))
     step (s', _) a''' = FL.Partial (f s' a''')
 
 
-sensorFold :: forall m. (Monad m, MonadSample m) => FL.Fold m (EnergyState) (SensorMetrics WattSeconds Watts) 
-sensorFold = FL.toFold $ SensorMetrics
-             <$> FL.Tee (fst <$> timeFold)
-             <*> FL.Tee (snd <$> timeFold)
-             <*> FL.Tee powerFold
-             <*> FL.Tee energyFold
-             <*> FL.Tee (batteryFold defBatteryParams)
-             <*> FL.Tee demandFold
-             <*> FL.Tee sensors 
+sensorFold :: forall m. (Monad m, MonadSample m) => (HW R) -> FL.Fold m (EnergyState) (SensorMetrics WattSeconds Watts) 
+sensorFold hw = FL.toFold $ SensorMetrics
+                <$> FL.Tee (fst <$> timeFold)
+                <*> FL.Tee (snd <$> timeFold)
+                <*> FL.Tee powerFold
+                <*> FL.Tee energyFold
+                <*> FL.Tee (batteryFold (storage hw) defBatteryParams)
+                <*> FL.Tee demandFold
+                <*> FL.Tee sensors 
 {--# INLINE sensorFold #-}
 
 demandFold :: (Monad m) => FL.Fold m (EnergyState) WattSeconds

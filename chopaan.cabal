@@ -64,6 +64,7 @@ library
       Chopaan.Kibbutz.AWS.Common
       Chopaan.Kibbutz.AWS.Things
       Chopaan.Kibbutz.DataSource
+      Chopaan.Kibbutz.FS
       Chopaan.Kibbutz.Graph
       Chopaan.Kibbutz.KbtzId
       Chopaan.Kibbutz.Kibbutz
