@@ -55,8 +55,11 @@ type TPCon f a = (Functor f, Foldable f, Zip f, Applicative f, TPScalar a)
 constrainDemand :: (TPCon f a) => f SumSym -> a -> Goal 
 constrainDemand nodeIncomings nodeDemand = do
   assertWithPenalty "demandConstraint" dc (Penalty 0.5 $ Just "demandGroup")
-  where
-    dc = (getSumSym $ sum nodeIncomings) .>= (realToFrac $ nodeDemand)
+  constrain $ tIn .<= d
+    where
+      dc = tIn .>= d
+      tIn = getSumSym $ sum nodeIncomings
+      d = realToFrac $ nodeDemand
 
 -- $ The total outflow at a node must be less than its spare capacity 
 constrainSupply :: (TPCon f a) => f SumSym -> a -> Goal 
@@ -85,12 +88,16 @@ distanceToResistance d = d * resistivity / crossSection
 powerBalance :: (Foldable f, Functor f) => f SumSym -> Goal
 powerBalance = constrain . (.== 0) . abs . getSumSym . sum
 
-transportCost' :: (TPCon f a, Num b, Floating b)
-  => (Distance a -> b) -> f (Distance a) -> f b -> f b -> b
-transportCost' toB distance tx d = sum (Data.Key.zipWith lossAt60v tx (toB <$> distance)) -- + (sum $ d ^-^ tx)
+txLoss xs ys = sum $ fmap abs (Data.Key.zipWith lossAt60v xs ys)  
 
-transportCost :: (TPCon f a, Floating a) => f (Distance a) -> f SumSym -> f (NodeType a) -> SReal
-transportCost dx tx d = getSumSym $ transportCost' getL (dx) tx (fmap (mkSumSym . unNT) d)
+dxLoss xs ys = abs $ xs <.> ys
+
+transportCost' :: (TPCon f a, Num b, Floating b)
+  => (Distance a -> b) -> f (Distance a) -> f b -> b
+transportCost' toB dist tx = txLoss tx (toB <$> dist) -- + (sum $ d ^-^ tx)
+
+transportCost :: (TPCon f a, Floating a) => f (Distance a) -> f SumSym -> SReal
+transportCost dx tx = getSumSym $ transportCost' getL dx tx -- (fmap (mkSumSym . unNT) d)
   where
     getL = SumSym . Sum . getD
     getDemand = SumSym . Sum . realToFrac
@@ -135,9 +142,9 @@ transportProblem :: forall n a. (HasVarName n, Ord n, Num a, Real a, Floating a)
 transportProblem costName g gSym dx = do
   let
     allVars = fmap ex $ AG.edgeList gSym
-  sequenceA $ fmap (constrainNode gSym) dx
-  sequenceA $ fmap isPos allVars
-  minimize costName $ transportCost (ex <$> AG.edgeList g) (ex <$> AG.edgeList gSym) (G.vertexList $ fmap snd dx)
+  sequence_ $ fmap (constrainNode gSym) dx
+  sequence_ $ fmap isPos allVars
+  minimize costName $ transportCost (ex <$> AG.edgeList g) (ex <$> AG.edgeList gSym) -- (G.vertexList $ fmap snd dx)
   where
     exS (l, _, _) = l
     ex (l, _, _) = l
