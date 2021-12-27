@@ -27,6 +27,7 @@ let
   branchmap = {
     "https://github.com/faezs/net-spider.git" = "bidirectional-neighborhood";
     "https://github.com/brendanhay/amazonka.git" = "main";
+    "https://github.com/faezs/concat.git" = "graphics-playground";
     };
   cleanGitHaskell = {src, name } :
     let
@@ -38,7 +39,7 @@ let
   pkgSet = haskell-nix.stackProject  {
     src = cleanGitHaskell { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
-    stack-sha256 = "1ivf0740r3s43bb89rvn0q95nmsrlqfgndc72mj9wyggvz0v1i98";
+    stack-sha256 = "0vbglgddn4vsxi5r1g5cbbwh7h8z8kycr12lq43kxzc6sva570q6";
     materialized = ./chopaan.materialized;
     checkMaterialization = false;
     # these extras will provide additional packages

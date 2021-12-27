@@ -21,6 +21,7 @@
         "influxdb" = (((hackage.influxdb)."1.9.2").revisions).default;
         "store" = (((hackage.store)."0.7.12").revisions).default;
         "one-liner" = (((hackage.one-liner)."1.0").revisions).default;
+        "dear-imgui" = (((hackage.dear-imgui)."1.3.0").revisions).default;
         "ulid" = (((hackage.ulid)."0.3.0.0").revisions)."f0eff432ed0f0d0b71be0fd7f45acb54d87aebc4e1e153d2c2e1be4b09eb20b5";
         "cursor" = (((hackage.cursor)."0.2.0.0").revisions)."9071e1029efc634bab63c8b3fd970bbd133475749ec918138a9e7304b0a7e696";
         "stm-containers" = (((hackage.stm-containers)."1.1.0.4").revisions)."f83a683357b6e3b1dda3e70d2077a37224ed534df1f74c4e11f3f6daa7945c5b";
@@ -97,7 +98,6 @@
         "higgledy" = (((hackage.higgledy)."0.4.1.1").revisions)."103701c8080ec345a21edd3ef149b4d3b8ec66a12a82d3d0b5c5e4a0d7d6ac26";
         "generic-lens" = (((hackage.generic-lens)."2.2.0.0").revisions)."4008a39f464e377130346e46062e2ac1211f9d2e256bbb1857216e889c7196be";
         "generic-lens-core" = (((hackage.generic-lens-core)."2.2.0.0").revisions)."b6b69e992f15fa80001de737f41f2123059011a1163d6c8941ce2e3ab44f8c03";
-        "dear-imgui" = (((hackage.dear-imgui)."1.2.2").revisions)."15bebd870853e375840d18f4f9ee54c67328601a749f5a2214d7a197b294fbad";
         "fast-builder" = (((hackage.fast-builder)."0.1.3.0").revisions)."301a50188856ee88706c432c7d5c8c20f744a64a3cbf00346b8c84015c5ecac4";
         "haxl" = (((hackage.haxl)."2.3.0.0").revisions)."4c9a7371a2c21df910628d582776cf52db72bcd6c808daa02823be0ab06f1eb9";
         "named" = (((hackage.named)."0.3.0.1").revisions)."418543272f0c844a77639b05276ee3906d5f305cd4cab46fafcb4f15b7f1e60d";
@@ -108,6 +108,8 @@
         "proto-lens-arbitrary" = (((hackage.proto-lens-arbitrary)."0.1.2.10").revisions)."14012d7783d4f589cba8b7d72b904a48c42d43bb4d9469f871886a1fac2249aa";
         "unicode-data" = (((hackage.unicode-data)."0.1.0.1").revisions)."57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe";
         "rel8" = (((hackage.rel8)."1.2.0.0").revisions)."d540fbfb967bf7eed23a1e7df24ef17424ed25575ab05a86a2cf213b2e6d6940";
+        "markov-chain-usage-model" = (((hackage.markov-chain-usage-model)."0.0.0").revisions)."1afa95faeb9213c4d960a669190078b41b89169462b8edd910472980671ba8c0";
+        "incremental" = (((hackage.incremental)."0.3.1").revisions)."9c697bae4f7e5ceb144bde13e03ca2f36b4bc2d0c92bbc02e0a604231ee279c2";
         chopaan = ./chopaan.nix;
         concat-inline = ./.stack-to-nix.cache.0;
         concat-known = ./.stack-to-nix.cache.1;
@@ -128,6 +130,7 @@
         amazonka-s3 = ./.stack-to-nix.cache.16;
         monad-bayes = ./.stack-to-nix.cache.17;
         net-spider = ./.stack-to-nix.cache.18;
+        quickcheck-state-machine = ./.stack-to-nix.cache.19;
         };
       };
   resolver = "lts-18.16";
@@ -135,6 +138,13 @@
     ({ lib, ... }:
       {
         packages = {
+          "dear-imgui" = {
+            flags = {
+              "opengl3" = lib.mkOverride 900 false;
+              "sdl" = lib.mkOverride 900 true;
+              "opengl2" = lib.mkOverride 900 true;
+              };
+            };
           "streamly" = {
             flags = { "use-c-malloc" = lib.mkOverride 900 true; };
             };
