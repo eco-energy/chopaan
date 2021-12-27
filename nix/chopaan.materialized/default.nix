@@ -21,7 +21,6 @@
         "influxdb" = (((hackage.influxdb)."1.9.2").revisions).default;
         "store" = (((hackage.store)."0.7.12").revisions).default;
         "one-liner" = (((hackage.one-liner)."1.0").revisions).default;
-        "dear-imgui" = (((hackage.dear-imgui)."1.3.0").revisions).default;
         "ulid" = (((hackage.ulid)."0.3.0.0").revisions)."f0eff432ed0f0d0b71be0fd7f45acb54d87aebc4e1e153d2c2e1be4b09eb20b5";
         "cursor" = (((hackage.cursor)."0.2.0.0").revisions)."9071e1029efc634bab63c8b3fd970bbd133475749ec918138a9e7304b0a7e696";
         "stm-containers" = (((hackage.stm-containers)."1.1.0.4").revisions)."f83a683357b6e3b1dda3e70d2077a37224ed534df1f74c4e11f3f6daa7945c5b";
@@ -110,6 +109,7 @@
         "rel8" = (((hackage.rel8)."1.2.0.0").revisions)."d540fbfb967bf7eed23a1e7df24ef17424ed25575ab05a86a2cf213b2e6d6940";
         "markov-chain-usage-model" = (((hackage.markov-chain-usage-model)."0.0.0").revisions)."1afa95faeb9213c4d960a669190078b41b89169462b8edd910472980671ba8c0";
         "incremental" = (((hackage.incremental)."0.3.1").revisions)."9c697bae4f7e5ceb144bde13e03ca2f36b4bc2d0c92bbc02e0a604231ee279c2";
+        "dear-imgui" = (((hackage.dear-imgui)."1.3.0").revisions)."f92f7b28aa8bff6912446f52292f46c5bb73b708015359be979d22e00cfd5655";
         chopaan = ./chopaan.nix;
         concat-inline = ./.stack-to-nix.cache.0;
         concat-known = ./.stack-to-nix.cache.1;

@@ -39,14 +39,15 @@ let
   pkgSet = haskell-nix.stackProject  {
     src = cleanGitHaskell { name = "chopaan"; src = ../.; };
     compiler-nix-name = compiler;
-    stack-sha256 = "0vbglgddn4vsxi5r1g5cbbwh7h8z8kycr12lq43kxzc6sva570q6";
+    stack-sha256 = "13qqzillnbnz0y6rdn9pa4dnv5jz2dvj6k969j4aknnq45jfizsl";
     materialized = ./chopaan.materialized;
     checkMaterialization = false;
     # these extras will provide additional packages
     # ontop of the package set derived from cabal resolution.
     pkg-def-extras = [(hackage: {
       packages = {
-          # Win32 = hackage.Win32."2.8.3.0".revisions.default;
+        # Win32 = hackage.Win32."2.8.3.0".revisions.default;
+        dear-imgui = hackage.dear-imgui."1.3.0".revisions.default;
       };
     })];
     branchMap = branchmap;
@@ -186,9 +187,9 @@ let
         packages.ekg.components.library.enableSeparateDataOutput = true;
 
         # dont haddock concatisms
-        packages.concat-inline.doHaddock = false;
-        packages.concat-plugin.doHaddock = false;
-        packages.concat-examples.doHaddock = false;
+        # packages.concat-inline.doHaddock = false;
+        # packages.concat-plugin.doHaddock = false;
+        # packages.concat-examples.doHaddock = false;
         
         # some packages are missing identifier.name:
         packages.cryptonite-openssl.package.identifier.name = "cryptonite-openssl";
