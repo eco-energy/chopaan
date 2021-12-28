@@ -78,6 +78,10 @@ extra-deps:
    subdirs:
      - net-spider
    # nix-sha256 1dg2vv5ci2s1m6qx37mhgqpjv8xqp9c4w7cv2dvk4db5gnd6svay
+ - git: https://github.com/stevana/quickcheck-state-machine.git
+   commit: cb5f0d8d4ff53ac1cdfa901f8f3fb6e568685433
+   # nix-sha256 1i9mq17yx2w5z6ys5fc6j7gldl2l7mazn5x4k9s58sx9lr0k3aa0
+
  - aeson-1.5.6.0
  - ulid-0.3.0.0@sha256:f0eff432ed0f0d0b71be0fd7f45acb54d87aebc4e1e153d2c2e1be4b09eb20b5,2918    
  - cursor-0.2.0.0@sha256:9071e1029efc634bab63c8b3fd970bbd133475749ec918138a9e7304b0a7e696,1637
@@ -175,7 +179,6 @@ extra-deps:
  - higgledy-0.4.1.1@sha256:103701c8080ec345a21edd3ef149b4d3b8ec66a12a82d3d0b5c5e4a0d7d6ac26,2238
  - generic-lens-2.2.0.0@sha256:4008a39f464e377130346e46062e2ac1211f9d2e256bbb1857216e889c7196be,3867
  - generic-lens-core-2.2.0.0@sha256:b6b69e992f15fa80001de737f41f2123059011a1163d6c8941ce2e3ab44f8c03,2913
- - dear-imgui-1.2.2@sha256:15bebd870853e375840d18f4f9ee54c67328601a749f5a2214d7a197b294fbad,6942
  - fast-builder-0.1.3.0@sha256:301a50188856ee88706c432c7d5c8c20f744a64a3cbf00346b8c84015c5ecac4,2802
  - haxl-2.3.0.0@sha256:4c9a7371a2c21df910628d582776cf52db72bcd6c808daa02823be0ab06f1eb9,3974
  - named-0.3.0.1@sha256:418543272f0c844a77639b05276ee3906d5f305cd4cab46fafcb4f15b7f1e60d,2312
@@ -186,6 +189,9 @@ extra-deps:
  - proto-lens-arbitrary-0.1.2.10@sha256:14012d7783d4f589cba8b7d72b904a48c42d43bb4d9469f871886a1fac2249aa,1197
  - unicode-data-0.1.0.1@sha256:57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe,3637
  - rel8-1.2.0.0@sha256:d540fbfb967bf7eed23a1e7df24ef17424ed25575ab05a86a2cf213b2e6d6940,5045
+ - markov-chain-usage-model-0.0.0@sha256:1afa95faeb9213c4d960a669190078b41b89169462b8edd910472980671ba8c0
+ - incremental-0.3.1@sha256:9c697bae4f7e5ceb144bde13e03ca2f36b4bc2d0c92bbc02e0a604231ee279c2,1153
+ - dear-imgui-1.3.0@sha256:f92f7b28aa8bff6912446f52292f46c5bb73b708015359be979d22e00cfd5655,7274
  #- net-spider-0.4.3.6@sha256:d6f08b83ca14144bfc3bf033df563ae5329d1a4fd97bc521d5ab20649560c27a,6198
  # # Override default flag values for local packages and extra-deps
 
@@ -194,9 +200,16 @@ flags:
     smt: False
   streamly:
     use-c-malloc: true
-#   dear-imgui:
-#     sdl: true
-#     opengl3: true
+  dear-imgui:
+    sdl: true
+    opengl2: true
+    opengl3: false
+
+build:
+  haddock-arguments:
+    haddock-args:
+      - --optghc=-fdefer-type-errors
+      - --optghc=-fobject-code
 
 
     
