@@ -62,6 +62,7 @@ import Control.Arrow ((&&&))
 import Control.Monad ( void )
 import Control.Monad.Trans.Class ()
 import Control.Monad.Trans.Reader ( ReaderT )
+import Control.Monad.Trans.State ( StateT )
 import Control.Monad.Catch ( MonadMask, MonadThrow, MonadCatch )
 import Control.Monad.IO.Class ( MonadIO(..) )
 import Control.Monad.Bayes.Class ( MonadSample )
@@ -164,6 +165,8 @@ type HConfM m a = ReaderT KbtzConf m a
 
 data LifeTime = Finite | Infinite deriving (Eq, Ord, Show, Generic, Read)
 
+--newtype HydrationT m a = HydrationT (ReaderT (StateT ))
+
 instance Var LifeTime where
   toVar = show
   fromVar = readMaybe
@@ -188,6 +191,8 @@ data ParStrategy = ParStrategy
   { dlThreads :: Int
   , sourceGenThreads :: Int
   } deriving (Generic, FromEnv)
+
+--newtype HydrationM m a = HydrationM (ReaderT HydrationConf (StateT m) a)
 
 parseParStrategy :: IO ParStrategy
 parseParStrategy = decodeWithDefaults (ParStrategy 1000 5)
@@ -256,6 +261,7 @@ data Control = Control
 mkTKbtz :: KbtzNodes -> STM (TKbtzim)
 mkTKbtz kns = newTVar =<< traverse (newTVar . Set.fromList) kns
 
+
 mkKbtzConf :: HydrationConf
   -> Env
   -> KbtzName
@@ -269,7 +275,8 @@ mkKbtzConf (HydrationConf{s3Bucket
                          , pastRes, futureRes}) env name store manOrSesh wp parHow =
   KbtzConf env (S3.BucketName s3Bucket) store name manOrSesh (toUTC startDate) lifetime wp (pastRes, futureRes) parHow
 
-runHydration :: InfluxConn -> HydrationConf -> TKbtzim -> GraphM ()
+runHydration :: (S.MonadAsync m, MonadCatch m, MonadMask m, MonadSample m)
+  => InfluxConn -> HydrationConf -> TKbtzim -> m ()
 runHydration influxcon conf kbtzim = do
   manConf <- liftIO $ parseManagerConf
   sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
@@ -409,16 +416,15 @@ hydrateKbtz KbtzConf{kbtzName, kbtzStore, manOrSesh, res, startTime, bucket, env
     prefixes' = ufStream (prefixGen life inSet res startTime t0)
     nps = nodePrefixes kbtzName (mkNodeDirs kbtzStore) ns prefixes'
   void $ S.fold (inFrame kbtzStore writeParams)
-    $ S.fromAhead
+    $ S.fromWAsync
     $ S.map (fst)
     $ S.filter ((> 0) . snd)
     $ S.trace (pr . frameLog)
-    S.|$ dlFramesParFS parHow manOrSesh (bucket, env, t0) (getKbtzPath kbtzStore)
-    $ S.fromWAsync
+    $ dlFramesParFS parHow manOrSesh (bucket, env, t0) (getKbtzPath kbtzStore)
     $ S.map fst
     $ S.filter ((> 0) . snd)
     $ S.trace (pr . keyLog)
-    S.|$ getKeysUF env bucket nps (fileSaver Keys kbtzStore)
+    $ getKeysUF env bucket nps (fileSaver Keys kbtzStore)
   where
     inSet n = liftIO @m . atomically $ do
       s <- readTVar tNodes
@@ -581,7 +587,7 @@ inFrame store writeParams = FL.classifyWith (fst) ingestNode
           where
             tag = (tagger store $ n)
             nodeLines = (\(a, b) -> a <> b) . bimap (lineSensorR tag) (lineMesh tag)
-            nodeFold n' = (FL.partition sensorFold (meshFold n'))
+            nodeFold n' = (FL.partition (sensorFold undefined) (meshFold n'))
     readNP p = UF.many (UF.function (\n' -> getKbtzPath store Frames n' p)) File.read
     fl = lineFoldHttp 32 writeParams
 

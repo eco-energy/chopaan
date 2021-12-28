@@ -1,16 +1,27 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia #-}
 {-# LANGUAGE OverloadedStrings, OverloadedLists, TypeApplications, ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts, NamedFieldPuns #-}
+{-# LANGUAGE FlexibleContexts, NamedFieldPuns, TupleSections #-}
+{-# LANGUAGE DataKinds #-}
 module Chopaan.Kibbutz.FS where
 
 import GHC.Generics ( Generic )
 import GHC.IO.Unsafe ( unsafePerformIO )
+import Control.Monad
 import Control.Monad.IO.Class ( MonadIO, liftIO )
 import Control.Monad.Catch
+import qualified Control.Concurrent.STM as STM
+import Control.Applicative
+import ConCat.Misc
+import ConCat.Free.VectorSpace
 
-import qualified Data.Map.Strict as M
-import Data.Maybe ( isJust, fromJust )
+import Data.Monoid
+import Data.Function
+import Data.Incremental
+import Data.Maybe ( isJust, fromJust, fromMaybe )
 import Data.Word (Word8)
+import qualified Data.Map.Strict as M
+
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Codec.Winery as W
 import System.Directory
@@ -40,10 +51,10 @@ import Streamly.Internal.FileSystem.Event.Linux as Ev
       WhenExists(ReplaceIfExists),
       showEvent
     )
-import Streamly.Unicode.Stream (encodeUtf8)
+import Streamly.Unicode.Stream (encodeUtf8, decodeUtf8)
 import qualified Streamly.Binary as B
 
-import Chopaan.Kibbutz.KbtzId ( KbtzName(..) )
+import Chopaan.Kibbutz.KbtzId ( KbtzName, KbtzId(..) )
 import Chopaan.Node.NodeId
 import qualified Streamly.Internal.FileSystem.Event.Linux as Ev
 import Streamly.Internal.FileSystem.Event.Linux
@@ -80,35 +91,75 @@ type ArrPath = (Array.Array Word8)
 arrPath :: FilePath -> ArrPath
 arrPath = unsafePerformIO . (Array.fromStreamD . S.toStreamD  . encodeUtf8 @IO @S.SerialT . S.fromList)
 
+fromArrPath :: ArrPath -> FilePath
+fromArrPath = unsafePerformIO . S.toList . decodeUtf8 . Array.toStream
+
 
 kbtzimConf :: Ev.Config -> Ev.Config
 kbtzimConf = setAttrsModified Off
   . setRootPathEvents Off
-  . setRootMoved Off
+  . setRootMoved On
   . setRootDeleted On
   . setWhenExists ReplaceIfExists
   . setOnlyDir On
   . setOneShot Off
   . setUnwatchMoved On
   . setFollowSymLinks Off
-  . setRecursiveMode Off
+  . setRecursiveMode On
 
-watchForKbtzim :: FilePath -> S.SerialT IO Event 
-watchForKbtzim dir = S.concatM $ do
-  createDirectoryIfMissing True dir
-  return $ watchWith kbtzimConf [arrPath dir]  
+watchKbtzim' :: (MonadIO m) => FilePath -> S.SerialT m (Event) 
+watchKbtzim' dir = S.before (liftIO $ createDirectoryIfMissing True dir)
+  $ S.hoist liftIO
+  $ watchWith kbtzimConf [arrPath dir]  
 
-getKbtzAction :: Event -> Maybe KbtzEv
-getKbtzAction ev
-  | Ev.isCreated ev = Just (CreateKbtz (Ev.getAbsPath ev))
-  | Ev.isDeleted ev = Just (DeleteKbtz (Ev.getAbsPath ev))
+watchKbtzim :: (MonadIO m) => FilePath -> S.SerialT m (Either KbtzEv NodeEv) 
+watchKbtzim dir = S.catMaybes $ S.map (getEv) $ watchKbtzim' dir
+
+getEv :: Event -> Maybe (Either KbtzEv NodeEv)
+getEv ev = case (getKbtzEv ev) of
+  Just kv -> return $ Left kv
+  Nothing ->  case (getNodeEv ev) of
+    Just nv -> return $ Right nv
+    Nothing -> Nothing
+
+
+data KbtzEv = CreateKbtz ArrPath
+            | DeleteKbtz ArrPath
+  deriving (Eq, Ord, Show, Generic)
+
+runKbtzEv :: MonadIO m => KbtzEv -> m ()
+runKbtzEv (CreateKbtz f) = liftIO $ createDirectoryIfMissing True (fromArrPath f) 
+runKbtzEv (DeleteKbtz f) = liftIO $ removeDirectory (fromArrPath f)
+
+getKbtzEv :: Event -> Maybe KbtzEv
+getKbtzEv ev
+  | Ev.isDir ev && Ev.isCreated ev = Just (CreateKbtz (Ev.getRelPath ev))
+  | Ev.isDir ev && Ev.isDeleted ev = Just (DeleteKbtz (Ev.getRelPath ev))
   | otherwise = Nothing
 
-data KbtzEv = CreateKbtz ArrPath | DeleteKbtz ArrPath
+
+data NodeEv = CreateNode ArrPath KbtzName NodeIdx 
+            | ReadNode ArrPath KbtzName NodeIdx
+            | UpdateNode ArrPath KbtzName NodeIdx
+            | DeleteNode ArrPath KbtzName NodeIdx 
   deriving (Eq, Ord, Show, Generic)
 
-data NodeEv = CreateNode ArrPath | ReadNode ArrPath | UpdateNode ArrPath | DeleteNode ArrPath 
-  deriving (Eq, Ord, Show, Generic)
+toNodeIdx :: ArrPath -> Maybe (KbtzName, NodeIdx)
+toNodeIdx = undefined -- pure . fromArrPath
+
+toKbtzName :: ArrPath -> Maybe KbtzName
+toKbtzName = undefined
+
+getNodeEv :: Event -> Maybe NodeEv
+getNodeEv ev
+  | (not (Ev.isDir ev)) && (Ev.isCreated ev) = (uncurry (CreateNode p)) <$> getNode
+  | (not (Ev.isDir ev)) && (Ev.isAccessed ev) = (uncurry (ReadNode p)) <$> getNode
+  | (not (Ev.isDir ev)) && (Ev.isModified ev) = (uncurry (UpdateNode p)) <$> getNode
+  | (not (Ev.isDir ev)) && (Ev.isDeleted ev) = (uncurry (DeleteNode p)) <$> getNode
+  | otherwise = Nothing
+  where
+    p = Ev.getAbsPath $ ev
+    getNode = toNodeIdx . Ev.getRelPath $ ev
 
 data NodeModel = NodeModel
   { nodeIdx :: NodeIdx
@@ -118,63 +169,125 @@ data NodeModel = NodeModel
   , nodeOwner :: T.Text
   , connectionTo :: NodeIdx
   }
-  deriving (Eq, Show, Generic)
+  deriving (Show, Generic)
   deriving W.Serialise via (W.WineryRecord (NodeModel))
 
-type KbtzModel = AG.Graph Double NodeModel
+instance Eq NodeModel where
+  (==) = (==) `on` nodeIdx
 
-type Kbtzim = M.Map KbtzName KbtzModel 
+instance Ord NodeModel where
+  compare = compare `on` nodeIdx
+
+type KbtzModel = AG.Graph (Sum R) NodeModel
+
+
+updateNode :: NodeModel -> Unop KbtzModel
+updateNode v = AG.replaceVertex v v
+
+addNode :: KbtzModel -> NodeModel -> KbtzModel
+addNode k n = case findConn k of
+      Nothing -> AG.overlay k (AG.vertex n)
+      Just x -> AG.overlay k (AG.connect (Sum $ distanceTo x n) (AG.vertex x) (AG.vertex n)) 
+      where
+        findConn = hasV
+          . AG.induce (\n' -> (connectionTo n) == (nodeIdx n'))  
+        distanceTo :: NodeModel -> NodeModel -> Double
+        distanceTo = (dist `on` nodeLocation)
+          where
+            dist :: (R, R) -> (R, R) -> R
+            dist v v' = distSqr (toV v) (toV v')
+        hasV (AG.Vertex n') = Just n'
+        hasV AG.Empty = Nothing
+        hasV e =
+          error $ ("hasV is called after an inducement, it should not return: " <> (show e))
+
+type Kbtzim = M.Map KbtzName KbtzModel
+
+readDirFiles :: forall m a. (S.MonadAsync m, MonadCatch m, W.Serialise a)
+  => UF.Unfold m FilePath (Maybe (Either B.DecodeException a))
+readDirFiles = UF.mapM
+  (S.head . fmap (fmap B.fromWino) . B.decodeFile)
+  Dir.readFiles
 
 readKbtzDir :: forall m. (S.MonadAsync m, MonadCatch m)
   => UF.Unfold m FilePath (Maybe (Either B.DecodeException NodeModel))
-readKbtzDir = UF.mapM (S.head . fmap (fmap B.fromWino) . B.decodeFile) Dir.readFiles
+readKbtzDir = readDirFiles
 
-reportAndClean :: (Eq a, Show x, Show e, S.MonadAsync m)
+readChopaanDir :: forall m. (S.MonadAsync m, MonadCatch m)
+  => UF.Unfold m FilePath FilePath
+readChopaanDir = Dir.readFiles
+
+readNode :: forall m. (S.MonadAsync m, MonadCatch m)
+  => FilePath -> m (Maybe (Either B.DecodeException NodeModel))
+readNode = S.head . (fmap (fmap B.fromWino)) . B.decodeFile 
+
+logMaybeEither :: (Eq a, Show x, Show e, S.MonadAsync m)
   => UF.Unfold m x (Maybe (Either e a)) -> UF.Unfold m x a
-reportAndClean = UF.map fromJust . UF.filter isJust . UF.mapMWithInput report
+logMaybeEither = UF.map fromJust . UF.filter isJust . UF.mapMWithInput report
   where
-    report fp (Just (Right x)) = return (Just x)
+    report _ (Just (Right x)) = return (Just x)
     report fp (Just (Left x)) = do
       liftIO . print $ "decode error for Path: " <> (show fp) <> "\n" <> (show x)
       return Nothing
     report fp (Nothing) = do
       liftIO . print $ "Nothing decoded for Path: " <> (show fp)
       return Nothing
-      
+
 
 createKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => FilePath -> KbtzModel -> m ()
 createKbtz fp = B.encodeArray fp . B.toWino
 
-readKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => FilePath -> m (KbtzModel)
-readKbtz = UF.fold topologicalFold (reportAndClean readKbtzDir)
+readKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => FilePath -> m KbtzModel
+readKbtz = UF.fold topologicalFold (logMaybeEither readKbtzDir)
 
-readKbtzim = undefined
+deleteKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => KbtzName -> m ()
+deleteKbtz = undefined
 
-monitor :: (S.MonadAsync m, MonadCatch m) => FilePath -> m ()
-monitor fp = do
-  g <- readKbtzim
-  undefined
+readKbtzim :: forall m. (S.MonadAsync m, MonadCatch m) => FilePath -> m (Kbtzim)
+readKbtzim = UF.fold toMap $
+             (UF.mapMWithInput (\i d -> (convertFP i, ) <$> readKbtz d) readChopaanDir)
+  where
+    convertFP :: FilePath -> KbtzName
+    convertFP = KbtzId . T.pack
+    
+toMap :: (Monad m, Ord n) => FL.Fold m (n, a) (M.Map n a) 
+toMap = FL.foldl' (\m (n, a) -> M.insert n a m) mempty 
 
-onNodeEv :: FL.Fold m NodeEv KbtzModel
-onNodeEv = undefined
 
-onKbtzEv :: FL.Fold m KbtzEv Kbtzim
-onKbtzEv = undefined
+kbtzim :: forall m. (S.MonadAsync m, MonadCatch m)
+        => FilePath -> S.SerialT m Kbtzim
+kbtzim fp = S.scan (FL.foldlM' onEv (readKbtzim fp)) (watchKbtzim fp)
+
+onEv :: (S.MonadAsync m, MonadCatch m) => Kbtzim -> Either KbtzEv NodeEv -> m Kbtzim
+onEv k (Left kv) = onKbtzEv kv k 
+onEv k (Right nv) = onNodeEv nv k
 
 
+onNodeEv :: (S.MonadAsync m, MonadCatch m) => NodeEv -> Kbtzim -> m Kbtzim
+onNodeEv (CreateNode p k _) ks = upsertFS p k ks
+onNodeEv (ReadNode p k n) ks = pure ks
+onNodeEv (UpdateNode p k n) ks = upsertFS p k ks
+onNodeEv (DeleteNode p k n) ks = pure $
+  M.update (\g -> Just $ AG.removeVertex (NodeModel {nodeIdx = n}) g) k ks
+
+onKbtzEv :: (Applicative m) => KbtzEv -> Kbtzim -> m Kbtzim
+onKbtzEv (CreateKbtz p) ks = case (toKbtzName p) of
+  Nothing -> pure ks
+  Just k -> pure $ M.insert k AG.empty ks
+onKbtzEv (DeleteKbtz p) ks = case (toKbtzName p) of
+  Nothing -> pure ks
+  Just k -> pure $ M.delete k ks
 
 topologicalFold :: forall m. (S.MonadAsync m) => FL.Fold m NodeModel KbtzModel
-topologicalFold = FL.foldl' toG AG.empty
-  where
-    toG :: KbtzModel -> NodeModel -> KbtzModel
-    toG k n = case findConn k of
-      Nothing -> (AG.vertex n)
-      Just x -> AG.connect (distanceTo x n) (AG.vertex x) (AG.vertex n) 
-      where
-        findConn = hasV
-          . AG.induce (\n' -> (connectionTo n) == (nodeIdx n'))  
-        distanceTo = undefined
-        hasV (AG.Vertex n') = Just n'
-        hasV AG.Empty = Nothing
-        hasV e =
-          error $ ("hasV is called after an inducement, it should not return: " <> (show e))
+topologicalFold = FL.foldl' addNode AG.empty
+
+upsertFS :: (S.MonadAsync m, MonadCatch m) => ArrPath -> KbtzName -> Kbtzim -> m Kbtzim
+upsertFS p k ks = do
+  n' <- readNode (fromArrPath p)
+  case n' of
+    Nothing -> return $ ks
+    Just (Right n'') -> do
+      return $ M.update (Just . updateNode n'') k ks
+    Just (Left n'') -> do
+      liftIO . print $ "Parsing Error: " <> (show n'')
+      return $ ks

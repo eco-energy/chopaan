@@ -21,8 +21,9 @@
 
 module Main where
 
-import qualified Chopaan.Client as C
-import           Shpadoinkle.Run (runJSorWarp, live)
+--import qualified Chopaan.Client as C
+--import           Shpadoinkle.Run (runJSorWarp, live)
+import qualified Chopaan.Ui as Ui
 import GHC.Generics
 import Options.Applicative
 
@@ -46,6 +47,7 @@ options = info (parser <**> helper) $
 defCA = ClientArgs "localhost" 8080
 
 main :: IO ()
-main = do
-  c <- execParser options
-  runJSorWarp 8080 (C.frontend (serverHost c) (serverPort c))
+main = Ui.main
+  -- do
+  -- c <- execParser options
+  -- runJSorWarp 8080 (C.frontend (serverHost c) (serverPort c))

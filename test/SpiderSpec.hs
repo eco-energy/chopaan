@@ -93,7 +93,7 @@ foldSpec = do
         tf = sampleStream $ S.postscan timeFold es
         pf = sampleStream $ S.postscan powerFold es
         ef = sampleStream $ S.postscan energyFold es
-        bf = sampleStream $ S.postscan (batteryFold defBatteryParams) es
+        bf = sampleStream $ S.postscan (batteryFold undefined defBatteryParams) es
         df = sampleStream $ S.postscan demandFold es
         lc f = do
           l <- S.length $ f
@@ -107,7 +107,7 @@ foldSpec = do
       ns <- liftIO $ arbs @NodeMAC nNodes
       l <- S.length
            $ S.tapRate 1 (\r -> liftIO $ print ("sensorFold rate: " <> (show r)))
-           $ (sampleStream $ S.postscan (FL.classify sensorFold) (esStreams nMessages nNodes ns))
+           $ (sampleStream $ S.postscan (FL.classify (sensorFold undefined)) (esStreams nMessages nNodes ns))
       l `shouldBe` (nMessages * nNodes)
       
 
@@ -121,7 +121,7 @@ kbtzSpec = do
       qs <- initQs
       k <- S.hoist (runGraphWithDB db) <$> (runGraphWithDB db $ do
         runKibbutz KbtzC { name = kId
-                         , nodes = ns
+                         , structure = undefined
                          , channelOpts = (Right qs)
                          , s3Opts = Nothing
                          , influxCon = ic

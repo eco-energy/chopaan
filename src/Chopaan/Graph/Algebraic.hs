@@ -17,6 +17,7 @@ import Chopaan.Graph.Snapshot
       SnapshotGraph )
 -- import Shpadoinkle.Widgets.Types (Humanize)
 import  Algebra.Graph.Labelled as AG
+import  Algebra.Graph.Label
 import qualified Algebra.Graph as G
 
 
@@ -40,6 +41,10 @@ deriving instance Traversable (AG.Graph a)
 deriving instance (FromJSON e, FromJSON a) => FromJSON (AG.Graph e a)
 deriving instance (ToJSON e, ToJSON a) => ToJSON (AG.Graph e a)
 deriving via (W.WineryVariant (AG.Graph e a)) instance (W.Serialise e, W.Serialise a) => W.Serialise (AG.Graph e a)
+
+--deriving instance Generic (Distance a)
+--deriving via (W.WineryRecord (NonNegative a)) instance (W.Serialise a) => W.Serialise (NonNegative a)
+--deriving via (W.WineryVariant (Distance a)) instance (W.Serialise a) => W.Serialise (Distance a)
 
 
 newtype Gr flow state = Gr { unGr :: (AG.Graph flow state) }

@@ -44,6 +44,8 @@ import Chopaan.Node.NodeSensors
 import Chopaan.Node.Metrics
 import Chopaan.Node.Storage.Battery
 import Chopaan.Node.Mesh
+import Chopaan.Kibbutz.Transactor.Stake
+import Chopaan.Kibbutz.Transactor.Status
 import Chopaan.Kibbutz.Transactor
 import Chopaan.Comm.S3
 import qualified Chopaan.Node.HW as HW

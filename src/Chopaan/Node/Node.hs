@@ -16,7 +16,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Chopaan.Node.Node (
   -- scans
-  nodeS, SensorR, energyS, powerS, timeS
+  SensorR 
+--  nodeS, energyS, powerS, timeS
   -- folds
   , sensorFold, energyFold, powerFold, timeFold
   ) where
@@ -38,19 +39,19 @@ import Chopaan.Node.Metrics
 ---------------------------------------------------------------------------------------------------------------}
 
 
-powerS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m PowerNR
-powerS = S.postscan powerFold
-{-# INLINE powerS #-}
+-- powerS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m PowerNR
+-- powerS = S.postscan powerFold
+-- {-# INLINE powerS #-}
 
 
-energyS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m EnergyNR
-energyS = S.postscan energyFold
-{-# INLINE energyS #-}
+-- energyS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m EnergyNR
+-- energyS = S.postscan energyFold
+-- {-# INLINE energyS #-}
 
-nodeS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m SensorR
-nodeS = S.postscan sensorFold
-{-# INLINE nodeS #-}
+-- nodeS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m SensorR
+-- nodeS = S.postscan sensorFold
+-- {-# INLINE nodeS #-}
 
-timeS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
-timeS = S.postscan timeFold
-{-# INLINE timeS #-}
+-- timeS :: (MonadSample m, MonadAsync m, IsStream t) => t m EnergyState -> t m Timestamp
+-- timeS = S.postscan timeFold
+-- {-# INLINE timeS #-}

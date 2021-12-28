@@ -240,6 +240,17 @@ packages:
     git: https://github.com/faezs/net-spider.git
     commit: 831f10df821a299e6a79331dee8931e517bdffd4
 - completed:
+    name: quickcheck-state-machine
+    version: 0.7.1
+    git: https://github.com/stevana/quickcheck-state-machine.git
+    pantry-tree:
+      size: 5413
+      sha256: 1ccd79dba7f6e3e2774bbebe28e05fa548e89687257855864ec075d3b860a688
+    commit: cb5f0d8d4ff53ac1cdfa901f8f3fb6e568685433
+  original:
+    git: https://github.com/stevana/quickcheck-state-machine.git
+    commit: cb5f0d8d4ff53ac1cdfa901f8f3fb6e568685433
+- completed:
     hackage: aeson-1.5.6.0@sha256:72c170b9fa0a4d1eaf47098902c621d0d95331cda1ebc4d86582bd557756b3ff,6791
     pantry-tree:
       size: 37981
@@ -905,13 +916,6 @@ packages:
   original:
     hackage: generic-lens-core-2.2.0.0@sha256:b6b69e992f15fa80001de737f41f2123059011a1163d6c8941ce2e3ab44f8c03,2913
 - completed:
-    hackage: dear-imgui-1.2.2@sha256:15bebd870853e375840d18f4f9ee54c67328601a749f5a2214d7a197b294fbad,6942
-    pantry-tree:
-      size: 4927
-      sha256: 632df02d727c9fc2685842e92d3a34ec8108611ae7943d9c27f06719d8c4d5e1
-  original:
-    hackage: dear-imgui-1.2.2@sha256:15bebd870853e375840d18f4f9ee54c67328601a749f5a2214d7a197b294fbad,6942
-- completed:
     hackage: fast-builder-0.1.3.0@sha256:301a50188856ee88706c432c7d5c8c20f744a64a3cbf00346b8c84015c5ecac4,2802
     pantry-tree:
       size: 986
@@ -981,6 +985,27 @@ packages:
       sha256: a037ef16fed5785e57d68a83721fa2b0cfc47ce8ed7a128be0149455797c2d76
   original:
     hackage: rel8-1.2.0.0@sha256:d540fbfb967bf7eed23a1e7df24ef17424ed25575ab05a86a2cf213b2e6d6940,5045
+- completed:
+    hackage: markov-chain-usage-model-0.0.0@sha256:1afa95faeb9213c4d960a669190078b41b89169462b8edd910472980671ba8c0,2112
+    pantry-tree:
+      size: 432
+      sha256: 6871bd9281acf589296d0998a3d62892b036040ab10e74e8a0f356f68c194f4f
+  original:
+    hackage: markov-chain-usage-model-0.0.0@sha256:1afa95faeb9213c4d960a669190078b41b89169462b8edd910472980671ba8c0
+- completed:
+    hackage: incremental-0.3.1@sha256:9c697bae4f7e5ceb144bde13e03ca2f36b4bc2d0c92bbc02e0a604231ee279c2,1153
+    pantry-tree:
+      size: 370
+      sha256: fd5f40352dbf1602babd2c5db2a120c26e57bbd5ad30b19ce24d04189f6a18d1
+  original:
+    hackage: incremental-0.3.1@sha256:9c697bae4f7e5ceb144bde13e03ca2f36b4bc2d0c92bbc02e0a604231ee279c2,1153
+- completed:
+    hackage: dear-imgui-1.3.0@sha256:f92f7b28aa8bff6912446f52292f46c5bb73b708015359be979d22e00cfd5655,7274
+    pantry-tree:
+      size: 5275
+      sha256: 52af6902429a10db0d11e6a62df425a0814f933984cf041e1d40d2dcad86f030
+  original:
+    hackage: dear-imgui-1.3.0@sha256:f92f7b28aa8bff6912446f52292f46c5bb73b708015359be979d22e00cfd5655,7274
 snapshots:
 - completed:
     size: 586286

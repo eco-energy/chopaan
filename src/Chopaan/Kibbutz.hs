@@ -190,7 +190,7 @@ runKibbutz kc@KbtzC{name, structure, channelOpts, influxCon} = do
                 --   $ plan
                 --  $ S.map (second Tx)
                 $ S.tap (FL.lmap glS sLineF)
-                $ gridSensorR nodes
+                $ gridSensorR structure
                 $ S.tapRate 60 (\x -> liftIO . print $ "Grid Incoming Rate: " <> show x) s
     processRS s = S.tapRate 10 (\x -> liftIO . print $ "Mesh Processed Rate: " <> show x)
                 $ S.tap mLineF -- meshFold)
@@ -228,9 +228,11 @@ runKibbutz kc@KbtzC{name, structure, channelOpts, influxCon} = do
     -- {-# INLINE getLatest #-}
     horizon = 10 * 60
     {-# INLINE horizon #-}
-    gridSensorR :: (KbtzConn t m n) => [n] -> t m (n, EnergyState) -> t m (n, M.Map n SensorR)
-    gridSensorR ns s = S.map (first fromJust)
-                       . S.filter (isJust . fst)
-                       . S.postscan (FL.tee (FL.foldl' ((const (Just . fst))) Nothing)
-                                     (FL.demux $ fmap sensorFold (nodeHWs structure))) $ s
-    {-# INLINE gridSensorR #-}
+
+
+gridSensorR :: (KbtzConn t m n) => KbtzG n -> t m (n, EnergyState) -> t m (n, M.Map n SensorR)
+gridSensorR structure = S.map (first fromJust)
+                        . S.filter (isJust . fst)
+                        . S.postscan (FL.tee (FL.foldl' ((const (Just . fst))) Nothing)
+                                       (FL.demux $ fmap sensorFold (nodeHWs structure)))
+{-# INLINE gridSensorR #-}

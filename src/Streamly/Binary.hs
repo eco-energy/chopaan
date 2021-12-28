@@ -235,7 +235,6 @@ decodeFile :: forall t m a. (HasEncoding a, IsStream t, MonadAsync m, MonadCatch
   => FilePath -> t m (Either DecodeException a)
 decodeFile f = S.concatM $ do
   exists <- liftIO $ doesFileExist f
-  --fSize <- liftIO $ fileSize <$> (getFileStatus f)
   case (exists) of
     True -> return $ S.mapM (pure . decodeA) . (S.parseManyD (chunkBytes @a)) . File.toBytes $ f
     False -> return $ S.fromPure (Left NoFile)

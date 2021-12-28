@@ -3,8 +3,6 @@ module Chopaan where
 
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Chopaan.Kibbutz
-    ( KbtzC(KbtzC, name, nodes, channelOpts, s3Opts, influxCon),
-      runKibbutz )
 import Chopaan.Hydrate ( hConfDef, mkTKbtz, runHydration )
 import Chopaan.Kibbutz.KbtzId ( KbtzId(KbtzId) )
 import Chopaan.Node.NodeId ( NodeId(NodeId), NodeMAC )
@@ -71,7 +69,7 @@ runKbtzim mq hydrationOpts influxCon = do
       addzim [deployKbtz]
     False -> getKNs
   kbtzim <- liftIO . atomically $ mkTKbtz kns
-  let confss = S.fromList $ fmap sConf $ M.toList kns
+  let confss = S.fromList $ fmap sConf $ fmap undefined $ M.toList kns
       s3Hydration = S.fromEffect ((pure . (const True)) =<< (runHydration influxCon hConfDef kbtzim))
       mqttStream = S.map (const True)
         $ S.concatMapWith S.parallel (S.concatM . runKibbutz @t) confss
@@ -79,7 +77,7 @@ runKbtzim mq hydrationOpts influxCon = do
   where 
     deployKbtz = (KbtzId "Bismillah_Mor", fmap fst deployNodes)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
-                          , nodes = ns
+                          , structure = ns
                           , channelOpts = Left mq
                           , s3Opts = Just (BucketName (s3BucketName hydrationOpts))
                           , influxCon = influxCon

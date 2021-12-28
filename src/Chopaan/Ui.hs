@@ -32,7 +32,7 @@ main = do
     _ <- managed_ $ bracket_ (sdl2InitForOpenGL window glContext) sdl2Shutdown
     _ <- managed_ $ bracket_ openGL2Init openGL2Shutdown
     fonts <- fontSet
-    s = S.nil
+    let s = S.nil
     liftIO $ mainLoop window (act (largeFont fonts) s)
   where
     config = defaultWindow

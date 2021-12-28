@@ -153,8 +153,12 @@ dependencies:
 - http-types
 - cas-store >= 1.1.0
 - cas-hashable
-- dear-imgui
+- dear-imgui >= 1.3.0
+- sdl2
+- gl
+- managed
 - rel8
+- incremental
 when:
   - condition: flag(prod)
     then:
@@ -233,17 +237,17 @@ executables:
   #               - -fdicts-strict
   #               - -O1
   #               - -threaded 
-  # ui:
-  #   main:                Ui.hs
-  #   other-modules: []
-  #   source-dirs:         app
-  #   dependencies:
-  #     - chopaan
-  #     - optparse-simple
-  #     - base
-  #   ghc-options:
-  #     - -threaded
-  #     - -O1
+  ui:
+    main:                Ui.hs
+    other-modules: []
+    source-dirs:         app
+    dependencies:
+      - chopaan
+      - optparse-simple
+      - base
+    ghc-options:
+      - -threaded
+      - -O1
 
   dashgen:
     main:                DashGen.hs
@@ -353,6 +357,7 @@ tests:
           - checkers
           - quickspec
           - quickcheck-instances
+          - quickcheck-state-machine
           - generic-arbitrary
           - proto-lens-arbitrary
           - proto-lens-arbitrary
