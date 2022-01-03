@@ -31,9 +31,9 @@ main = do
     _ <- managed $ bracket createContext destroyContext
     _ <- managed_ $ bracket_ (sdl2InitForOpenGL window glContext) sdl2Shutdown
     _ <- managed_ $ bracket_ openGL2Init openGL2Shutdown
-    fonts <- fontSet
-    let s = S.nil
-    liftIO $ mainLoop window (act (largeFont fonts) s)
+    --fonts <- fontSet
+    --let s = S.nil
+    liftIO $ mainLoop window -- (largeFont fonts)) --s)
   where
     config = defaultWindow
       { windowGraphicsContext = OpenGLContext defaultOpenGL
@@ -42,14 +42,15 @@ main = do
       , windowInitialSize = pure 1024
       }
       
-act :: Font -> S.SerialT IO K.Kbtzim -> IO ()
-act font ts = withWindowOpen "Hello, Chopaan!" $ do
-  withFont font $ do
-    text "Hello, Chopaan!"
-    button "Click-ity" >>= \case
-      False -> return ()
-      True -> putStrLn "Ow!"
-    --showDemoWindow
+act :: IO ()
+act = do
+  withWindowOpen "Hello, Chopaan!" $ do
+    --withFont font $ do
+      text "Hello, Chopaan!"
+      
+      button "Click-ity" >>= \case
+        False -> return ()
+        True -> putStrLn "Ow!"
 
 data FontSet a = FontSet
   { largeFont :: a
@@ -62,19 +63,19 @@ fontSet = FontAtlas.rebuild FontSet
   , defaultFont = FontAtlas.DefaultFont 
   } 
 
-mainLoop :: Window -> IO () -> IO ()
-mainLoop window frameAction = loop
+mainLoop :: Window -> IO ()
+mainLoop window = unlessQuit $ do
+  openGL2NewFrame
+  sdl2NewFrame
+  newFrame
+  act
+  showDemoWindow
+  glClear GL_COLOR_BUFFER_BIT
+  render
+  openGL2RenderDrawData =<< getDrawData
+  glSwapWindow window
+  mainLoop window
   where
-    loop = unlessQuit $ do
-      openGL2NewFrame
-      sdl2NewFrame
-      newFrame
-      frameAction
-      glClear GL_COLOR_BUFFER_BIT
-      render
-      openGL2RenderDrawData =<< getDrawData
-      glSwapWindow window
-      loop
     unlessQuit action = do
       shouldQuit <- checkEvents
       if shouldQuit then pure () else action

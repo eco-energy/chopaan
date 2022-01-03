@@ -145,6 +145,9 @@ almostEqual :: (Show a, Eq a, Num a, Ord a) => a -> a -> a -> Expectation
 almostEqual eta a b = do
   ((abs $ a - b) < eta) `shouldBe` True
 
+instance (Arbitrary a) => Arbitrary (KbtzId a) where
+  arbitrary = KbtzId <$> arbitrary
+
 instance Arbitrary Prefix where
   arbitrary = (pure . Prefix . getPositive) =<< arbitrary
 

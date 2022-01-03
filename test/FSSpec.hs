@@ -1,41 +1,74 @@
+{-# LANGUAGE OverloadedStrings, StandaloneDeriving, DeriveAnyClass, FlexibleInstances, TypeSynonymInstances #-}
 module FSSpec where
 
 import Test.Hspec
+import Test.Hspec.QuickCheck
 import Test.QuickCheck
-import Test.QuickCheck
+import Test.QuickCheck.State
+import Test.QuickCheck.Arbitrary.Generic
 
+import Data.Bifunctor
+import qualified Data.Map.Strict as M
+import Common
+
+import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.FS
+import Chopaan.Node.NodeId
+import Chopaan.Node.HW
+import Chopaan.Node.Components
+import qualified Chopaan.Graph.Algebraic as AG
 import Data.IORef
+import qualified Data.Text as Text
 
--- data Command r
---   = Create
---   | Read (Reference (Opaque (IORef Int)) r)
---   | Write (Reference (Opaque (IORef Int)) r) Int
---   | Increment (Reference (Opaque (IORef Int)) r)
+instance Arbitrary (Tag KbtzName) where
+  arbitrary = (Tag . KbtzId . Text.pack . getPrintableString) <$> arbitrary
 
--- data Response r
---   = Created (Reference (Opaque (IORef Int)) r)
---   | ReadValue Int
---   | Written
---   | Incremented
+instance Arbitrary (Tag NodeIdx) where
+  arbitrary = (Tag . NodeId . getPositive) <$> arbitrary
 
--- data Bug = None | Logic | Race
---   deriving Eq
+instance Arbitrary (NodeIdx) where
+  arbitrary = (NodeId . getPositive) <$> arbitrary
 
--- semantics :: Bug -> Command Concrete -> IO (Response Concrete)
--- semantics bug cmd = case cmd of
---   Create -> Created <$> (reference . Opaque <$> newIORef 0)
---   Read ref -> ReadValue <$> readIORef (opaque ref)
---   Write ref i -> Written <@ writeIORef (opaque ref) i'
---     where
---       i' | bug == Logi && i `elem` [5..10] = i + 1
---          | otherwise = i
---   Increment ref -> do
---     if bug == Race
---     then do
---       i <- readIOref (opaque ref)
---       threadDelay =<< randomRIO (0, 5000)
---       writeIORef (opaque ref) (i + 1)
---     else
---       atomicModifyIORef' (opaque ref) (\i -> (i + 1, ()))
---     return Incremented
+instance Arbitrary KbtzEv where
+  arbitrary = genericArbitrary 
+
+instance (Arbitrary e, Arbitrary v) => Arbitrary (AG.Graph e v) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (Ownership a) where
+  arbitrary = genericArbitrary
+
+instance Arbitrary (NodeModel) where
+  arbitrary = genericArbitrary
+
+instance Arbitrary BatteryType where
+  arbitrary = genericArbitrary
+  
+instance (Arbitrary a) => Arbitrary (BatteryConf a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (BatteryTop a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (LoadConf a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (LoadTop a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (PVConf a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (PVTop a) where
+  arbitrary = genericArbitrary
+
+
+instance Arbitrary (HW Double) where
+  arbitrary = genericArbitrary
+
+spec :: Spec
+spec = do
+  describe "Kbtz Creation-Deletion events" $ do
+    prop "CreateKbtz event adds an empty graph to map" $ \ev ks -> do
+      let k' = onKbtzEv ev (M.mapKeys unTag ks)
+      1 `shouldBe` 0

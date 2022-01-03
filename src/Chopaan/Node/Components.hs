@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeOperators, DeriveGeneric, DeriveAnyClass, DeriveFunctor, DeriveFoldable, OverloadedStrings, DerivingVia, DerivingStrategies, FlexibleInstances, OverloadedStrings, ScopedTypeVariables, FlexibleContexts, DeriveTraversable, TypeApplications, CPP #-}
+{-# LANGUAGE GADTs, DeriveGeneric, DeriveAnyClass, OverloadedStrings, DerivingVia, FlexibleInstances, ScopedTypeVariables, FlexibleContexts, DeriveTraversable, CPP #-}
 
 module Chopaan.Node.Components where
 
@@ -7,16 +7,20 @@ import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON(..), FromJSON(..))
 import qualified Data.Text as T
 
--- import Shpadoinkle.Widgets.Types (Humanize(..), Present)
 
 import Data.Greskell.GraphSON.GValue (unwrapOne, unwrapAll)
 
 import Data.Greskell (FromGraphSON(..), Key(..))
 import Chopaan.Graph.Greskell
+    ( GreskellC,
+      parseUnwrapTraversable,
+      wineryJSONRead,
+      wineryJSONWrite,
+      wineryJSONEncode )
 
-#ifndef ghcjs_HOST_OS
+
 import NetSpider.Graph (NodeAttributes(..), VFoundNode)
-#endif
+
 
 import Data.Greskell.Extra (writeKeyValues, (<=:>), pMapToFail, lookupAs)
 import qualified Codec.Winery as W
@@ -49,7 +53,7 @@ data BatteryConf a = BatteryConf
 instance (GreskellC a, Num a) => FromGraphSON (BatteryConf a) where
   parseGraphSON = parseUnwrapTraversable
 
-#ifndef ghcjs_HOST_OS
+
 minVKey :: (GreskellC a, Num a) => Key VFoundNode a
 minVKey = "minV"
 maxVKey :: (GreskellC a, Num a) => Key VFoundNode a
@@ -60,7 +64,7 @@ batTypeKey :: (GreskellC a) => Key VFoundNode a
 batTypeKey = "batType"
 
 instance (GreskellC a, Num a) => NodeAttributes (BatteryConf a) where
-  writeNodeAttributes bc = fmap writeKeyValues $ sequence $
+  writeNodeAttributes bc = writeKeyValues <$> sequence
     [ minVKey <=:> minV bc
     , maxVKey <=:> maxV bc
     , capacityAHKey <=:> capacityAH bc
@@ -72,7 +76,7 @@ instance (GreskellC a, Num a) => NodeAttributes (BatteryConf a) where
                                           <*> lookupAs capacityAHKey props
                                           <*> lookupAs batTypeKey props
                                          )
-#endif
+
 
 defBC :: Num a => BatteryConf a
 defBC = BatteryConf 0 0 0 LeadAcidFlooded
@@ -109,9 +113,9 @@ data Battery a where
 
 
 runBB :: (Fractional a) => Battery a -> VI a -> VI a
-runBB (ParB a b) (v , i) = combinePar (runBB a (v , (i/2))) (runBB b (v , (i/2)))
+runBB (ParB a b) (v , i) = combinePar (runBB a (v , i/2)) (runBB b (v , i/2))
 runBB (SeqB a b) (v , i) = combineSeq (runBB a (v/2 , i)) (runBB b (v/2 , i))
-runBB (ABattery bConf evolve) vi = evolve bConf vi 
+runBB (ABattery bConf evolve) vi = evolve bConf vi
 
 combinePar :: VI a -> VI a -> VI a
 combinePar = undefined
@@ -151,9 +155,11 @@ instance (W.Serialise a) => FromJSON (PVTop a) where
 
 instance (GreskellC a, Num a) => FromGraphSON (PVTop a) where
   parseGraphSON = parseJSON . unwrapAll
-    
 
-data PVEnv a = PVEnv deriving (Eq, Ord, Show, Read, Generic, W.Serialise, NFData)
+
+data PVEnv a = PVEnv
+  deriving (Eq, Ord, Show, Read, Generic, NFData)
+  deriving (W.Serialise) via (W.WineryVariant (PVEnv a))
 
 type EvolvePV a = (PVConf a -> PVEnv a -> VI a)
 
@@ -173,7 +179,7 @@ runPV (APV bConf evolve) p = evolve bConf p
 
 data LoadConf a = LoadConf
   { loadPower :: a
-  , loadName :: T.Text
+  -- , loadName :: T.Text
   }
   deriving (Eq, Ord, Show, Read, Generic, NFData, ToJSON, FromJSON, Functor, Foldable, Traversable)
   deriving W.Serialise via (W.WineryRecord (LoadConf a))
@@ -181,10 +187,10 @@ data LoadConf a = LoadConf
 
 instance (GreskellC a, Num a) => FromGraphSON (LoadConf a) where
   parseGraphSON = parseUnwrapTraversable
-  
+
 
 defLC :: Num a => LoadConf a
-defLC = LoadConf 0 "No_LC"
+defLC = LoadConf 0 -- "No_LC"
 
 data Load a where
   ParLoad :: Load a -> Load a -> Load a

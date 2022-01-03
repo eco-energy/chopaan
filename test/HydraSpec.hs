@@ -130,8 +130,8 @@ prefixGenSpec = describe "Prefix Generation Invariants for Infinite and finite s
     
 controlSpec :: Spec
 controlSpec = parallel $ describe "State Management" $ do
-  let ks = (KbtzId . T.pack . (pure @[])) <$> ['a'..'d']
-      ns = (NodeId . T.pack . show) <$> [1..12]
+  let ks = KbtzId . T.pack . pure @[] <$> ['a'..'d']
+      ns = NodeId . T.pack . show <$> [1..12]
       kns = fst $ foldr zop ([], ns) ks
         where
           zop :: k -> ([(k, [n])], [n]) -> ([(k, [n])], [n]) 

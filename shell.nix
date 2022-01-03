@@ -40,7 +40,12 @@ chopaanHaskellPackages.shellFor {
 
     # Some you may need to get some other way.
     buildInputs = with pkgs;
-      [ haskellPackages.ghcid pkgs.protobuf pkgs.postgresql pkgs.bazel pkgs.python3 ];
+      [ haskellPackages.ghcid
+        pkgs.protobuf
+        pkgs.postgresql
+        pkgs.bazel
+        pkgs.python3
+      ];
 
     # Prevents cabal from choosing alternate plans, so that
     # *all* dependencies are provided by Nix.
