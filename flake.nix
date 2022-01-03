@@ -1,17 +1,28 @@
 { description = "Chopaan";
   inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
-  inputs.nixpkgs.follows = "haskellNix/nixpkgs-unstable";
+  inputs.nixpkgs.follows = "haskellNix/nixpkgs-2111";
   inputs.flake-utils.url = "github:numtide/flake-utils";
   outputs = { self, nixpkgs, flake-utils, haskellNix }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "x86_64-darwin" ] (system:
       let
+        # cleanGitHaskell = {src, name } :
+        #   let
+        #     clean = haskellNix.lib.haskellLib.cleanGit {
+        #       name = "${name}-gitClean"; inherit src;
+        #     };
+        #   in
+        #     clean {};
 
+            # nixpkgs.pkgs.haskell-nix.cleanSourceHaskell {
+            #   inherit name;
+            #   src = clean;
+            # };
       overlays = [ haskellNix.overlay
         (final: prev: {
           # This overlay adds our project to pkgs
           chopaanProject =
             final.haskell-nix.project' {
-              src = ./.;
+              src = ./.; # cleanGitHaskell { name="chopaan"; src = ./.; };
               name = "chopaan";
               #stack-sha256 = "07xcy5j2qir1pnp2g2bznd21z1dfcmv860rzd7nd0iy061iwdi15";
               #materialized = ./chopaan.materialized;
@@ -28,28 +39,16 @@
               # This is used by `nix develop .` to open a shell for use with
               # `cabal`, `hlint` and `haskell-language-server`
               shell.tools = {
-                cabal =
-                  { version = "3.2.0.0";
-                    index-state = "2021-12-02T00:00:00Z";
-                    plan-sha256 = "1l3561ifzhz25i2izivv89lqb1ya1rl2qnxa5hgy75xqaj8bxdaq";
-                    materialized = ./nix/materialized/cabal;
-                    checkMaterialization = true;
-                  };
+                cabal = { };
                 #hlint = {};
-                haskell-language-server =
-                  { version = "latest";
-                    index-state = "2021-12-02T00:00:00Z";
-                    plan-sha256 = "1gjx7xi508yn2lrwl7ic1pnyhxzl38ylzy5v9pi9v2q8a6vxi3dd";
-                    materialized = ./nix/materialized/hls;
-                    checkMaterialization = true;
-                  };
+                haskell-language-server = { };
               };
               # Non-Haskell shell tools go here
               shell.buildInputs = with pkgs; [
                 nixpkgs-fmt
               ];
               # This adds `js-unknown-ghcjs-cabal` to the shell.
-              #shell.crossPlatform = p: [p.ghcjs];
+              shell.crossPlatform = p: [p.ghcjs];
             };
         })
       ];
