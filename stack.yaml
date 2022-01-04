@@ -36,7 +36,7 @@ packages:
 #
 extra-deps:
  - git: https://github.com/faezs/concat.git
-   commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+   commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
    subdirs:
      - inline
      - known
@@ -46,7 +46,7 @@ extra-deps:
      - examples
      - graphics
      - hardware
-   # nix-sha256 1pn2p63j41nqmfzy98ha69mjzkvbhdjiyjxmzv8hpalhcpyvwzbb
+   # nix-sha256 0sskvx1qsmxb5m6h5514g42p3p4fxw99n6rdcas206halzc91601
  - git: https://github.com/composewell/streamly.git
    commit: a0206907dab8cf2d5d339e794bd4d61bba37a634
    # nix-sha256 00hcmwvif4ibbjx0l3n6p998v2857kfsy7mia8wslsk2j668h3s8

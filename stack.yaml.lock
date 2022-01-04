@@ -11,12 +11,12 @@ packages:
     git: https://github.com/faezs/concat.git
     pantry-tree:
       size: 319
-      sha256: 54fc1efd925d33e67eddaf121419ebd59f15b775c84d8e381a58832f17680fda
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+      sha256: 2ef3f0e185dd5d497ad326546cf583d385819c498044bf08124c54203608dd90
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
   original:
     subdir: inline
     git: https://github.com/faezs/concat.git
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
 - completed:
     subdir: known
     name: concat-known
@@ -25,11 +25,11 @@ packages:
     pantry-tree:
       size: 168
       sha256: 32bfd2141c47e73bb9f7caea8866a62490913cea7c48eced10dc77f547cec134
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
   original:
     subdir: known
     git: https://github.com/faezs/concat.git
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
 - completed:
     subdir: satisfy
     name: concat-satisfy
@@ -38,11 +38,11 @@ packages:
     pantry-tree:
       size: 374
       sha256: 11c157d06988fb02b9201518b3326c1e6cc4f749489c7a909adc538e990c024b
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
   original:
     subdir: satisfy
     git: https://github.com/faezs/concat.git
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
 - completed:
     subdir: classes
     name: concat-classes
@@ -51,11 +51,11 @@ packages:
     pantry-tree:
       size: 1124
       sha256: 53eae1825cddfc0ab80b3bbf29c4738333d44b110294fe5bde7cbf9ab49cb155
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
   original:
     subdir: classes
     git: https://github.com/faezs/concat.git
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
 - completed:
     subdir: plugin
     name: concat-plugin
@@ -63,25 +63,25 @@ packages:
     git: https://github.com/faezs/concat.git
     pantry-tree:
       size: 460
-      sha256: e3204e7c4836a67fdda7bc7068349516ceeef06e3d0544d76411bb26f4b59c1e
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+      sha256: 90ff57bcf73005a87230ac4f7b09a17ad2ecf6f9edfb18651bd20ce94cb1ea3c
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
   original:
     subdir: plugin
     git: https://github.com/faezs/concat.git
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
 - completed:
     subdir: examples
     name: concat-examples
     version: 0.3.0.0
     git: https://github.com/faezs/concat.git
     pantry-tree:
-      size: 9680
-      sha256: 85ac4382bc30330bf1eae4accf6960c5fe68f712974c2f8fe2c5687e9f837520
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+      size: 9738
+      sha256: 182a38765f5731434f56630b3d3ee6425d2a156328a41382dd808683d22d9635
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
   original:
     subdir: examples
     git: https://github.com/faezs/concat.git
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
 - completed:
     subdir: graphics
     name: concat-graphics
@@ -89,12 +89,12 @@ packages:
     git: https://github.com/faezs/concat.git
     pantry-tree:
       size: 641
-      sha256: 926213faef4933b190d0c911bf73ad4bf1959847a405dbcb8fdb1dfddf903a27
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+      sha256: 72e91483fb2083c600d0828f16eea78e3a7b80e4df75839a576d6b87db7f7499
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
   original:
     subdir: graphics
     git: https://github.com/faezs/concat.git
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
 - completed:
     subdir: hardware
     name: concat-hardware
@@ -103,11 +103,11 @@ packages:
     pantry-tree:
       size: 500
       sha256: a638206be5f573f7d82af885831d89a52ed324d3f63223ae5e529e585e004c43
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
   original:
     subdir: hardware
     git: https://github.com/faezs/concat.git
-    commit: 5dd50143472dd66634ab6111b3bfce9dd132f5e9
+    commit: 21723a1d6212f9f0cbb4fd54b62e324e3b3b63c5
 - completed:
     name: streamly
     version: 0.8.1
