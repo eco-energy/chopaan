@@ -1,10 +1,15 @@
-{-# LANGUAGE TypeApplications, ScopedTypeVariables, RecordWildCards, FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE TypeApplications, ScopedTypeVariables, RecordWildCards, FlexibleContexts, OverloadedStrings, ConstraintKinds #-}
 module Chopaan where
 
+import Control.Applicative
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
+
+
 import Chopaan.Kibbutz
+import Chopaan.Hydration.Prefix
 import Chopaan.Hydrate ( hConfDef, mkTKbtz, runHydration )
 import Chopaan.Kibbutz.KbtzId ( KbtzId(KbtzId) )
+import Chopaan.Kibbutz.FS
 import Chopaan.Node.NodeId ( NodeId(NodeId), NodeMAC )
 import Chopaan.API.History ()
 import Chopaan.Types
@@ -50,6 +55,10 @@ import RIO
       atomically )
 import qualified Data.Time as Ti
 
+import ConCat.Graphics.Image
+import ConCat.Graphics.Color
+import ConCat.Synchronous
+import Chopaan.Ui
 
 type KbtzM = ReaderT (MQTTOpts) GraphM
 
@@ -70,10 +79,11 @@ runKbtzim mq hydrationOpts influxCon = do
     False -> getKNs
   kbtzim <- liftIO . atomically $ mkTKbtz kns
   let confss = S.fromList $ fmap sConf $ fmap undefined $ M.toList kns
-      s3Hydration = S.fromEffect ((pure . (const True)) =<< (runHydration influxCon hConfDef kbtzim))
-      mqttStream = S.map (const True)
-        $ S.concatMapWith S.parallel (S.concatM . runKibbutz @t) confss
-  return $ s3Hydration `S.parallel` mqttStream
+      s3Hydration :: t GraphM (NodeMAC, Prefix)
+      s3Hydration = runHydration influxCon hConfDef kbtzim hw
+      mqttStream :: _
+      mqttStream = S.concatMapWith S.parallel (S.concatM . runKibbutz @t) confss
+  return $ (Left <$> s3Hydration) `S.parallel` (Right <$> mqttStream)
   where 
     deployKbtz = (KbtzId "Bismillah_Mor", fmap fst deployNodes)
     sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
@@ -82,6 +92,36 @@ runKbtzim mq hydrationOpts influxCon = do
                           , s3Opts = Just (BucketName (s3BucketName hydrationOpts))
                           , influxCon = influxCon
                           }
+
+
+
+
+
+
+type MonConstraint t m n a = ( S.IsStream t, S.MonadAsync m, HasPath n
+                           , Renderable n, Renderable a, MonadRender m )
+
+class Renderable a where
+  render :: a -> (ImageC, Region)
+
+instance (Renderable a, Renderable b) => Renderable (a, b) where
+  render (a, b) = ((liftA2 overC colA colB), unionR regA regB)
+    where
+      (colA, regA) = render a
+      (colB, regB) = render b
+  
+  
+class (Monad m) => MonadRender m where
+  renderM :: ImageC -> Region -> m ()
+  
+newtype RenderM m a = RenderM (m a)
+
+
+monitor :: forall t m n a. (MonConstraint t m n a) => t m (n, a) -> m ()
+monitor = S.foldlM' (\_ a -> (uncurry renderM) . render $ a) (pure ()) . S.adapt 
+
+
+
 
 type NodeKey = NodeId Int
 
@@ -132,7 +172,7 @@ run = do
     KibbutzOpts{..} = kibbutzOpts
   tc <- liftIO $ execParser tkOptions
   ic <- liftIO $ execParser icOptions
-  liftIO $ forkServer "localhost" 8111
+  serverThread <- liftIO $ forkServer "localhost" 8111
   liftIO $ createDB influxConn "chopaanMQTT"
   liftIO $ runGraphM poolConf tc $
     S.drain . S.fromAhead =<< (runKbtzim @S.AheadT mqttOpts hydrationOpts ic)

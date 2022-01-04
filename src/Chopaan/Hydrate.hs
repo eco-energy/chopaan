@@ -48,6 +48,7 @@ import Chopaan.Kibbutz.AWS.Common ( Env, withAwsEnv, getAwsEnv )
 import Chopaan.Utils.Retry (recoverC, recoverOrNothing, recoverWith)
 import Chopaan.Comm.Dispatch (accessEnergyState, accessRTS)
 import Chopaan.Node.Folds (sensorFold, meshFold, SensorR, MeshR)
+import Chopaan.Node.HW 
 import Chopaan.Utils.Time (utcTimeNow)
 import Data.Influxable (KbtzNode, asKbtzNode, lineSensorR
                        , lineMesh, lineFoldHttp, showText, chopaanDB, wp, qp)
@@ -275,9 +276,13 @@ mkKbtzConf (HydrationConf{s3Bucket
                          , pastRes, futureRes}) env name store manOrSesh wp parHow =
   KbtzConf env (S3.BucketName s3Bucket) store name manOrSesh (toUTC startDate) lifetime wp (pastRes, futureRes) parHow
 
-runHydration :: (S.MonadAsync m, MonadCatch m, MonadMask m, MonadSample m)
-  => InfluxConn -> HydrationConf -> TKbtzim -> m ()
-runHydration influxcon conf kbtzim = do
+runHydration :: forall t m. (HConS t m, MonadSample m)
+  => InfluxConn
+  -> HydrationConf
+  -> TKbtzim
+  -> M.Map NodeMAC (HW Double)
+  -> t m (NodeMAC, Prefix)
+runHydration influxcon conf kbtzim kHw = S.concatM $ do
   manConf <- liftIO $ parseManagerConf
   sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
   parConf <- liftIO $ parseParStrategy
@@ -286,13 +291,14 @@ runHydration influxcon conf kbtzim = do
   let p = qp influxcon hydrationDB
   liftIO $ DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) hydrationDB
   let
+    configureH :: (KbtzName, TNodes) -> t m (NodeMAC, Prefix)
     configureH (kId, kNodes) = do
       let
         store = initKbtzStore kId (storePath conf)
-        c = mkKbtzConf conf aws kId store (Right sesh) (wp influxcon hydrationDB) parConf 
-      hydrateKbtz c kNodes (unfoldNodes (lifetime conf) kbtzim)
-  S.drain . S.fromWAsync $
-    S.mapM configureH $ S.unfold (unfoldKbtzim (lifetime conf) kbtzim) ()
+        c = mkKbtzConf conf aws kId store
+            (Right sesh) (wp influxcon hydrationDB) parConf 
+      hydrateKbtz c kNodes kHw (unfoldNodes (lifetime conf) kbtzim)
+  return $ S.concatMap configureH (S.unfold (unfoldKbtzim (lifetime conf) kbtzim) ())
 
 data Command = StartKbtz KbtzName [NodeMAC]
              | StopKbtz KbtzName
@@ -405,18 +411,19 @@ nodePrefixes kbtzId mkDirs ns ps = do
   return (n, p)
 
 
-hydrateKbtz :: forall m. (HConM m, MonadSample m)
+hydrateKbtz :: forall t m. (HConS t m, MonadSample m)
   => KbtzConf
   -> TNodes
+  -> M.Map NodeMAC (HW Double)
   -> UF.Unfold m KbtzName NodeMAC
-  -> m ()
-hydrateKbtz KbtzConf{kbtzName, kbtzStore, manOrSesh, res, startTime, bucket, env, writeParams, life, parHow} tNodes ns = do
-  t0 <- liftIO $ Time.getCurrentTime
+  -> t m (NodeMAC, Prefix)
+hydrateKbtz KbtzConf{kbtzName, kbtzStore, manOrSesh, res, startTime, bucket, env, writeParams, life, parHow} tNodes hw ns = S.concatM $ do
+  t0 <- (liftIO $ Time.getCurrentTime)
   let
     prefixes' = ufStream (prefixGen life inSet res startTime t0)
     nps = nodePrefixes kbtzName (mkNodeDirs kbtzStore) ns prefixes'
-  void $ S.fold (inFrame kbtzStore writeParams)
-    $ S.fromWAsync
+  return $ S.fromWAsync
+    $ S.tap (inFrame kbtzStore writeParams hw)
     $ S.map (fst)
     $ S.filter ((> 0) . snd)
     $ S.trace (pr . frameLog)
@@ -574,10 +581,11 @@ nodeDirUF store stage = uf
 inFrame :: forall m. (HConM m, MonadSample m)
   => KbtzStore
   -> Http.WriteParams
+  -> M.Map NodeMAC (HW Double)
   -> FL.Fold m (NodeMAC, Prefix) (M.Map NodeMAC ()) 
-inFrame store writeParams = FL.classifyWith (fst) ingestNode 
+inFrame store writeParams hw = FL.classifyWith (fst) ingestNode 
   where
-    ingestNode :: FL.Fold m (NodeMAC, Prefix) ()
+    ingestNode :: FL.Fold m (NodeMAC, Prefix) (())
     ingestNode = (FL.mkFoldM iN (pure $ FL.Partial ((), Nothing)) (pure . fst))
       where
         iN (_, oldF) (n, p) = do
@@ -587,7 +595,7 @@ inFrame store writeParams = FL.classifyWith (fst) ingestNode
           where
             tag = (tagger store $ n)
             nodeLines = (\(a, b) -> a <> b) . bimap (lineSensorR tag) (lineMesh tag)
-            nodeFold n' = (FL.partition (sensorFold undefined) (meshFold n'))
+            nodeFold n' = (FL.partition (sensorFold (hw M.! n')) (meshFold n'))
     readNP p = UF.many (UF.function (\n' -> getKbtzPath store Frames n' p)) File.read
     fl = lineFoldHttp 32 writeParams
 
@@ -608,7 +616,7 @@ ingestFrames source nodeFold lnFold n = do
     . S.postscan (FL.tee nodeFold (FL.duplicate nodeFold))
     . S.catMaybes
     . S.trace (logNothing)
-    . S.mapM (pure . validateMF')
+    . S.map (validateMF')
     . S.rights
     . S.trace (logEither)
     . S.mapM (pure . parsePB)
