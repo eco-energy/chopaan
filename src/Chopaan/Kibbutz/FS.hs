@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 
@@ -10,7 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+
 {-# LANGUAGE FlexibleInstances #-}
 
 module Chopaan.Kibbutz.FS where
@@ -20,7 +21,7 @@ import qualified Chopaan.Graph.Algebraic as AG
 import Chopaan.Kibbutz.KbtzId (KbtzId (..), KbtzName)
 import Chopaan.Node.Components ()
 import Chopaan.Node.HW (HW (..))
-import Chopaan.Node.NodeId ( NodeIdx, NodeMAC, toText )
+import Chopaan.Node.NodeId ( NodeIdx, NodeMAC, NodeId(..), toText )
 import qualified Codec.Winery as W
 import ConCat.Free.VectorSpace
 import ConCat.Isomorphism
@@ -31,18 +32,22 @@ import qualified Control.Concurrent.STM as STM
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class (MonadIO, liftIO)
+
 import Data.Function
 import Data.Incremental
+import Data.Bifunctor
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Monoid
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import Data.Char (ord)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import GHC.IO.Unsafe (unsafePerformIO)
 import qualified Streamly.Binary as B
 import qualified Streamly.Internal.Data.Array.Foreign.Type as Array
+import qualified Streamly.Internal.Data.Array.Foreign as Array
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Stream.IsStream as S
 import qualified Streamly.Internal.Data.Unfold as UF
@@ -87,34 +92,44 @@ import qualified Streamly.Internal.FileSystem.File as File
 import qualified Streamly.Prelude as S
 import Streamly.Unicode.Stream (decodeUtf8, encodeUtf8)
 import System.Directory
-import qualified Codec.Winery as W
-
-data FSConfig = FSConfig
-  { rootDir :: ArrPath
-  }
-  deriving (Eq, Ord, Show, Generic)
-
-mkFSConfig :: FilePath -> FSConfig
-mkFSConfig = FSConfig . arrPath
 
 
 newtype ArrPath = ArrPath { unArrPath :: Array.Array Word8 }
   deriving (Eq, Ord, Show, Generic)
 
 instance Semigroup ArrPath where
-  a <> b = arrPath $ (fromArrPath a) <> "/" <> (fromArrPath b) 
+  a <> b = isoFwd pathIso $ isoRev pathIso a <> "/" <> isoRev pathIso b
+
+type PathIso = Iso (->) FilePath ArrPath
+
+pathIso :: PathIso
+pathIso = Iso arrPath fromArrPath
+  where
+    arrPath :: FilePath -> ArrPath
+    arrPath = ArrPath . unsafePerformIO . Array.fromStreamD
+              . S.toStreamD . encodeUtf8 @IO @S.SerialT . S.fromList
+    fromArrPath :: ArrPath -> FilePath
+    fromArrPath = unsafePerformIO . S.toList . decodeUtf8
+                  . Array.toStream . unArrPath
 
 
+class HasPath a where
+  path :: a -> ArrPath
+  --unpath :: ArrPath -> a
 
---instance Monoid ArrPath where
---  mempty = Array.mempty
+instance HasPath (Tag KbtzName) where
+  path = isoFwd pathIso . T.unpack . unKbtzId . unTag
 
+instance HasPath (Tag NodeIdx) where
+  path = isoFwd pathIso . show . unNodeId . unTag
 
-arrPath :: FilePath -> ArrPath
-arrPath = ArrPath . unsafePerformIO . Array.fromStreamD . S.toStreamD . encodeUtf8 @IO @S.SerialT . S.fromList
+instance (HasPath a, HasPath b) => HasPath (a, b) where
+  path (a, b) = path a <> path b
+  -- unpath = bimap unpath unpath . joinSplit . splitPath
+  --   where
+  --     joinSplit = unsafePerformIO . S.uncons 
+  --     splitPath (ArrPath a) = Array.splitOn (== (fromIntegral . ord $ '/')) a
 
-fromArrPath :: ArrPath -> FilePath
-fromArrPath = unsafePerformIO . S.toList . decodeUtf8 . Array.toStream . unArrPath
 
 kbtzimConf :: Ev.Config -> Ev.Config
 kbtzimConf =
@@ -129,14 +144,14 @@ kbtzimConf =
     . setFollowSymLinks Off
     . setRecursiveMode On
 
-watchKbtzim' :: (MonadIO m) => FilePath -> S.SerialT m Event
-watchKbtzim' dir =
-  S.before (liftIO $ createDirectoryIfMissing True dir) $
-    S.hoist liftIO $
-      watchWith kbtzimConf [unArrPath . arrPath $ dir]
 
-watchKbtzim :: (MonadIO m) => FilePath -> S.SerialT m (Either KbtzEv NodeEv)
-watchKbtzim dir = S.catMaybes $ S.map getEv $ watchKbtzim' dir
+watchKbtzim :: forall m. (MonadIO m) => FilePath -> S.SerialT m (Either KbtzEv NodeEv)
+watchKbtzim dir = S.catMaybes $ S.map getEv $ wk dir
+  where
+    wk :: FilePath -> S.SerialT m Event
+    wk dir = S.before (liftIO $ createDirectoryIfMissing True dir) $
+             S.hoist liftIO $
+             watchWith kbtzimConf [unArrPath . isoFwd pathIso $ dir]
 
 getEv :: Event -> Maybe (Either KbtzEv NodeEv)
 getEv ev = case getKbtzEv ev of
@@ -149,35 +164,14 @@ newtype Tag k = Tag { unTag :: k }
   deriving (Eq, Ord, Show, Generic)
 
 
-class (Monad m) => MonadCRUD m where
-  create :: (HasPath k, W.Serialise a) => k :* a -> m ArrPath
-  read :: (HasPath k, W.Serialise a) => ArrPath -> m (k :* a)
-  update :: (HasPath k, HasDelta a, W.Serialise a) => (k :* a) -> m (ArrPath, k :* a)
-  delete :: HasPath k => k -> m (ArrPath)
-
-class HasPath a where
-  path :: a -> ArrPath
-  unpath :: ArrPath -> a
-
-instance HasPath (Tag KbtzName) where
-  path = undefined
-  unpath = undefined
-
-instance HasPath (Tag NodeIdx) where
-  path = undefined
-  unpath = undefined
-
-instance (HasPath a, HasPath b) => HasPath (a, b) where
-  path (a, b) = path a <> path b
-
 data KbtzEv
   = CreateKbtz (Tag KbtzName)
   | DeleteKbtz (Tag KbtzName)
   deriving (Eq, Ord, Show, Generic)
 
-runKbtzEv :: MonadIO m => KbtzEv -> m ()
-runKbtzEv (CreateKbtz f) = liftIO . createDirectoryIfMissing True . fromArrPath . path $ f
-runKbtzEv (DeleteKbtz f) = liftIO . removeDirectory . fromArrPath . path $ f
+interpretK :: MonadIO m => KbtzEv -> m ()
+interpretK (CreateKbtz f) = liftIO . createDirectoryIfMissing True . isoRev pathIso . path $ f
+interpretK (DeleteKbtz f) = liftIO . removeDirectory . isoRev pathIso . path $ f
 
 getKbtzEv :: Event -> Maybe KbtzEv
 getKbtzEv ev
@@ -193,10 +187,14 @@ data NodeEv
   deriving (Eq, Ord, Show, Generic)
 
 toNodeIdx :: ArrPath -> Maybe (KbtzName, NodeIdx)
-toNodeIdx = undefined -- pure . fromArrPath
+toNodeIdx p = case T.splitOn "/" . T.pack . isoRev pathIso $ p of
+  [x, y] -> Just (KbtzId x, NodeId . read . T.unpack $ y)
+  _ -> Nothing
 
 toKbtzName :: ArrPath -> Maybe (Tag KbtzName)
-toKbtzName = undefined
+toKbtzName p = case T.splitOn "/" . T.pack . isoRev pathIso $ p of
+  [x] -> Just . Tag . KbtzId $ x
+  _ -> Nothing
 
 getNodeEv :: Event -> Maybe NodeEv
 getNodeEv ev
@@ -337,9 +335,9 @@ nodePath :: KbtzName -> NodeIdx -> FilePath
 nodePath k n = kbtzFolder k <> "/" <> T.unpack (toText n)
 
 onNodeEv :: (S.MonadAsync m, MonadCatch m) => NodeEv -> Kbtzim -> m Kbtzim
-onNodeEv (CreateNode k n) ks = upsertFS k n ks
+onNodeEv (CreateNode k n) ks = upsert' k n ks
 onNodeEv (ReadNode k n) ks = pure ks
-onNodeEv (UpdateNode k n) ks = upsertFS k n ks
+onNodeEv (UpdateNode k n) ks = upsert' k n ks
 onNodeEv (DeleteNode k n) ks =
   pure $
     M.update (Just . AG.removeVertex (NodeModel {nodeIdx = n})) k ks
@@ -355,9 +353,10 @@ onKbtzEv (DeleteKbtz p) ks = case toKbtzName . path $ p of
 topologicalFold :: forall m. (S.MonadAsync m) => FL.Fold m NodeModel KbtzModel
 topologicalFold = FL.foldl' addNode AG.empty
 
-upsertFS :: (S.MonadAsync m, MonadCatch m) => KbtzName -> NodeIdx -> Kbtzim -> m Kbtzim
-upsertFS k n ks = do
-  n' <- liftIO . readNode . fromArrPath . path $ (Tag k, Tag n)
+upsert' :: (S.MonadAsync m, MonadCatch m)
+  => KbtzName -> NodeIdx -> Kbtzim -> m Kbtzim
+upsert' k n ks = do
+  n' <- liftIO . readNode . isoRev pathIso . path $ (Tag k, Tag n)
   case n' of
     Nothing -> return ks
     Just (Right n'') ->
@@ -365,3 +364,13 @@ upsertFS k n ks = do
     Just (Left n'') -> do
       liftIO . print $ "Parsing Error: " <> show n''
       return ks
+
+
+data CRUDError = CreateError | ReadError | UpdateError | DeleteError
+  deriving (Eq, Bounded, Enum, Show, Generic, Exception)
+
+class (Monad m) => MonadCRUD m where
+  createM :: (HasPath k, W.Serialise a) => k -> a -> m (Either CRUDError ())
+  readM :: (HasPath k, W.Serialise a) => k -> m (Either CRUDError a)
+  updateM :: (HasPath k, HasDelta a, W.Serialise a) => k -> a -> m (Either CRUDError ())
+  deleteM :: HasPath k => k -> m (Either CRUDError ())

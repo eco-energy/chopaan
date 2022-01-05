@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, TupleSections, AllowAmbiguousTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Chopaan.Kibbutz ( runKibbutz, runKibbutz', runKibbutzM
-                       , KbtzC(..), mkKbtzConf, S3Opts) where
+                       , KbtzC(..), KbtzScene, mkKbtzConf, S3Opts) where
 
 import GHC.Generics ( Generic )
 

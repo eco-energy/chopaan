@@ -170,7 +170,7 @@ instance (Arbitrary v) => Arbitrary (Node v) where
 instance (Arbitrary e, Arbitrary p) => Arbitrary (Battery e p) where
   arbitrary = genericArbitrary
 
-instance Arbitrary s => Arbitrary (Sec s) where
+instance Arbitrary s => Arbitrary (Chopaan.Node.NodeSensors.T s) where
   arbitrary = genericArbitrary
 instance Arbitrary s => Arbitrary (I s) where
   arbitrary = genericArbitrary

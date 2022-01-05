@@ -1,56 +1,53 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TypeApplications #-}
+
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving, DerivingStrategies, DerivingVia, StandaloneDeriving #-}
+{-# LANGUAGE DerivingVia, StandaloneDeriving #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE NamedFieldPuns, RecordWildCards #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, TypeOperators #-}
 module Chopaan.Node.NodeSensors (power, NodeT'(..), fromNodeMessage
-                                , NodeSensors, Sec, I, V, Res) where
+                                , NodeSensors, T, I, V, Res, i, v, t, p, e) where
 
 import qualified Prelude as P
 
 import qualified Proto.NodeMessageSchema.NodeMessages as NM
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as NM
 
-import Data.Monoid
+import Data.Monoid ( (<>), Monoid(mempty) )
 
-import GHC.Generics hiding (C, R)
+import GHC.Generics ( Generic )
 
 import Numeric.Units.Dimensional.Prelude
-
-import Control.DeepSeq
+      
+import Control.DeepSeq ( NFData )
 import Data.Aeson (ToJSON, FromJSON)
-import Control.Monad
-import Control.Monad.State
-import Algebra.Graph.Labelled as G
+import Control.Monad ()
+import Control.Monad.State ( State )
+import Algebra.Graph.Labelled as G ( edges, Graph )
 -- Conversions and Accessors
-import Data.Time
+import Data.Time ( UTCTime, diffUTCTime )
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
-import Lens.Micro
+import Lens.Micro ( (^.) )
+import ConCat.Misc
 import qualified Codec.Winery as W
 
-import Streamly
 import qualified Streamly.Prelude as S
 
 import Control.Monad.Bayes.Class
 
 
 
-type R = Double
-
 deriving via (W.WineryVariant (Quantity DTime s)) instance (W.Serialise s) => W.Serialise (Quantity DTime s)
 deriving via (W.WineryVariant (ElectricPotential s)) instance (W.Serialise s) => W.Serialise (ElectricPotential s)
 deriving via (W.WineryVariant (ElectricCurrent s)) instance (W.Serialise s) => W.Serialise (ElectricCurrent s)
 deriving via (W.WineryVariant (ElectricResistance s)) instance (W.Serialise s) => W.Serialise (ElectricResistance s)
 
-deriving anyclass instance ToJSON s => ToJSON (Sec s)
-deriving anyclass instance FromJSON s => FromJSON (Sec s)
+deriving anyclass instance ToJSON s => ToJSON (T s)
+deriving anyclass instance FromJSON s => FromJSON (T s)
 deriving anyclass instance ToJSON s => ToJSON (I s)
 deriving anyclass instance FromJSON s => FromJSON (I s)
 deriving anyclass instance ToJSON s => ToJSON (V s)
@@ -59,10 +56,10 @@ deriving anyclass instance ToJSON s => ToJSON (Res s)
 deriving anyclass instance FromJSON s => FromJSON (Res s)
 
 
-type Sec s = Quantity DTime s
+type T s = Quantity DTime s
 type I s = ElectricCurrent s
 type V s = ElectricPotential s
-type Res s = ElectricResistance s 
+type Res s = ElectricResistance s
 
 v :: (Num s) => s -> V s
 v = (*~ volt)
@@ -73,23 +70,23 @@ i = (*~ ampere)
 r :: (Num s) => s -> Res s
 r = (*~ ohm)
 
-s :: (Num s) => s -> Sec s
-s = (*~ second)
+t :: (Num s) => s -> Time s
+t = (*~ second)
 
-p :: (Num s) => Current s -> Voltage s -> Power s
-p (Current i) (Voltage v) = i * v
+p :: (Num s) => V s -> I s -> Power s
+p i v = i * v
 
-e :: (Num s) => Power s -> Sec s -> Energy s
+e :: (Num s) => Power s -> T s -> Energy s
 e = (*)
 
 
-type St u v = forall t m. (IsStream t, Monad m) => t m (u v)
+type St u v = forall t m. (S.IsStream t, Monad m) => t m (u v)
 
 toDist :: forall m a. (MonadSample m, Double ~ a) => (a, a) -> a -> m a
 toDist (mean, std) a = do
   noise <- normal mean std
   return $ a P.+ noise
-  
+
 
 -- Streams of Sensors
 type V' s = St Voltage s
@@ -102,8 +99,8 @@ type It t s = I' (t, s)
 type Pt t s = P' (t, s)
 type Et t s = E' (t, s)
 
-time :: (Num s) => s -> Sec s
-time = s
+time :: (Num s) => s -> T s
+time = t
 
 volts :: (Num s) => s -> Voltage s
 volts = Voltage . v
@@ -112,8 +109,7 @@ amps :: (Num s) => s -> Current s
 amps = Current . i
 
 power :: (Num s) => I' s -> V' s -> P' s
-power i v = S.zipWith p i v
-
+power = S.zipWith (\(Current i) (Voltage v) -> p v i)
 
 --energy :: (Num s) => P' s -> E' s
 --energy = S.postscan (FL.sum P.* FL.product) 
@@ -121,31 +117,41 @@ power i v = S.zipWith p i v
 newtype Voltage s = Voltage (V s) deriving (Eq, Ord, Show, Generic)
 newtype Current s = Current (I s) deriving (Eq, Ord, Show, Generic)
 
+-- data Bus s where
+--   EmptyBus :: Bus s
+--   GenBus :: V s -> I s -> Bus s
+--   StorageBus :: V s -> Bus s
+--   TxBus :: V s -> I s -> Bus s
+--   LoadBus :: I s -> V s -> Bus s
+--   ComposeBus ::  Bus s -> Bus s -> Bus s
+--   ParallelBus :: Bus s :* Bus s -> Bus (s :* s)
 
-data Bus = GenBus | StorageBus | TxBus | LoadBus | Join Bus Bus | EmptyBus
-  deriving (Eq, Ord, Show, Generic)
+-- instance Semigroup (Bus s) where
+--   a <> b = ComposeBus a b
+
+-- instance Monoid (Bus s) where
+--   mempty = EmptyBus
 
 
-instance Semigroup Bus where
-  a <> b = Join a b
 
-instance Monoid Bus where
-  mempty = EmptyBus
-
-newtype Circuit s = Circuit { runCircuit :: G.Graph (Bus, I s) (Bus, V s) }
+newtype Circuit s = Circuit {
+  runCircuit :: G.Graph (Component (V s) (I s)) (V s, I s)
+  } deriving (Generic)
 
 type CircuitM s = State Int (Circuit s)
 
 
-fromSensors :: forall s. (Num s) => NodeSensors s -> Circuit s
-fromSensors NodeSensors{..} = Circuit $ G.edges es
-  where
-    es = [((GenBus, genCurrent), (GenBus, genVoltage), sv)
-         , ((TxBus, gridCurrent), sv, (TxBus, gridVoltage))
-         , ((LoadBus, loadCurrent), sv, (LoadBus, v 0))
-         ]
-      where
-        sv = (StorageBus, batteryVoltage)
+type Component v i = Unop (v :* i)
+
+-- fromSensors :: forall s. (Num s) => NodeSensors s -> Circuit s
+-- fromSensors NodeSensors{..} = Circuit $ G.edges es
+--   where
+--     es = [(GenBus genVoltage genCurrent, GenBus genVoltage, sv)
+--          , (TxBus batteryVoltage gridCurrent, TxBus gridVoltage gridCurrent, sv)
+--          , (LoadBus loadCurrent batteryVoltage, LoadBus loadCurrent 0, sv)
+--          ]
+--       where
+--         sv = StorageBus batteryVoltage
 
 data NodeSensors s = NodeSensors
   { batteryVoltage :: !(V s)
@@ -181,7 +187,7 @@ fromNodeMessage nm = NodeT' (nodeTimeToUTC nm, NodeSensors
                        , genVoltage = genV
                        })
   where
-    genV = ((i (nm ^. NM.solarInputCurrent)) * solarRes) + (v (nm ^. NM.batteryVoltage))
+    genV = i (nm ^. NM.solarInputCurrent) * solarRes + v (nm ^. NM.batteryVoltage)
     solarRes :: Res R
     solarRes = r 1
     cOut :: I R
@@ -189,56 +195,21 @@ fromNodeMessage nm = NodeT' (nodeTimeToUTC nm, NodeSensors
     cIn :: I R
     cIn = i $ (-1) P.* (nm ^. NM.gridToBatteryCurrent)
 
-
 {--------------------------------------------------------------------------------------------
                                    Units
 --------------------------------------------------------------------------------------------}
 
--- $ converts the millisecond timestamp in the EnergyState to a UTITime  
-nodeTimeToUTC :: NM.EnergyState -> UTCTime
-nodeTimeToUTC es = posixSecondsToUTCTime $ (fromIntegral $ (es ^. NM.cpuTime))
-
-diffUTC :: forall s. (Fractional s) => UTCTime -> UTCTime -> Sec s
-diffUTC a b = s . realToFrac $ diffUTCTime a b
-
-
 newtype Terminal s = Terminal (Voltage s, Current s) deriving (Eq, Ord, Show, Generic)
-
 
 data BusP s = Gen (Terminal s)
             | Storage (Terminal s)
             | Tx (Terminal s)
             | Load (Terminal s)
-            deriving (Eq, Ord, Show, Generic) 
+            deriving (Eq, Ord, Show, Generic)
 
+-- $ converts the millisecond timestamp in the EnergyState to a UTITime  
+nodeTimeToUTC :: NM.EnergyState -> UTCTime
+nodeTimeToUTC es = posixSecondsToUTCTime (fromIntegral (es ^. NM.cpuTime))
 
-
-
-{--
-data Bus a b where
-  B2G :: s -> s -> (Bus Gen (Terminal s) (Storage (Terminal s)))
-  G2B :: s -> s -> (Bus Gen)
---}
-{--
-type LocatedSensor u = (SensorLoc, u)
-
---newtype Sensor s = Sensor { unSensor :: (I s, V s) }
-
-powerAt :: (Num s) => Sensor s -> Power s
-powerAt = (uncurry p) . unSensor
-
-txPower :: (Num s) => NodeSensors s -> LocatedSensor (Power s)
-txPower NodeSensors{gridCurrent, gridVoltage} = (TransmitterTerminal, p gridCurrent gridVoltage)
-
-genPower :: (Num s) => NodeSensors s -> LocatedSensor (Power s)
-genPower NodeSensors{genCurrent, batteryVoltage} = (BatteryTerminal, p genCurrent batteryVoltage)
-
-loadPower :: (Num s) => NodeSensors s -> LocatedSensor (Power s)
-loadPower NodeSensors{loadCurrent, batteryVoltage} = (BatteryTerminal, p loadCurrent batteryVoltage)
-
-batteryCurrent :: Num s => NodeSensors s -> I s
-batteryCurrent NodeSensors{gridCurrent, genCurrent, loadCurrent} = gridCurrent + genCurrent - loadCurrent
-
-deltaT :: (Fractional s) => NodeT' s -> NodeT' s -> Sec s
-deltaT (NodeT'(t, _)) (NodeT'(t', _)) = diffUTC t t'
---}
+diffUTC :: forall s. (Fractional s) => UTCTime -> UTCTime -> T s
+diffUTC a b = t . realToFrac $ diffUTCTime a b

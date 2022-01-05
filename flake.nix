@@ -75,6 +75,6 @@
     in flake // {
       # Built by `nix build .`
       defaultPackage = flake.packages."chopaan:lib:chopaan";
-      app = pkgs.chopaan.project.passthru;
+      #app = pkgs.chopaan.plan-nix.passthru;
     });
 }

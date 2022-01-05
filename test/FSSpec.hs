@@ -70,5 +70,9 @@ spec :: Spec
 spec = do
   describe "Kbtz Creation-Deletion events" $ do
     prop "CreateKbtz event adds an empty graph to map" $ \ev ks -> do
-      let k' = onKbtzEv ev (M.mapKeys unTag ks)
-      1 `shouldBe` 0
+      let
+        k = M.mapKeys unTag ks
+        k' = onKbtzEv ev k 
+      case ev of
+        CreateKbtz dk -> (M.keys $ k' `M.difference` k) `shouldBe` [unTag dk] 
+        DeleteKbtz dk -> (M.keys $ k `M.difference` k') `shouldBe` [unTag dk]
