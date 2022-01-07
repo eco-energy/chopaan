@@ -24,9 +24,10 @@ import Chopaan.Graph.Kbtz ( getKbtzim )
 import Chopaan.Graph
     ( GraphM, runGraphM, withKbtzPool, tkOptions, getKNs, addzim )
 import Data.Influxable (createDB)
-import Data.Bifunctor ( Bifunctor(bimap) )
+import Data.Bifunctor ( Bifunctor(..) )
 import Data.Pool (stats)
 import qualified Data.Map.Strict as M
+import Data.Maybe
 
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Unfold as UF
@@ -62,6 +63,7 @@ import Chopaan.Ui
 type KbtzM = ReaderT (MQTTOpts) GraphM
 
 
+
 runKbtzim :: forall t.
   (S.IsStream t)
   => MQTTOpts
@@ -69,27 +71,23 @@ runKbtzim :: forall t.
   -> InfluxConn
   -> GraphM (t GraphM (Either (NodeMAC, Prefix) (KbtzScene NodeMAC)))
 runKbtzim mq hydrationOpts influxCon = do
-  tNow <- liftIO $ Ti.getCurrentTime
-  ks' <- withKbtzPool getKbtzim
-  kns <- case (length ks' < 1) of
-    True -> do
-      liftIO . print $ "Adding " <> (show (fst deployKbtz))
-      addzim [deployKbtz]
-    False -> getKNs
-  kbtzim <- liftIO . atomically $ mkTKbtz kns
-  let confss = S.fromList $ fmap sConf $ fmap undefined $ M.toList kns
+  kns <- fromJust <$> S.head (kbtzimEnv undefined)
+  let 
       s3Hydration :: t GraphM (NodeMAC, Prefix)
-      s3Hydration = runHydration influxCon hConfDef kbtzim undefined
-      mqttStream = S.concatMapWith S.parallel (S.concatM . runKibbutz @t) confss
+      s3Hydration = runHydration influxCon hConfDef kns
+      mqttStream = S.concatMapWith S.parallel (S.concatM . runKibbutz @t) (confss kns)
   return $ (Left <$> s3Hydration) `S.parallel` (Right <$> mqttStream)
-  where 
+  where
+    confss :: (S.IsStream t, S.MonadAsync m) => Kbtzim -> t m (KbtzC NodeMAC)
+    confss = S.fromList . fmap sConf . fmap (second toKbtzG) . M.toList
+    sConf (k, kns) = KbtzC { Chopaan.Kibbutz.name = k
+                           , structure = kns
+                           , channelOpts = Left mq
+                           , s3Opts = Just (BucketName (s3BucketName hydrationOpts))
+                           , influxCon = influxCon
+                           }
     deployKbtz = (KbtzId "Bismillah_Mor", fmap fst deployNodes)
-    sConf (k, ns) = KbtzC { Chopaan.Kibbutz.name = k
-                          , structure = ns
-                          , channelOpts = Left mq
-                          , s3Opts = Just (BucketName (s3BucketName hydrationOpts))
-                          , influxCon = influxCon
-                          }
+    
 
 
 type MonConstraint t m n a = ( S.IsStream t, S.MonadAsync m, HasPath n

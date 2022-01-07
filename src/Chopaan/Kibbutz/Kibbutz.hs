@@ -15,8 +15,3 @@ import Chopaan.Comm.Address (Address)
 
 type KbtzConn t m n = (IsStream t, MonadAsync m, Ord n, Show n, Address n, MonadSample m)
 
-
-data KbtzActions n = CreateKbtz [n]
-                   | AddNode n
-                   | RemoveNode n
-                   deriving (Eq, Ord, Show, Generic)

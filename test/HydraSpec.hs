@@ -39,7 +39,7 @@ import Chopaan.Kibbutz.KbtzId
 
 spec = parallel $ do
   prefixSpec
-  controlSpec
+  --controlSpec
   prefixGenSpec
   --keySpec
   --frameSpec
@@ -73,30 +73,27 @@ instance Arbitrary InAMinute where
         t2 = Time.addUTCTime dt' t1
     return $ InAMinute (t0, t1, t2)
 
-instance Arbitrary KbtzName where
-  arbitrary = (KbtzId . T.pack) <$> (listOf1 arbitraryPrintableChar)
-
-pipelineSpec :: Spec
-pipelineSpec = do
-  parallel $ describe "pipeline invariants" $ do
-    it "prefix congregation works" $ do
-      k <- liftIO $ generate (arbitrary @KbtzName)
-      ns <- S.toList $ S.replicateM 10 (liftIO . generate $ (arbitrary @NodeMAC))
-      tk <- liftIO . atomically $ mkTKbtz $ M.fromList [(k, ns)]
-      (InAMinute (t0, t1, _)) <- liftIO $ generate $ (arbitrary @InAMinute)
-      let ufN = unfoldNodes Finite tk
-          ps = ufStream (prefixGen Infinite (\_ -> pure True) (Ten2, Second) t0 t1)
-          nps = nodePrefixes k (\_ -> pure ()) ufN ps
-      r <- S.length $ S.hoist (liftIO)
-           $ S.trace (liftIO . print)
-           S.|$ S.mapM (uncurry bo)
-           --  $ S.trace (liftIO . print)
-           $ S.fromWAsync
-           $ nps
-      r `shouldBe` (6 * (length ns))
-      where
-        bo :: (HConM m) => NodeMAC -> Prefix -> m ((NodeMAC, Prefix), Int)
-        bo n a = return ((n,a), 10)
+-- pipelineSpec :: Spec
+-- pipelineSpec = do
+--   parallel $ describe "pipeline invariants" $ do
+--     it "prefix congregation works" $ do
+--       k <- liftIO $ generate (arbitrary @KbtzName)
+--       ns <- S.toList $ S.replicateM 10 (liftIO . generate $ (arbitrary @(NodeMAC, HW R)))
+--       tk <- liftIO . atomically $ mkTKbtz $ M.fromList [(k, ns)]
+--       (InAMinute (t0, t1, _)) <- liftIO $ generate $ (arbitrary @InAMinute)
+--       let ufN = unfoldNodes Finite tk
+--           ps = ufStream (prefixGen Infinite (\_ -> pure True) (Ten2, Second) t0 t1)
+--           nps = nodePrefixes k (\_ -> pure ()) ufN ps
+--       r <- S.length $ S.hoist (liftIO)
+--            $ S.trace (liftIO . print)
+--            S.|$ S.mapM (uncurry bo)
+--            --  $ S.trace (liftIO . print)
+--            $ S.fromWAsync
+--            $ nps
+--       r `shouldBe` (6 * (length ns))
+--       where
+--         bo :: (HConM m) => NodeMAC -> Prefix -> m ((NodeMAC, Prefix), Int)
+--         bo n a = return ((n,a), 10)
 
 suc1 = modifyMaxSuccess (const 1)
 
@@ -128,28 +125,28 @@ prefixGenSpec = describe "Prefix Generation Invariants for Infinite and finite s
         z = prefixGen l2 yes r3 start end ()
         in (x, y, z)
     
-controlSpec :: Spec
-controlSpec = parallel $ describe "State Management" $ do
-  let ks = KbtzId . T.pack . pure @[] <$> ['a'..'d']
-      ns = NodeId . T.pack . show <$> [1..12]
-      kns = fst $ foldr zop ([], ns) ks
-        where
-          zop :: k -> ([(k, [n])], [n]) -> ([(k, [n])], [n]) 
-          zop k (k', n') = ((k, take 3 n') : k', drop 3 n')
-      addKs = (uncurry StartKbtz) <$> kns
-      rmKs = StopKbtz <$> ks
-      addNs = conc $ (\(k', ns') -> (StartNode k' <$> ns')) <$> kns
-      rmNs = conc $ (\(k', ns') -> (StopNode k' <$> ns')) <$> kns
-  it "Adding a kibbutz and its nodes produces the right unfold" $ do
-    k <- atomically $ newTVar mempty
-    kadd <- mapM_ (atomically . onCommand k) addKs
-    newNS' <- S.toList $ S.take (length ns) $ S.unfoldManyRoundRobin (unfoldNodes Infinite k) (S.fromList ks)
-    (Set.fromList newNS') `shouldBe` (Set.fromList ns)
-    krm <- mapM_ (atomically . onCommand k) rmKs
-    noNS <- S.toList $ S.unfoldManyRoundRobin (unfoldNodes Infinite k) (S.fromList ks)
-    (length noNS) `shouldBe` 0
-  where
-    conc = foldl (<>) mempty
+-- controlSpec :: Spec
+-- controlSpec = parallel $ describe "State Management" $ do
+--   let ks = KbtzId . T.pack . pure @[] <$> ['a'..'d']
+--       ns = NodeId . T.pack . show <$> [1..12]
+--       kns = fst $ foldr zop ([], ns) ks
+--         where
+--           zop :: k -> ([(k, [n])], [n]) -> ([(k, [n])], [n]) 
+--           zop k (k', n') = ((k, take 3 n') : k', drop 3 n')
+--       addKs = (uncurry StartKbtz) <$> kns
+--       rmKs = StopKbtz <$> ks
+--       addNs = conc $ (\(k', ns') -> (StartNode k' <$> ns')) <$> kns
+--       rmNs = conc $ (\(k', ns') -> (StopNode k' <$> ns')) <$> kns
+--   it "Adding a kibbutz and its nodes produces the right unfold" $ do
+--     k <- atomically $ newTVar mempty
+--     kadd <- mapM_ (atomically . onCommand k) addKs
+--     newNS' <- S.toList $ S.take (length ns) $ S.unfoldManyRoundRobin (unfoldNodes Infinite k) (S.fromList ks)
+--     (Set.fromList newNS') `shouldBe` (Set.fromList ns)
+--     krm <- mapM_ (atomically . onCommand k) rmKs
+--     noNS <- S.toList $ S.unfoldManyRoundRobin (unfoldNodes Infinite k) (S.fromList ks)
+--     (length noNS) `shouldBe` 0
+--   where
+--     conc = foldl (<>) mempty
 
 
 prefixSpec :: Spec

@@ -48,10 +48,12 @@ import Chopaan.Kibbutz.Transactor.Stake
 import Chopaan.Kibbutz.Transactor.Status
 import Chopaan.Kibbutz.Transactor
 import Chopaan.Comm.S3
-import qualified Chopaan.Node.HW as HW
-import qualified Chopaan.Node.Components as C
-import Chopaan.Kibbutz.KbtzId (KbtzId(..))
+import Chopaan.Node.HW
+import Chopaan.Node.Components
+import Chopaan.Kibbutz.KbtzId (KbtzId(..), KbtzName)
+import qualified Chopaan.Graph.Algebraic as AG
 import Chopaan.Kibbutz
+import Chopaan.Kibbutz.FS
 import Chopaan.Graph.Spider
 import Chopaan.Graph.Snapshot
 
@@ -145,6 +147,51 @@ almostEqual :: (Show a, Eq a, Num a, Ord a) => a -> a -> a -> Expectation
 almostEqual eta a b = do
   ((abs $ a - b) < eta) `shouldBe` True
 
+instance Arbitrary (Tag KbtzName) where
+  arbitrary = (Tag . KbtzId . T.pack . getPrintableString) <$> arbitrary
+
+instance Arbitrary (Tag NodeIdx) where
+  arbitrary = (Tag . NodeId . getPositive) <$> arbitrary
+
+instance Arbitrary (NodeIdx) where
+  arbitrary = (NodeId . getPositive) <$> arbitrary
+
+instance Arbitrary KbtzEv where
+  arbitrary = genericArbitrary 
+
+instance (Arbitrary e, Arbitrary v) => Arbitrary (AG.Graph e v) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (Ownership a) where
+  arbitrary = genericArbitrary
+
+instance Arbitrary (NodeModel) where
+  arbitrary = genericArbitrary
+
+instance Arbitrary BatteryType where
+  arbitrary = genericArbitrary
+  
+instance (Arbitrary a) => Arbitrary (BatteryConf a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (BatteryTop a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (LoadConf a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (LoadTop a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (PVConf a) where
+  arbitrary = genericArbitrary
+
+instance (Arbitrary a) => Arbitrary (PVTop a) where
+  arbitrary = genericArbitrary
+
+instance Arbitrary (HW Double) where
+  arbitrary = genericArbitrary
+
 instance (Arbitrary a) => Arbitrary (KbtzId a) where
   arbitrary = KbtzId <$> arbitrary
 
@@ -157,17 +204,17 @@ instance Arbitrary Resolution where
 instance (Num a, Arbitrary a, Compensable a) => (Arbitrary (Compensated a)) where
   arbitrary =  (\a -> pure $ add a 0 compensated) =<< arbitrary
 
-instance Arbitrary Watts where
+instance Arbitrary Chopaan.Node.Metrics.Watts where
   arbitrary = genericArbitrary
 
-instance Arbitrary WattSeconds where
+instance Arbitrary Chopaan.Node.Metrics.WattSeconds where
   arbitrary = genericArbitrary
 
 instance (Arbitrary v) => Arbitrary (Node v) where
   arbitrary = genericArbitrary
 
 
-instance (Arbitrary e, Arbitrary p) => Arbitrary (Battery e p) where
+instance (Arbitrary e, Arbitrary p) => Arbitrary (Chopaan.Node.Storage.Battery.Battery e p) where
   arbitrary = genericArbitrary
 
 instance Arbitrary s => Arbitrary (Chopaan.Node.NodeSensors.T s) where

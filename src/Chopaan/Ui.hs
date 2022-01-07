@@ -6,11 +6,21 @@
 #-}
 module Chopaan.Ui where
 
-import qualified Streamly.Prelude as S
-import qualified Chopaan.Kibbutz.FS as K
 import Control.Exception
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Managed
+
+import qualified Streamly.Prelude as S
+
+
+import qualified Chopaan.Kibbutz.FS as K
+import Chopaan.Kibbutz.KbtzId
+import Chopaan.Node.NodeId
+import Chopaan.Node.HW
+import Chopaan.Node.Components
+
+import Data.Maybe
 
 import DearImGui
 import DearImGui.OpenGL2
@@ -41,6 +51,21 @@ main = do
       , windowResizable = True
       , windowInitialSize = pure 1024
       }
+
+
+
+addNode ::
+  NodeIdx
+  -> NodeMAC
+  -> HW Double
+  -> (Double, Double)
+  -> Maybe NodeIdx
+  -> K.NodeModel
+addNode i mac hw loc conn = K.NodeModel i mac hw loc (K.Ownership i) (fromMaybe i conn)  
+
+addNodes :: (Monad m) => m ()
+addNodes = void $ pure $ do
+  addNode (NodeId 1) (NodeId "ac:bcncsad") (HW (SingBC defBC) (SingPC defPC) (SingLC defLC))
       
 act :: IO ()
 act = do

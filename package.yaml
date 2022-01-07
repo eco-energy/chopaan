@@ -159,6 +159,8 @@ dependencies:
 - managed
 - rel8
 - incremental
+- path
+- path-io
 when:
   - condition: flag(prod)
     then:
@@ -296,48 +298,10 @@ executables:
                 - -rtsopts
                 - -fdicts-strict
                 - -O1
-                - -threaded
                 - -eventlog
       else:
         buildable: false
-  hydrate:
-    main:                Hydrate.hs
-    other-modules:
-      - Paths_chopaan
-    source-dirs:         app
-    when:
-      condition: "!impl(ghcjs)"
-      then:
-        buildable: true
-        dependencies:
-          - chopaan
-          - optparse-simple
-          - base
-        when:
-          - condition: flag(prod)
-            then:
-              ghc-options:
-                #- -fplugin=ConCat.Plugin
-                - -fdicts-strict
-                - -fplugin Fusion.Plugin
-                - -O2
-                - -fmax-worker-args=16
-                - -fspec-constr-recursive=16
-                #- -with-rtsopts=-N
-                - -with-rtsopts=-N
-                - -threaded
-                - -rtsopts
-                - -eventlog
-            else:
-              ghc-options:
-                - -rtsopts
-                - -fdicts-strict
-                - -O1
-                - -threaded
-                - -eventlog
-      else:
-        buildable: false
-
+ 
 
 tests:
   chopaan-test:

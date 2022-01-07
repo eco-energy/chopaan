@@ -26,10 +26,12 @@ import Data.Greskell.Extra (writeKeyValues, (<=:>), pMapToFail, lookupAs)
 import qualified Codec.Winery as W
 
 
-data BatteryType = LeadAcidFlooded | LeadAcidSealed | LithiumIon
+data BatteryType = LeadAcidFlooded | LeadAcidSealed | DryBattery | LithiumIon
   deriving (Eq, Ord, Enum, Bounded, Read, Show,
             Generic, ToJSON, FromJSON, NFData)
   deriving W.Serialise via (W.WineryVariant BatteryType)
+
+
 
 
 -- instance Humanize (Maybe BatteryType) where
@@ -44,6 +46,7 @@ instance FromGraphSON BatteryType where
 data BatteryConf a = BatteryConf
   { minV :: a
   , maxV :: a
+  , nominalV :: a
   , capacityAH :: a
   , batType :: BatteryType
   }
@@ -58,6 +61,8 @@ minVKey :: (GreskellC a, Num a) => Key VFoundNode a
 minVKey = "minV"
 maxVKey :: (GreskellC a, Num a) => Key VFoundNode a
 maxVKey = "maxV"
+nominalVKey :: (GreskellC a, Num a) => Key VFoundNode a
+nominalVKey = "nominalV"
 capacityAHKey :: (GreskellC a, Num a) => Key VFoundNode a
 capacityAHKey = "capacityAH"
 batTypeKey :: (GreskellC a) => Key VFoundNode a
@@ -67,19 +72,21 @@ instance (GreskellC a, Num a) => NodeAttributes (BatteryConf a) where
   writeNodeAttributes bc = writeKeyValues <$> sequence
     [ minVKey <=:> minV bc
     , maxVKey <=:> maxV bc
+    , nominalVKey <=:> nominalV bc
     , capacityAHKey <=:> capacityAH bc
     , batTypeKey <=:> batType bc
     ]
   parseNodeAttributes props = pMapToFail (BatteryConf
                                           <$> lookupAs minVKey props
                                           <*> lookupAs maxVKey props
+                                          <*> lookupAs nominalVKey props
                                           <*> lookupAs capacityAHKey props
                                           <*> lookupAs batTypeKey props
                                          )
 
 
 defBC :: Num a => BatteryConf a
-defBC = BatteryConf 0 0 0 LeadAcidFlooded
+defBC = BatteryConf 0 0 0 0 LeadAcidFlooded
 
 data BatteryTop a = ParBC (BatteryConf a) (BatteryConf a)
                   | SeqBC (BatteryConf a) (BatteryConf a)

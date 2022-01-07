@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeApplications, ScopedTypeVariables, ExplicitForAll, NamedFieldPuns, TupleSections, BangPatterns, PolyKinds, DataKinds, UnboxedTuples #-}
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, DeriveFunctor, DeriveFoldable, DeriveTraversable, DerivingVia, CPP, LambdaCase, RecordWildCards, RankNTypes, ConstraintKinds, GADTs, TypeSynonymInstances, FlexibleInstances, QuantifiedConstraints, MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeApplications, ScopedTypeVariables, NamedFieldPuns, TupleSections, BangPatterns, PolyKinds, DataKinds, UnboxedTuples #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveTraversable, DerivingVia, CPP, LambdaCase, RecordWildCards, RankNTypes, ConstraintKinds, GADTs, FlexibleInstances, QuantifiedConstraints, MultiParamTypeClasses #-}
 module Chopaan.Hydrate
   ( runHydration
   , Command(..)
@@ -9,6 +9,7 @@ module Chopaan.Hydrate
   , HydrationConf(..)
   , parseHConf
   , mkTKbtz
+  , mkConfig
   , ufStream
   , prefixGen
   , nodePrefixes
@@ -26,6 +27,8 @@ import Chopaan.Hydration.Prefix
       asFileName )
 import Chopaan.Node.NodeId ( NodeMAC )
 import Chopaan.Kibbutz.KbtzId ( KbtzId(unKbtzId), KbtzName )
+import qualified Chopaan.Kibbutz.FS as FS
+import Chopaan.Kibbutz.FS (Kbtzim, NodeModel(..))
 import Chopaan.Comm.S3
     ( s3Paths'',
       timedPrefix,
@@ -48,7 +51,7 @@ import Chopaan.Kibbutz.AWS.Common ( Env, withAwsEnv, getAwsEnv )
 import Chopaan.Utils.Retry (recoverC, recoverOrNothing, recoverWith)
 import Chopaan.Comm.Dispatch (accessEnergyState, accessRTS)
 import Chopaan.Node.Folds (sensorFold, meshFold, SensorR, MeshR)
-import Chopaan.Node.HW 
+import Chopaan.Node.HW
 import Chopaan.Utils.Time (utcTimeNow)
 import Data.Influxable (KbtzNode, asKbtzNode, lineSensorR
                        , lineMesh, lineFoldHttp, showText, chopaanDB, wp, qp)
@@ -160,7 +163,7 @@ import System.Envy
 
 type HConM m = (S.MonadAsync m, MonadCatch m, MonadThrow m, MonadMask m)
 
-type HConS t m = (S.IsStream t, HConM m) 
+type HConS t m = (S.IsStream t, HConM m)
 
 type HConfM m a = ReaderT KbtzConf m a
 
@@ -198,20 +201,20 @@ data ParStrategy = ParStrategy
 parseParStrategy :: IO ParStrategy
 parseParStrategy = decodeWithDefaults (ParStrategy 1000 5)
 
-parseHConf :: IO (HydrationConf)
+parseHConf :: IO HydrationConf
 parseHConf = decodeWithDefaults hConfDef
 
 parseHConf' :: IO (Either String HydrationConf)
 parseHConf' = decodeEnv
 
-parseManagerConf :: IO (ManagerSettings)
+parseManagerConf :: IO ManagerSettings
 parseManagerConf = decodeWithDefaults manConfDef
 
 manConfDef :: ManagerSettings
 manConfDef = ManagerSettings 512 10 90
 
 hConfDef :: HydrationConf
-hConfDef = HydrationConf basePath bucket defDate Ten5 Ten2 Infinite 
+hConfDef = HydrationConf basePath bucket defDate Ten5 Ten2 Infinite
   where
     defDate = Date 14 10 2021
     basePath = "./data/hydration"
@@ -231,11 +234,12 @@ data KbtzConf = KbtzConf
   } deriving (Generic)
 
 
-type TNodes = TVar (Set NodeMAC)
+type TNodes = TVar (Set HWNode)
 
-type TMap k v = TVar (M.Map k (TVar (Set v))) 
+type TMap k v = TVar (M.Map k (TVar (Set v)))
 
-type TKbtzim = TMap KbtzName NodeMAC
+type TKbtzim = TMap KbtzName HWNode
+type HWNode = (NodeMAC, HW Double)
 
 lookupTSet :: (Ord k) => k -> TMap k v -> STM (Maybe (Set v))
 lookupTSet k tv = do
@@ -244,7 +248,7 @@ lookupTSet k tv = do
     Nothing -> return Nothing
     Just s' -> Just <$> readTVar s'
 
-readKbtzim :: TKbtzim -> STM (M.Map KbtzName (Set NodeMAC))
+readKbtzim :: TKbtzim -> STM (M.Map KbtzName (Set HWNode))
 readKbtzim k = do
     v <- readTVar k
     let xx = M.toList v
@@ -255,12 +259,17 @@ readKbtzim k = do
     return $ M.fromList v'
 
 data Control = Control
-  { command :: TQueue (Command)
+  { command :: TQueue Command
   , kbtzNodes :: TKbtzim
   }
 
-mkTKbtz :: KbtzNodes -> STM (TKbtzim)
+type KbtzHW = M.Map KbtzName [HWNode]
+
+mkTKbtz :: KbtzHW -> STM TKbtzim
 mkTKbtz kns = newTVar =<< traverse (newTVar . Set.fromList) kns
+
+mkConfig :: Kbtzim -> (TKbtzim, M.Map NodeMAC (HW Double))
+mkConfig = undefined
 
 
 mkKbtzConf :: HydrationConf
@@ -271,39 +280,44 @@ mkKbtzConf :: HydrationConf
   -> Http.WriteParams
   -> ParStrategy
   -> KbtzConf
-mkKbtzConf (HydrationConf{s3Bucket
+mkKbtzConf HydrationConf{s3Bucket
                          , startDate, lifetime
-                         , pastRes, futureRes}) env name store manOrSesh wp parHow =
-  KbtzConf env (S3.BucketName s3Bucket) store name manOrSesh (toUTC startDate) lifetime wp (pastRes, futureRes) parHow
+                         , pastRes, futureRes} env name store manOrSesh wp =
+  KbtzConf env (S3.BucketName s3Bucket)
+  store name
+  manOrSesh (toUTC startDate)
+  lifetime wp
+  (pastRes, futureRes)
+
 
 runHydration :: forall t m. (HConS t m, MonadSample m)
   => InfluxConn
   -> HydrationConf
-  -> TKbtzim
-  -> M.Map NodeMAC (HW Double)
+  -> Kbtzim
   -> t m (NodeMAC, Prefix)
-runHydration influxcon conf kbtzim kHw = S.concatM $ do
-  manConf <- liftIO $ parseManagerConf
+runHydration influxcon conf kbtzim' = S.concatM $ do
+  manConf <- liftIO parseManagerConf
   sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
-  parConf <- liftIO $ parseParStrategy
+  parConf <- liftIO parseParStrategy
   aws <- getAwsEnv S3.s3
   let hydrationDB = "chopaanS3"
   let p = qp influxcon hydrationDB
   liftIO $ DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) hydrationDB
   let
+    (kbtzim, kHw) = mkConfig kbtzim'
     configureH :: (KbtzName, TNodes) -> t m (NodeMAC, Prefix)
     configureH (kId, kNodes) = do
       let
         store = initKbtzStore kId (storePath conf)
         c = mkKbtzConf conf aws kId store
-            (Right sesh) (wp influxcon hydrationDB) parConf 
+            (Right sesh) (wp influxcon hydrationDB) parConf
       hydrateKbtz c kNodes kHw (unfoldNodes (lifetime conf) kbtzim)
   return $ S.concatMap configureH (S.unfold (unfoldKbtzim (lifetime conf) kbtzim) ())
 
-data Command = StartKbtz KbtzName [NodeMAC]
+data Command = StartKbtz KbtzName [HWNode]
              | StopKbtz KbtzName
-             | StartNode KbtzName NodeMAC
-             | StopNode KbtzName NodeMAC
+             | StartNode KbtzName HWNode
+             | StopNode KbtzName HWNode
              | ShowState
              deriving (Eq, Ord, Show, Generic)
 
@@ -319,14 +333,14 @@ onCommand tv (StartKbtz k ns) = do
     Nothing -> do
       v <- newTVar (Set.fromList ns)
       modifyTVar' tv (M.insert k v)
-    Just s' -> modifyTVar' s' (\s'' -> s'' <> (Set.fromList ns))
+    Just s' -> modifyTVar' s' (\s'' -> s'' <> Set.fromList ns)
 onCommand tv (StopKbtz k) = modifyTVar' tv (M.delete k)
 onCommand tv (StartNode k n) = do
   m <- readTVar tv
   let s = M.lookup k m
   case s of
     Nothing -> return ()
-    (Just s') -> modifyTVar s' ((Set.insert n))
+    (Just s') -> modifyTVar s' (Set.insert n)
 onCommand tv (StopNode k n) = do
   m <- readTVar tv
   let s = M.lookup k m
@@ -338,7 +352,7 @@ onCommand tv ShowState = void $ readKbtzim tv
 --getKbtzim = UF.unfoldrM ()
 
 
-unfoldNodes :: forall m. (HConM m) => LifeTime -> TKbtzim -> UF.Unfold m KbtzName NodeMAC
+unfoldNodes :: forall m. (HConM m) => LifeTime -> TKbtzim -> UF.Unfold m KbtzName HWNode
 unfoldNodes lt tv = -- traceUF (liftIO . print) $ 
   UF.many (UF.mkUnfoldM step inject) UF.fromList
   where
@@ -347,22 +361,20 @@ unfoldNodes lt tv = -- traceUF (liftIO . print) $
     onNullDiff s = case lt of
       Finite -> return UF.Stop
       Infinite -> delay >> return (UF.Skip s)
-    step :: (KbtzName, Set NodeMAC) -> m (UF.Step (KbtzName, Set NodeMAC) [NodeMAC])
+    --step :: (KbtzName, Set NodeMAC) -> m (UF.Step (KbtzName, Set NodeMAC) [NodeMAC])
     step (k, oldSet) = do
       newSet <- liftIO . atomically $ lookupTSet k tv
       case newSet of
-        Nothing -> return $ UF.Stop
+        Nothing -> return UF.Stop
         Just s -> do
           let diff = Set.difference s oldSet
-          case (null diff) of
-            True -> onNullDiff (k, s)
-            False -> return $ UF.Yield (Set.toList diff) (k, s)
-    inject :: KbtzName -> m (KbtzName, Set NodeMAC)
+          if (null diff) then onNullDiff (k, s) else return $ UF.Yield (Set.toList diff) (k, s)
+    --inject :: KbtzName -> m (KbtzName, Set NodeMAC)
     inject k = return (k, mempty)
 
 getKeys :: (Ord k) => TMap k v -> STM (Set k)
-getKeys = (fmap (Set.fromList . M.keys)) . readTVar
-    
+getKeys = fmap (Set.fromList . M.keys) . readTVar
+
 unfoldKbtzim :: forall m. (HConM m) => LifeTime -> TKbtzim -> UF.Unfold m () (KbtzName, TNodes)
 unfoldKbtzim lt tv = traceUF (liftIO . print . fst) $
                   UF.many (UF.mkUnfoldM step inject) UF.fromList
@@ -372,25 +384,21 @@ unfoldKbtzim lt tv = traceUF (liftIO . print . fst) $
     onNullDiff s = case lt of
       Finite -> return UF.Stop
       Infinite -> delay >> return (UF.Skip s)
-    step :: (Set KbtzName) -> m (UF.Step (Set KbtzName) [(KbtzName, TNodes)])
+    step :: Set KbtzName -> m (UF.Step (Set KbtzName) [(KbtzName, TNodes)])
     step oldSet = do
       newSet <- liftIO . atomically $ getKeys tv
       let diff = Set.difference newSet oldSet
-      case (null diff) of
-        True -> onNullDiff newSet
-        False -> do
-          let z = (Set.toList diff)
-          ps <- liftIO . atomically $ traverse (flip nodeSet' tv) z
-          return $ UF.Yield (zip z ps) newSet
+      if null diff then onNullDiff newSet else (do
+        let z = Set.toList diff
+        ps <- liftIO . atomically $ traverse (`nodeSet'` tv) z
+        return $ UF.Yield (zip z ps) newSet)
     inject :: () -> m (Set KbtzName)
     inject _ = return mempty
 
 nodeSet' :: KbtzName -> TKbtzim -> STM TNodes
 nodeSet' kId ks = do
-    nodeSet'' <- (M.lookup kId) <$> readTVar ks
-    case nodeSet'' of
-      Nothing -> retry
-      Just s -> return s
+    nodeSet'' <- M.lookup kId <$> readTVar ks
+    maybe retry return nodeSet''
 
 nodeSet :: MonadIO m => KbtzName -> TKbtzim -> m TNodes
 nodeSet kId = liftIO . atomically . nodeSet' kId
@@ -404,7 +412,7 @@ nodePrefixes :: forall m. (HConM m)
   -> (NodeMAC -> IO ())
   -> UF.Unfold m KbtzName NodeMAC
   -> UF.Unfold m NodeMAC Prefix
-  -> S.WAsyncT m (NodeMAC, Prefix) 
+  -> S.WAsyncT m (NodeMAC, Prefix)
 nodePrefixes kbtzId mkDirs ns ps = do
   n <- S.trace (liftIO . mkDirs) $ S.unfold ns kbtzId
   p <- S.unfold ps n
@@ -415,16 +423,16 @@ hydrateKbtz :: forall t m. (HConS t m, MonadSample m)
   => KbtzConf
   -> TNodes
   -> M.Map NodeMAC (HW Double)
-  -> UF.Unfold m KbtzName NodeMAC
+  -> UF.Unfold m KbtzName (NodeMAC, HW Double)
   -> t m (NodeMAC, Prefix)
 hydrateKbtz KbtzConf{kbtzName, kbtzStore, manOrSesh, res, startTime, bucket, env, writeParams, life, parHow} tNodes hw ns = S.concatM $ do
-  t0 <- (liftIO $ Time.getCurrentTime)
+  t0 <- liftIO $ Time.getCurrentTime
   let
     prefixes' = ufStream (prefixGen life inSet res startTime t0)
-    nps = nodePrefixes kbtzName (mkNodeDirs kbtzStore) ns prefixes'
+    nps = nodePrefixes kbtzName (mkNodeDirs kbtzStore) (fmap fst ns) prefixes'
   return $ S.fromWAsync
     $ S.tap (inFrame kbtzStore writeParams hw)
-    $ S.map (fst)
+    $ S.map fst
     $ S.filter ((> 0) . snd)
     $ S.trace (pr . frameLog)
     $ dlFramesParFS parHow manOrSesh (bucket, env, t0) (getKbtzPath kbtzStore)
@@ -435,12 +443,12 @@ hydrateKbtz KbtzConf{kbtzName, kbtzStore, manOrSesh, res, startTime, bucket, env
   where
     inSet n = liftIO @m . atomically $ do
       s <- readTVar tNodes
-      return $ Set.member n s
+      return $ Set.member n (Set.map fst s)
     {-# INLINE inSet #-}
     pr = liftIO . print
-    prefLog (n, p) = "Prefix Generated :" <> (show (n, p))
-    keyLog ((n, p), i) = "Keys Downloaded" <> (show (n, p, i))
-    frameLog ((n, p), i) = "Frames Downloaded:" <> (show (n, p, i))
+    prefLog (n, p) = "Prefix Generated :" <> show (n, p)
+    keyLog ((n, p), i) = "Keys Downloaded" <> show (n, p, i)
+    frameLog ((n, p), i) = "Frames Downloaded:" <> show (n, p, i)
 
 prefixGen :: forall m a. (S.MonadAsync m, Ord a)
   => LifeTime
@@ -449,7 +457,7 @@ prefixGen :: forall m a. (S.MonadAsync m, Ord a)
   -> Time.UTCTime
   -> Time.UTCTime
   -> a
-  -> S.SerialT m Prefix 
+  -> S.SerialT m Prefix
 prefixGen life keep (pastRes, futureRes) start now n = case life of
   Finite -> past
   Infinite -> S.uniq (past <> future)
@@ -459,7 +467,7 @@ prefixGen life keep (pastRes, futureRes) start now n = case life of
     future = posthence futureRes
     {-# INLINE future #-}
 {-# INLINE prefixGen #-}
-    
+
 
 deriving newtype instance W.Serialise ST.MilliSecond64
 
@@ -471,7 +479,7 @@ newtype S3Id = S3Id ST.MilliSecond64
 deriving newtype instance W.Serialise S3.ObjectKey
 
 toS3Id :: S3.ObjectKey -> S3Id
-toS3Id = S3Id . ST.MilliSecond64 . read . T.unpack . snd . (T.breakOnEnd ("/")) . (T.replace " " "") . unObject
+toS3Id = S3Id . ST.MilliSecond64 . read . T.unpack . snd . T.breakOnEnd ("/") . T.replace " " "" . unObject
 
 newtype S3Idx a = S3Idx (S3Id, a)
   deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
@@ -484,7 +492,7 @@ type S3Key = S3Idx S3.ObjectKey
 
 type S3Req = S3Idx BS.ByteString
 
-type S3Body = (S3Idx (BS.ByteString))
+type S3Body = (S3Idx BS.ByteString)
 
 type GetObjError = (S3Idx RespStatus)
 
@@ -505,7 +513,7 @@ wrapStatus s = RespStatus (NC.statusCode s, NC.statusMessage s, state)
 
 type S3Resp = Either GetObjError S3Body
 
-(</>) :: FilePath -> FilePath -> FilePath 
+(</>) :: FilePath -> FilePath -> FilePath
 a </> b = a <> "/" <> b
 
 data StoreType = Keys | Frames | Errors | Ingested
@@ -520,11 +528,11 @@ data KbtzStore = KbtzStore
   , frameFolder :: NodeMAC -> FilePath
   , errFolder :: NodeMAC -> FilePath
   , ingestedFolder :: NodeMAC -> FilePath
-  , keyFile :: (NodeMAC -> Prefix -> FilePath)
-  , frameFile :: (NodeMAC -> Prefix -> FilePath)
-  , errFile :: (NodeMAC -> Prefix -> FilePath)
-  , ingestedFile :: (NodeMAC -> Prefix -> FilePath)
-  , tagger :: (NodeMAC -> KbtzNode)
+  , keyFile :: NodeMAC -> Prefix -> FilePath
+  , frameFile :: NodeMAC -> Prefix -> FilePath
+  , errFile :: NodeMAC -> Prefix -> FilePath
+  , ingestedFile :: NodeMAC -> Prefix -> FilePath
+  , tagger :: NodeMAC -> KbtzNode
   } deriving (Generic)
 
 
@@ -545,7 +553,7 @@ getKbtzPath KbtzStore{..} = \case
 
 
 traceUF :: (Monad m) => (a -> m b) -> UF.Unfold m x a -> UF.Unfold m x a
-traceUF f = UF.mapM (\a -> f a >> (pure a))
+traceUF f = UF.mapM (\a -> f a >> pure a)
 
 initKbtzStore :: KbtzName -> FilePath -> KbtzStore
 initKbtzStore kbtz base = KbtzStore mkNodeDirs
@@ -553,18 +561,18 @@ initKbtzStore kbtz base = KbtzStore mkNodeDirs
     (hFile Keys) (hFile Frames) (hFile Errors) (hFile Ingested) (asKbtzNode kbtz)
   where
     root = base </> (T.unpack . showText $ kbtz)
-    nodeDirHere here n =  root </> here </> (nodeMACPath n)
+    nodeDirHere here n =  root </> here </> nodeMACPath n
     mkNodeDirHere p n = cd (nodeDirHere p n)
     mkNodeDirs :: NodeMAC -> IO ()
-    mkNodeDirs n = mapM_ (\p -> mkNodeDirHere p n) storeDirNames
+    mkNodeDirs n = mapM_ (`mkNodeDirHere` n) storeDirNames
       where
         storeDirNames :: [FilePath]
         storeDirNames = storeTypeName <$>  [(minBound @StoreType)..maxBound]
     hFolder :: StoreType -> NodeMAC -> FilePath
     hFolder s n = base
-                  </> (T.unpack (unKbtzId kbtz))
-                  </> (storeTypeName s)
-                  </> (nodeMACPath n)
+                  </> T.unpack (unKbtzId kbtz)
+                  </> storeTypeName s
+                  </> nodeMACPath n
     hFile :: StoreType -> NodeMAC -> Prefix -> FilePath
     hFile s n pref = hFolder s n
                      </> (T.unpack . asFileName $ pref)
@@ -582,20 +590,20 @@ inFrame :: forall m. (HConM m, MonadSample m)
   => KbtzStore
   -> Http.WriteParams
   -> M.Map NodeMAC (HW Double)
-  -> FL.Fold m (NodeMAC, Prefix) (M.Map NodeMAC ()) 
-inFrame store writeParams hw = FL.classifyWith (fst) ingestNode 
+  -> FL.Fold m (NodeMAC, Prefix) (M.Map NodeMAC ())
+inFrame store writeParams hw = FL.classifyWith fst ingestNode
   where
-    ingestNode :: FL.Fold m (NodeMAC, Prefix) (())
-    ingestNode = (FL.mkFoldM iN (pure $ FL.Partial ((), Nothing)) (pure . fst))
+    ingestNode :: FL.Fold m (NodeMAC, Prefix) ()
+    ingestNode = FL.mkFoldM iN (pure $ FL.Partial ((), Nothing)) (pure . fst)
       where
         iN (_, oldF) (n, p) = do
           let thisF = fromMaybe (nodeFold n) oldF
-          (r, newF) <- ingestFrames (readNP p) thisF (FL.lmap nodeLines $ fl)  n
+          (r, newF) <- ingestFrames (readNP p) thisF (FL.lmap nodeLines fl)  n
           return $ FL.Partial (r, newF)
           where
-            tag = (tagger store $ n)
-            nodeLines = (\(a, b) -> a <> b) . bimap (lineSensorR tag) (lineMesh tag)
-            nodeFold n' = (FL.partition (sensorFold (hw M.! n')) (meshFold n'))
+            tag = tagger store $ n
+            nodeLines = (uncurry (<>)) . bimap (lineSensorR tag) (lineMesh tag)
+            nodeFold n' = FL.partition (sensorFold (hw M.! n')) (meshFold n')
     readNP p = UF.many (UF.function (\n' -> getKbtzPath store Frames n' p)) File.read
     fl = lineFoldHttp 32 writeParams
 
@@ -608,35 +616,34 @@ ingestFrames :: forall m r. (S.MonadAsync m, MonadCatch m)
   -> FL.Fold m (SensorR, MeshR) r
   -> NodeMAC
   -> m (r, Maybe (GF m))
-ingestFrames source nodeFold lnFold n = do
+ingestFrames source nodeFold lnFold n =
   S.fold (FL.unzip lnFold FL.last)
-    . S.fromAhead
-    . S.maxThreads 3000
-    . S.tapRate 60 (\r -> liftIO $ print $ "Ingest Rate for " <> (show n) <> " : " <> (show r))
-    . S.postscan (FL.tee nodeFold (FL.duplicate nodeFold))
-    . S.catMaybes
-    . S.trace (logNothing)
-    . S.map (validateMF')
-    . S.rights
-    . S.trace (logEither)
-    . S.mapM (pure . parsePB)
-    . decodeFrames
-    $ S.unfold source n
+  . S.fromAhead
+  . S.maxThreads 3000
+  . S.tapRate 60 (\r -> liftIO $ print $ "Ingest Rate for " <> (show n) <> " : " <> (show r))
+  . S.postscan (FL.tee nodeFold (FL.duplicate nodeFold))
+  . S.catMaybes
+  . S.trace (logNothing)
+  . S.map (validateMF')
+  . S.rights
+  . S.trace (logEither)
+  . S.mapM (pure . parsePB)
+  . decodeFrames
+  $ S.unfold source n
   where
-    parsePB = (traverse ((fmap fromPB) . decodeA @(PB MeshFrame) . SBS.toArray))
+    parsePB = traverse ((fmap fromPB) . decodeA @(PB MeshFrame) . SBS.toArray)
     validateMF' :: S3Idx MeshFrame -> Maybe (Either EnergyState RuntimeStats)
-    validateMF' (S3Idx ((S3Id idx), m)) = case accessEnergyState m of
-      Just !e -> Just . Left $ fixGridTS t e
-      Nothing ->
-        case accessRTS m of
-          Just !r -> Just . Right $ fixMeshTS t r
-          Nothing -> Nothing
+    validateMF' (S3Idx (S3Id idx, m)) = case accessEnergyState m of
+      (Just !e) -> Just . Left $ fixGridTS t e
+      Nothing -> case accessRTS m of
+        Just !r -> Just . Right $ fixMeshTS t r
+        Nothing -> Nothing
      where
-       t = Just . posixSecondsToUTCTime . fromIntegral $ div idx 1000 
-    decodeFrames :: forall t . (S.IsStream t) => t m Word8 -> t m (S3Body)
-    decodeFrames = S.map (fromWino)
+       t = Just . posixSecondsToUTCTime . fromIntegral $ div idx 1000
+    decodeFrames :: forall t . (S.IsStream t) => t m Word8 -> t m S3Body
+    decodeFrames = S.map fromWino
       . S.rights
-      . S.trace (logEither)
+      . S.trace logEither
       . decodeS @t @m @(Wino S3Body)
 
 
@@ -644,14 +651,14 @@ commonPref :: Prefix -> Prefix -> Maybe (T.Text, T.Text, T.Text)
 commonPref (Prefix p) (Prefix p') = T.commonPrefixes (T.pack . show $ p) (T.pack . show $ p')
 
 latestPrefix :: (HConM m) => A.Array Prefix -> m (Maybe Prefix)
-latestPrefix a = A.fold (FL.maximum) a
+latestPrefix = A.fold (FL.maximum)
 
 mapToStream :: (HConS t m, Ord k) => (k -> ar -> m (Maybe pi)) -> M.Map k ar -> m (t m (k, pi))
-mapToStream f = (fmap (S.fromList
+mapToStream f = fmap (S.fromList
                        . map (second fromJust)
                        . filter (isJust . snd)
-                       . M.toList))
-                . (M.traverseWithKey f)
+                       . M.toList)
+                . M.traverseWithKey f
 
 dlFramesParFS ::
   forall t m. HConS t m
@@ -671,19 +678,19 @@ dlFramesParFS st manOrSesh sw getPath = S.maxThreads (sourceGenThreads st) . S.m
       where
         frameSink = saveWithLength (n, p) (encodeFold (getPath Frames n p))
         errSink = encodeFold (getPath Errors n p)
-        keySource :: S.AheadT m (S3Key)
+        keySource :: S.AheadT m S3Key
         keySource = decodeKeys readAll
           where
             readAll = S.unfold File.read (getPath Keys n p)
-            decodeKeys :: S.AheadT m Word8 -> S.AheadT m (S3Key)
-            decodeKeys = S.map (fromWino)
+            decodeKeys :: S.AheadT m Word8 -> S.AheadT m S3Key
+            decodeKeys = S.map fromWino
               . S.rights
-              . S.trace (logEither)
+              . S.trace logEither
               . decodeS @S.AheadT @m @(Wino S3Key)
 {-# INLINE dlFramesParFS #-}
 
-saveWithLength :: (MonadIO m) => b -> FL.Fold m a () -> FL.Fold m a (b, Int) 
-saveWithLength tag f = FL.rmapM (\x -> (return (tag, (snd x))))
+saveWithLength :: (MonadIO m) => b -> FL.Fold m a () -> FL.Fold m a (b, Int)
+saveWithLength tag f = FL.rmapM (\x -> return (tag, (snd x)))
                        (FL.tee f FL.length)
 {-# INLINE saveWithLength #-}
 
@@ -695,7 +702,7 @@ dlHttpClient :: forall m tag r. (HConM m, Show tag)
   -> FL.Fold m (Wino S3Body) r
   -> FL.Fold m (Wino GetObjError) ()
   -> S.AheadT m S3Key
-  -> m r 
+  -> m r
 dlHttpClient nThreads man signWith = download (dl nThreads man signWith)
 {-# INLINABLE dlHttpClient #-}
 
@@ -708,7 +715,7 @@ dlWreq :: forall m tag r. (HConM m, Show tag)
   -> FL.Fold m (Wino S3Body) r
   -> FL.Fold m (Wino GetObjError) ()
   -> S.AheadT m S3Key
-  -> m r 
+  -> m r
 dlWreq nThreads sesh signWith = download (sessionS3 nThreads signWith sesh)
 {-# INLINABLE dlWreq #-}
 
@@ -720,33 +727,33 @@ download :: forall m tag r. (HConM m, Show tag)
   -> FL.Fold m (Wino GetObjError) ()
   -> S.AheadT m S3Key
   -> m r
-download download' tag saveDL saveErr = (fmap snd)
+download download' tag saveDL saveErr = fmap snd
   . S.fold (FL.partition saveErr saveDL)
   . S.map (bimap toWino toWino)
-  . S.tapRate 60 (printDLRate)
+  . S.tapRate 60 printDLRate
   . S.fromAhead
   . download'
   where
     printDLRate r = liftIO . print
       $ "Download rate from Node "
-      <> (show tag)
-      <> " is " <> (show r)
+      <> show tag
+      <> " is " <> show r
 {-# INLINE download #-}
 
 
 dl :: forall m. HConM m => Int -> NC.Manager -> SignWith -> S.AheadT m S3Key -> S.AheadT m S3Resp
-dl nThreads man signWith = S.trace (logEither)
+dl nThreads man signWith = S.trace logEither
                            . S.maxThreads nThreads
-                           . S.mapM (goIdxd)
-                           . S.mapM (signIdxd)
+                           . S.mapM goIdxd
+                           . S.mapM signIdxd
                            . S.maxRate (realToFrac $ nThreads * 2)
   where
-    goIdxd :: S3Req -> m (S3Resp)
+    goIdxd :: S3Req -> m S3Resp
     goIdxd (S3Idx (idx, bs)) = do
       o <- getObject man bs
       return $ bimap (S3Idx . (idx,)) (S3Idx . (idx,)) o
     {-# INLINE goIdxd #-}
-    signIdxd :: S3Key -> m (S3Req)
+    signIdxd :: S3Key -> m S3Req
     signIdxd = traverse (signGetObject signWith)
     {-# INLINE signIdxd #-}
 {-# INLINE dl #-}
@@ -758,14 +765,14 @@ type SignWith = (S3.BucketName, Env, Time.UTCTime)
 sessionS3 :: forall m. (S.MonadAsync m, MonadMask m)
   => Int -> SignWith -> Session.Session -> S.AheadT m S3Key -> S.AheadT m S3Resp
 sessionS3 threads (S3.BucketName bucket, env, _) sesh ks = S.concatM $ do
-  aut <- liftIO $ getAuth
+  aut <- liftIO getAuth
   let
     (AccessKey accessKey) = _authAccess aut
     (SecretKey secretKey) = desensitise . _authSecret $ aut
     opts = ropts accessKey secretKey
   return $ S.maxThreads threads
     $ S.mapM (pure . a) S.|$ S.mapM (traverse (s3GetSafe opts sesh))
-    $ S.maxRate (1000) ks
+    $ S.maxRate 1000 ks
   where
     a (S3Idx (idx, o)) = bimap (S3Idx . (idx,)) (S3Idx . (idx,)) o
     s3GetSafe opts sesh = recoverWith ("req" :: String) 3 (Left . wrapStatus $ NC.imATeapot418) . s3Get opts sesh
@@ -773,33 +780,31 @@ sessionS3 threads (S3.BucketName bucket, env, _) sesh ks = S.concatM $ do
       -> Session.Session
       -> S3.ObjectKey
       -> m (Either RespStatus BS.ByteString)
-    s3Get opts sesh r = liftIO $ do
-      (checkResponse) =<< (Session.getWith opts sesh . toReq $ r) 
+    s3Get opts sesh r = liftIO $
+      (checkResponse) =<< (Session.getWith opts sesh . toReq $ r)
     region = "ap-southeast-1"
     basePath = T.unpack $ "https://" <> bucket <> ".s3." <> region <> ".amazonaws.com" <> "/"
-    toReq (S3.ObjectKey k) = basePath <> (T.unpack k) 
+    toReq (S3.ObjectKey k) = basePath <> T.unpack k
     -- region = env ^. envRegion
     ropts access secret = defaults &
       auth ?~ awsFullAuth AWSv4 access secret Nothing (Just ("s3", "ap-southeast-1"))
-    getAuth = case (env ^. envAuth) of
+    getAuth = case env ^. envAuth of
       Ref _ r -> readIORef r
       Auth ae -> return ae
-    checkResponse :: NC.Response BL.ByteString -> IO (Either RespStatus (BS.ByteString)) 
-    checkResponse resp = case (NC.responseStatus resp == NC.ok200) of
-                           True -> do
-                             let bo = BL.toStrict (NC.responseBody $ resp)
-                             return . Right $! bo
-                           _ -> return . Left . wrapStatus $ NC.responseStatus resp
+    checkResponse :: NC.Response BL.ByteString -> IO (Either RespStatus BS.ByteString)
+    checkResponse resp = if (NC.responseStatus resp == NC.ok200) then (do
+                           let bo = BL.toStrict (NC.responseBody $ resp)
+                           return . Right $! bo) else return . Left . wrapStatus $ NC.responseStatus resp
 
-signGetObject :: (MonadIO m) => SignWith -> S3.ObjectKey -> m (BS.ByteString)
+signGetObject :: (MonadIO m) => SignWith -> S3.ObjectKey -> m BS.ByteString
 signGetObject (bucket, env, t) = sign
   where
-    sign w = liftIO $ withAwsEnv env (liftAWS . presignURL t (oneHour) . toReq $ w)
+    sign w = liftIO $ withAwsEnv env (liftAWS . presignURL t oneHour . toReq $ w)
     toReq k = S3.getObject bucket k
     oneHour = 60 * 60
 {-# INLINE signGetObject #-}
 
-getObject :: (MonadIO m) => NC.Manager -> BS.ByteString -> m (Either RespStatus (BS.ByteString))
+getObject :: (MonadIO m) => NC.Manager -> BS.ByteString -> m (Either RespStatus BS.ByteString)
 getObject manager req = liftIO $ do
   r <- NC.parseRequest . T.unpack . T.decodeUtf8 $ req
   --  let r' = r{ NC.secure = False, NC.port = 80}
@@ -807,19 +812,17 @@ getObject manager req = liftIO $ do
     (Left . wrapStatus $ NC.imATeapot418)
     (NC.withResponse r manager checkResponse)
   where
-    checkResponse :: NC.Response NC.BodyReader -> IO (Either RespStatus (BS.ByteString)) 
-    checkResponse resp = case (NC.responseStatus resp == NC.ok200) of
-                           True -> do
-                             bo <- BS.concat <$> (NC.brConsume . NC.responseBody $ resp)
-                             return . Right $ bo
-                           _ -> return . Left . wrapStatus $ NC.responseStatus resp
+    checkResponse :: NC.Response NC.BodyReader -> IO (Either RespStatus BS.ByteString)
+    checkResponse resp = if (NC.responseStatus resp == NC.ok200) then (do
+                           bo <- BS.concat <$> (NC.brConsume . NC.responseBody $ resp)
+                           return . Right $ bo) else return . Left . wrapStatus $ NC.responseStatus resp
 {-# INLINE getObject #-}
 
 
 fileSaver :: (HConM m) => StoreType -> KbtzStore -> NodeMAC -> Prefix -> FL.Fold m S3Key ((NodeMAC, Prefix), Int)
 fileSaver ty store n t = saveWithLength (n, t) (FL.lmap toWino (encodeFold path))
   where
-    path = (getKbtzPath store ty n t)
+    path = getKbtzPath store ty n t
 {-# INLINE fileSaver #-}
 
 getKeysUF :: forall t m r. (HConS t m, Show r)
@@ -834,8 +837,8 @@ getKeysUF env bucket ns prefixFold = S.mapM (uncurry prefixKeys) ns
     prefixKeys n t = UF.fold (prefixFold n t)
               (UF.map keyed (s3Paths'' env (req n))) t
       where
-        keyed = (toS3Idx . (toS3Id &&& id) . fst)
-        req n' prefix = S3.listObjectsV2 bucket & S3.lovPrefix .~ (timedPrefix n' prefix)
+        keyed = toS3Idx . (toS3Id &&& id) . fst
+        req n' prefix = S3.listObjectsV2 bucket & S3.lovPrefix .~ timedPrefix n' prefix
 {-# INLINE getKeysUF #-}
 
 ourSettings :: ManagerSettings -> NC.ManagerSettings
@@ -844,7 +847,7 @@ ourSettings ManagerSettings{..} = cachingSettings
     oneSec = 1000000
     cachingSettings = tlsManagerSettings -- -- NC.defaultManagerSettings --
       { NC.managerConnCount = manConnCount
-      , NC.managerIdleConnectionCount = manIdleConn 
+      , NC.managerIdleConnectionCount = manIdleConn
       , NC.managerResponseTimeout = NC.responseTimeoutMicro (manTimeout * oneSec)
       -- , NC.managerModifyRequest = preResolveReq c  
       }
@@ -855,7 +858,7 @@ ourSettings ManagerSettings{..} = cachingSettings
 
 
 logNothing :: forall m a. (MonadIO m, Show a) => Maybe a -> m ()
-logNothing = \x -> if (isNothing x) then (liftIO $ print x) else (return ())
+logNothing x = if (isNothing x) then (liftIO $ print x) else (return ())
 {-# INLINE logNothing #-}
 
 logEither :: forall m a b. (MonadIO m, Show a) => Either a b -> m ()

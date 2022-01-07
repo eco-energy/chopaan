@@ -48,9 +48,10 @@ import Proto.NodeMessageSchema.NodeMessages (RuntimeStats, EnergyState)
 import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N (cpuTime)
 import System.IO (stdout)
 
+import Data.Semigroup
 import Chopaan.Kibbutz.KbtzId ( KbtzName )
 import Chopaan.Kibbutz.Kibbutz ( KbtzConn )
-
+import Chopaan.Kibbutz.FS
 
 import Chopaan.Kibbutz.Transactor ()
 import Chopaan.Node.NodeId (NodeMAC)
@@ -79,7 +80,9 @@ import Chopaan.Graph
       withSpider,
       runGraphWithDB,
       DBPools,
-      GraphM )
+      GraphM,
+      TinkerConf
+    )
 import qualified Chopaan.Graph.Algebraic as AG
 import Algebra.Graph.Label (Distance(..))
 
@@ -94,7 +97,13 @@ instance Ord (MessageQs n) where
 instance Show (MessageQs n) where
   show = const "SomeQueue"
 
-type KbtzG n = AG.Graph (Distance R) (n, HW R)
+type KbtzG n = AG.Graph (Sum R) (n, HW R)
+
+type MQTTOpts' n = MQTTOpts
+
+data Channels n = MQTT (MQTTOpts' n) | Qs (MessageQs n) | S3 S3Opts 
+
+data StorageBackend = Influx InfluxConn | JanusGraph TinkerConf | FS ArrPath  
 
 data KbtzC n = KbtzC
   { name :: KbtzName
@@ -119,7 +128,7 @@ newtype Kbtzim = Kbtzim { unKbtzim :: S.SerialT GraphM (Either KbtzName (KbtzNam
   deriving (Generic)
 
 
-mkKbtzConf :: KbtzName -> AG.Graph (Distance R) (n, HW R) -> Either MQTTOpts (MessageQs n) -> Maybe S3Opts -> InfluxConn -> KbtzC n
+mkKbtzConf :: KbtzName -> AG.Graph (Sum R) (n, HW R) -> Either MQTTOpts (MessageQs n) -> Maybe S3Opts -> InfluxConn -> KbtzC n
 mkKbtzConf = KbtzC
 {-# INLINE mkKbtzConf #-}
 
@@ -177,10 +186,9 @@ type GridEv = (SensorR) -- , Maybe Stake, Maybe TxStatus)
 runKibbutz :: forall t. (IsStream t) => KbtzC NodeMAC -> GraphM (t GraphM (KbtzScene NodeMAC))
 runKibbutz kc@KbtzC{name, structure, channelOpts, influxCon} = do
   -- Live Data
-  liftIO . print $ show kc
-  t0 <- liftIO $ getCurrentTime
+  --t0 <- liftIO $ getCurrentTime
   --gridFold <- withSpider $ saveTx name
-  meshFold <- withSpider (addMeshNode @GraphM)
+  --meshFold <- withSpider (addMeshNode @GraphM)
   let
     processES :: t GraphM (NodeMAC, EnergyState) -> t GraphM (GridScene NodeMAC)
     processES s = S.tapRate 60 (\x -> liftIO . print $ "Grid Processed Rate: " <> show x)
