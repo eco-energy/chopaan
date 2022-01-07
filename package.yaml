@@ -161,6 +161,7 @@ dependencies:
 - incremental
 - path
 - path-io
+- grafana
 when:
   - condition: flag(prod)
     then:
@@ -213,32 +214,6 @@ executables:
                 - -fdicts-strict
                 - -O1
                 - -threaded 
-  # dev:
-  #   main:             Dev.hs
-  #   other-modules:
-  #     - Paths_chopaan
-  #   source-dirs:         app
-  #   when:
-  #     condition: "impl(ghcjs)"
-  #     then:
-  #       buildable: false
-  #     else:
-  #       dependencies:
-  #         - chopaan
-  #         - optparse-simple
-  #         - base
-  #       when:
-  #         - condition: flag(prod)
-  #           then:
-  #             ghc-options:
-  #               - -fdicts-strict
-  #               - -O1
-  #               - -threaded
-  #           else:
-  #             ghc-options:
-  #               - -fdicts-strict
-  #               - -O1
-  #               - -threaded 
   ui:
     main:                Ui.hs
     other-modules: []
@@ -250,23 +225,6 @@ executables:
     ghc-options:
       - -threaded
       - -O1
-
-  dashgen:
-    main:                DashGen.hs
-    other-modules: []
-    source-dirs:         app
-    when:
-      condition: "impl(ghcjs)"
-      then:
-        buildable: false
-      else:
-        dependencies:
-          - grafana
-          - optparse-simple
-          - text
-          - bytestring
-          - chopaan
-          - base
   kbtzim:
     main:                Main.hs
     other-modules:
