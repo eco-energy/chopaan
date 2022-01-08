@@ -22,7 +22,7 @@ toPImageC'' = (toPImageC' .)
 --toPImageC'' = (fmap toPImageC' .)
 
 --nodeUi :: StoreC -> GenC -> LoadC -> GridC -> R2 -> ImageC
-nodeUi :: (StoreC :* GenC :* LoadC :* GridC) -> (R2 -> Color)
+nodeUi :: (StoreC :* GenC :* LoadC :* GridC) -> ImageC
 nodeUi = toPImageC (uncurry . uncurry . uncurry $ nodeDisks)
 
 nodeEnergy :: StoreC -> ImageC

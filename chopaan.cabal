@@ -74,6 +74,7 @@ library
       Chopaan.Kibbutz.Transactor
       Chopaan.Kibbutz.Transactor.Stake
       Chopaan.Kibbutz.Transactor.Status
+      Chopaan.Kibbutz.Ui
       Chopaan.Machine
       Chopaan.Monad.Env
       Chopaan.Node.Calibration

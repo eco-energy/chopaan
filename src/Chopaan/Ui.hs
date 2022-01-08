@@ -4,15 +4,29 @@
 {-# LANGUAGE DeriveGeneric, DeriveFunctor, DeriveFoldable
 , DeriveTraversable, DeriveAnyClass, GeneralisedNewtypeDeriving, DerivingStrategies, DerivingVia
 #-}
+{-# LANGUAGE TypeOperators, TypeApplications, ScopedTypeVariables, ConstraintKinds #-}
 module Chopaan.Ui where
 
+
+import GHC.Generics
 import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Managed
 
-import qualified Streamly.Prelude as S
+import ConCat.Misc ((:*),R,sqr,magSqr,Unop,Binop,inNew,inNew2)
+import ConCat.Circuit (GenBuses,(:>))
+import ConCat.Graphics.GLSL
+import ConCat.Graphics.Color (ToColor(..))
+import ConCat.Graphics.Image
+import qualified ConCat.RunCircuit as RC
+import ConCat.Syntactic (Syn,render)
+import ConCat.AltCat (Ok2,toCcc,(:**:)(..))
+import qualified ConCat.AltCat as A
 
+import ConCat.Rebox () -- necessary for reboxing rules to fire
+
+import qualified Streamly.Prelude as S
 
 import qualified Chopaan.Kibbutz.FS as K
 import Chopaan.Kibbutz.KbtzId
@@ -29,13 +43,30 @@ import DearImGui.SDL
 import DearImGui.SDL.OpenGL
 import Graphics.GL
 import SDL
+import Chopaan.Kibbutz.Ui
+
+type GO a b = (GenBuses a, Ok2 (:>) a b)
+
+runSyn :: Syn a b -> IO ()
+runSyn syn = putStrLn ('\n' : ConCat.Syntactic.render syn)
+
+runCirc :: GO a b => String -> (a :> b) -> IO ()
+runCirc nm circ = RC.run nm [] circ
+
+
+-- glsl' :: (GenBuses a, ToColor c)
+--          => String -> Widgets a -> (a -> Image c) -> Shader a
+-- glsl' _ _ _ = error "glsl' called directly"
+-- {-# NOINLINE glsl' #-}
+-- {-# RULES "glsl'"
+--   forall n w f. glsl' n w f = runH n w $ toCcc $ toPImageC f #-}
+
 
 main :: IO ()
 main = do
   initializeAll
   runManaged $ do
     window <- do
-      let title = "Hello, Chopaan!"
       managed $ bracket (createWindow title config) destroyWindow
     glContext <- managed $ bracket (glCreateContext window) glDeleteContext
     _ <- managed $ bracket createContext destroyContext
@@ -45,6 +76,7 @@ main = do
     --let s = S.nil
     liftIO $ mainLoop window -- (largeFont fonts)) --s)
   where
+    title = "Chopaan"
     config = defaultWindow
       { windowGraphicsContext = OpenGLContext defaultOpenGL
       , windowHighDPI = True
@@ -96,7 +128,7 @@ mainLoop window = unlessQuit $ do
   act
   showDemoWindow
   glClear GL_COLOR_BUFFER_BIT
-  render
+  DearImGui.render
   openGL2RenderDrawData =<< getDrawData
   glSwapWindow window
   mainLoop window

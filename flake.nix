@@ -4,7 +4,7 @@
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.nixops-plugged.url = "github:lukebfox/nixops-plugged";
   outputs = { self, nixpkgs, flake-utils, haskellNix, nixops-plugged }:
-    flake-utils.lib.eachSystem [ "x86_64-linux" "x86_64-darwin" ] (system:
+    flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
         projectName = "chopaan";
       overlays = [ haskellNix.overlay
@@ -12,19 +12,19 @@
           # This overlay adds our project to pkgs
           chopaan =
             final.haskell-nix.project' {
-              src =
-                let
-                  cleanGitHaskell = {src, name } :
-                    let
-                      clean = final.haskell-nix.haskellLib.cleanGit {
-                        name = "${name}-gitClean"; inherit src;
-                      };
-                    in
-                      final.haskell-nix.cleanSourceHaskell {
-                        inherit name;
-                        src = clean;
-                      };
-                in cleanGitHaskell { name=projectName; src = ./.; };
+              src = ./.;
+                # let
+                #   cleanGitHaskell = {src, name } :
+                #     let
+                #       clean = final.haskell-nix.haskellLib.cleanGit {
+                #         name = "${name}-gitClean"; inherit src;
+                #       };
+                #     in
+                #       final.haskell-nix.cleanSourceHaskell {
+                #         inherit name;
+                #         src = clean;
+                #       };
+                # in cleanGitHaskell { name=projectName; src = ./.; };
 
               name = projectName;
               #stack-sha256 = "07xcy5j2qir1pnp2g2bznd21z1dfcmv860rzd7nd0iy061iwdi15";
@@ -97,7 +97,7 @@
 
             (
               let passthru = if
-                    __hasAttr project "stack-nix"
+                    builtins.hasAttr "stack-nix" project
                     then project.stack-nix.passthru
                     else project.plan-nix.passthru;
                   getMaterializers = ( name: project:
