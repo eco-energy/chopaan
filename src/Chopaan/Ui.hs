@@ -4,7 +4,7 @@
 {-# LANGUAGE DeriveGeneric, DeriveFunctor, DeriveFoldable
 , DeriveTraversable, DeriveAnyClass, GeneralisedNewtypeDeriving, DerivingStrategies, DerivingVia
 #-}
-{-# LANGUAGE TypeOperators, TypeApplications, ScopedTypeVariables, ConstraintKinds #-}
+{-# LANGUAGE TypeOperators, TypeApplications, ScopedTypeVariables, ConstraintKinds, FlexibleContexts #-}
 module Chopaan.Ui where
 
 
@@ -17,7 +17,7 @@ import Control.Monad.Managed
 import ConCat.Misc ((:*),R,sqr,magSqr,Unop,Binop,inNew,inNew2)
 import ConCat.Circuit (GenBuses,(:>))
 import ConCat.Graphics.GLSL
-import ConCat.Graphics.Color (ToColor(..))
+import ConCat.Graphics.Color
 import ConCat.Graphics.Image
 import qualified ConCat.RunCircuit as RC
 import ConCat.Syntactic (Syn,render)
@@ -44,6 +44,30 @@ import DearImGui.SDL.OpenGL
 import Graphics.GL
 import SDL
 import Chopaan.Kibbutz.Ui
+
+
+type MonConstraint t m n a = ( S.IsStream t, S.MonadAsync m, K.HasPath n
+                           , Renderable n, Renderable a, MonadRender m )
+
+class Renderable a where
+  renderI :: a -> (ImageC, Region)
+
+instance (Renderable a, Renderable b) => Renderable (a, b) where
+  renderI (a, b) = ((A.liftA2' overC colA colB), unionR regA regB)
+    where
+      (colA, regA) = renderI a
+      (colB, regB) = renderI b
+  
+  
+class (Monad m) => MonadRender m where
+  renderM :: ImageC -> Region -> m ()
+  
+newtype RenderM m a = RenderM (m a)
+
+
+monitor :: forall t m n a. (MonConstraint t m n a) => t m (n, a) -> m ()
+monitor = S.foldlM' (\_ a -> (uncurry renderM) . renderI $ a) (pure ()) . S.adapt 
+
 
 type GO a b = (GenBuses a, Ok2 (:>) a b)
 

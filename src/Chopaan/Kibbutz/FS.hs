@@ -73,12 +73,23 @@ import Path
 newtype ArrPath = ArrPath { unArrPath :: Array.Array Word8 }
   deriving (Eq, Ord, Show, Generic)
 
+type FPArrIso = Iso (->) FilePath ArrPath
 
-instance Semigroup ArrPath where
-  a <> b = isoFwd arrDirPath $ isoRev arrDirPath a </> isoRev arrDirPath b
+fpArrIso :: FPArrIso
+fpArrIso = Iso arrPath fromArrPath
+  where
+    arrPath = ArrPath . unsafePerformIO . Array.fromStreamD
+              . S.toStreamD . encodeUtf8 @IO @S.SerialT . S.fromList
+    fromArrPath = unsafePerformIO . (fmap (toFilePath . filename) . parseRelFile <=< S.toList) . decodeUtf8
+                  . Array.toStream . unArrPath
+    
+
+-- instance Semigroup ArrPath where
+--   a <> b = undefined -- isoFwd arrDirPath $ isoRev arrDirPath a </> isoRev arrDirPath b
 
 
-type RelDir = (Path Rel Dir)
+type RelDir = Path Rel Dir
+type AbsDir = Path Abs Dir
 type RelFile = (Path Rel File)
 type PathIso t = Iso (->) (Path Rel t) ArrPath
 
@@ -96,7 +107,7 @@ arrDirPath :: PathIso Dir
 arrDirPath = Iso arrPath fromArrPath
   where
     arrPath = ArrPath . unsafePerformIO . Array.fromStreamD
-              . S.toStreamD . encodeUtf8 @IO @S.SerialT . S.fromList . toFilePath
+              . S.toStreamD . encodeUtf8 @IO @S.SerialT . S.fromList . toFilePath 
     fromArrPath = unsafePerformIO . (fmap dirname . parseRelDir <=< S.toList) . decodeUtf8
                   . Array.toStream . unArrPath
                   
@@ -145,13 +156,13 @@ kbtzimConf =
     . EvL.setRecursiveMode On
 
 
-watchKbtzim :: forall m. (MonadIO m) => RelDir -> S.SerialT m (Either KbtzEv NodeEv)
+watchKbtzim :: forall m t. (MonadIO m) => Path t Dir -> S.SerialT m (Either KbtzEv NodeEv)
 watchKbtzim dir = S.catMaybes $ S.map getEv $ wk dir
   where
-    wk :: RelDir -> S.SerialT m Event
+    wk :: Path t Dir -> S.SerialT m Event
     wk dir = S.before (liftIO $ createDirectoryIfMissing True $ toFilePath dir) $
              S.hoist liftIO $
-             EvL.watchWith kbtzimConf [unArrPath . isoFwd arrDirPath $ dir]
+             EvL.watchWith kbtzimConf [unArrPath . isoFwd fpArrIso . toFilePath $ dir]
 
 getEv :: Event -> Maybe (Either KbtzEv NodeEv)
 getEv ev = case getKbtzEv ev of
@@ -287,6 +298,11 @@ listDirUF ::
   UF.Unfold m FilePath FilePath
 listDirUF = Dir.readFiles
 
+listDirUF' ::
+  forall m.
+  (S.MonadAsync m, MonadCatch m) =>
+  UF.Unfold m FilePath (Path Rel File)
+listDirUF' = UF.map fromJust . UF.filter (isJust) $ parseRelFile <$> listDirUF
 
 logMaybeEither ::
   (Eq a, Show x, Show e, S.MonadAsync m) =>
@@ -308,23 +324,24 @@ createKbtz fp = B.encodeArray fp . B.toWino
 readKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => FilePath -> m KbtzModel
 readKbtz = UF.fold topologicalFold (logMaybeEither readKbtzDir)
 
+toTag :: k -> Tag k
 toTag = Tag
 
 deleteKbtz :: KbtzName -> Unop Kbtzim
 deleteKbtz k = onKbtzEv (DeleteKbtz . toTag $ k)
 
-readKbtzim :: forall m. (S.MonadAsync m, MonadCatch m) => RelDir -> m Kbtzim
+readKbtzim :: forall m. (S.MonadAsync m, MonadCatch m) => AbsDir -> m Kbtzim
 readKbtzim =
   UF.fold toMap
     (UF.mapMWithInput (\i d -> (convertFP i,) <$> readKbtz d) listDirUF) . toFilePath
   where
     convertFP :: FilePath -> KbtzName
-    convertFP = KbtzId . T.pack
+    convertFP = KbtzId . T.pack . toFilePath . dirname . fromJust . parseRelDir
 
 toMap :: (Monad m, Ord n) => FL.Fold m (n, a) (M.Map n a)
 toMap = FL.foldl' (\m (n, a) -> M.insert n a m) mempty
 
-kbtzimEnv :: forall m. (S.MonadAsync m, MonadCatch m, MonadFail m) => Path Rel Dir -> S.SerialT m Kbtzim
+kbtzimEnv :: forall m. (S.MonadAsync m, MonadCatch m, MonadFail m) => Path Abs Dir -> S.SerialT m Kbtzim
 kbtzimEnv fp = S.scan (FL.foldlM' onEv (readKbtzim fp)) (watchKbtzim fp) 
 
 

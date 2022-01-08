@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, TupleSections, AllowAmbiguousTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Chopaan.Kibbutz ( runKibbutz, runKibbutz', runKibbutzM
-                       , KbtzC(..), KbtzScene, mkKbtzConf, S3Opts) where
+                       , KbtzC(..), KbtzScene, mkKbtzConf, S3Opts, KConS) where
 
 import GHC.Generics ( Generic )
 
@@ -15,7 +15,7 @@ import Control.Applicative ()
 import Control.Arrow ( Arrow(second, first) )
 import Control.Monad.IO.Class ( MonadIO(..) )
 import Control.Monad ( (<=<) )
-import Control.Monad.Catch ( MonadCatch )
+import Control.Monad.Catch ( MonadCatch, MonadMask )
 import Control.Monad.STM ()
 import Control.Monad.IO.Unlift ()
 import Control.Monad.Bayes.Class ( MonadSample )
@@ -168,13 +168,13 @@ mqttQs qs opts name ns = do
 
 
 
-runKibbutz' :: forall t m. (IsStream t, MonadAsync m, MonadSample m, MonadCatch m)
+runKibbutz' :: forall t m. (KConS t m)
   => DBPools -> KbtzC NodeMAC -> t m (KbtzScene NodeMAC)
-runKibbutz' poo = S.concatM . (runKibbutzM poo)
+runKibbutz' poo = runKibbutz
 
-runKibbutzM :: forall t m. (IsStream t, MonadAsync m, MonadSample m, MonadCatch m)
+runKibbutzM :: forall t m. (KConS t m)
   => DBPools -> KbtzC NodeMAC -> m (t m (KbtzScene NodeMAC))
-runKibbutzM poo = (pure . S.adapt . S.hoist (runGraphWithDB poo)) <=< (runGraphWithDB poo . runKibbutz)
+runKibbutzM poo = pure . runKibbutz -- (pure . S.adapt . S.hoist (runGraphWithDB poo)) <=< (runGraphWithDB poo .
 
 
 type GridScene n = (M.Map n SensorR)--, Maybe (TxPlan n)), TxState n)
@@ -183,14 +183,17 @@ type MeshScene n = (n, (MeshNode, RxSignal))
 type KbtzScene n = Either (GridScene n) (MeshScene n)
 type GridEv = (SensorR) -- , Maybe Stake, Maybe TxStatus)
 
-runKibbutz :: forall t. (IsStream t) => KbtzC NodeMAC -> GraphM (t GraphM (KbtzScene NodeMAC))
-runKibbutz kc@KbtzC{name, structure, channelOpts, influxCon} = do
+type KConS t m = (IsStream t, S.MonadAsync m, MonadSample m, MonadCatch m, MonadMask m)
+
+runKibbutz :: forall t m. (KConS t m)
+  => KbtzC NodeMAC -> t m (KbtzScene NodeMAC)
+runKibbutz KbtzC{name, structure, channelOpts, influxCon} = S.concatM $ do
   -- Live Data
   --t0 <- liftIO $ getCurrentTime
   --gridFold <- withSpider $ saveTx name
   --meshFold <- withSpider (addMeshNode @GraphM)
   let
-    processES :: t GraphM (NodeMAC, EnergyState) -> t GraphM (GridScene NodeMAC)
+    processES :: t m (NodeMAC, EnergyState) -> t m (GridScene NodeMAC)
     processES s = S.tapRate 60 (\x -> liftIO . print $ "Grid Processed Rate: " <> show x)
                 $ S.map snd
                 --   $ S.tap (FL.mapM (liftIO . print) (FL.lmap getLatest gridFold))
@@ -220,20 +223,10 @@ runKibbutz kc@KbtzC{name, structure, channelOpts, influxCon} = do
     wp' = wp influxCon "chopaanMQTT" 
     glS :: (NodeMAC, (M.Map NodeMAC SensorR)) -> (NodeMAC, SensorR)
     glS (n, m) = (n, fromMaybe initSM (M.lookup n m))
-    sLineF :: FL.Fold GraphM (NodeMAC, SensorR) ()
+    sLineF :: FL.Fold m (NodeMAC, SensorR) ()
     sLineF = FL.lmap (\(n, x) -> lineSensorR (asKbtzNode name n) x) (lineFoldHttp 10 wp')
-    mLineF :: FL.Fold GraphM (NodeMAC, (MeshNode, RxSignal)) ()
+    mLineF :: FL.Fold m (NodeMAC, (MeshNode, RxSignal)) ()
     mLineF = FL.lmap (\(n, x) -> lineMesh (asKbtzNode name n) x) (lineFoldHttp 10 wp')
-      -- Stream Processors that run Folds
-    -- getLatest ::
-    --   (NodeMAC, ((NodeStates NodeMAC, Maybe (TxPlan NodeMAC)), (TxState NodeMAC)))
-    --   -> (NodeMAC, (SensorR, Maybe Stake, Maybe TxStatus))
-    -- getLatest (n, ((Tx a, b), c)) = let
-    --   a' = fromMaybe initSM (M.lookup n a)
-    --   b' = (M.lookup n . unTx) =<< b
-    --   c' = snd <$> (M.lookup n (unTx c))
-    --   in (n, (a', b', c'))
-    -- {-# INLINE getLatest #-}
     horizon = 10 * 60
     {-# INLINE horizon #-}
 

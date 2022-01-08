@@ -13,24 +13,12 @@
           chopaan =
             final.haskell-nix.project' {
               src = ./.;
-                # let
-                #   cleanGitHaskell = {src, name } :
-                #     let
-                #       clean = final.haskell-nix.haskellLib.cleanGit {
-                #         name = "${name}-gitClean"; inherit src;
-                #       };
-                #     in
-                #       final.haskell-nix.cleanSourceHaskell {
-                #         inherit name;
-                #         src = clean;
-                #       };
-                # in cleanGitHaskell { name=projectName; src = ./.; };
-
               name = projectName;
-              #stack-sha256 = "07xcy5j2qir1pnp2g2bznd21z1dfcmv860rzd7nd0iy061iwdi15";
-              #materialized = ./nix/materialized/flake;
-              #checkMaterialization = false;
               compiler-nix-name = "ghc8107";
+              #stack-sha256 = "1znwg9jxi6mbsdj4ih6wb4gvcm9cyrav8qjmmaljypyz8lw32ll5";
+              #materialized = ./nix/materialized/flake/chopaan;
+              #checkMaterialization = true;
+
               modules = [
                 { doHaddock = false;
                   packages.${projectName}.doHaddock = false;
@@ -56,12 +44,16 @@
                  ];
       tools = {
         cabal =
-          { version = "latest"; };
+          { version = "latest";
+            index-state = "2021-12-02T00:00:00Z";
+            plan-sha256 = "03i9rdvnpkr96x3ng5zfvfd9h49qsyzmxlckh2i1yr4xn991yid3";
+            #materialized = ./nix/materialized/flake/cabal;
+          };
         haskell-language-server =
           { version = "latest";
             index-state = "2021-12-02T00:00:00Z";
             plan-sha256 = "1gjx7xi508yn2lrwl7ic1pnyhxzl38ylzy5v9pi9v2q8a6vxi3dd";
-            materialized = ./nix/materialized/hls;
+            materialized = ./nix/materialized/flake/hls;
           };
       };
       pkgs = import nixpkgs { inherit system overlays; inherit (haskellNix) config; };
@@ -96,14 +88,14 @@
             )
 
             (
-              let passthru = if
-                    builtins.hasAttr "stack-nix" project
-                    then project.stack-nix.passthru
-                    else project.plan-nix.passthru;
+              let passthru = p: if
+                    builtins.hasAttr "stack-nix" p
+                    then p.stack-nix.passthru
+                    else p.plan-nix.passthru;
                   getMaterializers = ( name: project:
                     pkgs.linkFarmFromDrvs "${name}" [
-                      passthru.calculateMaterializedSha
-                      passthru.generateMaterialized
+                      (passthru project).calculateMaterializedSha
+                      (passthru project).generateMaterialized
                     ]
                   );
               in

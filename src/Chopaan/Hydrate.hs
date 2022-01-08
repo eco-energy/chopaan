@@ -48,17 +48,14 @@ import Streamly.Binary
       decodeS,
       encodeFold )
 import Chopaan.Kibbutz.AWS.Common ( Env, withAwsEnv, getAwsEnv )
-import Chopaan.Utils.Retry (recoverC, recoverOrNothing, recoverWith)
+import Chopaan.Utils.Retry (recoverWith)
 import Chopaan.Comm.Dispatch (accessEnergyState, accessRTS)
 import Chopaan.Node.Folds (sensorFold, meshFold, SensorR, MeshR)
 import Chopaan.Node.HW
-import Chopaan.Utils.Time (utcTimeNow)
 import Data.Influxable (KbtzNode, asKbtzNode, lineSensorR
-                       , lineMesh, lineFoldHttp, showText, chopaanDB, wp, qp)
-import Chopaan.Graph ( KbtzNodes, GraphM )
+                       , lineMesh, lineFoldHttp, showText, wp, qp)
 
 import Proto.NodeMessageSchema.NodeMessages (MeshFrame, EnergyState, RuntimeStats)
-import qualified Proto.NodeMessageSchema.NodeMessages_Fields as N
 
 import GHC.Generics ( Generic )
 
@@ -66,7 +63,6 @@ import Control.Arrow ((&&&))
 import Control.Monad ( void )
 import Control.Monad.Trans.Class ()
 import Control.Monad.Trans.Reader ( ReaderT )
-import Control.Monad.Trans.State ( StateT )
 import Control.Monad.Catch ( MonadMask, MonadThrow, MonadCatch )
 import Control.Monad.IO.Class ( MonadIO(..) )
 import Control.Monad.Bayes.Class ( MonadSample )
@@ -116,19 +112,13 @@ import Network.AWS.Data.Sensitive (Sensitive(..))
 import qualified Network.AWS.S3 as S3
 
 import Network.DNS.Resolver ()
-import qualified Network.DNS.Cache as NC
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified Network.HTTP.Types as NC
 import qualified Network.HTTP.Client as NC
-import qualified Network.HTTP.Client.Internal as NC (hostAddress)
 
-import Database.InfluxDB.Line (Line)
-import qualified Database.InfluxDB.Query as Q
-import qualified Database.InfluxDB.Write.UDP as Udp
 import qualified Database.InfluxDB.Write as Http
 import qualified Database.InfluxDB.Format as F
 import qualified Database.InfluxDB.Manage as DB
-import qualified Database.InfluxDB.Types as DB
 
 import qualified Codec.Winery as W
 import Data.ProtoLens ()
@@ -146,14 +136,11 @@ import qualified Streamly.Internal.FileSystem.File as File
 import qualified Streamly.Internal.FileSystem.Dir as Dir
 import qualified Streamly.Internal.Data.Stream.IsStream.Transform as S
 import qualified Streamly.Internal.Data.Stream.IsStream.Common as S
-import qualified Streamly.Internal.Data.Stream.IsStream.Generate as S
 import qualified Streamly.Internal.Data.Stream.IsStream.Expand as S
 import qualified Streamly.External.ByteString as SBS
 import qualified Streamly.Internal.Data.Array.Foreign as A
-import qualified Streamly.Internal.Data.Array.Foreign.Type as A
-import qualified Streamly.Internal.Data.Array.Stream.Foreign as AS
 import qualified Streamly.Internal.Data.Time.Units as ST
-import Streamly.Internal.Data.IORef.Prim (Prim(..))
+import Streamly.Internal.Data.IORef.Prim (Prim)
 --import Dhall hiding (newManager, void)
 import System.Directory ()
 import System.Envy
@@ -236,19 +223,19 @@ data KbtzConf = KbtzConf
 
 type TNodes = TVar (Set HWNode)
 
-type TMap k v = TVar (M.Map k (TVar (Set v)))
+type TMap k v = TVar (M.Map k (TVar v))
 
-type TKbtzim = TMap KbtzName HWNode
+type TKbtzim = TMap KbtzName KbtzHW
 type HWNode = (NodeMAC, HW Double)
 
-lookupTSet :: (Ord k) => k -> TMap k v -> STM (Maybe (Set v))
+lookupTSet :: (Ord k) => k -> TMap k (Set v) -> STM (Maybe (Set v))
 lookupTSet k tv = do
   m <- readTVar tv
   case M.lookup k m of
     Nothing -> return Nothing
     Just s' -> Just <$> readTVar s'
 
-readKbtzim :: TKbtzim -> STM (M.Map KbtzName (Set HWNode))
+readKbtzim :: TKbtzim -> STM (M.Map KbtzName KbtzHW)
 readKbtzim k = do
     v <- readTVar k
     let xx = M.toList v
@@ -258,17 +245,19 @@ readKbtzim k = do
                ) xx
     return $ M.fromList v'
 
-data Control = Control
-  { command :: TQueue Command
-  , kbtzNodes :: TKbtzim
-  }
+-- data Control = Control
+--   { command :: TQueue Command
+--   , kbtzNodes :: TKbtzim
+--   }
 
-type KbtzHW = M.Map KbtzName [HWNode]
+type KbtzHW = (M.Map NodeMAC HWNode)
 
-mkTKbtz :: KbtzHW -> STM TKbtzim
-mkTKbtz kns = newTVar =<< traverse (newTVar . Set.fromList) kns
+type KbtzimHW = M.Map KbtzName KbtzHW
 
-mkConfig :: Kbtzim -> (TKbtzim, M.Map NodeMAC (HW Double))
+mkTKbtz :: KbtzimHW -> STM TKbtzim
+mkTKbtz kns = newTVar =<< (traverse newTVar kns)
+
+mkConfig :: Kbtzim -> (TKbtzim, KbtzHW)
 mkConfig = undefined
 
 
@@ -290,66 +279,71 @@ mkKbtzConf HydrationConf{s3Bucket
   (pastRes, futureRes)
 
 
+mkKbtzConfM :: (MonadIO m)
+  => Http.WriteParams -> HydrationConf -> (KbtzName, TNodes) -> m (KbtzConf, TNodes)
+mkKbtzConfM wp conf (kId, kNodes) = do
+  manConf <- liftIO parseManagerConf
+  sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
+  parConf <- liftIO parseParStrategy
+  aws <- getAwsEnv S3.s3
+  let
+    store = initKbtzStore kId (storePath conf)
+    c = mkKbtzConf conf aws kId store (Right sesh) wp parConf
+  return (c, kNodes)
+
 runHydration :: forall t m. (HConS t m, MonadSample m)
   => InfluxConn
   -> HydrationConf
   -> Kbtzim
   -> t m (NodeMAC, Prefix)
 runHydration influxcon conf kbtzim' = S.concatM $ do
-  manConf <- liftIO parseManagerConf
-  sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
-  parConf <- liftIO parseParStrategy
-  aws <- getAwsEnv S3.s3
-  let hydrationDB = "chopaanS3"
-  let p = qp influxcon hydrationDB
   liftIO $ DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) hydrationDB
   let
-    (kbtzim, kHw) = mkConfig kbtzim'
-    configureH :: (KbtzName, TNodes) -> t m (NodeMAC, Prefix)
-    configureH (kId, kNodes) = do
-      let
-        store = initKbtzStore kId (storePath conf)
-        c = mkKbtzConf conf aws kId store
-            (Right sesh) (wp influxcon hydrationDB) parConf
-      hydrateKbtz c kNodes kHw (unfoldNodes (lifetime conf) kbtzim)
-  return $ S.concatMap configureH (S.unfold (unfoldKbtzim (lifetime conf) kbtzim) ())
+    (kbtzim, kHws) = mkConfig kbtzim' 
+  let h (c, kNodes) = hydrateKbtz c kNodes kHw (unfoldNodes (lifetime conf) kbtzim)
+  S.unfoldMany (UF.function h) (configs kbtzim)
+  where
+    configs = UF.mapM (mkKbtzConfM w conf) . unfoldKbtzim (lifetime conf)
+    hydrationDB = "chopaanS3"
+    w = wp influxcon hydrationDB
+    p = qp influxcon hydrationDB
+      
+-- data Command = StartKbtz KbtzName [HWNode]
+--              | StopKbtz KbtzName
+--              | StartNode KbtzName HWNode
+--              | StopNode KbtzName HWNode
+--              | ShowState
+--              deriving (Eq, Ord, Show, Generic)
 
-data Command = StartKbtz KbtzName [HWNode]
-             | StopKbtz KbtzName
-             | StartNode KbtzName HWNode
-             | StopNode KbtzName HWNode
-             | ShowState
-             deriving (Eq, Ord, Show, Generic)
 
+-- parseCmd :: (HConS t m) => t m Command
+-- parseCmd = S.delayPre 1 $ S.repeat ShowState
 
-parseCmd :: (HConS t m) => t m Command
-parseCmd = S.delayPre 1 $ S.repeat ShowState
-
-onCommand :: TKbtzim -> Command -> STM ()
-onCommand tv (StartKbtz k ns) = do
-  m <- readTVar tv
-  let s = M.lookup k m
-  case s of
-    Nothing -> do
-      v <- newTVar (Set.fromList ns)
-      modifyTVar' tv (M.insert k v)
-    Just s' -> modifyTVar' s' (\s'' -> s'' <> Set.fromList ns)
-onCommand tv (StopKbtz k) = modifyTVar' tv (M.delete k)
-onCommand tv (StartNode k n) = do
-  m <- readTVar tv
-  let s = M.lookup k m
-  case s of
-    Nothing -> return ()
-    (Just s') -> modifyTVar s' (Set.insert n)
-onCommand tv (StopNode k n) = do
-  m <- readTVar tv
-  let s = M.lookup k m
-  case s of
-    Nothing -> return ()
-    (Just s') -> modifyTVar s' (Set.delete n)
-onCommand tv ShowState = void $ readKbtzim tv
---getKbtzim :: UF.Unfold m TKbtzim KbtzName
---getKbtzim = UF.unfoldrM ()
+-- onCommand :: TKbtzim -> Command -> STM ()
+-- onCommand tv (StartKbtz k ns) = do
+--   m <- readTVar tv
+--   let s = M.lookup k m
+--   case s of
+--     Nothing -> do
+--       v <- newTVar (Set.fromList ns)
+--       modifyTVar' tv (M.insert k v)
+--     Just s' -> modifyTVar' s' (\s'' -> s'' <> Set.fromList ns)
+-- onCommand tv (StopKbtz k) = modifyTVar' tv (M.delete k)
+-- onCommand tv (StartNode k n) = do
+--   m <- readTVar tv
+--   let s = M.lookup k m
+--   case s of
+--     Nothing -> return ()
+--     (Just s') -> modifyTVar s' (Set.insert n)
+-- onCommand tv (StopNode k n) = do
+--   m <- readTVar tv
+--   let s = M.lookup k m
+--   case s of
+--     Nothing -> return ()
+--     (Just s') -> modifyTVar s' (Set.delete n)
+-- onCommand tv ShowState = void $ readKbtzim tv
+-- --getKbtzim :: UF.Unfold m TKbtzim KbtzName
+-- --getKbtzim = UF.unfoldrM ()
 
 
 unfoldNodes :: forall m. (HConM m) => LifeTime -> TKbtzim -> UF.Unfold m KbtzName HWNode
@@ -396,9 +390,7 @@ unfoldKbtzim lt tv = traceUF (liftIO . print . fst) $
     inject _ = return mempty
 
 nodeSet' :: KbtzName -> TKbtzim -> STM TNodes
-nodeSet' kId ks = do
-    nodeSet'' <- M.lookup kId <$> readTVar ks
-    maybe retry return nodeSet''
+nodeSet' kId ks = maybe retry return =<< (M.lookup kId <$> readTVar ks)
 
 nodeSet :: MonadIO m => KbtzName -> TKbtzim -> m TNodes
 nodeSet kId = liftIO . atomically . nodeSet' kId
