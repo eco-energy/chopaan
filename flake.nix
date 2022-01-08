@@ -15,8 +15,8 @@
               src = ./.;
               name = projectName;
               compiler-nix-name = "ghc8107";
-              #stack-sha256 = "1znwg9jxi6mbsdj4ih6wb4gvcm9cyrav8qjmmaljypyz8lw32ll5";
-              #materialized = ./nix/materialized/flake/chopaan;
+              stack-sha256 = "1znwg9jxi6mbsdj4ih6wb4gvcm9cyrav8qjmmaljypyz8lw32ll5";
+              materialized = ./nix/materialized/flake/chopaan;
               #checkMaterialization = true;
 
               modules = [

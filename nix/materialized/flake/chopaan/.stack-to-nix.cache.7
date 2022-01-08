@@ -1,0 +1,78 @@
+{ system
+  , compiler
+  , flags
+  , pkgs
+  , hsPkgs
+  , pkgconfPkgs
+  , errorHandler
+  , config
+  , ... }:
+  {
+    flags = {};
+    package = {
+      specVersion = "1.10";
+      identifier = { name = "concat-hardware"; version = "0.1.0.0"; };
+      license = "BSD-3-Clause";
+      copyright = "2017 Conal Elliott, David Banas";
+      maintainer = "capn.freako@gmail.com";
+      author = "Conal Elliott, David Banas";
+      homepage = "";
+      url = "";
+      synopsis = "Circuit description (HDL) via compiling-to-categories";
+      description = "Circuit description (HDL) via compiling-to-categories";
+      buildType = "Simple";
+      };
+    components = {
+      "library" = {
+        depends = [
+          (hsPkgs."base" or (errorHandler.buildDepError "base"))
+          (hsPkgs."concat-classes" or (errorHandler.buildDepError "concat-classes"))
+          (hsPkgs."concat-examples" or (errorHandler.buildDepError "concat-examples"))
+          (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
+          (hsPkgs."directory" or (errorHandler.buildDepError "directory"))
+          (hsPkgs."prettyclass" or (errorHandler.buildDepError "prettyclass"))
+          (hsPkgs."text" or (errorHandler.buildDepError "text"))
+          (hsPkgs."verilog" or (errorHandler.buildDepError "verilog"))
+          (hsPkgs."netlist" or (errorHandler.buildDepError "netlist"))
+          (hsPkgs."netlist-to-verilog" or (errorHandler.buildDepError "netlist-to-verilog"))
+          ];
+        buildable = true;
+        };
+      tests = {
+        "hardware-examples" = {
+          depends = [
+            (hsPkgs."base" or (errorHandler.buildDepError "base"))
+            (hsPkgs."concat-classes" or (errorHandler.buildDepError "concat-classes"))
+            (hsPkgs."concat-examples" or (errorHandler.buildDepError "concat-examples"))
+            (hsPkgs."concat-hardware" or (errorHandler.buildDepError "concat-hardware"))
+            (hsPkgs."concat-plugin" or (errorHandler.buildDepError "concat-plugin"))
+            (hsPkgs."ghc-prim" or (errorHandler.buildDepError "ghc-prim"))
+            (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
+            (hsPkgs."text" or (errorHandler.buildDepError "text"))
+            (hsPkgs."verilog" or (errorHandler.buildDepError "verilog"))
+            (hsPkgs."netlist" or (errorHandler.buildDepError "netlist"))
+            (hsPkgs."netlist-to-verilog" or (errorHandler.buildDepError "netlist-to-verilog"))
+            ];
+          buildable = true;
+          };
+        "hardware-trace" = {
+          depends = [
+            (hsPkgs."base" or (errorHandler.buildDepError "base"))
+            (hsPkgs."concat-classes" or (errorHandler.buildDepError "concat-classes"))
+            (hsPkgs."concat-examples" or (errorHandler.buildDepError "concat-examples"))
+            (hsPkgs."concat-hardware" or (errorHandler.buildDepError "concat-hardware"))
+            (hsPkgs."concat-plugin" or (errorHandler.buildDepError "concat-plugin"))
+            (hsPkgs."ghc-prim" or (errorHandler.buildDepError "ghc-prim"))
+            (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
+            (hsPkgs."text" or (errorHandler.buildDepError "text"))
+            (hsPkgs."verilog" or (errorHandler.buildDepError "verilog"))
+            (hsPkgs."netlist" or (errorHandler.buildDepError "netlist"))
+            (hsPkgs."netlist-to-verilog" or (errorHandler.buildDepError "netlist-to-verilog"))
+            ];
+          buildable = true;
+          };
+        };
+      };
+    } // rec {
+    src = (pkgs.lib).mkDefault /nix/store/hdfxl3ynbs72xfbgymzxmjz1ghmlpiyi-concat-21723a1/hardware;
+    }

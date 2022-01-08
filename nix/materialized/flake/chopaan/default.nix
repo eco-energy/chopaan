@@ -1,0 +1,160 @@
+{
+  extras = hackage:
+    {
+      packages = {
+        "aeson" = (((hackage.aeson)."1.5.6.0").revisions).default;
+        "ghcjs-dom" = (((hackage.ghcjs-dom)."0.9.4.0").revisions).default;
+        "ghcjs-dom-jsaddle" = (((hackage.ghcjs-dom-jsaddle)."0.9.4.0").revisions).default;
+        "jsaddle-dom" = (((hackage.jsaddle-dom)."0.9.4.1").revisions).default;
+        "quickspec" = (((hackage.quickspec)."2.1.5").revisions).default;
+        "suavemente" = (((hackage.suavemente)."0.2.0.0").revisions).default;
+        "diagrams-lib" = (((hackage.diagrams-lib)."1.4.4").revisions).default;
+        "diagrams-core" = (((hackage.diagrams-core)."1.5.0").revisions).default;
+        "dual-tree" = (((hackage.dual-tree)."0.2.3.0").revisions).default;
+        "active" = (((hackage.active)."0.2.0.15").revisions).default;
+        "beam-core" = (((hackage.beam-core)."0.9.0.0").revisions).default;
+        "beam-postgres" = (((hackage.beam-postgres)."0.5.0.0").revisions).default;
+        "beam-migrate" = (((hackage.beam-migrate)."0.5.0.0").revisions).default;
+        "optics-extra" = (((hackage.optics-extra)."0.3").revisions).default;
+        "linear" = (((hackage.linear)."1.21.6").revisions).default;
+        "prettyprinter-ansi-terminal" = (((hackage.prettyprinter-ansi-terminal)."1.1.2").revisions).default;
+        "influxdb" = (((hackage.influxdb)."1.9.2").revisions).default;
+        "store" = (((hackage.store)."0.7.12").revisions).default;
+        "one-liner" = (((hackage.one-liner)."1.0").revisions).default;
+        "ulid" = (((hackage.ulid)."0.3.0.0").revisions)."f0eff432ed0f0d0b71be0fd7f45acb54d87aebc4e1e153d2c2e1be4b09eb20b5";
+        "cursor" = (((hackage.cursor)."0.2.0.0").revisions)."9071e1029efc634bab63c8b3fd970bbd133475749ec918138a9e7304b0a7e696";
+        "stm-containers" = (((hackage.stm-containers)."1.1.0.4").revisions)."f83a683357b6e3b1dda3e70d2077a37224ed534df1f74c4e11f3f6daa7945c5b";
+        "stm-hamt" = (((hackage.stm-hamt)."1.2.0.4").revisions)."7957497c022554b7599e790696d1a3e56359ad99e5da36a251894c626ca1f60a";
+        "random-fu-multivariate" = (((hackage.random-fu-multivariate)."0.1.2.1").revisions)."b8b3adcdb01269480b3d28dae1e9c9a040834b9974c434d6996d3e1545c4d4f7";
+        "estimator" = (((hackage.estimator)."1.2.0.0").revisions)."44c85267299ea1e3eeb3e4eb9f317e4972563c84ba8220924c834a99b9048960";
+        "language-glsl" = (((hackage.language-glsl)."0.3.0").revisions)."85c1e7bf2cf5d6e604b7a2899c27e2935033425944db200798e57849e64d4c81";
+        "numeric-limits" = (((hackage.numeric-limits)."0.1.0.0").revisions)."214bb53112bff315e42c0e9efa4a89e2cc2e9914e6232d923b596f29f9b1afe6";
+        "total-map" = (((hackage.total-map)."0.1.3").revisions)."081b917276323564e6d6ebaaf20c14d8ffc0a260cf3f29113c2577f774a272f1";
+        "semiring-num" = (((hackage.semiring-num)."1.6.0.4").revisions)."ea73b7ec4980add625dedfe159dbeea9a37aa540a2a9df0f36263455b1654cc1";
+        "key" = (((hackage.key)."0.1.2.0").revisions)."3bdfda94f99b8f2e01498ddf5f704cd84ce93315b532df50420ded94cbf5ba2e";
+        "fusion-plugin-types" = (((hackage.fusion-plugin-types)."0.1.0").revisions)."0f11bbc445ab8ae3dbbb3d5d2ea198bdb1ac020518b7f4f7579035dc89182438";
+        "geodetics" = (((hackage.geodetics)."0.1.0").revisions)."699c10cd8d69222b125d054cdc8e2bcee7cb0558c78fa1b4fa06b2d3ecf29f5c";
+        "hgeometry" = (((hackage.hgeometry)."0.9.0.0").revisions)."43043574d2ce39c543dfadb629ab3a41fe65d7bf68a1426d8d01312818bc6e4e";
+        "hgeometry-combinatorial" = (((hackage.hgeometry-combinatorial)."0.9.0.0").revisions)."a03b48302d8c542ff2ff90ba5d45f2742cc21ed1a676c8fa4870cd461a273354";
+        "fusion-plugin" = (((hackage.fusion-plugin)."0.2.3").revisions)."edb97d5c2ecd99d3a3ad3eccebbfb44ec1fafb7b48a8c2dfb77896066d8ea1b6";
+        "perfect-vector-shuffle" = (((hackage.perfect-vector-shuffle)."0.1.1.1").revisions)."8656a3f1f491d1d79aba9e0a5dbb08589613202b08c7a9b92570d6bec7390093";
+        "servant-websockets" = (((hackage.servant-websockets)."2.0.0").revisions)."6e9e3600bced90fd52ed3d1bf632205cb21479075b20d6637153cc4567000234";
+        "servant-client-js" = (((hackage.servant-client-js)."0.1.0.0").revisions)."e066d7cb57e0c29e8171206bb979dca27f9ba690c70b1bb606ab5baa80e36549";
+        "servant-rawm-server" = (((hackage.servant-rawm-server)."1.0.0.1").revisions)."bdbc14572a3ca58a8468b1ea1ccb160d77aa56702007c19b55e01e0a4a87ef11";
+        "servant-rawm" = (((hackage.servant-rawm)."1.0.0.0").revisions)."abee186db4f9eaeaf66bc6a442abfdc27ca31871f8e945c8b74244cded001836";
+        "compactable" = (((hackage.compactable)."0.1.2.3").revisions)."1dccae8bcf6aa4cfd01e2fd0ec36c98d6efdd3247b6ab1a49a7cfdede4d27d95";
+        "http2" = (((hackage.http2)."1.6.5").revisions)."f1743ba4a267f525106c218894e4bd2acf28fa047a9ba660b4a317a97382a877";
+        "jsaddle" = (((hackage.jsaddle)."0.9.7.1").revisions)."711e48fa92c04d373fc18f058743dd9a53aecd048c851a47c932ff7d9bff2c82";
+        "jsaddle-warp" = (((hackage.jsaddle-warp)."0.9.7.0").revisions)."2499b761254df1935f95e73285b59de1933d39e405baa76190cb14f9ddf2a687";
+        "ref-tf" = (((hackage.ref-tf)."0.4.0.2").revisions)."69de3550250e0cd69f45d080359cb314a9487c915024349c75b78732bbee9332";
+        "warp" = (((hackage.warp)."3.2.28").revisions)."b32fb8fed7ace4bd206fd897c388c00cdb915ec7e34ee61dc6397d518d9e651c";
+        "twee-lib" = (((hackage.twee-lib)."2.2").revisions)."9fe9327505d8f450a94f2fc9eea74b292901b7992d520aa1dd4f0410fbe0e594";
+        "diagrams-svg" = (((hackage.diagrams-svg)."1.4.3").revisions)."7b4eefffba2b25267eea25155dded4309a153a965eebf16923d289bb797ac3a6";
+        "diagrams-contrib" = (((hackage.diagrams-contrib)."1.4.4").revisions)."4f767211b35c60a018534c23cee1b00f560df999c111e5a2c1629d6fcac077d6";
+        "diagrams-graphviz" = (((hackage.diagrams-graphviz)."1.4.1.1").revisions)."e71afa8f89904c2a6a2cb490dba7108c6425779c2174b90bd90dbaf507a9d3dc";
+        "force-layout" = (((hackage.force-layout)."0.4.0.6").revisions)."4adae4a45a09a9378ea87930f082a968767a2bc95f6b2122e11966c57046a01c";
+        "newtype-generics" = (((hackage.newtype-generics)."0.6").revisions)."ac08e4b6caff80c8310649581ffba887e9d65b659c8b5697feaf32cf135b6c68";
+        "data-interval" = (((hackage.data-interval)."2.0.1").revisions)."e5a8705d15a14d56791fbc1cdb90fdcc434bc084f938c096e70a3194a442b444";
+        "extended-reals" = (((hackage.extended-reals)."0.2.4.0").revisions)."c1c815b8d8763b22566c7877b43a5e9e748b09b753d63096604c61102146d6f0";
+        "algebraic-graphs" = (((hackage.algebraic-graphs)."0.5").revisions)."6eeec5ed1687ff7aa916e7bf9f02f51aaabde6f314dc0b7b1a84156974d7da73";
+        "dhall" = (((hackage.dhall)."1.38.0").revisions)."c0ee9503c367b22d8c1ab23bec0c46d2920589e212eb545dd2d46536895df78e";
+        "cborg-json" = (((hackage.cborg-json)."0.2.2.0").revisions)."cd4bff2a672b75642e9108a50487de49dafcbd91dbef2876390a625fb75c6ac1";
+        "prettyprinter" = (((hackage.prettyprinter)."1.7.0").revisions)."6a9569e21fa61163a7f066d23d701e23e917893e8f39733d6e617ec72787ae5f";
+        "repline" = (((hackage.repline)."0.4.0.0").revisions)."3324479e497d27c40c3d4762bffc52058f9921621d20d2947dcf9a554b94cd0d";
+        "haskeline" = (((hackage.haskeline)."0.8.1.1").revisions)."21c0d6bd9f36a8b0cfbceab30820f4fe4ac72535c4d2cdf217123d816a4e494e";
+        "greskell-websocket" = (((hackage.greskell-websocket)."0.1.2.5").revisions)."1e2a9db2dac540452744940cdddd4f659a02c1667089e46cdd9c201e273dc459";
+        "greskell" = (((hackage.greskell)."1.2.0.1").revisions)."a330a20f5dcf6b28eda7bc301b44322470c3493dcd5c09c176f8c37b6aad9144";
+        "greskell-core" = (((hackage.greskell-core)."0.1.3.6").revisions)."8542953d972ff074db69ebc51fb5cdde3743c4c3bf18a43085c39444ab2d0f6d";
+        "network" = (((hackage.network)."3.1.2.1").revisions)."188d6daea8cd91bc3553efd5a90a1e7c6d0425fa66a53baa74db5b6d9fd75c8b";
+        "ghc-byteorder" = (((hackage.ghc-byteorder)."4.11.0.0.10").revisions)."d47fdef63f2a145091e91b1aedbd46bf61ca03bb935e81e3462a1d904c319de3";
+        "constraints-extras" = (((hackage.constraints-extras)."0.3.1.0").revisions)."c70fcf437e1d640cfd50a8eda1db47a64e49c96857e08fd0d8c438327d908ac1";
+        "html-parse" = (((hackage.html-parse)."0.2.0.2").revisions)."268c6c3a723aae77ff799bf501d60a91e60536facab3ae70df7a74cea75e29c3";
+        "ghcjs-base-stub" = (((hackage.ghcjs-base-stub)."0.3.0.2").revisions)."1ce3ac155173b8036873ad990d3ed86137a643264fb6dad294a935a32e1105a2";
+        "derive-storable" = (((hackage.derive-storable)."0.3.0.0").revisions)."819332e8dd666ec88dab17e3aca0cffced197c1a560f5a003789a9372e7f07f1";
+        "aeson-optics" = (((hackage.aeson-optics)."1.1.0.1").revisions)."730de585030e820cc3ade10d756f257be846d891028942b8c545a8498e6b5580";
+        "exceptions" = (((hackage.exceptions)."0.10.4").revisions)."d2546046d7ba4b460d3bc7fd269cd2c52d0b7fb3cfecc038715dd0881b78a484";
+        "resourcet" = (((hackage.resourcet)."1.2.4.2").revisions)."d57516781d1721f70aa0b9ec8ea9200ab02bf76349cb76d73ad57729302289cc";
+        "indexed-profunctors" = (((hackage.indexed-profunctors)."0.1.1").revisions)."363e1bcd89f8498a770ae783e8388fcce35e6515b4c38dca47327aad81196a7b";
+        "indexed-traversable-instances" = (((hackage.indexed-traversable-instances)."0.1").revisions)."3aaf97040001bbe583e29c2b9c7d41660df265e6565a0d2ac09a3ed5b8bc21be";
+        "optics-core" = (((hackage.optics-core)."0.3.0.1").revisions)."50845a47810eb5a5f03dfa9bb1edd8a577fc7ca1702ba4bde68b235f7cb44528";
+        "indexed-traversable" = (((hackage.indexed-traversable)."0.1.1").revisions)."e330ec1ab336ee2fb1eff117ebe3480d1663396fecd981f185b7123dc7941ae1";
+        "vector" = (((hackage.vector)."0.12.3.0").revisions)."0ae2c1ba86f0077910be242ec6802cc3d7725fe7b2bea6987201aa3737b239b5";
+        "base-orphans" = (((hackage.base-orphans)."0.8.4").revisions)."9a70dc95761ab9a9d49a038a4599b7b7945d486d80ed1678f347445bc336f3e0";
+        "monoid-extras" = (((hackage.monoid-extras)."0.6").revisions)."fabcab0a59ac48d8f271016cf8190b21969b202c760df2db85add2fef93d38b4";
+        "hspec" = (((hackage.hspec)."2.8.3").revisions)."43a42e23994a6c61a7adead7e8a412016680234f5a14a157f68c020871e59534";
+        "hspec-core" = (((hackage.hspec-core)."2.8.3").revisions)."e4c1e08e16842804c470c2b4722e417ed2a556a47a74107401ad42195522f7a7";
+        "hspec-discover" = (((hackage.hspec-discover)."2.8.3").revisions)."b94758b375b5a810ea4c4c187381211c3acc77007f6f795c4e79f206ed6da56a";
+        "winery" = (((hackage.winery)."1.3.2").revisions)."c2289c82301a69df026c86ea31f14d76509309c30fb29fe7e7712ec45d36c2cc";
+        "barbies" = (((hackage.barbies)."2.0.3.0").revisions)."cb400bf207b333d08b3882f6796a52fcd79eeb4924b09dc9b1157124f1cb5dc2";
+        "barbies-th" = (((hackage.barbies-th)."0.1.8").revisions)."2855c0f80c683ad30295370e5d9e786d909355695054ae4126ae61ea5c7779c4";
+        "concurrent-dns-cache" = (((hackage.concurrent-dns-cache)."0.1.3").revisions)."aa90bbd66c325cb27d6ac3124027ffc86e1ecb1ec03dc9f095c1bff5381c5a50";
+        "ghc-events" = (((hackage.ghc-events)."0.16.0").revisions)."ae0115dcf24b1b44ee62009ea377d4f816c53cd585b86541329f104012cececa";
+        "hvega" = (((hackage.hvega)."0.11.0.1").revisions)."0631812a1f849ac3f55fe6f2d4108d023a17118f14ffec085ead2d3c35e5c057";
+        "statistics-linreg" = (((hackage.statistics-linreg)."0.3").revisions)."95c6efe6c7f6b26bc6e9ada90ab2d18216371cf59a6ef2b517b4a6fd35d9a76f";
+        "trie-simple" = (((hackage.trie-simple)."0.4.1.1").revisions)."f5a377053f869f34196178475932732242f73351a7f52c81df2f1d340e6f070a";
+        "cas-store" = (((hackage.cas-store)."1.1.0").revisions)."00175fd67f55582c593a57673f2c02d30b63ed9716a6fe415c6fbe3c9fd996d9";
+        "cas-hashable" = (((hackage.cas-hashable)."1.0.1").revisions)."fa10169aa9c58566eb3bfcda3fb62d76390ea43d8cdcc0878ab0dae2c93ba325";
+        "higgledy" = (((hackage.higgledy)."0.4.1.1").revisions)."103701c8080ec345a21edd3ef149b4d3b8ec66a12a82d3d0b5c5e4a0d7d6ac26";
+        "generic-lens" = (((hackage.generic-lens)."2.2.0.0").revisions)."4008a39f464e377130346e46062e2ac1211f9d2e256bbb1857216e889c7196be";
+        "generic-lens-core" = (((hackage.generic-lens-core)."2.2.0.0").revisions)."b6b69e992f15fa80001de737f41f2123059011a1163d6c8941ce2e3ab44f8c03";
+        "fast-builder" = (((hackage.fast-builder)."0.1.3.0").revisions)."301a50188856ee88706c432c7d5c8c20f744a64a3cbf00346b8c84015c5ecac4";
+        "haxl" = (((hackage.haxl)."2.3.0.0").revisions)."4c9a7371a2c21df910628d582776cf52db72bcd6c808daa02823be0ab06f1eb9";
+        "named" = (((hackage.named)."0.3.0.1").revisions)."418543272f0c844a77639b05276ee3906d5f305cd4cab46fafcb4f15b7f1e60d";
+        "proto-lens" = (((hackage.proto-lens)."0.7.1.0").revisions)."b151890929e71db5b8c2ad86cd758bcdf1dfcf25f34eb6c9ce19e3d7cd4eae39";
+        "proto-lens-runtime" = (((hackage.proto-lens-runtime)."0.7.0.1").revisions)."703f327422b2e204f8ea13c5e178edd8ab42ccd01c7a5a89fcb1b37ab474c68a";
+        "svg-builder" = (((hackage.svg-builder)."0.1.1").revisions)."22de54d326a6b6912e461e1302edb9108b02aac0b6a6368fcdc3c4a224d487fd";
+        "mwc-random" = (((hackage.mwc-random)."0.14.0.0").revisions)."6ae33e246e91f66f621caabb2323b431c8dab57427a417a98f5cac3d82eb7b21";
+        "proto-lens-arbitrary" = (((hackage.proto-lens-arbitrary)."0.1.2.10").revisions)."14012d7783d4f589cba8b7d72b904a48c42d43bb4d9469f871886a1fac2249aa";
+        "unicode-data" = (((hackage.unicode-data)."0.1.0.1").revisions)."57529e1f443a8c5f8f29cda24df810991dd2506edb89f10f7607fc5e44cd52fe";
+        "rel8" = (((hackage.rel8)."1.2.0.0").revisions)."d540fbfb967bf7eed23a1e7df24ef17424ed25575ab05a86a2cf213b2e6d6940";
+        "markov-chain-usage-model" = (((hackage.markov-chain-usage-model)."0.0.0").revisions)."1afa95faeb9213c4d960a669190078b41b89169462b8edd910472980671ba8c0";
+        "incremental" = (((hackage.incremental)."0.3.1").revisions)."9c697bae4f7e5ceb144bde13e03ca2f36b4bc2d0c92bbc02e0a604231ee279c2";
+        "dear-imgui" = (((hackage.dear-imgui)."1.3.0").revisions)."f92f7b28aa8bff6912446f52292f46c5bb73b708015359be979d22e00cfd5655";
+        chopaan = ./chopaan.nix;
+        concat-inline = ./.stack-to-nix.cache.0;
+        concat-known = ./.stack-to-nix.cache.1;
+        concat-satisfy = ./.stack-to-nix.cache.2;
+        concat-classes = ./.stack-to-nix.cache.3;
+        concat-plugin = ./.stack-to-nix.cache.4;
+        concat-examples = ./.stack-to-nix.cache.5;
+        concat-graphics = ./.stack-to-nix.cache.6;
+        concat-hardware = ./.stack-to-nix.cache.7;
+        streamly = ./.stack-to-nix.cache.8;
+        streamly-bytestring = ./.stack-to-nix.cache.9;
+        testcontainers = ./.stack-to-nix.cache.10;
+        resource-pool = ./.stack-to-nix.cache.11;
+        grafana = ./.stack-to-nix.cache.12;
+        amazonka = ./.stack-to-nix.cache.13;
+        amazonka-iot = ./.stack-to-nix.cache.14;
+        amazonka-core = ./.stack-to-nix.cache.15;
+        amazonka-s3 = ./.stack-to-nix.cache.16;
+        monad-bayes = ./.stack-to-nix.cache.17;
+        net-spider = ./.stack-to-nix.cache.18;
+        quickcheck-state-machine = ./.stack-to-nix.cache.19;
+        };
+      };
+  resolver = "lts-18.16";
+  modules = [
+    ({ lib, ... }:
+      {
+        packages = {
+          "dear-imgui" = {
+            flags = {
+              "opengl3" = lib.mkOverride 900 false;
+              "sdl" = lib.mkOverride 900 true;
+              "opengl2" = lib.mkOverride 900 true;
+              };
+            };
+          "streamly" = {
+            flags = { "use-c-malloc" = lib.mkOverride 900 true; };
+            };
+          "concat-examples" = {
+            flags = { "smt" = lib.mkOverride 900 false; };
+            };
+          };
+        })
+    { packages = {}; }
+    ({ lib, ... }:
+      { planned = lib.mkOverride 900 true; })
+    ];
+  }
