@@ -157,14 +157,14 @@ instance HasVarName TPKey where
   getVarName = show
   fromVarName = read
 
-sumEdges :: forall n a. (Ord n, Ord a, Num a) => AG.Graph a n -> G.Graph (n, a)
-sumEdges = AG.foldg G.empty (G.vertex . (, 0)) newG
-  where
-    newG :: a -> G.Graph (n, a) -> G.Graph (n, a) -> G.Graph (n, a)
-    newG l g@(G.Vertex (n, a)) g'@(G.Vertex (n', a')) = case (compare l 0) of
-      EQ -> G.connect g g'
-      GT -> G.connect (G.Vertex (n, a + l)) g'
-      LT -> G.connect g (G.Vertex (n', a' + l))
+-- sumEdges :: forall n a. (Ord n, Ord a, Num a) => AG.Graph a n -> G.Graph (n, a)
+-- sumEdges = AG.foldg G.empty (G.vertex . (, 0)) newG
+--   where
+--     newG :: a -> G.Graph (n, a) -> G.Graph (n, a) -> G.Graph (n, a)
+--     newG l g@(G.Vertex (n, a)) g'@(G.Vertex (n', a')) = case (compare l 0) of
+--       EQ -> G.connect g g'
+--       GT -> G.connect (G.Vertex (n, a + l)) g'
+--       LT -> G.connect g (G.Vertex (n', a' + l))
       
 exampleTP :: DistanceG TPKey Double
           -> (DistanceG TPKey Double -> G.Graph (TPKey, Double))

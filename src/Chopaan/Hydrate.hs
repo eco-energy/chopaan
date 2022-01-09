@@ -2,8 +2,8 @@
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveTraversable, DerivingVia, CPP, LambdaCase, RecordWildCards, RankNTypes, ConstraintKinds, GADTs, FlexibleInstances, QuantifiedConstraints, MultiParamTypeClasses #-}
 module Chopaan.Hydrate
   ( runHydration
-  , Command(..)
-  , onCommand
+  -- , Command(..)
+  -- , onCommand
   , unfoldNodes
   , LifeTime(..)
   , HydrationConf(..)
@@ -221,43 +221,25 @@ data KbtzConf = KbtzConf
   } deriving (Generic)
 
 
-type TNodes = TVar (Set HWNode)
-
+type TNodes = TVar (KbtzHW)
 type TMap k v = TVar (M.Map k (TVar v))
-
+type KbtzHW = (M.Map NodeMAC (HW Double))
+type KbtzimHW = M.Map KbtzName KbtzHW
 type TKbtzim = TMap KbtzName KbtzHW
-type HWNode = (NodeMAC, HW Double)
 
-lookupTSet :: (Ord k) => k -> TMap k (Set v) -> STM (Maybe (Set v))
+
+lookupTSet :: KbtzName -> TKbtzim -> STM (Maybe (Set NodeMAC))
 lookupTSet k tv = do
   m <- readTVar tv
   case M.lookup k m of
     Nothing -> return Nothing
-    Just s' -> Just <$> readTVar s'
+    Just s' -> (Just . M.keysSet) <$> readTVar s'
 
-readKbtzim :: TKbtzim -> STM (M.Map KbtzName KbtzHW)
-readKbtzim k = do
-    v <- readTVar k
-    let xx = M.toList v
-    v' <- mapM (\(k', v') -> do
-                   v'' <- readTVar v'
-                   return (k', v'')
-               ) xx
-    return $ M.fromList v'
-
--- data Control = Control
---   { command :: TQueue Command
---   , kbtzNodes :: TKbtzim
---   }
-
-type KbtzHW = (M.Map NodeMAC HWNode)
-
-type KbtzimHW = M.Map KbtzName KbtzHW
 
 mkTKbtz :: KbtzimHW -> STM TKbtzim
 mkTKbtz kns = newTVar =<< (traverse newTVar kns)
 
-mkConfig :: Kbtzim -> (TKbtzim, KbtzHW)
+mkConfig :: Kbtzim -> TKbtzim
 mkConfig = undefined
 
 
@@ -279,7 +261,7 @@ mkKbtzConf HydrationConf{s3Bucket
   (pastRes, futureRes)
 
 
-mkKbtzConfM :: (MonadIO m)
+mkKbtzConfM :: forall m. (HConM m)
   => Http.WriteParams -> HydrationConf -> (KbtzName, TNodes) -> m (KbtzConf, TNodes)
 mkKbtzConfM wp conf (kId, kNodes) = do
   manConf <- liftIO parseManagerConf
@@ -292,18 +274,17 @@ mkKbtzConfM wp conf (kId, kNodes) = do
   return (c, kNodes)
 
 runHydration :: forall t m. (HConS t m, MonadSample m)
-  => InfluxConn
+  => Time.UTCTime
+  -> InfluxConn
   -> HydrationConf
   -> Kbtzim
-  -> t m (NodeMAC, Prefix)
-runHydration influxcon conf kbtzim' = S.concatM $ do
-  liftIO $ DB.manage p $ F.formatQuery ("CREATE DATABASE "F.%F.database) hydrationDB
-  let
-    (kbtzim, kHws) = mkConfig kbtzim' 
-  let h (c, kNodes) = hydrateKbtz c kNodes kHw (unfoldNodes (lifetime conf) kbtzim)
-  S.unfoldMany (UF.function h) (configs kbtzim)
+  -> UF.Unfold m () (t m (NodeMAC, Prefix))
+runHydration t0 influxcon conf kbtzim' =
+  UF.many (configs kbtzim) (UF.function (h kbtzim)) 
   where
-    configs = UF.mapM (mkKbtzConfM w conf) . unfoldKbtzim (lifetime conf)
+    kbtzim = mkConfig kbtzim' 
+    h kns (c, kNodes) = hydrateKbtz t0 c kNodes (unfoldNodes (lifetime conf) kns)
+    configs kns = UF.mapM (mkKbtzConfM w conf) $ (unfoldKbtzim (lifetime conf) kns)
     hydrationDB = "chopaanS3"
     w = wp influxcon hydrationDB
     p = qp influxcon hydrationDB
@@ -346,7 +327,7 @@ runHydration influxcon conf kbtzim' = S.concatM $ do
 -- --getKbtzim = UF.unfoldrM ()
 
 
-unfoldNodes :: forall m. (HConM m) => LifeTime -> TKbtzim -> UF.Unfold m KbtzName HWNode
+unfoldNodes :: forall m. (HConM m) => LifeTime -> TKbtzim -> UF.Unfold m KbtzName NodeMAC
 unfoldNodes lt tv = -- traceUF (liftIO . print) $ 
   UF.many (UF.mkUnfoldM step inject) UF.fromList
   where
@@ -412,18 +393,17 @@ nodePrefixes kbtzId mkDirs ns ps = do
 
 
 hydrateKbtz :: forall t m. (HConS t m, MonadSample m)
-  => KbtzConf
+  => Time.UTCTime
+  -> KbtzConf
   -> TNodes
-  -> M.Map NodeMAC (HW Double)
-  -> UF.Unfold m KbtzName (NodeMAC, HW Double)
+  -> UF.Unfold m KbtzName (NodeMAC)
   -> t m (NodeMAC, Prefix)
-hydrateKbtz KbtzConf{kbtzName, kbtzStore, manOrSesh, res, startTime, bucket, env, writeParams, life, parHow} tNodes hw ns = S.concatM $ do
-  t0 <- liftIO $ Time.getCurrentTime
-  let
-    prefixes' = ufStream (prefixGen life inSet res startTime t0)
-    nps = nodePrefixes kbtzName (mkNodeDirs kbtzStore) (fmap fst ns) prefixes'
-  return $ S.fromWAsync
-    $ S.tap (inFrame kbtzStore writeParams hw)
+hydrateKbtz t0 KbtzConf{kbtzName, kbtzStore
+                       , manOrSesh, res
+                       , startTime, bucket
+                       , env, writeParams
+                       , life, parHow} tNodes ns = S.fromWAsync
+    $ S.tap (inFrame kbtzStore writeParams tNodes)
     $ S.map fst
     $ S.filter ((> 0) . snd)
     $ S.trace (pr . frameLog)
@@ -431,11 +411,13 @@ hydrateKbtz KbtzConf{kbtzName, kbtzStore, manOrSesh, res, startTime, bucket, env
     $ S.map fst
     $ S.filter ((> 0) . snd)
     $ S.trace (pr . keyLog)
-    $ getKeysUF env bucket nps (fileSaver Keys kbtzStore)
+    $ getKeysUF env bucket (nps t0) (fileSaver Keys kbtzStore)
   where
+    prefixes' t0 = ufStream (prefixGen life inSet res startTime t0)
+    nps t0 = nodePrefixes kbtzName (mkNodeDirs kbtzStore) ns (prefixes' t0)
     inSet n = liftIO @m . atomically $ do
       s <- readTVar tNodes
-      return $ Set.member n (Set.map fst s)
+      return $ M.member n s
     {-# INLINE inSet #-}
     pr = liftIO . print
     prefLog (n, p) = "Prefix Generated :" <> show (n, p)
@@ -581,7 +563,7 @@ nodeDirUF store stage = uf
 inFrame :: forall m. (HConM m, MonadSample m)
   => KbtzStore
   -> Http.WriteParams
-  -> M.Map NodeMAC (HW Double)
+  -> TNodes
   -> FL.Fold m (NodeMAC, Prefix) (M.Map NodeMAC ())
 inFrame store writeParams hw = FL.classifyWith fst ingestNode
   where
@@ -589,13 +571,16 @@ inFrame store writeParams hw = FL.classifyWith fst ingestNode
     ingestNode = FL.mkFoldM iN (pure $ FL.Partial ((), Nothing)) (pure . fst)
       where
         iN (_, oldF) (n, p) = do
-          let thisF = fromMaybe (nodeFold n) oldF
+          f0 <- (nodeFold n)
+          let thisF = fromMaybe f0 oldF
           (r, newF) <- ingestFrames (readNP p) thisF (FL.lmap nodeLines fl)  n
           return $ FL.Partial (r, newF)
           where
             tag = tagger store $ n
             nodeLines = (uncurry (<>)) . bimap (lineSensorR tag) (lineMesh tag)
-            nodeFold n' = FL.partition (sensorFold (hw M.! n')) (meshFold n')
+            nodeFold n' = do
+              hw' <- liftIO . atomically $ (M.! n) <$> readTVar hw
+              return $ FL.partition (sensorFold (hw')) (meshFold n')
     readNP p = UF.many (UF.function (\n' -> getKbtzPath store Frames n' p)) File.read
     fl = lineFoldHttp 32 writeParams
 

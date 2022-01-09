@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, TypeApplications, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, OverloadedStrings, FlexibleContexts, ViewPatterns #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, StandaloneDeriving, TypeApplications, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, OverloadedStrings, FlexibleContexts, ViewPatterns, TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module SpiderSpec (spec) where
 
@@ -19,6 +19,7 @@ import qualified Data.Text as Text
 import Data.ProtoLens
 import Data.Word
 import Data.Maybe
+import qualified Data.Map.Strict as M
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Parser as A
 import qualified Data.Aeson.Types as A
@@ -29,9 +30,12 @@ import qualified Network.HTTP.Client as NC (brConsume, responseBody)
 import Database.InfluxDB.Query (Query, withQueryResponse)
 import Database.InfluxDB (WriteParams, QueryParams)
 import Database.InfluxDB.JSON (parseSeriesObject, parseSeriesBody, parseResultsObject, parseErrorObject)
+import Data.Monoid
 import qualified Data.Vector as V
 import Data.Influxable
 import NetSpider.Snapshot
+import Chopaan.Graph.Algebraic as AG
+import Chopaan.Node.HW
 import Chopaan.Monad.Env
 import Control.Monad.Bayes.Class
 import Chopaan.Node.NodeId
@@ -110,6 +114,18 @@ foldSpec = do
            $ (sampleStream $ S.postscan (FL.classify (sensorFold undefined)) (esStreams nMessages nNodes ns))
       l `shouldBe` (nMessages * nNodes)
       
+circuit :: [a] -> [(a, a)]
+circuit [] = []
+circuit (_:[]) = []
+circuit (x:y:xs) = (x, y) : (circuit (y:xs)) 
+
+arbG :: (Ord n) => [n] -> Gen (AG.Graph (Sum Double) (n, HW Double))
+arbG ns = do
+  ds <- arbitrary
+  (hw :: [(n, HW Double)]) <- sequence . fmap sequence $ (, arbitrary @(HW Double)) <$> ns
+  let hw' = M.fromList hw
+  return $ AG.edges $
+    zipWith (\(n, n') d' -> (d', (n, hw' M.! n), (n', hw' M.! n'))) (circuit ns) ds
 
 kbtzSpec :: Spec
 kbtzSpec = do
@@ -119,13 +135,13 @@ kbtzSpec = do
           es = sampleStream $ esStreams nMessages nNodes ns 
           rs = rsStreams nMessages nNodes ns
       qs <- initQs
-      k <- S.hoist (runGraphWithDB db) <$> (runGraphWithDB db $ do
-        runKibbutz KbtzC { name = kId
-                         , structure = undefined
-                         , channelOpts = (Right qs)
-                         , s3Opts = Nothing
-                         , influxCon = ic
-                         })
+      struct <- generate $ arbG ns
+      let k = S.hoist (runGraphWithDB db) $ runKibbutz KbtzC { name = kId
+                                                          , structure = struct
+                                                          , channelOpts = (Right qs)
+                                                          , s3Opts = Nothing
+                                                          , influxCon = ic
+                                                          }
       forkIO $ do
         S.drain $
           S.mapM (\(n, e) -> writeChan (stateChan qs) n e) es
@@ -176,7 +192,7 @@ chkNodeQs qp nq = do
   es <- resLen (energyQ nq)
   bs <- resLen (batteryQ nq)
   ms <- resLen (meshQ nq)
-  --liftIO . print $ (ps, es, bs, ms)
+  liftIO . print $ (ps, es, bs, ms)
   return (ps, es, bs, ms)
   where
     resLen = (pure . fromMaybe 0) <=< (S.the . S.mapM mkQ . S.fromList)

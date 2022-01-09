@@ -31,6 +31,7 @@ import Data.Maybe
 
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Unfold as UF
+import qualified Streamly.Internal.Data.Stream.IsStream.Generate as S
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Pipe as Pipe
 import qualified Streamly.Internal.FileSystem.Handle as H
@@ -68,16 +69,18 @@ type KbtzM = ReaderT (MQTTOpts) GraphM
 
 runKbtzim :: forall t m.
   (HConS t m, KConS t m)
-  => MQTTOpts
+  => Ti.UTCTime
+  -> MQTTOpts
   -> HydrationOpts
   -> InfluxConn
   -> Kbtzim
   -> t m (Either (NodeMAC, Prefix) (KbtzScene NodeMAC))
-runKbtzim mq hydrationOpts influxCon kbtzim = do
-  (Left <$> s3Hydration kbtzim) `S.parallel` (Right <$> mqttStream kbtzim)
+runKbtzim t0 mq hydrationOpts influxCon kbtzim = (Left <$> s3Hydration kbtzim)
+                                                 `S.parallel`
+                                                 (Right <$> mqttStream kbtzim)
   where
     s3Hydration :: Kbtzim -> t m (NodeMAC, Prefix)
-    s3Hydration kns = runHydration influxCon hConfDef kns
+    s3Hydration kns = S.concat $ S.unfold (runHydration t0 influxCon hConfDef kns) ()
     mqttStream :: Kbtzim -> t m (KbtzScene NodeMAC)
     mqttStream kns = S.concatMapWith S.parallel (runKibbutz @t) (confss kns)
     confss :: (S.IsStream t, S.MonadAsync m) => Kbtzim -> t m (KbtzC NodeMAC)
@@ -108,11 +111,15 @@ run = do
   ic <- liftIO $ execParser icOptions
   dir <- liftIO $ (getXdgDir XdgConfig) =<< (Just <$> parseRelDir "/kbtzim/")
   serverThread <- liftIO $ forkServer "localhost" 8111
-  liftIO $ createDB influxConn "chopaanMQTT"
+  liftIO $ createDB influxConn mqttDB 
+  liftIO $ createDB influxConn hydrationDB
+  t0 <- liftIO $ Ti.getCurrentTime
   liftIO $ runGraphM poolConf tc $ do
     kbtzim <- fromJust <$> (S.head $ kbtzimEnv dir)
-    S.drain . S.fromAhead $ runKbtzim @S.AheadT mqttOpts hydrationOpts ic kbtzim
-
+    S.drain . S.fromAhead $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts ic kbtzim
+  where
+    mqttDB = "chopaanMQTT"
+    hydrationDB = "chopaanS3"
 
 
 deployNodes :: [(NodeMAC, NodeKey)]

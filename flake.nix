@@ -9,7 +9,7 @@
         projectName = "chopaan";
       overlays = [ haskellNix.overlay
         (final: prev: {
-          # This overlay adds our project to pkgs
+          # This overlay adds our proect to pkgs
           chopaan =
             final.haskell-nix.project' {
               src = ./.;
@@ -47,13 +47,19 @@
           { version = "latest";
             index-state = "2021-12-02T00:00:00Z";
             plan-sha256 = "03i9rdvnpkr96x3ng5zfvfd9h49qsyzmxlckh2i1yr4xn991yid3";
-            #materialized = ./nix/materialized/flake/cabal;
+            materialized = ./nix/materialized/flake/cabal;
           };
         haskell-language-server =
           { version = "latest";
             index-state = "2021-12-02T00:00:00Z";
             plan-sha256 = "1gjx7xi508yn2lrwl7ic1pnyhxzl38ylzy5v9pi9v2q8a6vxi3dd";
-            materialized = ./nix/materialized/flake/hls;
+            materialized = ./nix/materialized/flake/haskell-language-server;
+          };
+        hoogle = 
+          { version = "latest";
+            index-state = "2021-12-02T00:00:00Z";
+            plan-sha256 = "0j7y117792f2sbwcxc1d7jlgx7kbcgp0v11ryxwldadbqmn6b66b";
+            materialized = ./nix/materialized/flake/hoogle;
           };
       };
       pkgs = import nixpkgs { inherit system overlays; inherit (haskellNix) config; };
@@ -70,14 +76,13 @@
     in flake // {
       # Built by `nix build .`
       defaultPackage = flake.packages."${projectName}:exe:kbtzim";
-      #app = pkgs.${projectName}.stack-nix.passthru;
       packages = flake.packages // {
         gcroot = pkgs.linkFarmFromDrvs "${projectName}-shell-gcroot" [
             devShell
             devShell.stdenv
+            devShell.inputs
             pkgs.${projectName}.stack-nix
             pkgs.${projectName}.roots
-
             (
               let compose = f: g: x: f (g x);
                   flakePaths = compose pkgs.lib.attrValues (

@@ -5,3 +5,10 @@ tarballs/
 certs/*
 data
 credentials
+janusgraph-config/cassandra_truststore.jks
+janusgraph-config/config/januskeyspaces.properties
+janusgraph-config/sf-class2-root.crt
+janusgraph-config/temp_file.der
+dash/
+direnv/
+webdev/

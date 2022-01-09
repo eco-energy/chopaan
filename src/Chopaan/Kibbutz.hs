@@ -3,7 +3,8 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveAnyClass, DeriveFunctor, StandaloneDeriving, TupleSections, AllowAmbiguousTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Chopaan.Kibbutz ( runKibbutz, runKibbutz', runKibbutzM
-                       , KbtzC(..), KbtzScene, mkKbtzConf, S3Opts, KConS) where
+                       , KbtzC(..), KbtzScene, mkKbtzConf, S3Opts
+                       , KConS, mkKbtzG, KbtzG) where
 
 import GHC.Generics ( Generic )
 
@@ -84,7 +85,6 @@ import Chopaan.Graph
       TinkerConf
     )
 import qualified Chopaan.Graph.Algebraic as AG
-import Algebra.Graph.Label (Distance(..))
 
 type S3Opts = BucketName
 
@@ -98,6 +98,9 @@ instance Show (MessageQs n) where
   show = const "SomeQueue"
 
 type KbtzG n = AG.Graph (Sum R) (n, HW R)
+
+mkKbtzG :: (Ord n) => M.Map n (HW R) -> [(Sum R, n, n)] -> KbtzG n
+mkKbtzG hw d = AG.edges $ (\(d', n, n') -> (d', (n, hw M.! n), (n', hw M.! n'))) <$> d
 
 type MQTTOpts' n = MQTTOpts
 
@@ -123,9 +126,6 @@ kbtzHW = AG.vertexList
 
 nodeHWs :: (Ord n) => KbtzG n -> M.Map n (HW R)
 nodeHWs = M.fromList . kbtzHW
-
-newtype Kbtzim = Kbtzim { unKbtzim :: S.SerialT GraphM (Either KbtzName (KbtzName, NodeMAC)) }
-  deriving (Generic)
 
 
 mkKbtzConf :: KbtzName -> AG.Graph (Sum R) (n, HW R) -> Either MQTTOpts (MessageQs n) -> Maybe S3Opts -> InfluxConn -> KbtzC n
@@ -188,10 +188,6 @@ type KConS t m = (IsStream t, S.MonadAsync m, MonadSample m, MonadCatch m, Monad
 runKibbutz :: forall t m. (KConS t m)
   => KbtzC NodeMAC -> t m (KbtzScene NodeMAC)
 runKibbutz KbtzC{name, structure, channelOpts, influxCon} = S.concatM $ do
-  -- Live Data
-  --t0 <- liftIO $ getCurrentTime
-  --gridFold <- withSpider $ saveTx name
-  --meshFold <- withSpider (addMeshNode @GraphM)
   let
     processES :: t m (NodeMAC, EnergyState) -> t m (GridScene NodeMAC)
     processES s = S.tapRate 60 (\x -> liftIO . print $ "Grid Processed Rate: " <> show x)
