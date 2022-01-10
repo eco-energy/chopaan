@@ -91,3 +91,6 @@ reload:
 	docker-compose down
 	images
 	docker-compose up
+
+editCreds:
+	nix-shell -p sops --run "sops secrets/chopaan.yaml"

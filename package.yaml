@@ -9,10 +9,6 @@ copyright:           2019 Faez Shakil
 extra-source-files:
 - README.md
 - ChangeLog.md
-- assets/style.css
-- assets/tailwind.min.css
-#- js/*.js
-#- js/*.html
 
 data-files:
  - options.dhall
@@ -255,6 +251,7 @@ executables:
               ghc-options:
                 - -rtsopts
                 - -fdicts-strict
+                - -threaded
                 - -O1
                 - -eventlog
       else:

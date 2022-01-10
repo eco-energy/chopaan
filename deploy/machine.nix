@@ -1,23 +1,28 @@
-{ config, pkgs, resources, lib, hostName, grubDevice, ... }:
+{ config, pkgs, resources, lib, hostName, grubDevice, app, sops-nix, ... }:
 let
-  #uijs = "${staticUi}/bin/ui.jsexe";
   region = "ap-southeast-1";
-  app = (import ../. {}).chopaan;
   janusPort = 8182;
   serverPort = 8080;
   mqttPort = 8883;
   awskey = "/run/keys/aws-creds";
   tinkerHost = "localhost";
-  janusConf = ../janusgraph-config;
-  frontend = (import ../nix/website.nix) {};
-  dashes = (import ../nix/dashboard.nix) {};
   withJanus = p: "${p} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}";
   withRTSOpts = p: "${p} +RTS -A32m -n4m -N";
   chopaanDir = "${config.users.users.chopaan.home}";
   dashboardDir = "/dash";
-  isHttps = if (hostName == "localhost") then false else true;
+  isHttps = if (hostName == "localhost") then false else true; 
 in
 {
+  imports = [
+    (import ./secrets.nix { inherit config pkgs lib sops-nix; })
+  ];  
+    
+  nix.binaryCaches = lib.mkForce [
+    https://cache.nixos.org s3://ee-nixcache?region=ap-southeast-1 https://hydra.iohk.io https://iohk.cachix.org https://nixcache.reflex-frp.org https://quickstrom.cachix.org https://nixfmt.cachix.org
+  ];
+  nix.binaryCachePublicKeys = lib.mkForce [
+    cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= ee-nixcache:qydUr3bm5mYfgWQDJn6S0VZGzGDZ5uwvzhEFlQVshDk= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= iohk.cachix.org-1:DpRUyj7h7V830dp/i6Nti+NEO2/nhblbov/8MW7Rqoo= ryantrinkle.com-1:JJiAKaRv9mWgpVAz8dwewnZe0AzzEAzPkagE9SP5NWI=  quickstrom.cachix.org-1:DeN0nBVqvp8WbknajUWWVH/DSavjbNiSCEF2eOKwWAA= nixfmt.cachix.org-1:uyEQg16IhCFeDpFV07aL+Dbmh18XHVUqpkk/35WAgJI=
+  ];
   environment.systemPackages = [ pkgs.z3 ];
   nix.trustedUsers = lib.mkForce ["root" ];
   users = {
@@ -25,9 +30,9 @@ in
       chopaan = {
         createHome = true;
         group = "chopaan";
-        extraGroups = ["keys" "dash"];
+        extraGroups = ["keys" "dash" config.users.groups.keys.name ];
         isSystemUser = true;
-        home = "/chopaan";
+        home = "/chopaanFS";
         useDefaultShell = true;
       };
     };
@@ -35,16 +40,7 @@ in
     groups.dash = {};
   };
 
-  deployment.keys = {
-    aws-creds = {
-      text = builtins.readFile ../credentials/key;
-      user = "chopaan";
-      group = "chopaan";
-      permissions = "0640";
-    };
-  };
-  
-  boot.loader.grub.device = lib.mkForce grubDevice;
+  #boot.loader.grub.device = lib.mkForce grubDevice;
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [ 80 443 ];
   environment.variables = { REGION = region; };
@@ -60,27 +56,6 @@ in
     value = 6400000;
     }
   ];
-
-  virtualisation.oci-containers.containers = {
-    janusgraph = {
-      image = "docker.io/janusgraph/janusgraph:0.6.0";
-      ports = [ "${toString janusPort}:${toString janusPort}" ];
-      volumes = [
-        "janusgraph-default-data:/var/lib/janusgraph"
-        "${janusConf}/config/janusgraph.properties:/etc/opt/janusgraph/janusgraph.properties:ro"
-        "${janusConf}/config/gremlin-server-0.6.yaml:/etc/opt/janusgraph/janusgraph-server.yaml:ro"
-        "${janusConf}/indexes/net-spider-index.groovy:/files/net-spider-index.groovy"
-        # "${janusConf}/cassandra_truststore.jks:/opt/janusgraph/cassandra_truststore.jks"
-      ];
-    };
-
-    # chronograf = {
-    #   image = "docker.io/chronograf:1.9.0-alpine";
-    #   ports = [ "8888:8888" ];
-    #   cmd = [ "--influxdb-url=http://localhost:8086" ];
-    #   extraDockerOptions = [ "--network=host" ];
-    # };
-  };
   
   systemd.extraConfig = "DefaultLimitNOFILE=6400000\nDefaultStandardError='journal'\nDefaultStandardOut='journal'";
 
@@ -94,16 +69,20 @@ in
   };
   
   systemd.services.chopaan = {
-    after = [ "aws-creds-key.service" "network.target" "docker-janusgraph.service" "influxdb.service" ];        
+    after = [ #"aws-creds-key.service"
+              "network.target"
+              "docker-janusgraph.service"
+              "influxdb.service"
+            ];        
     wantedBy = [ "multi-user.target" ];
     environment = {
-      AWS_CREDS = awskey;
+      AWS_CREDS = config.sops.secrets.aws-creds.path;
       XDG_ROOT_DIR = chopaanDir;
       STORE_PATH = "${chopaanDir}/data/hydration";
       S3_BUCKET = "dosti-datastream";
-      START_DATE = "15-10-2021";
+      START_DATE = "14-10-2021";
       PAST_RES = "Ten4";
-      FUTURE_RES = "Ten2";
+      FUTURE_RES = "Ten1";
       LIFETIME = "Infinite";
       MAN_CONN_COUNT = "128";
       MAN_IDLE_CONN = "64";
@@ -117,49 +96,22 @@ in
       User = "chopaan";
       LimitNOFILE = 6400000;
     };
-    script = withRTSOpts ((withJanus "${app.kbtzim}/bin/kbtzim"));
+    script = withRTSOpts ((withJanus "${app}/bin/kbtzim"));
   };
-
-  # systemd.services.hydrate = {
-  #   wantedBy = [ "multi-user.target" ];
-  #   after = [ "aws-creds-key.service" "network.target" "docker-janusgraph.service" "chopaan.service" "influxdb.service" ];
-  #   environment = {
-  #     AWS_CREDS = awskey;
-  #     XDG_ROOT_DIR = chopaanDir;
-  #     STORE_PATH = "${chopaanDir}/data/hydration";
-  #     S3_BUCKET = "dosti-datastream";
-  #     START_DATE = "15-10-2021";
-  #     PAST_RES = "Ten4";
-  #     FUTURE_RES = "Ten2";
-  #     LIFETIME = "Infinite";
-  #     MAN_CONN_COUNT = "100";
-  #     MAN_IDLE_CONN = "0";
-  #     MAN_TIMEOUT = "90";
-  #     DL_THREADS = "100";
-  #     SOURCE_GEN_THREADS = "12";
-  #   };
-  #   serviceConfig = {
-  #     WorkingDirectory = "~";
-  #     User = "chopaan";
-  #     LimitNOFILE = 6400000;
-  #   };
-  #   script = withRTSOpts ((withJanus "${app.hydrate}/bin/hydrate"));
-  # };
 
   systemd.tmpfiles.rules = [
     "d ${dashboardDir} 0775 chopaan dash"
   ];
-  systemd.services.dashgen = {
-    wantedBy = [ "grafana.service" ];
-    after = [ "chopaan.service" ];
-    #preStart = "cp -r ${dashes} ${dashboardDir}/Flat";
-    serviceConfig = {
-        User = "chopaan";
-        Group = "dash";
-      };
-    unitConfig.RequiresMountsFor = dashboardDir;
-    script = (withJanus "${app.dashgen}/bin/dashgen --outpath ${dashboardDir}");
-  };
+  # systemd.services.dashgen = {
+  #   wantedBy = [ "grafana.service" ];
+  #   after = [ "chopaan.service" ];
+  #   serviceConfig = {
+  #       User = "chopaan";
+  #       Group = "dash";
+  #     };
+  #   unitConfig.RequiresMountsFor = dashboardDir;
+  #   script = (withJanus "${app.dashgen}/bin/dashgen --outpath ${dashboardDir}");
+  # };
 
   services.influxdb = {
       enable = true;
@@ -173,10 +125,8 @@ in
   services.grafana = {
     enable = true;
     domain = hostName;
-    #rootUrl = "https://dosti.ecoenergy.global";
     port = 2342;
     addr = "127.0.0.1";
-    #extraOptions = { SERVE_FROM_SUB_PATH= "true"; };
     provision = {
       enable = true;
       dashboards = [
@@ -222,18 +172,6 @@ in
     recommendedOptimisation = true;
     recommendedGzipSettings = true;
     recommendedProxySettings = true;
-    # appendHttpConfig = ''
-    #     proxy_cache_path /tmp/cache/ levels=1:2 keys_zone=chop-cache:100m max_size=1g inactive=60m use_temp_path=off;
-    #     # Cache only success status codes; in particular we don't want to cache 404s.
-    #     # See https://serverfault.com/a/690258/128321
-    #     map $status $cache_header {
-    #     200     "public";
-    #     302     "public";
-    #     default "no-cache";
-    #     }
-    #     access_log logs/access.log;
-    #   '';
-
     virtualHosts.${hostName} = {
       forceSSL = isHttps;
       enableACME = isHttps; 
@@ -248,20 +186,5 @@ in
         ;
       };
     };
-    
-    # virtualHosts.${hostName} = {
-    #   forceSSL = true;
-    #   enableACME = true;
-    #   locations."/" = {
-    #     proxyPass = "http://127.0.0.1:${toString serverPort}";
-    #     root = staticUi;
-    #   };
-    #   #extraConfig = ""
-    #   locations."~* .(jpe?g|svg|png|gif|ico|css|js|webmanifest|json|fbx)$" = {
-    #     root = staticUi;
-    #     extraConfig = "proxy_cache chop-cache;";
-    #     tryFiles = "$uri uri/ =404";
-    #   };
-    # };
   };
 }

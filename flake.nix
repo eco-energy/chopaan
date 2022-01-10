@@ -3,8 +3,12 @@
   inputs.nixpkgs.follows = "haskellNix/nixpkgs-2111";
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.nixops-plugged.url = "github:lukebfox/nixops-plugged";
-  outputs = { self, nixpkgs, flake-utils, haskellNix, nixops-plugged }:
-    flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
+  inputs.sops-nix.url = "github:Mic92/sops-nix";
+  inputs.sops-nix.inputs.nixpkgs.follows = "haskellNix/nixpkgs-2111";
+  outputs = { self, nixpkgs, flake-utils, haskellNix, nixops-plugged, sops-nix }:
+    let
+     linux = "x86_64-linux";
+     f = flake-utils.lib.eachSystem [ linux ] (system:
       let
         projectName = "chopaan";
       overlays = [ haskellNix.overlay
@@ -12,24 +16,27 @@
           # This overlay adds our proect to pkgs
           chopaan =
             final.haskell-nix.project' {
-              src = ./.;
+              src = final.haskell-nix.haskellLib.cleanGit {
+                src = ./.;
+                name = "${projectName}-src";
+                keepGitDir = true;
+              };
               name = projectName;
               compiler-nix-name = "ghc8107";
               stack-sha256 = "1znwg9jxi6mbsdj4ih6wb4gvcm9cyrav8qjmmaljypyz8lw32ll5";
               materialized = ./nix/materialized/flake/chopaan;
               #checkMaterialization = true;
-
               modules = [
-                { doHaddock = false;
-                  packages.${projectName}.doHaddock = false;
-                  packages.concat-inline.doHaddock = false;
-                  packages.concat-plugin.doHaddock = false;
-                  packages.concat-examples.doHaddock = false;
-
-                }
+                  { doHaddock = true;
+                    doCheck = false;
+                    packages.${projectName} = {
+                      package.cleanHpack = true;
+                    };
+                    packages.concat-inline.doHaddock = false;
+                  }
               ];
               # This is used by `nix develop .` to open a shell for use with
-              # `cabal`, `hlint` and `haskell-language-server`
+              # `cabal`, `hoogle` and `haskell-language-server`
               shell.tools = tools;
               # Non-Haskell shell tools go here
               shell.buildInputs = with pkgs; [
@@ -69,18 +76,36 @@
         exactDeps = true;
         tools = tools;
       };
-      flake = pkgs.${projectName}.flake {
+      flake = project.flake {
         # This adds support for `nix build .#js-unknown-ghcjs-cabal:${projectName}:exe:${projectName}`
         # crossPlatforms = p: [p.ghcjs];
       };
     in flake // {
       # Built by `nix build .`
       defaultPackage = flake.packages."${projectName}:exe:kbtzim";
+      nixopsConfigurations.default = ({
+        inherit nixpkgs;
+        network.storage.legacy = {};
+        network.description = "${projectName} - Flake";
+        defaults = { ... }: {
+          imports = [{
+            imports = [ ./deploy/secrets.nix sops-nix.nixosModules.sops ];
+          }];
+          nixpkgs.pkgs = pkgs;
+          _module.args = { app = flake.packages."${projectName}:exe:kbtzim";
+                           inherit sops-nix;
+                         };
+        };
+      } // (import ./deployment.nix));
+      
+      # Adds a link farm which collects all the SHAs and materializers force
+      # the project and acts as a gcroot for the dependencies so they're not
+      # removed when nix-store --gc is run
       packages = flake.packages // {
         gcroot = pkgs.linkFarmFromDrvs "${projectName}-shell-gcroot" [
             devShell
             devShell.stdenv
-            devShell.inputs
+            devShell.buildInputs
             pkgs.${projectName}.stack-nix
             pkgs.${projectName}.roots
             (
@@ -114,4 +139,5 @@
           ];
       };
     });
+    in f // { nixopsConfigurations.default = f.nixopsConfigurations.${linux}.default; }; 
 }
