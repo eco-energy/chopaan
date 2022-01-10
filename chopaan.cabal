@@ -18,8 +18,6 @@ build-type:     Simple
 extra-source-files:
     README.md
     ChangeLog.md
-    assets/style.css
-    assets/tailwind.min.css
 data-files:
     options.dhall
 
@@ -416,7 +414,7 @@ executable kbtzim
     if flag(prod)
       ghc-options: -fdicts-strict -O2 -with-rtsopts=-N -threaded -rtsopts -eventlog
     else
-      ghc-options: -rtsopts -fdicts-strict -O1 -eventlog
+      ghc-options: -rtsopts -fdicts-strict -threaded -O1 -eventlog
   else
     buildable: False
   default-language: Haskell2010
