@@ -276,6 +276,7 @@ type KbtzModel = AG.Graph (Sum R) NodeModel
 toKbtzG :: KbtzModel -> AG.Graph (Sum R) (NodeMAC, HW R)
 toKbtzG = fmap toHWNode
 
+toHWNode :: NodeModel -> (NodeMAC, HW Double)
 toHWNode nm = (nodeMAC nm, nodeHW nm)
 
 type Kbtzim = M.Map KbtzName KbtzModel
@@ -367,13 +368,6 @@ onNodeEv (ReadNode _ _) ks = pure ks
 onNodeEv (UpdateNode k n) ks = upsertNode k n ks
 onNodeEv (DeleteNode k n) ks = pure $ removeNode k n ks
 
--- $ Specifies what depth in the Path tree a's should map to
-class HasDepth a where
-  depth :: Int
-
-
-pathAtDepth :: forall t b a. Path t b -> Maybe a
-pathAtDepth = undefined
 
 onKbtzEv :: KbtzEv -> Kbtzim -> Kbtzim
 onKbtzEv (CreateKbtz p) ks = case toKbtzName'' . path $ p of
