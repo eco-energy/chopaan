@@ -69,6 +69,7 @@ library
       Chopaan.Kibbutz.Kibbutz
       Chopaan.Kibbutz.LinOpt
       Chopaan.Kibbutz.Registry
+      Chopaan.Kibbutz.TKbtzim
       Chopaan.Kibbutz.Transactor
       Chopaan.Kibbutz.Transactor.Stake
       Chopaan.Kibbutz.Transactor.Status
