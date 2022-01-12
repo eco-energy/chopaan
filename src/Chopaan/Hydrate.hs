@@ -9,6 +9,7 @@ module Chopaan.Hydrate
   , HydrationConf(..)
   , parseHConf
   , mkTKbtz
+  , TKbtzim
   , mkConfig
   , ufStream
   , prefixGen
@@ -233,14 +234,13 @@ lookupTSet k tv = do
   m <- readTVar tv
   case M.lookup k m of
     Nothing -> return Nothing
-    Just s' -> (Just . M.keysSet) <$> readTVar s'
-
+    Just s' -> Just . M.keysSet <$> readTVar s'
 
 mkTKbtz :: KbtzimHW -> STM TKbtzim
-mkTKbtz kns = newTVar =<< (traverse newTVar kns)
+mkTKbtz kns = newTVar =<< traverse newTVar kns
 
-mkConfig :: Kbtzim -> TKbtzim
-mkConfig = undefined
+mkConfig :: Kbtzim -> STM TKbtzim
+mkConfig = mkTKbtz . undefined
 
 
 mkKbtzConf :: HydrationConf
@@ -277,14 +277,13 @@ runHydration :: forall t m. (HConS t m, MonadSample m)
   => Time.UTCTime
   -> InfluxConn
   -> HydrationConf
-  -> Kbtzim
+  -> TKbtzim
   -> UF.Unfold m () (t m (NodeMAC, Prefix))
-runHydration t0 influxcon conf kbtzim' =
+runHydration t0 influxcon conf kbtzim =
   UF.many (configs kbtzim) (UF.function (h kbtzim)) 
-  where
-    kbtzim = mkConfig kbtzim' 
-    h kns (c, kNodes) = hydrateKbtz t0 c kNodes (unfoldNodes (lifetime conf) kns)
-    configs kns = UF.mapM (mkKbtzConfM w conf) $ (unfoldKbtzim (lifetime conf) kns)
+  where 
+    h kns (c, kNodes) = hydrateKbtz t0 c kNodes $ unfoldNodes (lifetime conf) kns
+    configs kns = UF.mapM (mkKbtzConfM w conf) $ unfoldKbtzim (lifetime conf) kns
     hydrationDB = "chopaanS3"
     w = wp influxcon hydrationDB
     p = qp influxcon hydrationDB
@@ -336,15 +335,13 @@ unfoldNodes lt tv = -- traceUF (liftIO . print) $
     onNullDiff s = case lt of
       Finite -> return UF.Stop
       Infinite -> delay >> return (UF.Skip s)
-    --step :: (KbtzName, Set NodeMAC) -> m (UF.Step (KbtzName, Set NodeMAC) [NodeMAC])
     step (k, oldSet) = do
       newSet <- liftIO . atomically $ lookupTSet k tv
       case newSet of
         Nothing -> return UF.Stop
         Just s -> do
           let diff = Set.difference s oldSet
-          if (null diff) then onNullDiff (k, s) else return $ UF.Yield (Set.toList diff) (k, s)
-    --inject :: KbtzName -> m (KbtzName, Set NodeMAC)
+          if null diff then onNullDiff (k, s) else return $ UF.Yield (Set.toList diff) (k, s)
     inject k = return (k, mempty)
 
 getKeys :: (Ord k) => TMap k v -> STM (Set k)
@@ -371,7 +368,7 @@ unfoldKbtzim lt tv = traceUF (liftIO . print . fst) $
     inject _ = return mempty
 
 nodeSet' :: KbtzName -> TKbtzim -> STM TNodes
-nodeSet' kId ks = maybe retry return =<< (M.lookup kId <$> readTVar ks)
+nodeSet' kId ks = maybe retry return . M.lookup kId =<< readTVar ks
 
 nodeSet :: MonadIO m => KbtzName -> TKbtzim -> m TNodes
 nodeSet kId = liftIO . atomically . nodeSet' kId
@@ -396,7 +393,7 @@ hydrateKbtz :: forall t m. (HConS t m, MonadSample m)
   => Time.UTCTime
   -> KbtzConf
   -> TNodes
-  -> UF.Unfold m KbtzName (NodeMAC)
+  -> UF.Unfold m KbtzName NodeMAC
   -> t m (NodeMAC, Prefix)
 hydrateKbtz t0 KbtzConf{kbtzName, kbtzStore
                        , manOrSesh, res

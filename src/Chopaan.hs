@@ -6,7 +6,7 @@ import Control.Monad.IO.Class ( MonadIO(liftIO) )
 
 import Chopaan.Kibbutz
 import Chopaan.Hydration.Prefix
-import Chopaan.Hydrate ( hConfDef, mkTKbtz, runHydration, HConS )
+import Chopaan.Hydrate ( hConfDef, mkTKbtz, mkConfig, runHydration, HConS, TKbtzim)
 import Chopaan.Kibbutz.KbtzId ( KbtzId(KbtzId) )
 import Chopaan.Kibbutz.FS
 import Chopaan.Node.NodeId ( NodeId(NodeId), NodeMAC )
@@ -41,7 +41,6 @@ import qualified Streamly.Internal.FileSystem.File as File
 import System.Remote.Monitoring (forkServer)
 
 import Network.AWS.S3 (BucketName(..))
-import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
 
 import Options.Applicative ( execParser )
@@ -63,9 +62,9 @@ import Chopaan.Ui
 import Path.IO
 import Path
 
-type KbtzM = ReaderT (MQTTOpts) GraphM
 
-
+type Sources = (MQTTOpts, HydrationOpts)
+type Sink = InfluxConn 
 
 runKbtzim :: forall t m.
   (HConS t m, KConS t m)
@@ -75,16 +74,19 @@ runKbtzim :: forall t m.
   -> InfluxConn
   -> Kbtzim
   -> t m (Either (NodeMAC, Prefix) (KbtzScene NodeMAC))
-runKbtzim t0 mq hydrationOpts influxCon kbtzim = (Left <$> s3Hydration kbtzim)
-                                                 `S.parallel`
-                                                 (Right <$> mqttStream kbtzim)
+runKbtzim t0 mq hydrationOpts influxCon kbtzim = S.concatM $ do
+  tKbtzim <- atomically $ mkConfig kbtzim
+  return $
+    (Left <$> s3Hydration tKbtzim)
+    `S.parallel`
+    (Right <$> mqttStream kbtzim)
   where
-    s3Hydration :: Kbtzim -> t m (NodeMAC, Prefix)
+    s3Hydration :: TKbtzim -> t m (NodeMAC, Prefix)
     s3Hydration kns = S.concat $ S.unfold (runHydration t0 influxCon hConfDef kns) ()
     mqttStream :: Kbtzim -> t m (KbtzScene NodeMAC)
     mqttStream kns = S.concatMapWith S.parallel (runKibbutz @t) (confss kns)
     confss :: (S.IsStream t, S.MonadAsync m) => Kbtzim -> t m (KbtzC NodeMAC)
-    confss = S.fromList . fmap sConf . fmap (second toKbtzG) . M.toList
+    confss = S.fromList . fmap (sConf . second toKbtzG) . M.toList
     sConf (k, kns) = KbtzC { Chopaan.Kibbutz.name = k
                            , structure = kns
                            , channelOpts = Left mq
@@ -92,38 +94,35 @@ runKbtzim t0 mq hydrationOpts influxCon kbtzim = (Left <$> s3Hydration kbtzim)
                            , influxCon = influxCon
                            }
     deployKbtz = (KbtzId "Bismillah_Mor", fmap fst deployNodes)
-    
 
 
-
-type NodeKey = NodeId Int
-
-newtype DispatchNodes m n x = DispatchNodes (UF.Unfold m n x) 
 
 run :: RIO App ()
 run = do
-  hSetBuffering stdout LineBuffering 
+  hSetBuffering stdout LineBuffering
   app <- ask
   let
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
   tc <- liftIO $ execParser tkOptions
   ic <- liftIO $ execParser icOptions
-  dir <- liftIO $ (getXdgDir XdgConfig) =<< (Just <$> parseRelDir "/kbtzim/")
-  serverThread <- liftIO $ forkServer "localhost" 8111
-  liftIO $ createDB influxConn mqttDB 
+  dir <- liftIO $ getXdgDir XdgConfig . Just =<< parseRelDir "/kbtzim/"
+  --serverThread <- liftIO $ forkServer "localhost" 8111
+  liftIO $ createDB influxConn mqttDB
   liftIO $ createDB influxConn hydrationDB
-  t0 <- liftIO $ Ti.getCurrentTime
+  t0 <- liftIO Ti.getCurrentTime
   liftIO $ runGraphM poolConf tc $ do
-    kbtzim <- fromJust <$> (S.head $ kbtzimEnv dir)
+    kbtzim0 <- readKbtzim dir
+    let kEvs = watchKbtzim @GraphM dir
+    kbtzim <- fromJust <$> S.head (kbtzimEnv dir)
     S.drain . S.fromAhead $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts ic kbtzim
   where
     mqttDB = "chopaanMQTT"
     hydrationDB = "chopaanS3"
 
 
-deployNodes :: [(NodeMAC, NodeKey)]
-deployNodes = (bimap NodeId NodeId) <$>
+deployNodes :: [(NodeMAC, Int)]
+deployNodes = first NodeId <$>
   [ ("7c:9e:bd:48:4e:e0",  1)
   , ("7c:9e:bd:f5:ec:74",  3)
   , ("ac:67:b2:11:f3:10",  5)

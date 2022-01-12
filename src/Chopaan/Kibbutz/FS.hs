@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE DeriveAnyClass #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 
 
@@ -13,37 +13,38 @@
 {-# LANGUAGE TypeApplications #-}
 
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 module Chopaan.Kibbutz.FS where
 
-import Path.IO
 import Algebra.Graph.Label (Distance, distance, finite, getDistance, getFinite)
 import qualified Chopaan.Graph.Algebraic as AG
 import Chopaan.Kibbutz.KbtzId (KbtzId (..), KbtzName)
 import Chopaan.Node.Components ()
 import Chopaan.Node.HW (HW (..))
 import Chopaan.Node.NodeId ( NodeIdx, NodeMAC, NodeId(..), toText )
-import qualified Codec.Winery as W
-import ConCat.Free.VectorSpace
-import ConCat.Isomorphism
-import ConCat.Incremental
-import ConCat.Misc
-import Control.Applicative
+
+import Control.Applicative ()
 import qualified Control.Concurrent.STM as STM
-import Control.Monad
-import Control.Monad.Catch
+import Control.Monad ( join, (<=<) )
+import Control.Monad.Catch ( MonadCatch, Exception, MonadThrow )
 import Control.Monad.IO.Class (MonadIO, liftIO)
 
-import Data.Function
+
+import qualified Codec.Winery as W
+import ConCat.Free.VectorSpace ( distSqr, HasV(toV) )
+import ConCat.Isomorphism
+import ConCat.Misc ( R, Unop )
+
+
+import Data.Function ( on )
 import Data.Incremental
-import Data.Bifunctor
-import GHC.Generics.Lens
-import Control.Lens hiding (Iso)
+import Data.Bifunctor ( Bifunctor(bimap) )
+import GHC.Generics.Lens ()
+import Control.Lens ()
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust, fromMaybe, isJust)
-import Data.Monoid
+import Data.Monoid ( Sum(Sum) )
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Char (ord)
@@ -68,6 +69,18 @@ import System.Directory
     ( removeDirectory, createDirectoryIfMissing )
 import Path.IO
 import Path
+    ( Path,
+      Dir,
+      Rel,
+      Abs,
+      File,
+      parent,
+      dirname,
+      toFilePath,
+      (</>),
+      filename,
+      parseRelDir,
+      parseRelFile )
 
 
 newtype ArrPath = ArrPath { unArrPath :: Array.Array Word8 }
@@ -82,10 +95,6 @@ fpArrIso = Iso arrPath fromArrPath
               . S.toStreamD . encodeUtf8 @IO @S.SerialT . S.fromList
     fromArrPath = unsafePerformIO . (fmap (toFilePath . filename) . parseRelFile <=< S.toList) . decodeUtf8
                   . Array.toStream . unArrPath
-    
-
--- instance Semigroup ArrPath where
---   a <> b = undefined -- isoFwd arrDirPath $ isoRev arrDirPath a </> isoRev arrDirPath b
 
 
 type RelDir = Path Rel Dir
@@ -107,20 +116,19 @@ arrDirPath :: PathIso Dir
 arrDirPath = Iso arrPath fromArrPath
   where
     arrPath = ArrPath . unsafePerformIO . Array.fromStreamD
-              . S.toStreamD . encodeUtf8 @IO @S.SerialT . S.fromList . toFilePath 
+              . S.toStreamD . encodeUtf8 @IO @S.SerialT . S.fromList . toFilePath
     fromArrPath = unsafePerformIO . (fmap dirname . parseRelDir <=< S.toList) . decodeUtf8
                   . Array.toStream . unArrPath
-                  
+
 
 class Root k where
   rootPath :: k -> Maybe RelDir
 
 instance Root KbtzName where
-  rootPath (KbtzId p) = parseRelDir . T.unpack $ (p <> "_kbtz") 
+  rootPath (KbtzId p) = parseRelDir . T.unpack $ p <> "_kbtz"
 
 class HasPath a where
   path :: a -> Maybe (Either RelDir RelFile)
-  --unpath :: ArrPath -> a
 
 
 parseOptional :: (forall m. MonadThrow m => FilePath -> m (Either RelDir RelFile)) -> T.Text -> Maybe (Either RelDir RelFile)
@@ -135,11 +143,7 @@ instance HasPath (Tag NodeIdx) where
 instance (Root a, HasPath b) => HasPath (a, b) where
   path (a, b) = case rootPath a of
     Nothing -> Nothing
-    Just rp -> fmap (bimap (rp </>) (rp </>)) $ path b
-  -- unpath = bimap unpath unpath . joinSplit . splitPath
-  --   where
-  --     joinSplit = unsafePerformIO . S.uncons 
-  --     splitPath (ArrPath a) = Array.splitOn (== (fromIntegral . ord $ '/')) a
+    Just rp -> bimap (rp </>) (rp </>) <$> path b
 
 
 kbtzimConf :: EvL.Config -> EvL.Config
@@ -174,7 +178,6 @@ getEv ev = case getKbtzEv ev of
 newtype Tag k = Tag { unTag :: k }
   deriving (Eq, Ord, Show, Generic)
 
-
 data KbtzEv
   = CreateKbtz (Tag KbtzName)
   | DeleteKbtz (Tag KbtzName)
@@ -199,16 +202,16 @@ interpretK (DeleteKbtz f) = case path f of
     _ -> error "interpretK should only deal with Dir Paths"
 
 getKbtzEv :: Event -> Maybe KbtzEv
-getKbtzEv ev 
-  | EvL.isDir ev && (EvL.isCreated ev || (EvL.isDeleted ev)) =
-    join . fmap ctor . toKbtzName . EvL.getRelPath $ ev
+getKbtzEv ev
+  | EvL.isDir ev && (EvL.isCreated ev || EvL.isDeleted ev) =
+    ctor =<< (toKbtzName . EvL.getRelPath $ ev)
   | otherwise = Nothing
   where
-    ctor = if EvL.isCreated ev
-           then (Just . CreateKbtz . Tag)
-           else
-             (if EvL.isDeleted ev then (Just . DeleteKbtz . Tag) else (const Nothing))
-      
+    ctor
+      | EvL.isCreated ev = Just . CreateKbtz . Tag
+      | EvL.isDeleted ev = Just . DeleteKbtz . Tag
+      | otherwise = const Nothing
+
 data NodeEv
   = CreateNode KbtzName NodeIdx
   | ReadNode KbtzName NodeIdx
@@ -228,13 +231,13 @@ toKbtzName' p = case T.splitOn "/" . T.pack . toFilePath $ p of
   _ -> Nothing
 
 toKbtzName'' :: Maybe (Either RelDir RelFile) -> Maybe KbtzName
-toKbtzName'' = join . fmap (either onL (const Nothing))
+toKbtzName'' = ((either onL (const Nothing)) =<<)
   where
     onL p = case T.splitOn "/" . T.pack . toFilePath $ p of
       [x] -> Just . KbtzId $ x
       _ -> Nothing
 
-toKbtzName :: Array.Array Word8 -> Maybe KbtzName 
+toKbtzName :: Array.Array Word8 -> Maybe KbtzName
 toKbtzName = toKbtzName' . isoRev arrDirPath . ArrPath
 
 getNodeEv :: Event -> Maybe NodeEv
@@ -302,7 +305,7 @@ listDirUF' ::
   forall m.
   (S.MonadAsync m, MonadCatch m) =>
   UF.Unfold m FilePath (Path Rel File)
-listDirUF' = UF.map fromJust . UF.filter (isJust) $ parseRelFile <$> listDirUF
+listDirUF' = UF.map fromJust . UF.filter isJust $ parseRelFile <$> listDirUF
 
 logMaybeEither ::
   (Eq a, Show x, Show e, S.MonadAsync m) =>
@@ -342,10 +345,19 @@ toMap :: (Monad m, Ord n) => FL.Fold m (n, a) (M.Map n a)
 toMap = FL.foldl' (\m (n, a) -> M.insert n a m) mempty
 
 kbtzimEnv :: forall m. (S.MonadAsync m, MonadCatch m, MonadFail m) => Path Abs Dir -> S.SerialT m Kbtzim
-kbtzimEnv fp = S.scan (FL.foldlM' onEv (readKbtzim fp)) (watchKbtzim fp) 
+kbtzimEnv fp = S.scan (FL.foldlM' onEv (readKbtzim fp)) (watchKbtzim fp)
+
+class KbtzEnv m where
+  react :: a -> Ev -> m a
+
+withEvs :: (S.IsStream t, S.MonadAsync m, MonadCatch m)
+  => (a -> Ev -> m a) -> m a -> t m Ev -> t m a
+withEvs = S.scanlM'
+
+type Ev = Either KbtzEv NodeEv
 
 
-onEv :: (S.MonadAsync m, MonadCatch m) => Kbtzim -> Either KbtzEv NodeEv -> m Kbtzim
+onEv :: (S.MonadAsync m, MonadCatch m) => Kbtzim -> Ev -> m Kbtzim
 onEv k (Left kv) = pure $ onKbtzEv kv k
 onEv k (Right nv) = onNodeEv nv k
 
@@ -369,7 +381,7 @@ onKbtzEv (CreateKbtz p) ks = case toKbtzName'' . path $ p of
   Just k -> M.insert k AG.empty ks
 onKbtzEv (DeleteKbtz p) ks = case toKbtzName'' . path $ p of
   Nothing -> ks
-  Just (k) -> M.delete k ks
+  Just k -> M.delete k ks
 
 topologicalFold :: forall m. (S.MonadAsync m) => FL.Fold m NodeModel KbtzModel
 topologicalFold = FL.foldl' addNode AG.empty
@@ -407,27 +419,27 @@ upsertNode :: (S.MonadAsync m, MonadCatch m)
 upsertNode k n ks = case path (k, Tag n) of
   Nothing -> (liftIO . print $ ("Non-existent Path! " :: String)) >> return ks
   Just p -> do
-    n' <- liftIO . readNode $ (either toFilePath toFilePath) p 
+    n' <- liftIO . readNode $ either toFilePath toFilePath p
     case n' of
       Nothing -> return ks
       Just (Right n'') ->
-        return $ M.update (Just . (flip addNode n'')) k ks
+        return $ M.update (Just . flip addNode n'') k ks
       Just (Left n'') -> do
         liftIO . print $ "Parsing Error: " <> show n''
         return ks
 
 removeNode :: KbtzName -> NodeIdx -> Unop Kbtzim
-removeNode k n ks = M.update (Just . AG.removeVertex (NodeModel {nodeIdx = n})) k ks
+removeNode k n = M.update (Just . AG.removeVertex (NodeModel {nodeIdx = n})) k
 
 newtype Command = Command (Either KbtzEv NodeEv)
   deriving (Eq, Ord, Show, Generic)
 
 
-data CRUDError = CreateError | ReadError | UpdateError | DeleteError
-  deriving (Eq, Bounded, Enum, Show, Generic, Exception)
+-- data CRUDError = CreateError | ReadError | UpdateError | DeleteError
+--   deriving (Eq, Bounded, Enum, Show, Generic, Exception)
 
-class (Monad m) => MonadCRUD m where
-  createM :: (HasPath k, W.Serialise a) => k -> a -> m (Either CRUDError ())
-  readM :: (HasPath k, W.Serialise a) => k -> m (Either CRUDError a)
-  updateM :: (HasPath k, HasDelta a, W.Serialise a) => k -> a -> m (Either CRUDError ())
-  deleteM :: HasPath k => k -> m (Either CRUDError ())
+-- class (Monad m) => MonadCRUD m where
+--   createM :: (HasPath k, W.Serialise a) => k -> a -> m (Either CRUDError ())
+--   readM :: (HasPath k, W.Serialise a) => k -> m (Either CRUDError a)
+--   updateM :: (HasPath k, Delta a, W.Serialise a) => k -> a -> m (Either CRUDError ())
+--   deleteM :: HasPath k => k -> m (Either CRUDError ())
