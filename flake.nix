@@ -11,6 +11,10 @@
      f = flake-utils.lib.eachSystem [ linux ] (system:
       let
         projectName = "chopaan";
+        branchMap = {
+          "https://github.com/faezs/net-spider.git" = "bidirectional-neighborhood";
+          "https://github.com/brendanhay/amazonka.git" = "main";
+        };
       overlays = [ haskellNix.overlay
         (final: prev: {
           # This overlay adds our proect to pkgs
@@ -35,6 +39,8 @@
                     packages.concat-inline.doHaddock = false;
                   }
               ];
+              branchMap = branchMap;
+              lookupBranch = { location, ... }: (branchMap."${location}" or null);
               # This is used by `nix develop .` to open a shell for use with
               # `cabal`, `hoogle` and `haskell-language-server`
               shell.tools = tools;
