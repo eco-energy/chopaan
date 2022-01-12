@@ -26,12 +26,7 @@
       licenseFiles = [];
       dataDir = ".";
       dataFiles = [ "options.dhall" ];
-      extraSrcFiles = [
-        "README.md"
-        "ChangeLog.md"
-        "assets/style.css"
-        "assets/tailwind.min.css"
-        ];
+      extraSrcFiles = [ "README.md" "ChangeLog.md" ];
       extraTmpFiles = [];
       extraDocFiles = [];
       };

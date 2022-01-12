@@ -27,7 +27,7 @@
               };
               name = projectName;
               compiler-nix-name = "ghc8107";
-              stack-sha256 = "1znwg9jxi6mbsdj4ih6wb4gvcm9cyrav8qjmmaljypyz8lw32ll5";
+              stack-sha256 = "15dmnal1gcfxip37n9xswh6wvdaz6a3734vb8q68dh9nm0mkcwy0";
               materialized = ./nix/materialized/flake/chopaan;
               #checkMaterialization = true;
               modules = [
@@ -111,7 +111,7 @@
         gcroot = pkgs.linkFarmFromDrvs "${projectName}-shell-gcroot" [
             devShell
             devShell.stdenv
-            devShell.buildInputs
+            #devShell.buildInputs
             pkgs.${projectName}.stack-nix
             pkgs.${projectName}.roots
             (
