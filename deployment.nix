@@ -24,7 +24,7 @@ let
         spotInstanceRequestType = "persistent";
         spotInstanceInterruptionBehavior = "stop";
         ebsBoot = true;
-        #ebsInitialRootDiskSize = 100;
+        ebsInitialRootDiskSize = 100;
         keyPair = resources.ec2KeyPairs.chopaan-key-pair;
         instanceProfile = resources.iamRoles.chopaan-role.name;
         securityGroups = [
@@ -53,7 +53,7 @@ let
     };
 
     resources.ebsVolumes.chopaanFS = { inherit region accessKeyId zone;
-                                       volumeId = "vol-054f45b750609bba5";
+                                       #volumeId = "vol-054f45b750609bba5";
                                        size = 120;
                                        volumeType = "gp2";
                                        deleteOnTermination = false;
