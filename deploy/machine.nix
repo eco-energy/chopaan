@@ -6,7 +6,7 @@ let
   mqttPort = 8883;
   awskey = "/run/keys/aws-creds";
   tinkerHost = "localhost";
-  withJanus = p: "${p} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}";
+  withJanus = p: "${p} --influxHost localhost --influxPort 8086 --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}";
   withRTSOpts = p: "${p} +RTS -A32m -n4m -N";
   chopaanDir = "${config.users.users.chopaan.home}";
   dashboardDir = "/dash";
@@ -17,12 +17,6 @@ in
     (import ./secrets.nix { inherit config pkgs lib sops-nix; })
   ];  
     
-  nix.binaryCaches = lib.mkForce [
-    https://cache.nixos.org s3://ee-nixcache?region=ap-southeast-1 https://hydra.iohk.io https://iohk.cachix.org https://nixcache.reflex-frp.org https://quickstrom.cachix.org https://nixfmt.cachix.org
-  ];
-  nix.binaryCachePublicKeys = lib.mkForce [
-    cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= ee-nixcache:qydUr3bm5mYfgWQDJn6S0VZGzGDZ5uwvzhEFlQVshDk= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= iohk.cachix.org-1:DpRUyj7h7V830dp/i6Nti+NEO2/nhblbov/8MW7Rqoo= ryantrinkle.com-1:JJiAKaRv9mWgpVAz8dwewnZe0AzzEAzPkagE9SP5NWI=  quickstrom.cachix.org-1:DeN0nBVqvp8WbknajUWWVH/DSavjbNiSCEF2eOKwWAA= nixfmt.cachix.org-1:uyEQg16IhCFeDpFV07aL+Dbmh18XHVUqpkk/35WAgJI=
-  ];
   environment.systemPackages = [ pkgs.z3 ];
   nix.trustedUsers = lib.mkForce ["root" ];
   users = {
@@ -70,6 +64,7 @@ in
   
   systemd.services.chopaan = {
     after = [ #"aws-creds-key.service"
+              "chopaanFS.mount"
               "network.target"
               "docker-janusgraph.service"
               "influxdb.service"

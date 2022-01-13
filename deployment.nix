@@ -3,7 +3,7 @@ let
   zone = "${region}a";
   accessKeyId = "default";
   hostName = "dosti.ecoenergy.global";
-  grubDevice = "/dev/nvme0n1";
+  grubDevice = "/dev/nvme1n1";
   in
   {
     chopaan = { config, pkgs, resources, lib, app, sops-nix, ... }:
@@ -43,10 +43,12 @@ let
       #fileSystems.disk = resources.ebsVolumes.chopaanFS.volumeId; 
       fileSystems.chopaan = {
         mountPoint = "/chopaanFS";
-        device = "/dev/nvme1n1";
+        device = grubDevice;
+        fsType = "btrfs";
+        autoFormat = true;
         ec2 = {
           disk = resources.ebsVolumes.chopaanFS;
-          fsType = "ext4";
+          fsType = "btrfs";
           deleteOnTermination = false;
         }; 
       };
