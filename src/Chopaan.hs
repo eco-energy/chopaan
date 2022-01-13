@@ -106,8 +106,9 @@ run = do
     KibbutzOpts{..} = kibbutzOpts
   tc <- liftIO $ execParser tkOptions
   --ic <- liftIO $ execParser icOptions
-  dir <- liftIO $ getXdgDir XdgConfig . Just =<< parseRelDir "kbtzim/"
-  --serverThread <- liftIO $ forkServer "localhost" 8111
+  dir <- liftIO $ getXdgDir XdgData . Just =<< parseRelDir "kbtzim"
+  liftIO . print $ "Chopaan Kbtzim Path: " <> (show dir) 
+  liftIO $ ensureDir dir
   liftIO $ createDB influxConn mqttDB
   liftIO $ createDB influxConn hydrationDB
   t0 <- liftIO Ti.getCurrentTime

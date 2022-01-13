@@ -161,7 +161,7 @@ watchKbtzim :: forall m t. (MonadIO m) => Path t Dir -> S.SerialT m (Either Kbtz
 watchKbtzim dir = S.catMaybes $ S.map getEv $ wk dir
   where
     wk :: Path t Dir -> S.SerialT m Event
-    wk dir = S.before (liftIO $ createDirectoryIfMissing True $ toFilePath dir) $
+    wk dir = S.before (liftIO $ ensureDir dir) $
              S.hoist liftIO $
              EvL.watchWith kbtzimConf [unArrPath . isoFwd fpArrIso . toFilePath $ dir]
 

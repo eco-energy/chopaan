@@ -71,7 +71,7 @@ in
             ];        
     wantedBy = [ "multi-user.target" ];
     environment = {
-      AWS_CREDS = config.sops.secrets.aws-creds.path;
+      AWS_CREDS = awskey;
       XDG_ROOT_DIR = chopaanDir;
       STORE_PATH = "${chopaanDir}/data/hydration";
       S3_BUCKET = "dosti-datastream";
@@ -89,6 +89,7 @@ in
     serviceConfig = {
       WorkingDirectory = "~";
       User = "chopaan";
+      Group = "chopaan";
       LimitNOFILE = 6400000;
     };
     script = withRTSOpts ((withJanus "${app}/bin/kbtzim"));
