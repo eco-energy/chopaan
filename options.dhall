@@ -56,5 +56,5 @@ in
              , reaperWait =  5.0
              , maxConnsPerStripe = Natural/toInteger 25
              }
-, influxConn = { influxServer = "localhost", influxPort = +8086 }
+, influxConn = { influxHost = "localhost", influxPort = +8086 }
 }
