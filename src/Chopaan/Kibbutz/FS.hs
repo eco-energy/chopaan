@@ -1,20 +1,17 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
-
 {-# LANGUAGE DerivingVia #-}
-
 {-# LANGUAGE FlexibleContexts #-}
-
-
+{-# LANGUAGE ConstraintKinds#-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Chopaan.Kibbutz.FS where
 
 import Algebra.Graph.Label (Distance, distance, finite, getDistance, getFinite)
@@ -348,15 +345,21 @@ toMap = FL.foldl' (\m (n, a) -> M.insert n a m) mempty
 kbtzimEnv :: forall m. (S.MonadAsync m, MonadCatch m, MonadFail m) => Path Abs Dir -> S.SerialT m Kbtzim
 kbtzimEnv fp = S.scan (FL.foldlM' onEv (readKbtzim fp)) (watchKbtzim fp)
 
-class KbtzEnv m where
-  react :: a -> Ev -> m a
+class KbtzState m a where
+  handle :: a -> Ev -> m a
 
-withEvs :: (S.IsStream t, S.MonadAsync m, MonadCatch m)
+instance (MonadFS m) => KbtzState m Kbtzim where
+  handle = onEv
+
+onKbtzState :: (S.IsStream t, MonadFS m, KbtzState m a) => m a -> t m Ev -> t m a
+onKbtzState = withEvs handle
+
+withEvs :: (S.IsStream t, MonadFS m)
   => (a -> Ev -> m a) -> m a -> t m Ev -> t m a
 withEvs = S.scanlM'
 
 type Ev = Either KbtzEv NodeEv
-
+type MonadFS m = (S.MonadAsync m, MonadCatch m)
 
 onEv :: (S.MonadAsync m, MonadCatch m) => Kbtzim -> Ev -> m Kbtzim
 onEv k (Left kv) = pure $ onKbtzEv kv k
