@@ -105,8 +105,8 @@ run = do
     Options{..} = appOptions app
     KibbutzOpts{..} = kibbutzOpts
   tc <- liftIO $ execParser tkOptions
-  ic <- liftIO $ execParser icOptions
-  dir <- liftIO $ getXdgDir XdgConfig . Just =<< parseRelDir "/kbtzim/"
+  --ic <- liftIO $ execParser icOptions
+  dir <- liftIO $ getXdgDir XdgConfig . Just =<< parseRelDir "kbtzim/"
   --serverThread <- liftIO $ forkServer "localhost" 8111
   liftIO $ createDB influxConn mqttDB
   liftIO $ createDB influxConn hydrationDB
@@ -115,7 +115,7 @@ run = do
     kbtzim0 <- readKbtzim dir
     let kEvs = watchKbtzim @GraphM dir
     kbtzim <- fromJust <$> S.head (kbtzimEnv dir)
-    S.drain . S.fromAhead $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts ic kbtzim
+    S.drain . S.fromAhead $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts influxConn kbtzim
   where
     mqttDB = "chopaanMQTT"
     hydrationDB = "chopaanS3"
