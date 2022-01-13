@@ -6,7 +6,7 @@ let
   mqttPort = 8883;
   awskey = "/run/keys/aws-creds";
   tinkerHost = "localhost";
-  withJanus = p: "${p} --influxHost localhost --influxPort 8086 --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}";
+  withJanus = p: "${p} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}";
   withRTSOpts = p: "${p} +RTS -A32m -n4m -N";
   chopaanDir = "${config.users.users.chopaan.home}";
   dashboardDir = "/dash";
