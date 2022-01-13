@@ -270,6 +270,8 @@ instance Ord NodeModel where
 
 type KbtzModel = AG.Graph (Sum R) NodeModel
 
+
+
 toKbtzG :: KbtzModel -> AG.Graph (Sum R) (NodeMAC, HW R)
 toKbtzG = fmap toHWNode
 

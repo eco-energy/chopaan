@@ -54,6 +54,7 @@ import Chopaan.Utils.Retry (recoverWith)
 import Chopaan.Comm.Dispatch (accessEnergyState, accessRTS)
 import Chopaan.Node.Folds (sensorFold, meshFold, SensorR, MeshR)
 import Chopaan.Node.HW
+import qualified Chopaan.Graph.Algebraic as AG
 import Data.Influxable (KbtzNode, asKbtzNode, lineSensorR
                        , lineMesh, lineFoldHttp, showText, wp, qp)
 
@@ -216,9 +217,11 @@ data KbtzConf = KbtzConf
   } deriving (Generic)
 
 
+toHWDict :: FS.KbtzModel -> KbtzHW
+toHWDict = M.fromList . fmap (\n -> (FS.nodeMAC n, FS.nodeHW n)) . AG.vertexList
 
 mkConfig :: Kbtzim -> STM TKbtzim
-mkConfig = mkTKbtz . undefined
+mkConfig =  mkTKbtz . fmap toHWDict
 
 
 mkKbtzConf :: HydrationConf

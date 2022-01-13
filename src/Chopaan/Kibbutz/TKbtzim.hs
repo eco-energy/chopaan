@@ -29,6 +29,7 @@ type KbtzHW = (M.Map NodeMAC (HW Double))
 type KbtzimHW = M.Map KbtzName KbtzHW
 type TKbtzim = TMap KbtzName KbtzHW
 
+
 data LifeTime = Finite | Infinite deriving (Eq, Ord, Show, Generic, Read)
 
 
