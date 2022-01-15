@@ -6,7 +6,8 @@ import Control.Monad.IO.Class ( MonadIO(liftIO) )
 
 import Chopaan.Kibbutz
 import Chopaan.Hydration.Prefix
-import Chopaan.Hydrate ( hConfDef, mkTKbtz, mkConfig, runHydration, HConS, TKbtzim)
+import Chopaan.Hydrate ( hConfDef, runHydration, HConS)
+import Chopaan.Kibbutz.TKbtzim (mkConfig, TKbtzim, onEvT)
 import Chopaan.Kibbutz.KbtzId ( KbtzId(KbtzId) )
 import Chopaan.Kibbutz.FS
 import Chopaan.Node.NodeId ( NodeId(NodeId), NodeMAC )
@@ -72,14 +73,11 @@ runKbtzim :: forall t m.
   -> MQTTOpts
   -> HydrationOpts
   -> InfluxConn
-  -> Kbtzim
-  -> t m (Either (NodeMAC, Prefix) (KbtzScene NodeMAC))
-runKbtzim t0 mq hydrationOpts influxCon kbtzim = S.concatM $ do
-  tKbtzim <- atomically $ mkConfig kbtzim
-  return $
-    (Left <$> s3Hydration tKbtzim)
-    `S.parallel`
-    (Right <$> mqttStream kbtzim)
+  -> TKbtzim
+  -> t m (NodeMAC, Prefix)
+runKbtzim t0 mq hydrationOpts influxCon tKbtzim = s3Hydration tKbtzim
+    -- `S.parallel`
+    -- (Right <$> mqttStream kbtzim)
   where
     s3Hydration :: TKbtzim -> t m (NodeMAC, Prefix)
     s3Hydration kns = S.concat $ S.unfold (runHydration t0 influxCon hConfDef kns) ()
@@ -103,7 +101,6 @@ run = do
   app <- ask
   let
     Options{..} = appOptions app
-    KibbutzOpts{..} = kibbutzOpts
   tc <- liftIO $ execParser tkOptions
   --ic <- liftIO $ execParser icOptions
   dir <- liftIO $ getXdgDir XdgData . Just =<< parseRelDir "kbtzim"
@@ -115,8 +112,10 @@ run = do
   liftIO $ runGraphM poolConf tc $ do
     kbtzim0 <- readKbtzim dir
     let kEvs = watchKbtzim @GraphM dir
-    kbtzim <- fromJust <$> S.head (kbtzimEnv dir)
-    S.drain . S.fromAhead $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts influxConn kbtzim
+    tKbtzim <- atomically $ mkConfig kbtzim0
+    let wk = S.mapM (onEvT tKbtzim) kEvs
+        rk = (S.fromAhead $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts influxConn tKbtzim)
+    S.drain $ (fmap (const ()) rk) `S.parallel` wk
   where
     mqttDB = "chopaanMQTT"
     hydrationDB = "chopaanS3"

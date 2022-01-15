@@ -20,6 +20,7 @@ import qualified Data.Text as T
 import qualified Data.Set as Set
 import Data.Time.Clock.POSIX
 import Chopaan.Hydration.Prefix
+import Chopaan.Kibbutz.TKbtzim
 import Chopaan.Comm.S3
 import Chopaan.Hydrate
 import Streamly.Binary

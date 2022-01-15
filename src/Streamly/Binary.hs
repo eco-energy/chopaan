@@ -73,7 +73,7 @@ data DecodeException = WinoExp W.WineryException
                      | BinExp
                      | PBExp String
                      | TxtExp
-                     | NoFile
+                     | NoFile FilePath
                      deriving (Generic)
                      deriving (Show)
 
@@ -237,7 +237,7 @@ decodeFile f = S.concatM $ do
   exists <- liftIO $ doesFileExist f
   case (exists) of
     True -> return $ S.mapM (pure . decodeA) . (S.parseManyD (chunkBytes @a)) . File.toBytes $ f
-    False -> return $ S.fromPure (Left NoFile)
+    False -> return $ S.fromPure (Left . NoFile $ f)
 {-# INLINE decodeFile #-}
 
 

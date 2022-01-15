@@ -108,20 +108,6 @@ main = do
       , windowInitialSize = pure 1024
       }
 
-
-
-addNode ::
-  NodeIdx
-  -> NodeMAC
-  -> HW Double
-  -> (Double, Double)
-  -> Maybe NodeIdx
-  -> K.NodeModel
-addNode i mac hw loc conn = K.NodeModel i mac hw loc (K.Ownership i) (fromMaybe i conn)  
-
-addNodes :: (Monad m) => m ()
-addNodes = void $ pure $ do
-  addNode (NodeId 1) (NodeId "ac:bcncsad") (HW (SingBC defBC) (SingPC defPC) (SingLC defLC))
       
 act :: IO ()
 act = do

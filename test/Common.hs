@@ -150,10 +150,10 @@ almostEqual eta a b = do
 instance Arbitrary (Tag KbtzName) where
   arbitrary = (Tag . KbtzId . T.pack . getPrintableString) <$> arbitrary
 
-instance Arbitrary (Tag NodeIdx) where
+instance Arbitrary (Tag HHId) where
   arbitrary = (Tag . NodeId . getPositive) <$> arbitrary
 
-instance Arbitrary (NodeIdx) where
+instance Arbitrary (HHId) where
   arbitrary = (NodeId . getPositive) <$> arbitrary
 
 instance Arbitrary KbtzEv where

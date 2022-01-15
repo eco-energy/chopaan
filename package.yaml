@@ -210,8 +210,8 @@ executables:
                 - -fdicts-strict
                 - -O1
                 - -threaded 
-  ui:
-    main:                Ui.hs
+  add:
+    main:                Add.hs
     other-modules: []
     source-dirs:         app
     dependencies:

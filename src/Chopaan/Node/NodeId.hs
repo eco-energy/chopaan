@@ -28,7 +28,7 @@ type ThingName = Text.Text
 
 type NodeMAC = NodeId ThingName
 
-type NodeIdx = NodeId Int
+type HHId = NodeId Int
 
 newtype NodeId a = NodeId {unNodeId :: a}
   deriving stock (Generic, Functor)

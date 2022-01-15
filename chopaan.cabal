@@ -261,6 +261,154 @@ library
     ghc-options: -fdicts-strict -O1
   default-language: Haskell2010
 
+executable add
+  main-is: Add.hs
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -O1
+  build-depends:
+      ad
+    , adjunctions
+    , aeson
+    , algebraic-graphs >=0.5
+    , amazonka
+    , amazonka-core
+    , amazonka-iot
+    , amazonka-s3
+    , async
+    , barbies
+    , base
+    , base64
+    , binary
+    , bytestring
+    , cas-hashable
+    , cas-store >=1.1.0
+    , cassava
+    , chopaan
+    , clay
+    , colour
+    , comonad
+    , compensated
+    , concat-classes
+    , concat-examples
+    , concat-graphics
+    , concat-plugin
+    , concurrent-dns-cache >=0.1.3
+    , conduit
+    , connection
+    , constraints-extras
+    , containers
+    , convertible
+    , data-default-class
+    , dear-imgui >=1.3.0
+    , deepseq
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , dhall >=1.33.0
+    , diagrams-contrib >=1.4.4
+    , diagrams-lib >=1.4.4
+    , diagrams-svg >=1.4.3
+    , dimensional
+    , directory
+    , directory-tree
+    , distributive
+    , dns
+    , ekg
+    , ekg-core
+    , envy
+    , estimator
+    , exceptions
+    , file-embed
+    , filepath
+    , fusion-plugin >=0.2.3
+    , generic-data
+    , generic-lens
+    , ghc-prim
+    , gl
+    , grafana
+    , greskell >=1.2.0.0
+    , greskell-core >=0.1.3.5
+    , greskell-websocket >=0.1.2.5
+    , hashable
+    , haxl
+    , higgledy
+    , http-client
+    , http-client-tls
+    , http-types
+    , incremental
+    , influxdb >=1.9.0
+    , interpolatedstring-perl6
+    , katip
+    , keys
+    , lens
+    , linear >=1.21.6
+    , managed
+    , microlens
+    , monad-bayes
+    , monad-control
+    , mtl
+    , mwc-random
+    , net-mqtt >=0.7.0.1
+    , net-spider
+    , network >=3.1.2.1
+    , network-uri
+    , newtype-generics
+    , one-liner
+    , optparse-applicative
+    , optparse-simple
+    , path
+    , path-io
+    , pointed
+    , proto-lens
+    , proto-lens-runtime
+    , raw-strings-qq
+    , regex-applicative
+    , rel8
+    , resource-pool
+    , resourcet
+    , retry
+    , rio >=0.1.8.0
+    , safe-exceptions
+    , sbv
+    , sdl2
+    , servant
+    , servant-client
+    , servant-client-core
+    , servant-server
+    , servant-websockets
+    , stm
+    , streamly >=0.8.0
+    , streamly-bytestring >=0.1.3
+    , text
+    , time
+    , time-compat >=1.9.2.2
+    , tls
+    , transformers
+    , transformers-base
+    , unagi-chan
+    , unix
+    , unliftio
+    , unliftio-core
+    , unordered-containers
+    , vector
+    , vector-sized
+    , vinyl
+    , wai
+    , wai-cors
+    , wai-extra
+    , warp
+    , websockets
+    , winery >=1.3.2
+    , wreq
+    , x509-store
+    , x509-validation
+  if flag(prod)
+    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin-opt=Fusion.Plugin:verbose=1 -O2
+  else
+    ghc-options: -fdicts-strict -O1
+  default-language: Haskell2010
+
 executable kbtzim
   main-is: Main.hs
   other-modules:
@@ -576,154 +724,6 @@ executable server
       ghc-options: -fdicts-strict -O2 -with-rtsopts=-N -threaded
     else
       ghc-options: -fdicts-strict -O1 -threaded
-  default-language: Haskell2010
-
-executable ui
-  main-is: Ui.hs
-  hs-source-dirs:
-      app
-  ghc-options: -threaded -O1
-  build-depends:
-      ad
-    , adjunctions
-    , aeson
-    , algebraic-graphs >=0.5
-    , amazonka
-    , amazonka-core
-    , amazonka-iot
-    , amazonka-s3
-    , async
-    , barbies
-    , base
-    , base64
-    , binary
-    , bytestring
-    , cas-hashable
-    , cas-store >=1.1.0
-    , cassava
-    , chopaan
-    , clay
-    , colour
-    , comonad
-    , compensated
-    , concat-classes
-    , concat-examples
-    , concat-graphics
-    , concat-plugin
-    , concurrent-dns-cache >=0.1.3
-    , conduit
-    , connection
-    , constraints-extras
-    , containers
-    , convertible
-    , data-default-class
-    , dear-imgui >=1.3.0
-    , deepseq
-    , dependent-map
-    , dependent-sum
-    , dependent-sum-template
-    , dhall >=1.33.0
-    , diagrams-contrib >=1.4.4
-    , diagrams-lib >=1.4.4
-    , diagrams-svg >=1.4.3
-    , dimensional
-    , directory
-    , directory-tree
-    , distributive
-    , dns
-    , ekg
-    , ekg-core
-    , envy
-    , estimator
-    , exceptions
-    , file-embed
-    , filepath
-    , fusion-plugin >=0.2.3
-    , generic-data
-    , generic-lens
-    , ghc-prim
-    , gl
-    , grafana
-    , greskell >=1.2.0.0
-    , greskell-core >=0.1.3.5
-    , greskell-websocket >=0.1.2.5
-    , hashable
-    , haxl
-    , higgledy
-    , http-client
-    , http-client-tls
-    , http-types
-    , incremental
-    , influxdb >=1.9.0
-    , interpolatedstring-perl6
-    , katip
-    , keys
-    , lens
-    , linear >=1.21.6
-    , managed
-    , microlens
-    , monad-bayes
-    , monad-control
-    , mtl
-    , mwc-random
-    , net-mqtt >=0.7.0.1
-    , net-spider
-    , network >=3.1.2.1
-    , network-uri
-    , newtype-generics
-    , one-liner
-    , optparse-applicative
-    , optparse-simple
-    , path
-    , path-io
-    , pointed
-    , proto-lens
-    , proto-lens-runtime
-    , raw-strings-qq
-    , regex-applicative
-    , rel8
-    , resource-pool
-    , resourcet
-    , retry
-    , rio >=0.1.8.0
-    , safe-exceptions
-    , sbv
-    , sdl2
-    , servant
-    , servant-client
-    , servant-client-core
-    , servant-server
-    , servant-websockets
-    , stm
-    , streamly >=0.8.0
-    , streamly-bytestring >=0.1.3
-    , text
-    , time
-    , time-compat >=1.9.2.2
-    , tls
-    , transformers
-    , transformers-base
-    , unagi-chan
-    , unix
-    , unliftio
-    , unliftio-core
-    , unordered-containers
-    , vector
-    , vector-sized
-    , vinyl
-    , wai
-    , wai-cors
-    , wai-extra
-    , warp
-    , websockets
-    , winery >=1.3.2
-    , wreq
-    , x509-store
-    , x509-validation
-  if flag(prod)
-    ghc-options: -fdicts-strict -fplugin Fusion.Plugin -fmax-worker-args=16 -fspec-constr-recursive=16 -fplugin-opt=Fusion.Plugin:verbose=1 -O2
-  else
-    ghc-options: -fdicts-strict -O1
   default-language: Haskell2010
 
 test-suite chopaan-test
