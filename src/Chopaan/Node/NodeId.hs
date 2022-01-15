@@ -28,7 +28,11 @@ type ThingName = Text.Text
 
 type NodeMAC = NodeId ThingName
 
-type HHId = NodeId Int
+newtype HHId = HHId Int
+  deriving stock (Generic)
+  deriving newtype (Eq, Ord, Show, Read, Typeable, FromJSON, ToJSON, FromGraphSON, ToJSONKey)
+  deriving anyclass (NFData, Binary)
+  deriving (W.Serialise) via (W.WineryRecord HHId)
 
 newtype NodeId a = NodeId {unNodeId :: a}
   deriving stock (Generic, Functor)

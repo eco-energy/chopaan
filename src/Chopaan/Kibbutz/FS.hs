@@ -19,7 +19,7 @@ import qualified Chopaan.Graph.Algebraic as AG
 import Chopaan.Kibbutz.KbtzId (KbtzId (..), KbtzName)
 import Chopaan.Node.Components ()
 import Chopaan.Node.HW (HW (..))
-import Chopaan.Node.NodeId ( HHId, NodeMAC, NodeId(..), toText )
+import Chopaan.Node.NodeId ( HHId(..), NodeMAC, NodeId(..), toText )
 
 import Control.Applicative ()
 import qualified Control.Concurrent.STM as STM
@@ -135,7 +135,9 @@ instance HasPath (Tag KbtzName) where
   path = parseOptional (fmap Left . parseRelDir) . unKbtzId . unTag
 
 instance HasPath (Tag HHId) where
-  path = parseOptional (fmap Right . parseRelFile) . toText  . unTag
+  path = parseOptional (fmap Right . parseRelFile) . txt  . unTag
+    where
+      txt = T.replace "\"" "" . T.pack . show
 
 instance (Root a, HasPath b) => HasPath (a, b) where
   path (a, b) = case rootPath a of
@@ -220,7 +222,7 @@ toHHId :: RelFile -> Maybe (KbtzName, HHId)
 toHHId p = (, n) <$> k
   where
     k = toKbtzName' $ parent p
-    n = NodeId . read . toFilePath . filename $ p
+    n = HHId . read . toFilePath . filename $ p
 
 toKbtzName' :: RelDir -> Maybe KbtzName
 toKbtzName' p = case T.splitOn "/" . T.pack . toFilePath $ p of
