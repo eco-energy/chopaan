@@ -2,8 +2,6 @@
 module HydraSpec where
 
 import Common
-import qualified Streamly.Prelude as S
-import Streamly.Internal.Data.Time.Units (MilliSecond64(..))
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck.Checkers
@@ -15,33 +13,45 @@ import Test.QuickCheck.Instances.Text
 import Data.List
 import qualified Data.Map.Strict as M
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans
 import qualified Data.Time as Time
 import qualified Data.Text as T
 import qualified Data.Set as Set
 import Data.Time.Clock.POSIX
-import Chopaan.Hydration.Prefix
-import Chopaan.Kibbutz.TKbtzim
-import Chopaan.Comm.S3
-import Chopaan.Hydrate
+
 import Streamly.Binary
+import qualified Streamly.Internal.FileSystem.Event.Linux as Ev
 import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Data.Stream.IsStream.Expand as S
 import qualified Streamly.Internal.Data.Stream.IsStream as S
 import qualified Streamly.Internal.Data.Array.Foreign as A
 import qualified Streamly.Internal.Data.Array.Foreign.Type as A
 import qualified Streamly.Internal.Data.Array.Stream.Foreign as AS
+import qualified Streamly.Internal.Data.Time.Units as TU
+import qualified Streamly.Prelude as S
+import Streamly.Internal.Data.Time.Units (MilliSecond64(..))
+
 import Control.Concurrent.STM
 import Control.Concurrent.Async
+import Control.Concurrent
+import Path.IO
+import Path
 
-import qualified Streamly.Internal.Data.Time.Units as TU
 
+import Chopaan.Hydration.Prefix
+import Chopaan.Kibbutz.TKbtzim
+import Chopaan.Kibbutz.FS
+import Chopaan.Node.HW
+import Chopaan.Comm.S3
+import Chopaan.Hydrate
 import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId
 
 spec = parallel $ do
-  prefixSpec
-  --controlSpec
-  prefixGenSpec
+  --prefixSpec
+  controlSpec
+  --prefixGenSpec
   --keySpec
   --frameSpec
   --ingestionSpec
@@ -79,7 +89,7 @@ instance Arbitrary InAMinute where
 --   parallel $ describe "pipeline invariants" $ do
 --     it "prefix congregation works" $ do
 --       k <- liftIO $ generate (arbitrary @KbtzName)
---       ns <- S.toList $ S.replicateM 10 (liftIO . generate $ (arbitrary @(NodeMAC, HW R)))
+--       ns <- S.toList $ S.replicateM 10 (liftIO . generate $ (arbitrary @(NodeMAC, HW Double)))
 --       tk <- liftIO . atomically $ mkTKbtz $ M.fromList [(k, ns)]
 --       (InAMinute (t0, t1, _)) <- liftIO $ generate $ (arbitrary @InAMinute)
 --       let ufN = unfoldNodes Finite tk
@@ -125,29 +135,49 @@ prefixGenSpec = describe "Prefix Generation Invariants for Infinite and finite s
         y = prefixGen l1 yes r2 now end ()
         z = prefixGen l2 yes r3 start end ()
         in (x, y, z)
-    
--- controlSpec :: Spec
--- controlSpec = parallel $ describe "State Management" $ do
---   let ks = KbtzId . T.pack . pure @[] <$> ['a'..'d']
---       ns = NodeId . T.pack . show <$> [1..12]
---       kns = fst $ foldr zop ([], ns) ks
---         where
---           zop :: k -> ([(k, [n])], [n]) -> ([(k, [n])], [n]) 
---           zop k (k', n') = ((k, take 3 n') : k', drop 3 n')
---       addKs = (uncurry StartKbtz) <$> kns
---       rmKs = StopKbtz <$> ks
---       addNs = conc $ (\(k', ns') -> (StartNode k' <$> ns')) <$> kns
---       rmNs = conc $ (\(k', ns') -> (StopNode k' <$> ns')) <$> kns
---   it "Adding a kibbutz and its nodes produces the right unfold" $ do
---     k <- atomically $ newTVar mempty
---     kadd <- mapM_ (atomically . onCommand k) addKs
---     newNS' <- S.toList $ S.take (length ns) $ S.unfoldManyRoundRobin (unfoldNodes Infinite k) (S.fromList ks)
---     (Set.fromList newNS') `shouldBe` (Set.fromList ns)
---     krm <- mapM_ (atomically . onCommand k) rmKs
---     noNS <- S.toList $ S.unfoldManyRoundRobin (unfoldNodes Infinite k) (S.fromList ks)
---     (length noNS) `shouldBe` 0
---   where
---     conc = foldl (<>) mempty
+
+isLastEv :: Either KbtzEv NodeEv -> Bool
+isLastEv (Right (UpdateNode _ (HHId 9))) = False
+isLastEv _ = True
+
+controlSpec :: Spec
+controlSpec = describe "State Management" $ do
+  it "Unfolds based off TKbtzim responds to events" $ do
+    -- withSystemTempDir "kbtzim" $ \d -> do
+    (d :: AbsDir) <- liftIO $ makeAbsolute =<< (parseRelDir "data/test")
+    tk <- liftIO . atomically $ emptyTK
+    (Tag k, ns) <- do
+      k <- generate $ arbitrary @(Tag KbtzName) 
+      ns <- arbs @(NodeModel) 10
+      let ns' = zipWith (\n i -> n {nodeIdx = (HHId i)} ) ns [0, 1..]
+      return (k, ns')
+    flip runReaderT d $ do 
+      let kModel = (fromNodeModels ns)
+          wk = S.mapM_ (onEvT tk) $ S.trace (liftIO . print)
+            $ S.takeWhile (isLastEv) watchKbtzim
+      S.drain $ (S.fromEffect (createKbtz k kModel)) `S.parallel` (S.fromEffect wk)
+      let thisK = toKbtzimHW (M.singleton k kModel)
+      thatK <- liftIO . atomically $ getKbtzimHW tk
+      lift $ thatK `shouldBe` thisK
+      --interpretK (DeleteKbtz (Tag k))
+      --deadK <- lift . atomically $ getKbtzimHW tk
+      --lift $ deadK `shouldBe` mempty
+  where
+    oneS = TU.MilliSecond64 10
+      --interpretK d (DeleteKbtz (Tag k))
+      --deadK <- atomically $ getKbtzimHW tk
+      --deadK `shouldBe` mempty
+  
+  -- it "Adding a kibbutz and its nodes produces the right unfold" $ do
+  --   k <- atomically $ newTVar mempty
+  --   kadd <- mapM_ (atomically . onEvT k) addKs
+  --   newNS' <- S.toList $ S.take (length ns) $ S.unfoldManyRoundRobin (unfoldNodes Infinite k) (S.fromList ks)
+  --   (Set.fromList newNS') `shouldBe` (Set.fromList ns)
+  --   krm <- mapM_ (atomically . onCommand k) rmKs
+  --   noNS <- S.toList $ S.unfoldManyRoundRobin (unfoldNodes Infinite k) (S.fromList ks)
+  --   (length noNS) `shouldBe` 0
+  -- where
+  --   conc = foldl (<>) mempty
 
 
 prefixSpec :: Spec

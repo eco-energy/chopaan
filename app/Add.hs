@@ -9,6 +9,7 @@ import Chopaan.Node.Components
 import Chopaan.Node.HW
 import Chopaan.Kibbutz.KbtzId
 import Chopaan.Kibbutz.FS
+import Control.Monad.Trans.Reader
 
 mkNode :: (NodeMAC, HHId, PPUId, HW Double, (Double, Double), HHId) -> NodeModel
 mkNode (m, i, p, h, loc, to) = NodeModel i m h loc (Ownership i) p to 
@@ -50,6 +51,7 @@ ns = fmap mkNode $
 addBismillahMor :: IO ()
 addBismillahMor = do
   dir <- makeAbsolute =<< parseRelDir "data/kbtzim"
-  createKbtz dir (KbtzId "bismillahMor") (fromNodeModels ns)
+  flip runReaderT dir $ do
+    createKbtz (KbtzId "bismillahMor") (fromNodeModels ns)
 
 main = addBismillahMor

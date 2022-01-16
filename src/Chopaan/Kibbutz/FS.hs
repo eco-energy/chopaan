@@ -24,6 +24,8 @@ import Chopaan.Node.NodeId ( HHId(..), NodeMAC, NodeId(..), toText )
 import Control.Applicative ()
 import qualified Control.Concurrent.STM as STM
 import Control.Monad ( join, (<=<) )
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans
 import Control.Monad.Catch ( MonadCatch, Exception, MonadThrow )
 import Control.Monad.IO.Class (MonadIO, liftIO)
 
@@ -165,13 +167,14 @@ kbtzimConf =
     . EvL.setRecursiveMode On
 
 
-watchKbtzim :: forall m t. (S.MonadAsync m) => Path t Dir -> S.SerialT m (Either KbtzEv NodeEv)
-watchKbtzim dir = S.concatM $ do
+watchKbtzim :: forall m t. (S.MonadAsync m) => S.SerialT (FsM m) (Either KbtzEv NodeEv)
+watchKbtzim = S.concatM $ do
+  dir <- ask
   liftIO $ ensureDir dir
   d <- isoFwd fpArrIso . toFilePath $ dir 
   return $ S.catMaybes $ S.mapM getEv $ wk d
   where
-    wk :: ArrPath -> S.SerialT m Event
+    wk :: ArrPath -> S.SerialT (FsM m) Event
     wk d = S.hoist liftIO $
            EvL.watchWith kbtzimConf [unArrPath d]
 
@@ -194,16 +197,20 @@ interpretEv = undefined
 interpretE :: NodeModel -> NodeEv -> m ()
 interpretE = undefined
 
-interpretK :: MonadIO m => AbsDir -> KbtzEv -> m ()
-interpretK fp (CreateKbtz f) = case path f of
+interpretK :: MonadIO m => KbtzEv -> FsM m ()
+interpretK (CreateKbtz f) = case path f of
   Nothing -> liftIO . print $ "No Path!"
   Just d -> case d of
-    (Left dir) -> liftIO . ensureDir $ (fp </> dir)
+    (Left dir) -> do
+      base <- ask
+      liftIO . ensureDir $ (base </> dir)
     e -> liftIO . print $ "interpretK should only deal with Dir Paths, Got: " <> show e
-interpretK fp (DeleteKbtz f) = case path f of
+interpretK (DeleteKbtz f) = case path f of
   Nothing -> return ()
   Just d -> case d of
-    (Left dir) -> liftIO . removeDirectory . toFilePath $ (fp </> dir)
+    (Left dir) -> do
+      base <- ask
+      liftIO . removeDirectory . toFilePath $ (base </> dir)
     e ->  liftIO . print $ "interpretK should only deal with Dir Paths, Got: " <> show e
 
 
@@ -256,12 +263,12 @@ toKbtzName = fmap (Just . toKbtzName') . isoRev arrDirPath . ArrPath
 
 getNodeEv :: (PathM m) => Event -> m (Maybe NodeEv)
 getNodeEv ev = do
-  liftIO $ ((\p -> print $ "nodeEv: " <> p) =<< evRelPath ev)
+  -- liftIO $ ((\p -> print $ "nodeEv: " <> p) =<< evRelPath ev)
   case (EvL.isDir ev) of
     True -> return Nothing
     False -> do
       (k, n) <- fmap toHHId $ evRelPath' ev
-      return $ ctor $ (k, n)
+      return $ ctor (k, n)
   where
     ctor
       | EvL.isCreated ev = Just . uncurry CreateNode
@@ -351,14 +358,20 @@ logMaybeEither = UF.map fromJust . UF.filter isJust . UF.mapMWithInput report
 
 class Model m where
   
-
-createKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => AbsDir -> KbtzName -> KbtzModel -> m ()
-createKbtz root k m = do
-  interpretK root (CreateKbtz (Tag k))
+absFP :: (MonadFS m) => Path Rel b -> FsM m FilePath
+absFP p = (\d -> pure . toFilePath $ d </> p) =<< ask
+  
+createKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => KbtzName -> KbtzModel -> FsM m ()
+createKbtz k m = do
+  interpretK (CreateKbtz (Tag k))
   sequence_
     . fmap (\n -> case (path (k, (Tag (nodeIdx n)))) of
-               Nothing -> return ()
-               Just p -> B.encodeArray ((toFilePath root) <> pathBoth p) . B.toWino $ n)
+               Nothing -> liftIO . print $ "Node Path not assigned: " <> (show (k, nodeIdx n))
+               Just (Left p) -> do
+                 liftIO . print $ "Got RelDir, expected RelFile: " <> (show (k, nodeIdx n))
+               Just (Right p) -> do
+                 p' <- absFP p
+                 B.encodeArray p' . B.toWino $ n)
     . AG.vertexList $ m
 
 readKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => FilePath -> m KbtzModel
@@ -370,10 +383,11 @@ toTag = Tag
 deleteKbtz :: KbtzName -> Unop Kbtzim
 deleteKbtz k = onKbtzEv (DeleteKbtz . toTag $ k)
 
-readKbtzim :: forall m. (S.MonadAsync m, MonadCatch m) => AbsDir -> m Kbtzim
-readKbtzim =
+readKbtzim :: forall m. (S.MonadAsync m, MonadCatch m) => FsM m Kbtzim
+readKbtzim = do
+  dir <- ask
   UF.fold toMap
-    (UF.mapMWithInput (\i d -> (convertFP i,) <$> readKbtz d) listDirUF) . toFilePath
+    (UF.mapMWithInput (\i d -> (convertFP i,) <$> readKbtz d) listDirUF) . toFilePath $ dir
   where
     convertFP :: FilePath -> KbtzName
     convertFP = KbtzId . T.pack . toFilePath . dirname . fromJust . parseRelDir
@@ -381,30 +395,36 @@ readKbtzim =
 toMap :: (Monad m, Ord n) => FL.Fold m (n, a) (M.Map n a)
 toMap = FL.foldl' (\m (n, a) -> M.insert n a m) mempty
 
-kbtzimEnv :: forall m. (S.MonadAsync m, MonadCatch m, MonadFail m) => Path Abs Dir -> S.SerialT m Kbtzim
-kbtzimEnv fp = S.scan (FL.foldlM' onEv (readKbtzim fp)) (watchKbtzim fp)
+kbtzimEnv :: forall m. (S.MonadAsync m, MonadCatch m, MonadFail m) => AbsDir -> S.SerialT m Kbtzim
+kbtzimEnv fp = S.runReaderT (pure fp) $ S.scan (FL.foldlM' onEv readKbtzim) watchKbtzim
 
 class KbtzState m a where
-  handle :: a -> Ev -> m a
+  handle :: a -> Ev -> FsM m a
 
 instance (MonadFS m) => KbtzState m Kbtzim where
   handle = onEv
 
-onKbtzState :: (S.IsStream t, MonadFS m, KbtzState m a) => m a -> t m Ev -> t m a
-onKbtzState = withEvs handle
+onKbtzState :: forall t m a. (S.IsStream t, MonadFS m, KbtzState m a) => AbsDir
+  -> m a
+  -> t m Ev
+  -> t m a
+onKbtzState d x evs = S.runReaderT (pure d) $ withEvs handle (lift x) $ e'
+  where
+    e' :: t (FsM m) Ev
+    e' = S.liftInner evs
 
 withEvs :: (S.IsStream t, MonadFS m)
-  => (a -> Ev -> m a) -> m a -> t m Ev -> t m a
+  => (a -> Ev -> FsM m a) -> FsM m a -> t (FsM m) Ev -> t (FsM m) a
 withEvs = S.scanlM'
 
 type Ev = Either KbtzEv NodeEv
 type MonadFS m = (S.MonadAsync m, MonadCatch m)
 
-onEv :: (S.MonadAsync m, MonadCatch m) => Kbtzim -> Ev -> m Kbtzim
+onEv :: (S.MonadAsync m, MonadCatch m) => Kbtzim -> Ev -> FsM m Kbtzim
 onEv k (Left kv) = pure $ onKbtzEv kv k
 onEv k (Right nv) = onNodeEv nv k
 
-onNodeEv :: (S.MonadAsync m, MonadCatch m) => NodeEv -> Kbtzim -> m Kbtzim
+onNodeEv :: (S.MonadAsync m, MonadCatch m) => NodeEv -> Kbtzim -> FsM m Kbtzim
 onNodeEv (CreateNode k n) ks = upsertNode k n ks
 onNodeEv (ReadNode _ _) ks = pure ks
 onNodeEv (UpdateNode k n) ks = upsertNode k n ks
@@ -454,17 +474,24 @@ addNode k n = case findConn k of
 updateNode :: NodeModel -> Unop KbtzModel
 updateNode v = AG.replaceVertex v v
 
+type FsM m = ReaderT AbsDir m
+
 readNode' :: (S.MonadAsync m, MonadCatch m)
-  => KbtzName -> HHId -> m (Maybe (Either B.DecodeException NodeModel))
+  => KbtzName
+  -> HHId
+  -> FsM m (Maybe (Either B.DecodeException NodeModel))
 readNode' k n = case path (k, Tag n) of
   Nothing -> (liftIO . print $ ("Non-existent Path! " :: String)) >> return Nothing
-  Just p -> liftIO . readNode $ pathBoth p
+  Just (Left d) -> (liftIO . print $ "Dir Path Passed! " <> (show d)) >> return Nothing
+  Just (Right f) -> do
+    dir <- ask
+    liftIO . readNode . toFilePath $ dir </> f
 
 pathBoth :: Either RelDir RelFile -> FilePath
 pathBoth = either toFilePath toFilePath
 
 upsertNode :: (S.MonadAsync m, MonadCatch m)
-  => KbtzName -> HHId -> Kbtzim -> m Kbtzim
+  => KbtzName -> HHId -> Kbtzim -> FsM m Kbtzim
 upsertNode k n ks = do
   n' <- readNode' k n 
   case n' of

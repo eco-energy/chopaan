@@ -82,8 +82,8 @@ spec = do
   kbtzSpec
   --hydrationSpec
 
-nNodes = 100
-nMessages = 1000
+nNodes = 10
+nMessages = 100
 kId = KbtzId "testK"
 t0 = t
 tn = Ti.UTCTime (Ti.fromGregorian 2021 8 8) (Ti.secondsToDiffTime 0)
@@ -110,7 +110,7 @@ foldSpec = do
     it "Sensor Fold works" $ do
       ns <- liftIO $ arbs @NodeMAC nNodes
       l <- S.length
-           $ S.tapRate 1 (\r -> liftIO $ print ("sensorFold rate: " <> (show r)))
+          --  $ S.tapRate 1 (\r -> liftIO $ print ("sensorFold rate: " <> (show r)))
            $ (sampleStream $ S.postscan (FL.classify (sensorFold undefined)) (esStreams nMessages nNodes ns))
       l `shouldBe` (nMessages * nNodes)
       
@@ -150,8 +150,8 @@ kbtzSpec = do
         print "Messages Queued"
       l <- S.length -- S.fold (FL.tee FL.length (encodeFold "testFile"))
            --- $ fmap toWino
-           $ S.take ((2 * nNodes * nMessages) + 0) k
-      l `shouldBe` (2 * nNodes * nMessages)
+           $ S.take ((2 * nNodes * nMessages - nMessages)) k
+      l `shouldBe` (2 * nNodes * nMessages - nMessages)
 
     xit "RS snapshot graph has the right number of nodes and links" $ \(ns, db, _) -> do
       (gotNs, gotLs) <- snapDebug meshNodesSnapshot (spools db) ns t0 tn
@@ -177,7 +177,7 @@ kbtzSpec = do
            qp' = qp ic mqttDB
            qgp = QueryGenParams mqttDB "\"autogen\"" Nothing Nothing 
            nqs = nodeQueries qgp <$> kns
-           eqNM l = (abs (l - nMessages)) < 2
+           eqNM l = (abs (l - nMessages)) < (div (nNodes * nMessages) 2)
        t <- qResultTest qp' eqNM nqs
        t `shouldBe` (True)
 
@@ -239,8 +239,8 @@ runWithDBPools = do
   -- Create Influx DB!
   liftIO $ createDB ic mqttDB
   ns <- liftIO $ arbs @NodeMAC nNodes
-  liftIO $ withResource kp  (\c -> addKbtz c kId)
-  liftIO $ mapM_ (\n -> withResource kp (\c -> addNodeToKbtz c kId n)) ns
+  --liftIO $ withResource kp  (\c -> addKbtz c kId)
+  --liftIO $ mapM_ (\n -> withResource kp (\c -> addNodeToKbtz c kId n)) ns
   return (ns, sp, ic)
 
 

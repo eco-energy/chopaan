@@ -148,13 +148,21 @@ almostEqual eta a b = do
   ((abs $ a - b) < eta) `shouldBe` True
 
 instance Arbitrary (Tag KbtzName) where
-  arbitrary = (Tag . KbtzId . T.pack . getPrintableString) <$> arbitrary
+  arbitrary = do
+    let el = ['a'..'z']
+    xs <- mapM (\_ -> elements el) [1..6]
+    ys <- mapM (\_ -> elements el) [1..6]
+    let cpld = fmap (\(a, b) -> [a] <> [b]) $ zip xs ys
+    return $ Tag . KbtzId . T.pack . tail $ foldl (\x y -> x <> y) "" cpld
 
 instance Arbitrary (Tag HHId) where
-  arbitrary = (Tag . NodeId . getPositive) <$> arbitrary
+  arbitrary = (Tag . HHId . getPositive) <$> arbitrary
+
+instance Arbitrary (PPUId) where
+  arbitrary = (PPUId . getPositive) <$> arbitrary
 
 instance Arbitrary (HHId) where
-  arbitrary = (NodeId . getPositive) <$> arbitrary
+  arbitrary = (HHId . getPositive) <$> arbitrary
 
 instance Arbitrary KbtzEv where
   arbitrary = genericArbitrary 

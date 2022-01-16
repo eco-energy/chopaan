@@ -1,8 +1,17 @@
-{-# LANGUAGE TypeApplications, ScopedTypeVariables, RecordWildCards, FlexibleContexts, OverloadedStrings, ConstraintKinds #-}
+{-# LANGUAGE TypeApplications, ScopedTypeVariables, RecordWildCards, FlexibleContexts, OverloadedStrings, ConstraintKinds, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveGeneric, UndecidableInstances, TypeOperators, RankNTypes #-}
 module Chopaan where
 
+import GHC.Generics
 import Control.Applicative
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
+import Control.Monad.Reader.Class
+import Control.Monad.Catch
+import Control.Monad.Except
+import Control.Monad.Base
+import Control.Monad.Trans.Control
+import Control.Monad.IO.Unlift
+import Control.Monad.Bayes.Class
+import Control.Monad.Bayes.Sampler
 
 import Chopaan.Kibbutz
 import Chopaan.Hydration.Prefix
@@ -23,7 +32,7 @@ import Chopaan.Types
       icOptions )
 import Chopaan.Graph.Kbtz ( getKbtzim )
 import Chopaan.Graph
-    ( GraphM, runGraphM, withKbtzPool, tkOptions, getKNs, addzim )
+    ( GraphM, runGraphM, withKbtzPool, tkOptions, getKNs, addzim, type (~>) )
 import Data.Influxable (createDB)
 import Data.Bifunctor ( Bifunctor(..) )
 import Data.Pool (stats)
@@ -40,7 +49,7 @@ import qualified Streamly.Internal.FileSystem.File as File
 
 
 import System.Remote.Monitoring (forkServer)
-
+import System.Random.MWC
 import Network.AWS.S3 (BucketName(..))
 import qualified Streamly.Internal.Data.Stream.IsStream as S
 
@@ -49,6 +58,7 @@ import RIO
     ( MonadIO(liftIO),
       stdout,
       ReaderT,
+      runReaderT,
       MonadReader(ask),
       BufferMode(LineBuffering),
       RIO,
@@ -92,7 +102,22 @@ runKbtzim t0 mq hydrationOpts influxCon tKbtzim = s3Hydration tKbtzim
     --                        , influxCon = influxCon
     --                        }
 
+data Ctx = Ctx
+  { root :: AbsDir
+  , genIO :: GenIO
+  } deriving (Generic)
 
+newtype ChopaanFS a = ChopaanFS { runChopaanFS :: ReaderT Ctx IO a  }
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader Ctx,
+                    MonadBase IO, MonadBaseControl IO, MonadFail, MonadThrow, MonadCatch,
+                    MonadMask, MonadUnliftIO)
+
+runChopaanM :: MonadIO m => Ctx -> ChopaanFS ~> m
+runChopaanM c a = liftIO $ runReaderT (runChopaanFS a) c
+
+instance MonadSample ChopaanFS where
+  random = (liftIO . sampleIOwith random) . genIO =<< ask
+  {-# INLINE random #-}
 
 run :: RIO App ()
 run = do
@@ -100,21 +125,21 @@ run = do
   app <- ask
   let
     Options{..} = appOptions app
-  tc <- liftIO $ execParser tkOptions
-  --ic <- liftIO $ execParser icOptions
   dir <- makeAbsolute =<< parseRelDir "data/kbtzim" -- liftIO $ getXdgDir XdgData . Just =<< 
   liftIO . print $ "Chopaan Kbtzim Path: " <> (show dir) 
   liftIO $ ensureDir dir
   --liftIO $ createDB influxConn mqttDB
   liftIO $ createDB influxConn hydrationDB
   t0 <- liftIO Ti.getCurrentTime
-  liftIO $ runGraphM poolConf tc $ do
-    kbtzim0 <- readKbtzim dir
-    let kEvs = watchKbtzim @GraphM dir
-    tKbtzim <- atomically $ mkConfig kbtzim0
-    let wk = S.mapM (onEvT tKbtzim) $ S.trace (liftIO . print) kEvs --  
-        rk = (S.fromAhead $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts influxConn tKbtzim)
-    S.drain $ (fmap (const ()) $ S.trace (liftIO . print) rk) `S.parallel` wk
+  gen <- liftIO createSystemRandom
+  liftIO $ runChopaanM (Ctx dir gen) $ do
+    flip runReaderT dir $ do
+      tKbtzim <- atomically . mkConfig =<< readKbtzim
+      let wk = S.mapM_ (onEvT tKbtzim) $ S.trace (liftIO . print) watchKbtzim 
+          rk = S.liftInner $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts influxConn tKbtzim
+      S.drain . S.fromAhead $ (fmap (const ()) $ S.trace (liftIO . print) rk)
+        `S.parallel`
+        (S.fromEffect wk)
   where
     --mqttDB = "chopaanMQTT"
     hydrationDB = "chopaanS3"

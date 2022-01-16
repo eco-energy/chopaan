@@ -12,7 +12,6 @@ import Control.Concurrent.STM
       newTVar,
       readTVar,
       retry,
-      modifyTVar,
       modifyTVar',
       orElse
     )
@@ -32,6 +31,7 @@ import System.Envy
 import Chopaan.Kibbutz.KbtzId ( KbtzName )
 import Chopaan.Kibbutz.FS
     ( MonadFS,
+      FsM,
       Ev,
       KbtzState(..),
       Kbtzim,
@@ -68,6 +68,11 @@ lookupTSet k (TKbtzim tv) = do
     Nothing -> return Nothing
     Just s' -> Just . Set.fromList . fmap (fst.snd) . M.toList <$> readTVar s'
 
+getKbtzimHW :: TKbtzim -> STM KbtzimHW
+getKbtzimHW tv = do
+  m <- readTVar (unTKbtzim tv)
+  traverse readTVar m
+
 toMACSet :: KbtzHW -> NodeHWMap
 toMACSet = M.fromList . fmap snd . M.toList
 
@@ -78,6 +83,9 @@ lookupMACSet k (TKbtzim tv) = do
     Nothing -> return Nothing
     Just s' -> Just . toMACSet <$> readTVar s'
 
+emptyTK :: STM TKbtzim
+emptyTK = fmap TKbtzim $ newTVar mempty
+
 mkTKbtz :: KbtzimHW -> STM TKbtzim
 mkTKbtz kns = fmap TKbtzim . newTVar =<< traverse newTVar kns
 
@@ -85,6 +93,9 @@ toKV n = (nodeIdx n, (nodeMAC n, nodeHW n))
 
 toHWDict :: KbtzModel -> KbtzHW
 toHWDict = M.fromList . fmap toKV . AG.vertexList
+
+toKbtzimHW :: Kbtzim -> KbtzimHW
+toKbtzimHW = fmap toHWDict
 
 mkConfig :: Kbtzim -> STM TKbtzim
 mkConfig =  mkTKbtz . fmap toHWDict
@@ -149,54 +160,38 @@ macSet' kId ks = go `orElse` retry
 nodeSet :: MonadIO m => KbtzName -> TKbtzim -> m TNodes
 nodeSet kId = liftIO . atomically . nodeSet' kId
 
-
--- data Command = StartKbtz KbtzName [HWNode]
---              | StopKbtz KbtzName
---              | StartNode KbtzName HWNode
---              | StopNode KbtzName HWNode
---              | ShowState
---              deriving (Eq, Ord, Show, Generic)
-
-
--- parseCmd :: (HConS t m) => t m Command
--- parseCmd = S.delayPre 1 $ S.repeat ShowState
-
--- instance MonadFS m => KbtzState m TKbtzim where
---   handle = onEvT
-
-onEvT :: MonadFS m => TKbtzim -> Ev -> m ()
+onEvT :: MonadFS m => TKbtzim -> Ev -> FsM m ()
 onEvT k = either (onKbtzEvT k) (onNodeEvT k)
 
-onKbtzEvT :: (MonadFS m) => TKbtzim -> KbtzEv -> m ()
+onKbtzEvT :: (MonadFS m) => TKbtzim -> KbtzEv -> FsM m ()
 onKbtzEvT tv (CreateKbtz (Tag k)) = liftIO . atomically $ do
   m <- readTVar $ unTKbtzim tv
   case M.lookup k m of
     Nothing -> do
       v <- newTVar M.empty
       modifyTVar' (unTKbtzim tv) (M.insert k v)
-    Just s' -> return ()
+    Just _ -> return ()
 onKbtzEvT tv (DeleteKbtz (Tag k)) = liftIO . atomically $
                                     modifyTVar' (unTKbtzim tv) (M.delete k)
 
-onNodeEvT :: (MonadFS m) => TKbtzim -> NodeEv -> m ()
-onNodeEvT tv (CreateNode k n) = do
+onNodeEvT :: (MonadFS m) => TKbtzim -> NodeEv -> FsM m ()
+onNodeEvT (TKbtzim tv) (CreateNode k n) = do
   x <- readNode' k n
-  liftIO . atomically $ do
-    m <- readTVar $ unTKbtzim tv
-    case x of
-      Nothing -> return ()
-      Just (Left _) -> return ()
-      Just (Right nm) -> do
-        s' <- case M.lookup k m of
-          Nothing -> newTVar mempty
-          Just s' -> return s'
-        modifyTVar s' (uncurry M.insert (toKV nm))
+  case x of
+    Nothing -> liftIO . print $ "Node Not Read: " <> (show n)
+    Just (Left e) -> liftIO . print $ "Node Decode Error: " <> (show e)
+    Just (Right nm) -> liftIO . atomically $ do
+      m <- readTVar tv
+      s' <- case M.lookup k m of
+        Nothing -> newTVar mempty
+        Just s' -> return s'
+      modifyTVar' s' (uncurry M.insert (toKV nm))
+      modifyTVar' tv (M.insert k s')
 onNodeEvT tv (DeleteNode k n) = liftIO . atomically $ do
   m <- readTVar $ unTKbtzim  tv
-  let s = M.lookup k m
-  case s of
+  case (M.lookup k m) of
     Nothing -> return ()
-    Just s' -> modifyTVar s' (M.delete n)
+    Just s' -> modifyTVar' s' (M.delete n)
 onNodeEvT tv (UpdateNode k n) = onNodeEvT tv (CreateNode k n)
 onNodeEvT _ (ReadNode _ _) = return ()
 

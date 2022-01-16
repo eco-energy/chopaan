@@ -7,7 +7,7 @@
 
 module Chopaan.Graph ( module Chopaan.Graph
                      , module Chopaan.Graph.G
-
+                     , type (~>)
                      , module Chopaan.Graph.Spider
 
                      ) where

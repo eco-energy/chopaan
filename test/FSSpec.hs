@@ -27,7 +27,9 @@ spec = do
     prop "CreateKbtz event adds an empty graph to map" $ \ev ks -> do
       let
         k = M.mapKeys unTag ks
-        k' = onKbtzEv ev k 
+        k' = onKbtzEv ev k
       case ev of
         CreateKbtz dk -> (M.keys $ k' `M.difference` k) `shouldBe` [unTag dk] 
-        DeleteKbtz dk -> (M.keys $ k `M.difference` k') `shouldBe` [unTag dk]
+        DeleteKbtz dk -> case M.lookup (unTag dk) k of
+          Nothing -> (M.keys $ k `M.difference` k') `shouldBe` []
+          Just _ -> (M.keys $ k `M.difference` k') `shouldBe` [unTag dk]

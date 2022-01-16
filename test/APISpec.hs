@@ -44,7 +44,7 @@ tn = Ti.addUTCTime (60 * 60) t0
 
 serverSpec :: Spec
 serverSpec = describe "API TODO" $ do
-  let kId = (KbtzId "test")
+  let kId = (KbtzId "testK")
   around withUserApp $ do
     baseUrl <- runIO $ parseBaseUrl "http://localhost"
     manager <- runIO $ newManager defaultManagerSettings
