@@ -2,6 +2,8 @@
 module Main where
 
 import Data.Bifunctor
+import Path.IO
+import Path
 import Chopaan.Node.NodeId
 import Chopaan.Node.Components
 import Chopaan.Node.HW
@@ -46,6 +48,8 @@ ns = fmap mkNode $
   ]
 
 addBismillahMor :: IO ()
-addBismillahMor = createKbtz (KbtzId "bismillahMor") (fromNodeModels ns)
+addBismillahMor = do
+  dir <- makeAbsolute =<< parseRelDir "data/kbtzim"
+  createKbtz dir (KbtzId "bismillahMor") (fromNodeModels ns)
 
 main = addBismillahMor

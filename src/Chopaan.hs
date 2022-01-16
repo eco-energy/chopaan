@@ -81,17 +81,16 @@ runKbtzim t0 mq hydrationOpts influxCon tKbtzim = s3Hydration tKbtzim
   where
     s3Hydration :: TKbtzim -> t m (NodeMAC, Prefix)
     s3Hydration kns = S.concat $ S.unfold (runHydration t0 influxCon hConfDef kns) ()
-    mqttStream :: Kbtzim -> t m (KbtzScene NodeMAC)
-    mqttStream kns = S.concatMapWith S.parallel (runKibbutz @t) (confss kns)
-    confss :: (S.IsStream t, S.MonadAsync m) => Kbtzim -> t m (KbtzC NodeMAC)
-    confss = S.fromList . fmap (sConf . second toKbtzG) . M.toList
-    sConf (k, kns) = KbtzC { Chopaan.Kibbutz.name = k
-                           , structure = kns
-                           , channelOpts = Left mq
-                           , s3Opts = Just (BucketName (s3BucketName hydrationOpts))
-                           , influxCon = influxCon
-                           }
-    deployKbtz = (KbtzId "Bismillah_Mor", fmap fst deployNodes)
+    -- mqttStream :: Kbtzim -> t m (KbtzScene NodeMAC)
+    -- mqttStream kns = S.concatMapWith S.parallel (runKibbutz @t) (confss kns)
+    -- confss :: (S.IsStream t, S.MonadAsync m) => Kbtzim -> t m (KbtzC NodeMAC)
+    -- confss = S.fromList . fmap (sConf . second toKbtzG) . M.toList
+    -- sConf (k, kns) = KbtzC { Chopaan.Kibbutz.name = k
+    --                        , structure = kns
+    --                        , channelOpts = Left mq
+    --                        , s3Opts = Just (BucketName (s3BucketName hydrationOpts))
+    --                        , influxCon = influxCon
+    --                        }
 
 
 
@@ -103,56 +102,19 @@ run = do
     Options{..} = appOptions app
   tc <- liftIO $ execParser tkOptions
   --ic <- liftIO $ execParser icOptions
-  dir <- liftIO $ getXdgDir XdgData . Just =<< parseRelDir "kbtzim"
+  dir <- makeAbsolute =<< parseRelDir "data/kbtzim" -- liftIO $ getXdgDir XdgData . Just =<< 
   liftIO . print $ "Chopaan Kbtzim Path: " <> (show dir) 
   liftIO $ ensureDir dir
-  liftIO $ createDB influxConn mqttDB
+  --liftIO $ createDB influxConn mqttDB
   liftIO $ createDB influxConn hydrationDB
   t0 <- liftIO Ti.getCurrentTime
   liftIO $ runGraphM poolConf tc $ do
     kbtzim0 <- readKbtzim dir
     let kEvs = watchKbtzim @GraphM dir
     tKbtzim <- atomically $ mkConfig kbtzim0
-    let wk = S.mapM (onEvT tKbtzim) kEvs
+    let wk = S.mapM (onEvT tKbtzim) $ S.trace (liftIO . print) kEvs --  
         rk = (S.fromAhead $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts influxConn tKbtzim)
-    S.drain $ (fmap (const ()) rk) `S.parallel` wk
+    S.drain $ (fmap (const ()) $ S.trace (liftIO . print) rk) `S.parallel` wk
   where
-    mqttDB = "chopaanMQTT"
+    --mqttDB = "chopaanMQTT"
     hydrationDB = "chopaanS3"
-
-
-deployNodes :: [(NodeMAC, Int)]
-deployNodes = first NodeId <$>
-  [ ("7c:9e:bd:48:4e:e0",  1)
-  , ("7c:9e:bd:f5:ec:74",  3)
-  , ("ac:67:b2:11:f3:10",  5)
-  , ("7c:9e:bd:49:07:68",  6)
-  , ("ac:67:b2:11:f2:30",  8)
-  , ("8c:aa:b5:97:69:48",  9)
-  , ("8c:aa:b5:95:8f:9c", 10)
-  , ("ac:67:b2:1c:ec:d8", 11)
-  , ("7c:9e:bd:47:8a:5c", 12)
-  , ("7c:9e:bd:49:1d:80", 13)
-  , ("ac:67:b2:1d:e7:f4", 14)
-  , ("7c:9e:bd:47:b7:e8", 15)
-  ]
-
--- labNodes = NodeId <$> [ "ac:67:b2:11:f3:20",
---                         "ac:67:b2:1d:e7:f4",
---                         "8c:aa:b5:97:69:48",
---                         "8c:aa:b5:95:97:c8",
---                         "8c:aa:b5:95:8f:9c",
---                         "ac:67:b2:1c:ec:d8",
---                         "7c:9e:bd:f5:ec:74",
---                         "ac:67:b2:11:f0:28"
---                       ]
--- labNodes1 :: [NodeMAC]
--- labNodes1 = NodeId <$>
---   [ "ac:67:b2:11:f3:10"
---   , "ac:67:b2:12:07:b0"
---   , "7c:9e:bd:47:61:bc"
---   , "7c:9e:bd:47:b7:e8"
---   , "7c:9e:bd:48:4e:e0"
---   , "7c:9e:bd:48:a2:c4"
---   , "ac:67:b2:11:e6:e4"
---   ]
