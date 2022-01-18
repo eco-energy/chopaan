@@ -1,4 +1,4 @@
-{ config, pkgs, resources, lib, hostName, grubDevice, app, sops-nix, ... }:
+{ config, pkgs, resources, lib, hostName, grubDevice, chopaan, sops-nix, ... }:
 let
   region = "ap-southeast-1";
   janusPort = 8182;
@@ -6,7 +6,6 @@ let
   mqttPort = 8883;
   awskey = "/run/keys/aws-creds";
   tinkerHost = "localhost";
-  withJanus = p: "${p} --tinkerHost ${tinkerHost} --tinkerPort ${toString janusPort}";
   withRTSOpts = p: "${p} +RTS -A32m -n4m -N";
   chopaanDir = "${config.users.users.chopaan.home}";
   dashboardDir = "/dash";
@@ -71,12 +70,12 @@ in
             ];        
     wantedBy = [ "multi-user.target" ];
     environment = {
-      AWS_CREDS = awskey;
+      AWS_CREDS = config.sops.secrets.aws-creds.path;
       XDG_ROOT_DIR = chopaanDir;
-      STORE_PATH = "${chopaanDir}/data/hydration";
+      STORE_PATH = "./data/hydration";
       S3_BUCKET = "dosti-datastream";
       START_DATE = "14-10-2021";
-      PAST_RES = "Ten4";
+      PAST_RES = "Ten5";
       FUTURE_RES = "Ten1";
       LIFETIME = "Infinite";
       MAN_CONN_COUNT = "128";
@@ -92,7 +91,7 @@ in
       Group = "chopaan";
       LimitNOFILE = 6400000;
     };
-    script = withRTSOpts ((withJanus "${app}/bin/kbtzim"));
+    script = withRTSOpts "${chopaan.kbtzim}/bin/kbtzim";
   };
 
   systemd.tmpfiles.rules = [

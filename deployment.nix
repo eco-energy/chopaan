@@ -6,11 +6,11 @@ let
   grubDevice = "/dev/nvme1n1";
   in
   {
-    chopaan = { config, pkgs, resources, lib, app, sops-nix, ... }:
+    chopaan = { config, pkgs, resources, lib, chopaan, sops-nix, ... }:
     {
       imports = [
         ( import ./deploy/machine.nix {
-          inherit config pkgs resources lib hostName grubDevice app sops-nix;
+          inherit config pkgs resources lib hostName grubDevice chopaan sops-nix;
         })
       ];
       deployment.targetEnv = "ec2";
@@ -45,7 +45,7 @@ let
         mountPoint = "/chopaanFS";
         device = grubDevice;
         fsType = "btrfs";
-        autoFormat = true;
+        #autoFormat = true;
         ec2 = {
           disk = resources.ebsVolumes.chopaanFS;
           fsType = "btrfs";
