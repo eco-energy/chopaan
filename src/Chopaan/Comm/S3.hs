@@ -196,13 +196,7 @@ readObject bucket k = timeout 120 $ do
 --   in UF.many plist UF.fromList
 
 
-s3Paths'' :: forall m. (MonadIO m, MonadCatch m)
-        => Env -> (Prefix -> S3.ListObjectsV2) -> UF.Unfold m Prefix (S3.ObjectKey, Int)
-s3Paths'' env f = let
-  plist = UF.map ((fmap (\a -> (a ^. S3.oKey, a ^. S3.oSize))) . (^. S3.lovrsContents))
-    (UF.lmap f $ (pageUFM env))
-  in UF.many plist UF.fromList
-{-# INLINE s3Paths'' #-}
+
 --s3File :: forall m. (MonadIO m, MonadCatch m)
 --  => UF.Unfold m S3.ObjectKey 
 
@@ -309,72 +303,72 @@ prefixStartKey hPrefix n t = pure (t, Nothing)
 addC :: (MonadIO m) => C.Counter -> Int -> m ()
 addC c = liftIO . C.add c . fromIntegral
 
-nodeS3 :: forall m. (MonadAsync m, MonadCatch m)
-       => Env
-       -> S3.BucketName
-       -> BufferingOpts
-       -> T.Text
-       -> Monitor
-       -> S.AheadT m (Prefix)
-       -> NodeMAC
-       -> S.AheadT m (S3.ObjectKey, Either EnergyState RuntimeStats)
-nodeS3 env bucket BufferingOpts{..} hPrefix Monitor{..} pfs n = let
-  prefixes :: S.AheadT m (Prefix, Maybe S3.ObjectKey)
-  prefixes = S.tapRate (tapR + 1) (addC numPrefixes)
-    S.|$ S.mapM (prefixStartKey hPrefix n)
-    $ pfs
-  prefixPaths :: Prefix -> Maybe S3.ObjectKey -> S.AheadT m S3.ObjectKey
-  prefixPaths t o = S.tap (savePrefixPath t)
-        S.|$ S.mapM (\(x, y) -> (addC totalDownloadableSize y) >> return x)
-        S.|$ S.unfold (s3Paths'' env (flip req o)) t
-  prefixFrames :: (Prefix, Maybe S3.ObjectKey) -> S.AheadT m (S3.ObjectKey, MeshFrame)
-  prefixFrames (t, o) = S.rights
-        S.|$ S.rights
-        S.|$ S.trace (countErrors)
-        $ S.map (\(!k, !e) -> (fmap (k,)) <$> e)
-        S.|$ S.tapRate (tapR) (addC framesStored)
-        S.|$ S.tapAsync (storeAll t)
-        S.|$ S.tapRate (tapR) (addC downloadedFrames)
-        S.|$ S.fromAhead
-        S.|$ S.mapM addDLSize
-        S.|$ S.mapM (downloadWithErrLog)
-        S.|$ S.tapRate (tapR - 2) (addC discoveredPaths)
-        $ prefixPaths t o
-  in S.maxBuffer frameBuffer
-    $ S.tapRate tapR (\x -> addC secondsElapsed (round tapR) >> addC validated x)
-    $ S.map (second fromJust)
-    $ S.filter (isJust . snd)
-    $ S.map (uncurry validateMF)
-    S.|$ S.concatMapWith (S.ahead) prefixFrames
-    $ prefixes
-  where
-    tapR = 30
-    countErrors = \case
-      Left _ -> (liftIO $ C.inc downloadErrors)
-      Right r -> case r of
-        Left _ ->  (liftIO $ C.inc parsingErrors)
-        Right _ -> return ()
-    savePrefixPath t = (FL.lmap (toTxt . unObject) (encodeFold (prefixPathFile hPrefix n t)))
-    addDLSize = \(n', x) -> case x of
-      Left l -> return $ (n', Left l)
-      Right (a, s) -> do
-        _ <- (addC downloadedSize s)
-        return $ (n', Right a)
-    np = (T.unpack . unNodeId $ n)
-    req prefix startAfter = S3.listObjectsV2 bucket
-          & S3.lovPrefix .~ (timedPrefix n prefix)
-          & S3.lovStartAfter .~ (fmap unObject startAfter)
-    downloadWithErrLog :: S3.ObjectKey
-      -> m (S3.ObjectKey, Either SomeException (Either String MeshFrame, Int)) 
-    downloadWithErrLog p = (((p,)) <$> downloadMF env bucket p)
-    storeAll t = foldNodeHydration @m @MeshFrame (curry (bimap (toTxt . unObject) toPB))
-            dataPath dlDonePath errPath err1Tag err2Tag
-            where
-              dlDonePath = pathFile hPrefix n t "success"
-              dataPath = (frameDir hPrefix n t) <> "meshframe"
-              errPath tag = (errorDir hPrefix n t) <> (T.unpack tag)
-              err1Tag = "downloadError"
-              err2Tag = "parsingError"
+-- nodeS3 :: forall m. (MonadAsync m, MonadCatch m)
+--        => Env
+--        -> S3.BucketName
+--        -> BufferingOpts
+--        -> T.Text
+--        -> Monitor
+--        -> S.AheadT m (Prefix)
+--        -> NodeMAC
+--        -> S.AheadT m (S3.ObjectKey, Either EnergyState RuntimeStats)
+-- nodeS3 env bucket BufferingOpts{..} hPrefix Monitor{..} pfs n = let
+--   prefixes :: S.AheadT m (Prefix, Maybe S3.ObjectKey)
+--   prefixes = S.tapRate (tapR + 1) (addC numPrefixes)
+--     S.|$ S.mapM (prefixStartKey hPrefix n)
+--     $ pfs
+--   prefixPaths :: Prefix -> Maybe S3.ObjectKey -> S.AheadT m S3.ObjectKey
+--   prefixPaths t o = S.tap (savePrefixPath t)
+--         S.|$ S.mapM (\(x, y) -> (addC totalDownloadableSize y) >> return x)
+--         S.|$ S.unfold (s3Paths'' env (flip req o)) t
+--   prefixFrames :: (Prefix, Maybe S3.ObjectKey) -> S.AheadT m (S3.ObjectKey, MeshFrame)
+--   prefixFrames (t, o) = S.rights
+--         S.|$ S.rights
+--         S.|$ S.trace (countErrors)
+--         $ S.map (\(!k, !e) -> (fmap (k,)) <$> e)
+--         S.|$ S.tapRate (tapR) (addC framesStored)
+--         S.|$ S.tapAsync (storeAll t)
+--         S.|$ S.tapRate (tapR) (addC downloadedFrames)
+--         S.|$ S.fromAhead
+--         S.|$ S.mapM addDLSize
+--         S.|$ S.mapM (downloadWithErrLog)
+--         S.|$ S.tapRate (tapR - 2) (addC discoveredPaths)
+--         $ prefixPaths t o
+--   in S.maxBuffer frameBuffer
+--     $ S.tapRate tapR (\x -> addC secondsElapsed (round tapR) >> addC validated x)
+--     $ S.map (second fromJust)
+--     $ S.filter (isJust . snd)
+--     $ S.map (uncurry validateMF)
+--     S.|$ S.concatMapWith (S.ahead) prefixFrames
+--     $ prefixes
+--   where
+--     tapR = 30
+--     countErrors = \case
+--       Left _ -> (liftIO $ C.inc downloadErrors)
+--       Right r -> case r of
+--         Left _ ->  (liftIO $ C.inc parsingErrors)
+--         Right _ -> return ()
+--     savePrefixPath t = (FL.lmap (toTxt . unObject) (encodeFold (prefixPathFile hPrefix n t)))
+--     addDLSize = \(n', x) -> case x of
+--       Left l -> return $ (n', Left l)
+--       Right (a, s) -> do
+--         _ <- (addC downloadedSize s)
+--         return $ (n', Right a)
+--     np = (T.unpack . unNodeId $ n)
+--     req prefix startAfter = S3.listObjectsV2 bucket
+--           & S3.lovPrefix .~ (timedPrefix n prefix)
+--           & S3.lovStartAfter .~ (fmap unObject startAfter)
+--     downloadWithErrLog :: S3.ObjectKey
+--       -> m (S3.ObjectKey, Either SomeException (Either String MeshFrame, Int)) 
+--     downloadWithErrLog p = (((p,)) <$> downloadMF env bucket p)
+--     storeAll t = foldNodeHydration @m @MeshFrame (curry (bimap (toTxt . unObject) toPB))
+--             dataPath dlDonePath errPath err1Tag err2Tag
+--             where
+--               dlDonePath = pathFile hPrefix n t "success"
+--               dataPath = (frameDir hPrefix n t) <> "meshframe"
+--               errPath tag = (errorDir hPrefix n t) <> (T.unpack tag)
+--               err1Tag = "downloadError"
+--               err2Tag = "parsingError"
 
 
 createPrefixDirs hPrefix n t = do

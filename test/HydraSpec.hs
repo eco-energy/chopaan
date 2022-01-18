@@ -49,9 +49,10 @@ import Chopaan.Node.NodeId
 import Chopaan.Kibbutz.KbtzId
 
 spec = parallel $ do
-  --prefixSpec
+  prefixSpec
   controlSpec
-  --prefixGenSpec
+  prefixGenSpec
+  pipelineSpec
   --keySpec
   --frameSpec
   --ingestionSpec
@@ -74,7 +75,7 @@ type Tup3 a = (a, a, a)
 
 newtype InAMinute = InAMinute (Tup3 Time.UTCTime)
   deriving (Show)
-
+    
 instance Arbitrary InAMinute where
   arbitrary = do
     t0 <- (arbitrary @Time.UTCTime)
@@ -84,27 +85,35 @@ instance Arbitrary InAMinute where
         t2 = Time.addUTCTime dt' t1
     return $ InAMinute (t0, t1, t2)
 
--- pipelineSpec :: Spec
--- pipelineSpec = do
---   parallel $ describe "pipeline invariants" $ do
---     it "prefix congregation works" $ do
---       k <- liftIO $ generate (arbitrary @KbtzName)
---       ns <- S.toList $ S.replicateM 10 (liftIO . generate $ (arbitrary @(NodeMAC, HW Double)))
---       tk <- liftIO . atomically $ mkTKbtz $ M.fromList [(k, ns)]
---       (InAMinute (t0, t1, _)) <- liftIO $ generate $ (arbitrary @InAMinute)
---       let ufN = unfoldNodes Finite tk
---           ps = ufStream (prefixGen Infinite (\_ -> pure True) (Ten2, Second) t0 t1)
---           nps = nodePrefixes k (\_ -> pure ()) ufN ps
---       r <- S.length $ S.hoist (liftIO)
---            $ S.trace (liftIO . print)
---            S.|$ S.mapM (uncurry bo)
---            --  $ S.trace (liftIO . print)
---            $ S.fromWAsync
---            $ nps
---       r `shouldBe` (6 * (length ns))
---       where
---         bo :: (HConM m) => NodeMAC -> Prefix -> m ((NodeMAC, Prefix), Int)
---         bo n a = return ((n,a), 10)
+newtype PosRange = PosRange (Time.UTCTime, Time.UTCTime)
+  deriving Show
+
+instance Arbitrary PosRange where
+  arbitrary = do
+    t0 <- arbitrary @Time.UTCTime `suchThat` ((> toEnum 0) . Time.utctDay)
+    return $ PosRange (t0, Time.addUTCTime (fromInteger (86400 * 182)) t0)
+
+
+pipelineSpec :: Spec
+pipelineSpec = do
+  parallel $ describe "pipeline invariants" $ do
+    prop "finite prefix generation is complete" $ \fidelity -> do
+      (Tag k, ns) <- do
+        k <- generate $ arbitrary @(Tag KbtzName) 
+        ns <- arbs @(NodeModel) 10
+        let ns' = zipWith (\n i -> n {nodeIdx = (HHId i)} ) ns [0, 1..]
+        return (k, ns')
+      tk <- atomically . mkConfig $ M.singleton k (fromNodeModels ns)
+      PosRange (t0, t1) <- liftIO $ generate $ (arbitrary @PosRange)
+      let ufN = unfoldNodes Finite tk
+          ps = ufStream (prefixGen @S.SerialT Finite (\_ -> pure True) (fidelity, Second) t0 t1)
+          nps = S.unfold (nodePrefixes (\_ -> pure ()) ufN ps) k
+          expectedYields = (length ns) + (length ns * (ceiling $
+                                        (realToFrac $ Time.diffUTCTime t1 t0)
+                                        /  (10 ^ (fromEnum fidelity))))
+      print $ "expected Yields: " <> show expectedYields
+      r <- S.length $ S.fromWAsync nps
+      (abs (r - expectedYields) <= 10) `shouldBe` True 
 
 suc1 = modifyMaxSuccess (const 1)
 
@@ -131,9 +140,9 @@ prefixGenSpec = describe "Prefix Generation Invariants for Infinite and finite s
       mkT (l0, l1, l2) (r1, r2, r3) (s, n, e) = let
         [start, now, end] = sortBy compare [s, n, e]
         yes _ = return True
-        x = prefixGen l0 yes r1 start now ()
-        y = prefixGen l1 yes r2 now end ()
-        z = prefixGen l2 yes r3 start end ()
+        x = S.fromAhead $ prefixGen l0 yes r1 start now ()
+        y = S.fromAhead $ prefixGen l1 yes r2 now end ()
+        z = S.fromAhead $ prefixGen l2 yes r3 start end ()
         in (x, y, z)
 
 isLastEv :: Either KbtzEv NodeEv -> Bool

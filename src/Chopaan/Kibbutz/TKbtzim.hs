@@ -41,7 +41,8 @@ import Chopaan.Kibbutz.FS
       KbtzEv(..),
       Tag(Tag),
       readNode',
-      watchKbtzim
+      watchKbtzim,
+      traceUF
     )
 import Chopaan.Node.NodeId ( HHId, NodeMAC )
 import Chopaan.Node.HW ( HW )
@@ -102,30 +103,32 @@ mkConfig =  mkTKbtz . fmap toHWDict
 
 
 unfoldNodes :: forall m. (MonadIO m) => LifeTime -> TKbtzim -> UF.Unfold m KbtzName NodeMAC
-unfoldNodes lt tv = traceUF (liftIO . print) $
-  UF.many (UF.mkUnfoldM step inject) UF.fromList
+unfoldNodes lt tv = UF.many (UF.mkUnfoldM step inject) UF.fromList
   where
     delS = 10 :: Double
     delay = liftIO $ threadDelay $ round $ delS * 1000000
     onNullDiff s = case lt of
-      Finite -> return UF.Stop
-      Infinite -> delay >> return (UF.Skip s)
+      Finite -> do
+        liftIO . print $ "Difference is null, stopping Finite node unfold"
+        return UF.Stop
+      Infinite -> do
+        delay >> return (UF.Skip s)
     step (k, oldSet) = do
       newSet <- liftIO . atomically $ lookupTSet k tv
       case newSet of
-        Nothing -> return UF.Stop
+        Nothing -> do
+          liftIO . print $ "Stopping Node Unfold"
+          return UF.Stop
         Just s -> do
           let diff = Set.difference s oldSet
           if null diff
             then onNullDiff (k, s)
-            else return $ UF.Yield (Set.toList diff) (k, s)
+            else do
+            return $ UF.Yield (Set.toList diff) (k, s)
     inject k = return (k, mempty)
 
 getKeys :: (Ord k) => TMap k v -> STM (Set k)
 getKeys = fmap (Set.fromList . M.keys) . readTVar
-
-traceUF :: (Monad m) => (a -> m b) -> UF.Unfold m x a -> UF.Unfold m x a
-traceUF f = UF.mapM (\a -> f a >> pure a)
 
 
 unfoldKbtzim :: forall m. (MonadIO m) => LifeTime -> TKbtzim -> UF.Unfold m () (KbtzName, TNodes)
@@ -144,18 +147,14 @@ unfoldKbtzim lt tv = traceUF (liftIO . print . fst) $
       if null diff then onNullDiff newSet else (do
         let z = Set.toList diff
         ps <- liftIO . atomically $ traverse (`nodeSet'` tv) z
+        liftIO . print $ "New Kbtzim: " <> (show z)
         return $ UF.Yield (zip z ps) newSet)
     inject :: () -> m (Set KbtzName)
     inject _ = return mempty
 
+
 nodeSet' :: KbtzName -> TKbtzim -> STM TNodes
 nodeSet' kId ks = maybe retry return . M.lookup kId =<< readTVar (unTKbtzim ks)
-
-macSet' :: KbtzName -> TKbtzim -> STM MACSet
-macSet' kId ks = go `orElse` retry 
-  where
-    go = newTVar . toMACSet =<< readTVar =<< nodeSet' kId ks
-      
 
 nodeSet :: MonadIO m => KbtzName -> TKbtzim -> m TNodes
 nodeSet kId = liftIO . atomically . nodeSet' kId

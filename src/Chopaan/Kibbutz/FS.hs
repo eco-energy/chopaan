@@ -106,10 +106,10 @@ fpArrIso = IsoM (arrPath, fromArrPath)
 type RelDir = Path Rel Dir
 type AbsDir = Path Abs Dir
 type RelFile = (Path Rel File)
-type PathIso m t = IsoM m (Path Rel t) ArrPath
+type PathIso m l x = IsoM m (Path l x) ArrPath
 
 
-arrFilePath :: (PathM m) => PathIso m File
+arrFilePath :: (PathM m) => PathIso m Rel File
 arrFilePath = IsoM (arrPath, fromArrPath)
   where
     arrPath = fmap ArrPath . liftIO . Array.fromStreamD
@@ -117,7 +117,7 @@ arrFilePath = IsoM (arrPath, fromArrPath)
     fromArrPath = (parseRelFile <=< S.toList) . decodeUtf8
                   . Array.toStream . unArrPath
 
-arrDirPath :: (PathM m) => PathIso m Dir
+arrDirPath :: (PathM m) => PathIso m Rel Dir
 arrDirPath = IsoM (arrPath, fromArrPath)
   where
     arrPath = fmap ArrPath . liftIO . Array.fromStreamD
@@ -160,18 +160,26 @@ kbtzimConf =
     . EvL.setRootMoved On
     . EvL.setRootDeleted On
     . EvL.setWhenExists EvL.ReplaceIfExists
-    . EvL.setOnlyDir On
+    . EvL.setOnlyDir Off
     . EvL.setOneShot Off
     . EvL.setUnwatchMoved On
     . EvL.setFollowSymLinks Off
     . EvL.setRecursiveMode On
 
+arrFromPath :: (MonadFS m) => Path t b -> m (ArrPath)
+arrFromPath = isoFwd fpArrIso . toFilePath
 
-watchKbtzim :: forall m t. (S.MonadAsync m) => S.SerialT (FsM m) (Either KbtzEv NodeEv)
+absRootPath :: (Monad m, Root a) => a -> FsM m (AbsDir)
+absRootPath a = do
+  x <- ask
+  return . (x </>) . fromJust . rootPath $ a
+
+watchKbtzim :: forall m . (S.MonadAsync m, MonadFS m)
+  => S.SerialT (FsM m) (Either KbtzEv NodeEv)
 watchKbtzim = S.concatM $ do
   dir <- ask
   liftIO $ ensureDir dir
-  d <- isoFwd fpArrIso . toFilePath $ dir 
+  d <- arrFromPath $ dir 
   return $ S.catMaybes $ S.mapM getEv $ wk d
   where
     wk :: ArrPath -> S.SerialT (FsM m) Event
@@ -314,33 +322,31 @@ toHWNode nm = (nodeMAC nm, nodeHW nm)
 
 type Kbtzim = M.Map KbtzName KbtzModel
 
+listDirFiles :: (MonadFS m) => UF.Unfold m AbsDir (Path Abs File)
+listDirFiles = traceUF (liftIO . print . show)
+  $ UF.mapMWithInput (\d f -> pure $ d </> f)
+  $ UF.mapM (parseRelFile)
+  $ UF.lmap (toFilePath) Dir.readFiles
+
+listDirDirs :: (MonadFS m) => UF.Unfold m AbsDir AbsDir
+listDirDirs = traceUF (liftIO . print . show)
+  $ UF.mapMWithInput (\d f -> pure $ d </> f)
+  $ UF.mapM (parseRelDir)
+  $ UF.lmap (toFilePath) Dir.readDirs
+
 readDirFiles ::
   forall m a.
   (S.MonadAsync m, MonadCatch m, W.Serialise a) =>
-  UF.Unfold m FilePath (Maybe (Either B.DecodeException a))
-readDirFiles =
-  UF.mapM
-    (S.head . fmap (fmap B.fromWino) . B.decodeFile)
-    (UF.mapMWithInput (\d f -> pure $ d <> "/" <> f)
-     Dir.readFiles)
+  UF.Unfold m (Path Abs Dir) (Maybe (Either B.DecodeException a))
+readDirFiles = UF.mapM (S.head . fmap (fmap B.fromWino) . B.decodeFile) $
+  UF.map toFilePath listDirFiles
 
 readKbtzDir ::
   forall m.
   (S.MonadAsync m, MonadCatch m) =>
-  UF.Unfold m FilePath (Maybe (Either B.DecodeException NodeModel))
+  UF.Unfold m AbsDir (Maybe (Either B.DecodeException NodeModel))
 readKbtzDir = readDirFiles
 
-listDirUF ::
-  forall m.
-  (S.MonadAsync m, MonadCatch m) =>
-  UF.Unfold m FilePath FilePath
-listDirUF = Dir.readFiles
-
-listDirUF' ::
-  forall m.
-  (S.MonadAsync m, MonadCatch m) =>
-  UF.Unfold m FilePath (Path Rel File)
-listDirUF' = UF.map fromJust . UF.filter isJust $ parseRelFile <$> listDirUF
 
 logMaybeEither ::
   (Eq a, Show x, Show e, S.MonadAsync m) =>
@@ -374,7 +380,7 @@ createKbtz k m = do
                  B.encodeArray p' . B.toWino $ n)
     . AG.vertexList $ m
 
-readKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => FilePath -> m KbtzModel
+readKbtz :: forall m. (S.MonadAsync m, MonadCatch m) => AbsDir -> m KbtzModel
 readKbtz = UF.fold topologicalFold (logMaybeEither readKbtzDir)
 
 toTag :: k -> Tag k
@@ -383,14 +389,18 @@ toTag = Tag
 deleteKbtz :: KbtzName -> Unop Kbtzim
 deleteKbtz k = onKbtzEv (DeleteKbtz . toTag $ k)
 
+traceUF :: (Monad m) => (a -> m b) -> UF.Unfold m x a -> UF.Unfold m x a
+traceUF f = UF.mapM (\a -> f a >> pure a)
+
+
 readKbtzim :: forall m. (S.MonadAsync m, MonadCatch m) => FsM m Kbtzim
 readKbtzim = do
   dir <- ask
+  liftIO . print $ "Reading kbtzim at: " <> (show dir)
   UF.fold toMap
-    (UF.mapMWithInput (\i d -> (convertFP i,) <$> readKbtz d) listDirUF) . toFilePath $ dir
-  where
-    convertFP :: FilePath -> KbtzName
-    convertFP = KbtzId . T.pack . toFilePath . dirname . fromJust . parseRelDir
+    (UF.mapM (\d -> (toKbtzName' d,) <$> readKbtz d)
+     (traceUF (liftIO . print . show) listDirDirs))
+    $ dir
 
 toMap :: (Monad m, Ord n) => FL.Fold m (n, a) (M.Map n a)
 toMap = FL.foldl' (\m (n, a) -> M.insert n a m) mempty

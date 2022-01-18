@@ -16,7 +16,7 @@ import Control.Monad.Bayes.Sampler
 import Chopaan.Kibbutz
 import Chopaan.Hydration.Prefix
 import Chopaan.Hydrate ( hConfDef, runHydration, HConS)
-import Chopaan.Kibbutz.TKbtzim (mkConfig, TKbtzim, onEvT)
+import Chopaan.Kibbutz.TKbtzim (mkConfig, TKbtzim(..), onEvT, getKbtzimHW)
 import Chopaan.Kibbutz.KbtzId ( KbtzId(KbtzId) )
 import Chopaan.Kibbutz.FS
 import Chopaan.Node.NodeId ( NodeId(NodeId), NodeMAC )
@@ -33,7 +33,7 @@ import Chopaan.Types
 import Chopaan.Graph.Kbtz ( getKbtzim )
 import Chopaan.Graph
     ( GraphM, runGraphM, withKbtzPool, tkOptions, getKNs, addzim, type (~>) )
-import Data.Influxable (createDB)
+import Data.Influxable (createDB, wp, WriteParams)
 import Data.Bifunctor ( Bifunctor(..) )
 import Data.Pool (stats)
 import qualified Data.Map.Strict as M
@@ -62,6 +62,7 @@ import RIO
       MonadReader(ask),
       BufferMode(LineBuffering),
       RIO,
+      readTVar,
       hSetBuffering,
       atomically )
 import qualified Data.Time as Ti
@@ -81,16 +82,15 @@ runKbtzim :: forall t m.
   (HConS t m, KConS t m)
   => Ti.UTCTime
   -> MQTTOpts
-  -> HydrationOpts
-  -> InfluxConn
+  -> WriteParams
   -> TKbtzim
   -> t m (NodeMAC, Prefix)
-runKbtzim t0 mq hydrationOpts influxCon tKbtzim = s3Hydration tKbtzim
+runKbtzim t0 mq influxCon tKbtzim = s3Hydration tKbtzim
     -- `S.parallel`
     -- (Right <$> mqttStream kbtzim)
   where
     s3Hydration :: TKbtzim -> t m (NodeMAC, Prefix)
-    s3Hydration kns = S.concat $ S.unfold (runHydration t0 influxCon hConfDef kns) ()
+    s3Hydration kns = runHydration t0 influxCon kns
     -- mqttStream :: Kbtzim -> t m (KbtzScene NodeMAC)
     -- mqttStream kns = S.concatMapWith S.parallel (runKibbutz @t) (confss kns)
     -- confss :: (S.IsStream t, S.MonadAsync m) => Kbtzim -> t m (KbtzC NodeMAC)
@@ -135,11 +135,14 @@ run = do
   liftIO $ runChopaanM (Ctx dir gen) $ do
     flip runReaderT dir $ do
       tKbtzim <- atomically . mkConfig =<< readKbtzim
-      let wk = S.mapM_ (onEvT tKbtzim) $ S.trace (liftIO . print) watchKbtzim 
-          rk = S.liftInner $ runKbtzim @S.AheadT t0 mqttOpts hydrationOpts influxConn tKbtzim
-      S.drain . S.fromAhead $ (fmap (const ()) $ S.trace (liftIO . print) rk)
-        `S.parallel`
-        (S.fromEffect wk)
+      liftIO $ print =<< (atomically . getKbtzimHW $ tKbtzim)
+      let
+        dbWrite = wp influxConn hydrationDB
+        wk = S.mapM_ (onEvT tKbtzim) $ S.trace (liftIO . print) watchKbtzim 
+        rk = S.liftInner $ runKbtzim @S.SerialT t0 mqttOpts dbWrite tKbtzim
+      S.drain $ (S.fromEffect $ S.drain rk)
+         `S.async`
+         (S.fromEffect wk)
   where
     --mqttDB = "chopaanMQTT"
     hydrationDB = "chopaanS3"

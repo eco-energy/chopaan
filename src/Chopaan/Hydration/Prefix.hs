@@ -44,7 +44,7 @@ data Resolution = Second | Ten | Ten2 | Ten3 | Ten4 | Ten5 | Ten6 | Ten7
 
 newtype Prefix = Prefix { unPrefix :: Int64 }
   deriving (Eq, Ord, Show, Generic)
-  deriving newtype (Enum, Bounded, Num, Real, Integral, Storable)
+  deriving newtype (Enum, Storable)
   deriving (W.Serialise) via (W.WineryRecord (Prefix))
 
 

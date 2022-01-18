@@ -76,20 +76,17 @@ getAwsEnv svc = do
         <&> configure svc
 
 preResolvingManager :: forall m. (S.MonadAsync m) => m Manager
-preResolvingManager = NC.withDNSCache cacheConf cachingManager
+preResolvingManager = liftIO $ newManager cachingSettings
   where
-    cachingManager :: NC.DNSCache -> m Manager
-    cachingManager c = liftIO $ newManager cachingSettings
-      where
-        cachingSettings = tlsManagerSettings
-          { managerConnCount = 100
-          , managerIdleConnectionCount = 100
-          , managerModifyRequest = preResolveReq c  
-          }
-        preResolveReq cache r = do
-          h <- liftIO $ NC.lookup cache (host r)
-          let r' = r { hostAddress = h }
-          return r'
+    cachingSettings = tlsManagerSettings
+      { managerConnCount = 1000
+      , managerIdleConnectionCount = 100
+      -- , managerModifyRequest = preResolveReq c  
+      }
+      -- preResolveReq cache r = do
+      -- h <- liftIO $ NC.lookup cache (host r)
+      -- let r' = r { hostAddress = h }
+      -- return r'
 
 
 cacheConf :: NC.DNSCacheConf
@@ -120,9 +117,14 @@ pageUFM env = UF.lmap Just $ UF.unfoldrM step
     step :: (Maybe a) -> m (Maybe (Rs a, Maybe a)) 
     step Nothing = return Nothing
     step (Just req) = do
+      -- liftIO . print $ "Initiating Request: "
       y <- liftIO $ withAwsEnv env
-           $ recoverC ("paging retry" :: String) 10 $ timeout 90 $ send req
-      return $ Just (y, page req y)
+           $ recoverC ("paging retry" :: String) 3
+           $ timeout 90
+           $ send req
+      let e = page req y
+      -- liftIO . print $ "Page Response: " <> (show $ isJust e)
+      return $ Just (y, e)
 {-# INLINE pageUFM #-}
 
 pageS :: forall t m a. (S.IsStream t, S.MonadAsync m, MonadCatch m, AWSPager a) => Env -> a -> t m (Rs a)
