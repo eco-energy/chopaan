@@ -35,6 +35,8 @@
                     doCheck = false;
                     packages.${projectName} = {
                       package.cleanHpack = true;
+                      components.exes.kbtzim.dontStrip = false;
+                      components.exes.add.dontStrip = false;
                     };
                     packages.concat-inline.doHaddock = false;
                   }
@@ -98,7 +100,10 @@
             imports = [ ./deploy/secrets.nix sops-nix.nixosModules.sops ];
           }];
           nixpkgs.pkgs = pkgs;
-          _module.args = { app = flake.packages."${projectName}:exe:kbtzim";
+          _module.args = { chopaan = {
+            kbtzim = flake.packages."${projectName}:exe:kbtzim";
+            add = flake.packages."${projectName}:exe:add";
+          };
                            inherit sops-nix;
                          };
         };
