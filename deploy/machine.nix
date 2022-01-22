@@ -122,6 +122,7 @@ in
     domain = hostName;
     port = 2342;
     addr = "127.0.0.1";
+    dataDir = "chopaanFS/grafana";
     provision = {
       enable = true;
       dashboards = [
@@ -152,6 +153,9 @@ in
           database = "chopaanMQTT";
         }
       ];
+      security = {
+        adminPasswordFile = config.sops.secrets.aws-creds.path;
+      };
     };
   };
     

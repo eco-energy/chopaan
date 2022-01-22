@@ -313,7 +313,7 @@ hydrateKbtz t0 KbtzConf{kbtzName, kbtzStore
                        , life, parHow, ropts} tNodes ns = S.drain $ do
   (S.fromEffect . S.drain . S.fromAhead $ fp)
   `S.async`
-  (S.fromEffect . S.drain . S.fromAhead $ kbtzState kbtzStore writeParams tNodes)
+  (S.fromEffect $ kbtzState kbtzStore writeParams tNodes)
   where
     kp = S.map fst
         $ S.filter ((> 0) . snd)
@@ -537,16 +537,16 @@ initKbtzStore kbtz base = KbtzStore mkNodeDirs
                      </> (fromJust . parseRelFile . T.unpack . asFileName $ pref)
     frcRelDir = fromJust . parseRelDir
 
-kbtzState :: forall t m. (HConS t m, MonadSample m)
+kbtzState :: forall m. (HConM m, MonadSample m)
   => KbtzStore
   -> Http.WriteParams
   -> TNodes
-  -> t m (NodeMAC, (SensorR, MeshR))
-kbtzState store writeParams ns = S.concatM $ do
+  -> m ()
+kbtzState store writeParams ns = S.drain $ S.concatM $ do
   hw <- toMACSet <$> (liftIO . atomically $ readTVar ns)
-  return $ S.concatMapFoldableWith S.parallel nState $ M.toList hw
+  return $ S.mapM nState $ S.fromList $ M.toList hw
   where
-    nState (n, h) = fmap (n,) $ nodeState (nodeFold n h) (fl n) (nodeA @t @m @S3Body store n)
+    nState (n, h) = fmap (n,) $ nodeState (nodeFold n h) (fl n) (nodeA @S.SerialT @m @S3Body store n)
     nodeFold :: NodeMAC -> HW Double -> NodeF m
     nodeFold n h = (FL.partition (sensorFold h) (meshFold n))
     fl n = FL.lmap (nodeLines) $ lineFoldHttp @m 32 writeParams
@@ -570,9 +570,9 @@ nodeState :: forall t m. (HConS t m)
   => NodeF m
   -> FL.Fold m (SensorR, MeshR) ()  
   -> t m S3Body
-  -> t m (SensorR, MeshR)
-nodeState nodeFold sink x = S.tap (sink)
-  S.|$ S.postscan nodeFold
+  -> m ()
+nodeState nodeFold sink x = S.fold (sink) . S.adapt
+  $ S.postscan nodeFold
   S.|$ S.catMaybes
   S.|$ S.trace logNothing
   S.|$ S.mapM (pure . validateMF')
