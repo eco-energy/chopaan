@@ -292,12 +292,11 @@ ufStream f = UF.many (UF.function f) UF.fromStream
 
 nodePrefixes :: forall m. (HConM m)
   => KbtzName
-  -> (NodeMAC -> IO ())
   -> UF.Unfold m KbtzName NodeMAC
   -> UF.Unfold m NodeMAC Prefix
   -> S.WSerialT m (NodeMAC, Prefix)
-nodePrefixes k nodeAction ns ps = do
-  n' <- S.trace (liftIO . nodeAction) $ S.unfold ns k
+nodePrefixes k ns ps = do
+  n' <- S.unfold ns k
   p <- S.unfold ps n'
   return $ (n', p)
 
@@ -326,7 +325,10 @@ hydrateKbtz t0 KbtzConf{kbtzName, kbtzStore
         $ S.trace (pr . frameLog)
         S.|$ S.mapM (fetchFrames manOrSesh (bucket, env, t0) ropts (getKbtzPath kbtzStore))
         S.|$ kp
-    xs = S.fromWSerial $ nodePrefixes kbtzName (mkNodeDirs kbtzStore) ns prefixes
+    xs = S.fromWSerial $ nodePrefixes
+      kbtzName
+      (FS.traceUF (liftIO . mkNodeDirs kbtzStore) ns)
+      prefixes
     keyPath = getKbtzPath kbtzStore Keys
     prefixes = ufStream (prefixGen @S.SerialT life inSet res startTime t0)
     inSet :: NodeMAC -> m Bool
@@ -493,6 +495,7 @@ nodeA k n = S.concatMap x
   
 watchNodeStore :: (HConM m) => KbtzStore -> StoreType -> NodeMAC -> S.SerialT m StoreEv
 watchNodeStore k s n = S.concatM $ do
+  liftIO $ PIO.ensureDir (getKbtzFolder k s n)
   d <- FS.arrFromPath (getKbtzFolder k s n)
   return $ S.catMaybes
     $ S.mapM toStoreEv
