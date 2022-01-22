@@ -7,8 +7,6 @@ module Streamly.Binary
     Txt,
     Wino,
     EncT(..),
-    parseMsgS,
-    parseBinS,
     toPB,
     fromPB,
     toBin,
@@ -16,14 +14,12 @@ module Streamly.Binary
     toWino,
     fromWino,
     decodeFile,
+    decodeUnfold,
     encodeFold,
     encodeArray,
     decodeS,
-    parseTextLines,
-    prefixWithLength,
     toTxt,
     fromTxt,
-    parseLPArray
   )
 where
 
@@ -49,6 +45,7 @@ import Streamly.Prelude (IsStream, MonadAsync)
 import Streamly.Internal.Data.Tuple.Strict (Tuple'(..))
 import qualified Streamly.Internal.Data.Fold as FL
 import qualified Streamly.Internal.Data.Unfold as UF
+import qualified Streamly.Internal.Data.Unfold.Type as UF
 import qualified Streamly.Internal.FileSystem.File as File
 import qualified Streamly.Internal.Data.Array.Foreign as A
 import qualified Streamly.Internal.Data.Array.Foreign.Type as A
@@ -219,6 +216,8 @@ parseLPArray :: (MonadIO m, MonadCatch m) => AF.Fold m Word8 (A.Array Word8)
 parseLPArray = AF.fromParser parseLengthPrefixed
 {-# INLINE parseLPArray #-}
 
+--decodeArr = A.fold parseLPArray . File.readChunks
+
 parseNewline :: (MonadIO m, MonadCatch m) => P.Parser m Word8 (A.Array Word8)
 parseNewline = P.wordBy nl (A.write)
   where
@@ -243,48 +242,42 @@ decodeFile f = S.concatM $ do
 
 type FileSource a = (P.Source FilePath a)
 
-decodeUnfold :: forall m a. (HasEncoding a, MonadAsync m, MonadCatch m)
-  => P.Producer m (FileSource Word8) Word8
-  -> UF.Unfold m (FileSource Word8) (Either DecodeException a)
-decodeUnfold = P.simplify . decodeProducer
+f :: UF.Unfold m x b -> P.Producer m (P.Source x a) b
+f = undefined
 
-decodeProducer :: forall m a. (HasEncoding a, MonadAsync m, MonadCatch m)
-  => P.Producer m (FileSource Word8) Word8
-  -> P.Producer m (FileSource Word8) (Either DecodeException a)
+f' :: UF.Unfold m (P.Source x a) b -> UF.Unfold m x b
+f' = undefined
+
+--fromFP :: forall t m a. (FilePath -> S.Stream m a) -> P.Producer m (S.Stream m a) a
+--fromFP f = P.lmapM P.fromStreamD
+--upgrade :: (forall s. s -> m a) -> UF.Unfold m a b -> P.Producer m a b
+--upgrade k (UF.Unfold step inject) = P.Producer step inject k 
+
+decodeUnfold :: forall m a s. (HasEncoding a, MonadAsync m, MonadCatch m)
+  => UF.Unfold m s Word8
+  -> UF.Unfold m s (Either DecodeException a)
+decodeUnfold = f' . decodeUnfold' . f
+{-# INLINE decodeUnfold #-}
+
+decodeUnfold' :: forall m a s. (HasEncoding a, MonadAsync m, MonadCatch m)
+  => P.Producer m (P.Source s Word8) Word8
+  -> UF.Unfold m (P.Source s Word8) (Either DecodeException a)
+decodeUnfold' = P.simplify . decodeProducer
+{-# INLINE decodeUnfold' #-}
+
+decodeProducer :: forall m a x. (HasEncoding a, MonadAsync m, MonadCatch m)
+  => P.Producer m (P.Source x Word8) Word8
+  -> P.Producer m (P.Source x Word8) (Either DecodeException a)
 decodeProducer = (fmap decodeA) . P.parseManyD (chunkBytes @a)
+{-# INLINE decodeProducer #-}
 
 encodeArray :: (HasEncoding a, MonadAsync m, MonadCatch m)
   => FilePath -> a -> m ()
 encodeArray fp = liftIO . (File.putChunk fp <=< encodeA)
 {-# INLINE encodeArray #-}
 
+-- TODO: Rename to encodeFile
 encodeFold :: (HasEncoding a, MonadAsync m, MonadCatch m)
   => FilePath -> FL.Fold m a ()
 encodeFold fp = FL.lmapM encodeA (File.writeChunks fp)
 {-# INLINE encodeFold #-}
-
-encodeFile :: (HasEncoding a, MonadAsync m, MonadCatch m)
-  => FilePath -> FL.Fold m a ()
-encodeFile fp = FL.lmapM encodeA (File.writeChunks fp)
-{-# INLINE encodeFile #-}
-
--- encodeFold2 :: (HasEncoding a, MonadAsync m, MonadCatch m)
---   => FilePath -> FL.Fold m a ()
--- encodeFold2 fp = FL.lmapM encodeA (File.writeChunks2 fp)
--- {-# INLINE encodeFold2 #-}
-
-
-parseMsgS :: (IsStream t, MonadAsync m, Message a, MonadCatch m)
-  => FilePath -> t m (Either DecodeException (PB a))
-parseMsgS = decodeFile
-{-# INLINE parseMsgS #-}
-
-parseBinS :: (IsStream t, MonadAsync m, Binary a, MonadCatch m)
-  => FilePath -> t m (Either DecodeException (Bin a))
-parseBinS = decodeFile
-{-# INLINE parseBinS #-}
-
-parseTextLines :: (IsStream t, MonadAsync m, MonadCatch m)
-  => FilePath -> t m (Either DecodeException T.Text)
-parseTextLines = (fmap (second fromTxt)) . decodeFile
-{-# INLINE parseTextLines #-}

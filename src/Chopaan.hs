@@ -15,7 +15,7 @@ import Control.Monad.Bayes.Sampler
 
 import Chopaan.Kibbutz
 import Chopaan.Hydration.Prefix
-import Chopaan.Hydrate ( hConfDef, runHydration, HConS)
+import Chopaan.Hydrate ( hConfDef, runHydration, HConS, HConM)
 import Chopaan.Kibbutz.TKbtzim (mkConfig, TKbtzim(..), onEvT, getKbtzimHW)
 import Chopaan.Kibbutz.KbtzId ( KbtzId(KbtzId) )
 import Chopaan.Kibbutz.FS
@@ -79,17 +79,17 @@ type Sources = (MQTTOpts, HydrationOpts)
 type Sink = InfluxConn 
 
 runKbtzim :: forall t m.
-  (HConS t m, KConS t m)
+  (HConM m, MonadSample m)
   => Ti.UTCTime
   -> MQTTOpts
   -> WriteParams
   -> TKbtzim
-  -> t m (NodeMAC, Prefix)
+  -> m ()
 runKbtzim t0 mq influxCon tKbtzim = s3Hydration tKbtzim
     -- `S.parallel`
     -- (Right <$> mqttStream kbtzim)
   where
-    s3Hydration :: TKbtzim -> t m (NodeMAC, Prefix)
+    s3Hydration :: TKbtzim -> m ()
     s3Hydration kns = runHydration t0 influxCon kns
     -- mqttStream :: Kbtzim -> t m (KbtzScene NodeMAC)
     -- mqttStream kns = S.concatMapWith S.parallel (runKibbutz @t) (confss kns)
@@ -139,8 +139,8 @@ run = do
       let
         dbWrite = wp influxConn hydrationDB
         wk = S.mapM_ (onEvT tKbtzim) $ S.trace (liftIO . print) watchKbtzim 
-        rk = S.liftInner $ runKbtzim @S.SerialT t0 mqttOpts dbWrite tKbtzim
-      S.drain $ (S.fromEffect $ S.drain rk)
+        rk = runKbtzim t0 mqttOpts dbWrite tKbtzim
+      S.drain $ (S.fromEffect rk)
          `S.async`
          (S.fromEffect wk)
   where

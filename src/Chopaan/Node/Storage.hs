@@ -32,7 +32,6 @@ import Data.Monoid
 import GHC.Generics (Generic)
 
 import Control.Monad.Bayes.Class hiding (gamma)
-import Control.Concurrent.STM
 
 import Data.Distributive
 import Data.Foldable ()
@@ -41,10 +40,6 @@ import Linear
 import Numeric.AD
 
 import Chopaan.Node.Storage.Battery
---import Numeric.AD.Internal.Reverse ()
-
---import ConCat.Interval
---import ConCat.Regress
 
 -- | Goals
 -- 1) SoC Estimation
@@ -230,8 +225,6 @@ i_rkn BatteryParams{..} delT i_rkp i_k =  (expTerm * i_rkp) + ((1 - expTerm) * i
 {-# INLINE i_rkn #-}
 
 
---type SocOcv = socToOCV <-> ocvToSoC 
-
 soCtoOCV :: (ParamType a) => BatteryParams a -> a -> a
 soCtoOCV BatteryParams{chargeCapacity} soc = intervals !! index
   where
@@ -336,61 +329,23 @@ initKF s = KalmanFilter s initCov
 {-# INLINE initKF #-}
 
 
-estimatorStep' :: forall a. (ParamType a) => BatteryParams a -> a -> SensorVector a -> KF a -> (KF a, KI a)
-estimatorStep' battery dt sensorReadings@SensorVector{..} prior =
-  let
-    w_k = 0.5
-    procNoise = processNoise
-    senNoise = sensorNoise
-    processPosterior = --prior --processModel battery w_k dt
-      augmentProcess (model w_k) sensorReadings (scaled procNoise) (scaled senNoise) prior
-    (innovation, measurePosterior) = ic processPosterior
-  in (measurePosterior, innovation)
-  where
-    ic processPosterior = --(testInno (pure 0) (pure . pure $ 0), processPosterior)
-      innovationCorrection sensorPred initSensorCov processPosterior
-    sensorPred = sensorPrediction battery sensorReadings
-    --pm = processModel battery 0.5 dt
-    --model :: _
-    model noise = EKFProcess $ processModel (auto <$> battery) (auto noise) (auto dt)
-    --testInno = KalmanInnovation
-{-# INLINEABLE estimatorStep' #-}
-
-
 estimatorStep :: forall m a. (ParamType a, MonadSample m) => BatteryParams a -> a -> SensorVector a -> KF a -> m (KF a, KI a)
 estimatorStep battery dt sensorReadings@SensorVector{..} prior = do
   procNoise <- procDist
   senNoise <- senDist
   let
     w_k = 0.5
-    processPosterior = --prior --processModel battery w_k dt
+    processPosterior = 
       augmentProcess (model w_k) sensorReadings (scaled procNoise) (scaled senNoise) prior
     (innovation, measurePosterior) = ic processPosterior
   return $ (measurePosterior, innovation)
   where
-    ic processPosterior = --(testInno (pure 0) (pure . pure $ 0), processPosterior)
+    ic processPosterior =
       innovationCorrection sensorPred initSensorCov processPosterior
     sensorPred = sensorPrediction battery sensorReadings
-    --pm = processModel battery 0.5 dt
-    --model :: _
     model noise = EKFProcess $ processModel (auto <$> battery) (auto noise) (auto dt)
-{-# INLINEABLE estimatorStep #-}
-    --testInno = KalmanInnovation
+{-# INLINE estimatorStep #-}
 
--- runEstimator' :: forall m a. (MonadSample m, ParamType a) => BatteryParams a -> a -> SensorVector a -> KalmanState m a (KI a)
--- runEstimator' battery dt sensorReadings@SensorVector{..} = do
---   (ts, prior) <- get
---   senNoise <- lift senDist
---   procNoise <- lift procDist
---   w_k <- realToFrac <$> (lift $ normal 0.5 1)
---   let processPosterior = augmentProcess (model w_k) sensorReadings (scaled procNoise) (scaled senNoise) prior
---   let (innovation, measurePosterior) = ic processPosterior 
---   put (ts, measurePosterior) -- KalmanFilter state' p' = (ts, KalmanFilter state' p')
---   return $ innovation
---   where
---     ic processPosterior = innovationCorrection sensorPred initSensorCov processPosterior
---     sensorPred = sensorPrediction battery sensorReadings
---     model noise = EKFProcess $ processModel (auto <$> battery) (auto noise) (auto dt)
 
 
 

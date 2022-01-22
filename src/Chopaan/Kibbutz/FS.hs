@@ -79,7 +79,9 @@ import Path
       (</>),
       filename,
       parseRelDir,
-      parseRelFile )
+      parseRelFile,
+      parseAbsFile
+    )
 
 
 newtype ArrPath = ArrPath { unArrPath :: Array.Array Word8 }
@@ -108,6 +110,14 @@ type AbsDir = Path Abs Dir
 type RelFile = (Path Rel File)
 type PathIso m l x = IsoM m (Path l x) ArrPath
 
+
+arrAbsFile :: (PathM m) => PathIso m Abs File
+arrAbsFile = IsoM (arrPath, fromArrPath)
+  where
+    arrPath = fmap ArrPath . liftIO . Array.fromStreamD
+              . S.toStreamD . encodeUtf8 @IO @S.SerialT . S.fromList . toFilePath
+    fromArrPath = (parseAbsFile <=< S.toList) . decodeUtf8
+                  . Array.toStream . unArrPath
 
 arrFilePath :: (PathM m) => PathIso m Rel File
 arrFilePath = IsoM (arrPath, fromArrPath)
@@ -227,6 +237,9 @@ evRelPath = isoRev fpArrIso . ArrPath . EvL.getRelPath
 
 evRelPath' :: (PathM m) => EvL.Event -> m RelFile
 evRelPath' = isoRev arrFilePath . ArrPath . EvL.getRelPath
+
+evAbsPath' :: (PathM m) => EvL.Event -> m (Path Abs File)
+evAbsPath' = isoRev arrAbsFile . ArrPath . EvL.getAbsPath
 
 getKbtzEv :: (PathM m) => Event -> m (Maybe KbtzEv)
 getKbtzEv ev

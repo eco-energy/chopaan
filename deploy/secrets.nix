@@ -12,6 +12,7 @@
         owner = "chopaan";
         group = "chopaan";
         mode = "0440";
+        path = "/chopaanFS/.aws-creds";
         neededForUsers = false;
         sopsFile = ../credentials/chopaan.yaml;
         restartUnits = [ "chopaan.service" ];
