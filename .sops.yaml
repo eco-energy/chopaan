@@ -2,10 +2,10 @@
 # for a more complex example.
 keys:
   - &faez age1n0gffzg2ssuhgt735kxccxpd36f7yhwrg7x50wwgvty3m69304sszw5qwn
-  - &chopaan age1zpec5uhxqg4dj2t9k704ca5x622kud36nqrx9rurzehs42gccsvqpm479x
+  - &chop age1zpec5uhxqg4dj2t9k704ca5x622kud36nqrx9rurzehs42gccsvqpm479x
 creation_rules:
   - path_regex: credentials/[^/]+\.yaml$
     key_groups:
     - age:
       - *faez
-      - *chopaan
+      - *chop
