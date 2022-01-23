@@ -17,6 +17,16 @@
         sopsFile = ../credentials/chopaan.yaml;
         restartUnits = [ "chopaan.service" ];
       };
+      secrets.grafanaAdmin = {
+        name = "grafanaAdmin";
+        key = "grafanaAdmin";
+        owner = "grafana";
+        group = "grafana";
+        mode = "0440";
+        neededForUsers = false;
+        sopsFile = ../credentials/chopaan.yaml;
+        restartUnits = [ "grafana.service" ];
+      };
       keepGenerations = 1;
       log = [ "keyImport" "secretChanges"];
   };

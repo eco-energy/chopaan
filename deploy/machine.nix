@@ -25,7 +25,7 @@ in
         group = "chopaan";
         extraGroups = ["keys" "dash" config.users.groups.keys.name ];
         isSystemUser = true;
-        home = "/chopaanFS";
+        home = "/chopaanFS/chopaan/";
         useDefaultShell = true;
       };
     };
@@ -96,6 +96,10 @@ in
 
   systemd.tmpfiles.rules = [
     "d ${dashboardDir} 0775 chopaan dash"
+    "d /chopaanFS 0755 root root"
+    "d /chopaanFS/chopaan 0755 chopaan chopaan"
+    "d /chopaanFS/influx 0775 influxdb influxdb"
+    "d /chopaanFS/grafana 0775 grafana grafana"
   ];
   # systemd.services.dashgen = {
   #   wantedBy = [ "grafana.service" ];
@@ -109,11 +113,12 @@ in
   # };
 
   services.influxdb = {
-      enable = true;
-      extraConfig = {
-        collectd = [{ enabled = false; }];
-        udp = [{ enabled = true; }];
-      };
+    enable = true;
+    dataDir = "/chopaanFS/influx";
+    extraConfig = {
+      collectd = [{ enabled = false; }];
+      udp = [{ enabled = true; }];
+    };
   };
     
   users.users.grafana.extraGroups = ["dash"];
@@ -122,7 +127,10 @@ in
     domain = hostName;
     port = 2342;
     addr = "127.0.0.1";
-    dataDir = "chopaanFS/grafana";
+    dataDir = "/chopaanFS/grafana";
+    security = {
+      adminPasswordFile = config.sops.secrets.grafanaAdmin.path;
+    };
     provision = {
       enable = true;
       dashboards = [
@@ -153,9 +161,6 @@ in
           database = "chopaanMQTT";
         }
       ];
-      security = {
-        adminPasswordFile = config.sops.secrets.aws-creds.path;
-      };
     };
   };
     
