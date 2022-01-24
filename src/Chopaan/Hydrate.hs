@@ -285,7 +285,7 @@ runHydration t0 wp kbtzim = -- S.after (liftIO . print $ "Hydration Finished!") 
   S.drain . S.fromWAsync $ S.mapM (h kbtzim) (configs kbtzim) 
   where
     h kns (c, kNodes) = hydrateKbtz t0 c kNodes $ unfoldNodes (life c) kns
-    configs kns = S.mapM (mkKbtzConfM wp) $ S.unfold (unfoldKbtzim Finite kns) ()
+    configs kns = S.mapM (mkKbtzConfM wp) $ S.unfold (unfoldKbtzim Infinite kns) ()
 
 ufStream :: forall t m a b. (HConS t m) => (a -> t m b) -> UF.Unfold m a b
 ufStream f = UF.many (UF.function f) UF.fromStream
@@ -315,16 +315,16 @@ hydrateKbtz t0 KbtzConf{kbtzName, kbtzStore
   S.drain . S.fromAsync $ do
     n <- S.trace (liftIO . print)
       $ S.unfold (FS.traceUF (liftIO . mkNodeDirs kbtzStore) ns) kbtzName
-    S.fromEffect $ nodeState' @S.SerialT (n, hw M.! n) ((tagger kbtzStore) n)
+    S.fromEffect $ nodeState' (n, hw M.! n) ((tagger kbtzStore) n)
+      $ S.fromSerial
       $ S.map (uncurry (getKbtzPath kbtzStore Frames))
       $ fp (floor $ 5500 / (realToFrac $ length . M.keys $ hw))
       $ S.fromAhead . S.maxThreads 10 $ kp
       $ prefixGen @S.AheadT life inSet res startTime t0 n
   where
-    nodeState' :: forall t . (S.IsStream t)
-      => (NodeMAC, HW Double)
+    nodeState' :: (NodeMAC, HW Double)
       -> KbtzNode
-      -> t m (Path Abs File)
+      -> S.SerialT m (Path Abs File)
       -> m ()
     nodeState' (n, h) tag = nodeState nodeFold fl . readPaths
         where
@@ -387,6 +387,13 @@ newtype S3Idx a = S3Idx (S3Id, a)
 
 toS3Idx :: (S3Id, a) -> S3Idx a
 toS3Idx = S3Idx
+
+-- $ This exists because using traverse on S3Idx lead to all the compute being
+--  eaten and f not being applied. SO WEIRD. 
+onS3Idx :: (Monad m) => (a -> m b) -> S3Idx a -> m (S3Idx b)
+onS3Idx f (!S3Idx (!x, !y)) = do
+  !y' <- f y
+  return $! S3Idx (x, y')
 
 type S3Key = S3Idx S3.ObjectKey
 
@@ -499,6 +506,7 @@ nodeA k n = readPaths
 
 readPaths :: forall t m a. (HConS t m, W.Serialise a) => t m (Path Abs File) -> t m a
 readPaths = S.concatMap readPath
+{-# INLINE readPaths #-}
 
 readPath :: forall t m a. (HConS t m, W.Serialise a) => (Path Abs File) -> t m a    
 readPath = S.map fromWino
@@ -506,7 +514,8 @@ readPath = S.map fromWino
       . S.trace logEither
       . decodeFile @t @m @(Wino a)
       . toFilePath    
-  
+{-# INLINE[1] readPath #-}  
+
 watchNodeStore :: (HConM m) => KbtzStore -> StoreType -> NodeMAC -> S.SerialT m StoreEv
 watchNodeStore k s n = S.concatM $ do
   liftIO $ PIO.ensureDir (getKbtzFolder k s n)
@@ -564,30 +573,32 @@ rightsUF = UF.map (fromRight undefined) . UF.filter isRight
 catMaybesUF :: Monad m => UF.Unfold m x (Maybe a) -> UF.Unfold m x a
 catMaybesUF = UF.map fromJust . UF.filter isJust
 
-nodeState :: forall t m. (HConS t m)
+nodeState :: forall m. (HConM m)
   => NodeF m
   -> FL.Fold m (SensorR, MeshR) ()  
-  -> t m S3Body
+  -> S.SerialT m S3Body
   -> m ()
-nodeState nodeFold sink x = S.fold (sink) . S.adapt
+nodeState nodeFold sink x = S.fold sink
+  $ S.tapRate 10 (\r -> liftIO . print $ "Node Ingestion Rate: " <> show r)
   $ S.postscan nodeFold
-  S.|$ S.catMaybes
-  S.|$ S.trace logNothing
-  S.|$ S.map (validateMF')
-  S.|$ S.rights
-  S.|$ S.trace logEither
-  S.|$ S.map (parsePB)
-  S.|$ x
+  $ S.catMaybes
+  $ S.trace logNothing
+  $ S.map (validateMF')
+  $ S.rights
+  $ S.trace logEither
+  $ S.map (parsePB)
+  $ x
   where
-    parsePB = traverse (fmap fromPB . decodeA @(PB MeshFrame) . SBS.toArray)
+    parsePB = onS3Idx (fmap fromPB . decodeA @(PB MeshFrame) . SBS.toArray)
     validateMF' :: S3Idx MeshFrame -> Maybe (Either EnergyState RuntimeStats)
-    validateMF' (S3Idx (S3Id idx, m)) = case accessEnergyState m of
+    validateMF' (S3Idx (S3Id !idx, !m)) = case accessEnergyState m of
       (Just !e) -> Just . Left $ fixGridTS t e
       Nothing -> case accessRTS m of
         Just !r -> Just . Right $ fixMeshTS t r
         Nothing -> Nothing
      where
        t = Just . posixSecondsToUTCTime . fromIntegral $ div idx 1000
+{-# INLINE[1] nodeState #-}
 
 fetchFrames ::
   forall m. HConM m
@@ -598,13 +609,23 @@ fetchFrames ::
   -> Int
   -> (NodeMAC, Prefix)
   -> m ((NodeMAC, Prefix), Int)
-fetchFrames sesh sw ropts getPath maxThreads (n, p) = fmap snd
-  . S.fold (FL.partition errSink frameSink)
-  . S.map (bimap toWino toWino)
-  . S.tapRate 10 printDLRate
-  . S.fromAhead . S.maxThreads maxThreads . S.mapM ((sessionS3 sw sesh ropts))
-  $ keySource
+fetchFrames sesh sw ropts getPath maxThreads (n, p) = do
+  cached <- liftIO $ PIO.doesFileExist pth
+  case cached of
+    True -> do
+      l <- fromIntegral <$> (liftIO $ getFileSize $ toFilePath pth)
+      case l < 4 of
+        True -> dl
+        False -> return $ ((n, p), l)
+    False -> dl
   where
+    pth = getPath Frames n p
+    dl = fmap snd
+      . S.fold (FL.partition errSink frameSink)
+      . S.map (bimap toWino toWino)
+      . S.tapRate 10 printDLRate
+      . S.fromAhead . S.maxThreads maxThreads . S.mapM ((sessionS3 sw sesh ropts))
+      $ keySource
     printDLRate r = liftIO . print
       $ "Download rate from Node "
       <> show (n, p)
@@ -640,12 +661,6 @@ sessionS3 (S3.BucketName !bucket) !sesh !opts k = do
   -- liftIO $ print $ "Response Received" <> (show resp)
   return $! a resp 
   where
-    -- $ This exists because using traverse on S3Idx lead to all the compute being
-    --  eaten and f not being applied. SO WEIRD. 
-    onS3Idx :: (a -> m b) -> S3Idx a -> m (S3Idx b)
-    onS3Idx f (!S3Idx (!x, !y)) = do
-      !y' <- f y
-      return $! S3Idx (x, y')
     a (!S3Idx (!idx, !o)) = bimap (S3Idx . (idx,)) (S3Idx . (idx,)) o
     s3GetSafe =
       recoverWith ("req" :: String) 1 (Left . wrapStatus $ NC.imATeapot418) . s3Get
