@@ -11,7 +11,6 @@ module Chopaan.Hydrate
   -- , mkTKbtz
   -- , TKbtzim
   -- , mkConfig
-  -- , ufStream
   -- , prefixGen
   -- , nodePrefixes
   -- , HConM
@@ -213,7 +212,7 @@ manConfDef :: ManagerSettings
 manConfDef = ManagerSettings 128 10 60
 
 hConfDef :: HydrationConf
-hConfDef = HydrationConf basePath bucket defDate Ten5 Ten Finite
+hConfDef = HydrationConf basePath bucket defDate Ten5 Ten Infinite
   where
     defDate = Date 14 10 2021
     basePath = "./data/hydration"
@@ -287,9 +286,6 @@ runHydration t0 wp kbtzim = -- S.after (liftIO . print $ "Hydration Finished!") 
     h kns (c, kNodes) = hydrateKbtz t0 c kNodes $ unfoldNodes (life c) kns
     configs kns = S.mapM (mkKbtzConfM wp) $ S.unfold (unfoldKbtzim Infinite kns) ()
 
-ufStream :: forall t m a b. (HConS t m) => (a -> t m b) -> UF.Unfold m a b
-ufStream f = UF.many (UF.function f) UF.fromStream
-
 nodePrefixes :: forall m. (HConM m)
   => KbtzName
   -> UF.Unfold m KbtzName NodeMAC
@@ -312,15 +308,15 @@ hydrateKbtz t0 KbtzConf{kbtzName, kbtzStore
                        , env, writeParams
                        , life, parHow, ropts} tNodes ns = do
   hw <- toMACSet <$> (liftIO . atomically $ readTVar tNodes)
-  S.drain . S.fromAsync $ do
+  S.drain . S.fromParallel $ do
     n <- S.trace (liftIO . print)
       $ S.unfold (FS.traceUF (liftIO . mkNodeDirs kbtzStore) ns) kbtzName
     S.fromEffect $ nodeState' (n, hw M.! n) ((tagger kbtzStore) n)
       $ S.fromSerial
       $ S.map (uncurry (getKbtzPath kbtzStore Frames))
       $ fp (floor $ 5500 / (realToFrac $ length . M.keys $ hw))
-      $ S.fromAhead . S.maxThreads 10 $ kp
-      $ prefixGen @S.AheadT life inSet res startTime t0 n
+      $ S.fromAhead . S.maxThreads 10 $ kp . S.fromSerial
+      $ S.trace (pr . prefLog) $ prefixGen @S.SerialT life inSet res startTime t0 n
   where
     nodeState' :: (NodeMAC, HW Double)
       -> KbtzNode
@@ -361,7 +357,7 @@ prefixGen life keep (pastRes, futureRes) start now n = S.map (n,) xs
   where
     xs = case life of
            Finite -> past
-           Infinite -> S.uniq (past <> future)
+           Infinite -> past <> future
     past = S.fromList (prefixRange pastRes start (Just now))
     {-# INLINE past #-}
     future = S.takeWhileM (\_ -> keep n) $ posthence futureRes
