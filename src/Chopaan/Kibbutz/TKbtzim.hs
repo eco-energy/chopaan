@@ -62,6 +62,15 @@ instance Var LifeTime where
   toVar = show
   fromVar = readMaybe
 
+numKbtzimNodes :: TKbtzim -> STM Int
+numKbtzimNodes t = do
+  ks <- getKeys . unTKbtzim $ t
+  ls <- traverse (flip numKbtzNodes t) $ Set.toList ks
+  return $ foldl (+) 0 ls
+
+numKbtzNodes :: KbtzName -> TKbtzim -> STM Int
+numKbtzNodes = fmap (fmap length) . lookupTSet
+
 lookupTSet :: KbtzName -> TKbtzim -> STM (Maybe (Set NodeMAC))
 lookupTSet k (TKbtzim tv) = do
   m <- readTVar tv

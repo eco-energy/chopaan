@@ -35,6 +35,7 @@ import Chopaan.Kibbutz.TKbtzim
       TKbtzim,
       TNodes,
       MACSet,
+      numKbtzimNodes,
       mkTKbtz,
       mkConfig,
       unfoldNodes,
@@ -253,14 +254,15 @@ mkKbtzConf HydrationConf{s3Bucket
   (pastRes, futureRes)
 
 mkKbtzConfM :: forall m. (HConM m)
-  => Http.WriteParams -> (KbtzName, TNodes) -> m (KbtzConf, TNodes)
-mkKbtzConfM wp (kId, kNodes) = do
+  => Http.WriteParams -> (KbtzName, TNodes) -> m Int -> m (KbtzConf, TNodes)
+mkKbtzConfM wp (kId, kNodes) totalNodes = do
   !conf <- liftIO parseHConf
   !parConf <- liftIO parseParStrategy
   !aws <- getAwsEnv S3.s3
   !manConf <- liftIO parseManagerConf
   !basePath <- PIO.makeAbsolute =<< parseRelDir (storePath conf)
   -- TODO: Session should not be per kibbutz?
+  !numDlThreads <- totalNodes 
   !sesh <- liftIO $ Session.newSessionControl Nothing (ourSettings manConf)
   !aut <- liftIO $ do
     case aws ^. envAuth of
@@ -272,7 +274,10 @@ mkKbtzConfM wp (kId, kNodes) = do
     ropts = defaults &
       auth ?~ awsFullAuth AWSv4 accessKey secretKey Nothing (Just ("s3", "ap-southeast-1"))
     store = initKbtzStore kId (basePath)
-    c = mkKbtzConf conf aws kId store sesh wp parConf ropts
+    c = mkKbtzConf conf aws kId store sesh wp (parConf {
+                                                  dlThreads = (floor $
+                                                               5500 / (realToFrac numDlThreads))
+                                                  }) ropts
   return (c, kNodes)
 
 runHydration :: forall m. (HConM m, MonadSample m)
@@ -283,8 +288,9 @@ runHydration :: forall m. (HConM m, MonadSample m)
 runHydration t0 wp kbtzim = -- S.after (liftIO . print $ "Hydration Finished!") $
   S.drain . S.fromWAsync $ S.mapM (h kbtzim) (configs kbtzim) 
   where
+    nn = liftIO . atomically $ numKbtzimNodes kbtzim 
     h kns (c, kNodes) = hydrateKbtz t0 c kNodes $ unfoldNodes (life c) kns
-    configs kns = S.mapM (mkKbtzConfM wp) $ S.unfold (unfoldKbtzim Infinite kns) ()
+    configs kns = S.mapM (flip (mkKbtzConfM wp) nn) $ S.unfold (unfoldKbtzim Infinite kns) ()
 
 nodePrefixes :: forall m. (HConM m)
   => KbtzName
@@ -314,7 +320,7 @@ hydrateKbtz t0 KbtzConf{kbtzName, kbtzStore
     S.fromEffect $ nodeState' (n, hw M.! n) ((tagger kbtzStore) n)
       $ S.fromSerial
       $ S.map (uncurry (getKbtzPath kbtzStore Frames))
-      $ fp (floor $ 5500 / (realToFrac $ length . M.keys $ hw))
+      $ fp (dlThreads parHow)
       $ S.fromAhead . S.maxThreads 10 $ kp . S.fromSerial
       $ S.trace (pr . prefLog) $ prefixGen @S.SerialT life inSet res startTime t0 n
   where
