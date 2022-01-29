@@ -133,7 +133,7 @@ parseRTSToNode !rts = m
     m = MeshNode
       { isRoot = (rts ^? N.isRoot)
       , uptime = (fromIntegral $ rts ^. N.uptime)
-      , routerRSSI = (fromIntegral $ rts ^. N.wifiStrength)
+      , routerRSSI = (- (4294967295 + 1) + (fromIntegral $ rts ^. N.wifiStrength))
       , version = (NodeVersion <$> rts ^? N.version)
       , nodeTime = utcTimeNow $ rts ^. N.cpuTime
   }
@@ -158,7 +158,7 @@ meshNodeLink !kn !rts = (parseRTSToNode rts, rx')
 
 meshF :: forall m. (Monad m) => NodeMAC -> FL.Fold m (N.RuntimeStats) (MeshNode, RxSignal)
 meshF n = FL.mkFold_ (\_ r -> FL.Partial $ meshNodeLink n $ r) (FL.Partial (initMeshNode, noSignal))
---{-# INLINE meshF #-}
+{-# INLINE meshF #-}
 
 
 
