@@ -322,7 +322,7 @@ hydrateKbtz t0 KbtzConf{kbtzName, kbtzStore
       $ S.map (uncurry (getKbtzPath kbtzStore Frames))
       $ fp (dlThreads parHow)
       $ S.fromAhead . S.maxThreads 10 $ kp . S.fromSerial
-      $ S.trace (pr . prefLog) $ prefixGen @S.SerialT life inSet res startTime t0 n
+      $ prefixGen @S.SerialT life inSet res startTime t0 n
   where
     nodeState' :: (NodeMAC, HW Double)
       -> KbtzNode
@@ -334,13 +334,13 @@ hydrateKbtz t0 KbtzConf{kbtzName, kbtzStore
           fl = FL.lmap (nodeLines) $ lineFoldHttp @m 32 writeParams
           nodeLines = uncurry (<>) . bimap (lineSensorR tag) (lineMesh tag)
     fp mt = S.map fst
-        . S.filter ((> 0) . snd)
-        . S.trace (pr . frameLog)
-        . S.mapM (fetchFrames manOrSesh bucket ropts (getKbtzPath kbtzStore) mt)
+      . S.trace (pr . frameLog)
+      . S.filter ((> 0) . snd)
+      . S.mapM (fetchFrames manOrSesh bucket ropts (getKbtzPath kbtzStore) mt)
     kp = S.map fst
-        . S.filter ((> 0) . snd)
-        . S.trace (pr . keyLog)
-        . S.mapM (fetchKeys env bucket keyPath)
+      . S.trace (pr . keyLog)
+      . S.filter ((> 0) . snd)
+      . S.mapM (fetchKeys env bucket keyPath)
     keyPath = getKbtzPath kbtzStore Keys
     inSet :: NodeMAC -> m Bool
     inSet n = liftIO . atomically $ do
@@ -665,7 +665,7 @@ sessionS3 (S3.BucketName !bucket) !sesh !opts k = do
   where
     a (!S3Idx (!idx, !o)) = bimap (S3Idx . (idx,)) (S3Idx . (idx,)) o
     s3GetSafe =
-      recoverWith ("req" :: String) 1 (Left . wrapStatus $ NC.imATeapot418) . s3Get
+      recoverWith ("req" :: String) 100 (Left . wrapStatus $ NC.imATeapot418) . s3Get
     s3Get :: S3.ObjectKey -> m (Either RespStatus BS.ByteString)
     s3Get !r = liftIO $ do
       !r' <- checkResponse =<< (Session.getWith opts sesh . toReq $ r)

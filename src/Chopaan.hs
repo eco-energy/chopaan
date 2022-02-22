@@ -86,21 +86,9 @@ runKbtzim :: forall t m.
   -> TKbtzim
   -> m ()
 runKbtzim t0 mq influxCon tKbtzim = s3Hydration tKbtzim
-    -- `S.parallel`
-    -- (Right <$> mqttStream kbtzim)
   where
     s3Hydration :: TKbtzim -> m ()
     s3Hydration kns = runHydration t0 influxCon kns
-    -- mqttStream :: Kbtzim -> t m (KbtzScene NodeMAC)
-    -- mqttStream kns = S.concatMapWith S.parallel (runKibbutz @t) (confss kns)
-    -- confss :: (S.IsStream t, S.MonadAsync m) => Kbtzim -> t m (KbtzC NodeMAC)
-    -- confss = S.fromList . fmap (sConf . second toKbtzG) . M.toList
-    -- sConf (k, kns) = KbtzC { Chopaan.Kibbutz.name = k
-    --                        , structure = kns
-    --                        , channelOpts = Left mq
-    --                        , s3Opts = Just (BucketName (s3BucketName hydrationOpts))
-    --                        , influxCon = influxCon
-    --                        }
 
 data Ctx = Ctx
   { root :: AbsDir
@@ -119,20 +107,22 @@ instance MonadSample ChopaanFS where
   random = (liftIO . sampleIOwith random) . genIO =<< ask
   {-# INLINE random #-}
 
+getCtx :: (MonadIO m) => AbsDir -> m Ctx
+getCtx d = (pure . Ctx d) =<< liftIO createSystemRandom
+
 run :: RIO App ()
 run = do
   hSetBuffering stdout LineBuffering
   app <- ask
   let
     Options{..} = appOptions app
-  dir <- makeAbsolute =<< parseRelDir "data/kbtzim" -- liftIO $ getXdgDir XdgData . Just =<< 
+  dir <- makeAbsolute =<< parseRelDir "data/kbtzim" 
   liftIO . print $ "Chopaan Kbtzim Path: " <> (show dir) 
   liftIO $ ensureDir dir
-  --liftIO $ createDB influxConn mqttDB
   liftIO $ createDB influxConn hydrationDB
   t0 <- liftIO Ti.getCurrentTime
-  gen <- liftIO createSystemRandom
-  liftIO $ runChopaanM (Ctx dir gen) $ do
+  ctx <- getCtx dir
+  liftIO $ runChopaanM ctx  $ do
     flip runReaderT dir $ do
       tKbtzim <- atomically . mkConfig =<< readKbtzim
       liftIO $ print =<< (atomically . getKbtzimHW $ tKbtzim)
@@ -144,5 +134,4 @@ run = do
          `S.async`
          (S.fromEffect wk)
   where
-    --mqttDB = "chopaanMQTT"
     hydrationDB = "chopaanS3"

@@ -48,7 +48,7 @@ bmNs = fmap mkNode $
   , (NodeId "7c:9e:bd:47:b7:e8", HHId 9, PPUId 15, withB ses185, (3, 6), HHId 8) 
   , (NodeId "7c:9e:bd:48:d1:3c", HHId 10, PPUId 3, withB naruda150, (2, 6), HHId 9)
   , (NodeId "ac:67:b2:1d:e7:f4", HHId 11, PPUId 14, withB naruda150, (5, 15), HHId 8)
-  , (NodeId "7c:9e:bd:49:07:68", HHId 12, PPUId 6, withB ses185, (5, 20), HHId 11)
+  , (NodeId "78:21:84:7d:d8:6c", HHId 12, PPUId 6, withB ses185, (5, 20), HHId 11)
   ]
 
 labNs :: [NodeModel]
@@ -62,7 +62,7 @@ labNs = fmap mkNode $
   , (NodeId "7c:9e:bd:49:00:08", HHId 27, PPUId 27, withB ecostar120, (2, 3), HHId 25)
   , (NodeId "7c:9e:bd:47:aa:64", HHId 28, PPUId 28, withB ecostar120, (3, 1), HHId 25)
   , (NodeId "ac:67:b2:12:09:60", HHId 29, PPUId 29, withB ses230, (2, 1), HHId 30)
-  , (NodeId "a4:b9:7e:d0:77:fc", HHId 30, PPUId 30, withB ecostar120, (2, 3), HHId 29)
+  , (NodeId "94:b9:7e:d0:77:fc", HHId 30, PPUId 30, withB ecostar120, (2, 3), HHId 29)
   ]
 
 addBismillahMor :: IO ()
