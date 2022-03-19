@@ -388,6 +388,34 @@ storageSensors es = SensorVector
     !o = es ^. batteryToGridCurrent + es ^. batteryToLoadCurrent
 {-# INLINE storageSensors #-}
 
+filterES :: EnergyState -> Bool
+filterES es = and
+  [ limOn batteryVoltage 20 0
+  , limOn gridVoltage 100 (-100)
+  , limOn gridToBatteryCurrent 25 (-5)
+  , limOn batteryToGridCurrent 25 (-5)
+  , limOn batteryToLoadCurrent 25 (-5)
+  , limOn solarInputCurrent 25 (-5) 
+  ]  
+  where
+    lim v mx mn = (mn <= v) && (v <= mx)
+    limOn x maxx minx = lim (es ^. x) maxx minx
+{-# INLINE filterES #-}
+
+clampES :: EnergyState -> EnergyState
+clampES es = es
+             & batteryVoltage %~ clamp 20 0
+             & gridVoltage %~ clamp 100 (-100)
+             & gridToBatteryCurrent %~ clamp 25 0
+             & batteryToGridCurrent %~ clamp 25 0
+             & batteryToLoadCurrent %~ clamp 25 0
+             & solarInputCurrent %~ clamp 25 0
+  where
+    clamp :: (Num a, Ord a) => a -> a -> a -> a
+    clamp val min' max' = max min' $ min max' val
+{-# INLINE clampES #-}
+
+
 power :: EnergyState -> PowerNR
 power !es = Node
            { tx = txIn' - txOut'
@@ -398,9 +426,7 @@ power !es = Node
     !txOut' = p batteryVoltage batteryToGridCurrent
     !cnsm' = p batteryVoltage batteryToLoadCurrent
     !genP' = p batteryVoltage solarInputCurrent
-    p !v !i = toWatts $ (es ^. i) * v'
-      where
-        !v' = (es ^. v)
+    p !v !i = toWatts $ (es ^. i) * (es ^. v)
 {-# INLINE power #-}
 
 utcTimeES :: EnergyState -> UTCTime
