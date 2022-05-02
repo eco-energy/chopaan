@@ -90,6 +90,8 @@ in
       User = "chopaan";
       Group = "chopaan";
       LimitNOFILE = 6400000;
+      Restart = "always";
+      RestartSec = "5s";
     };
     script = withRTSOpts "${chopaan.kbtzim}/bin/kbtzim";
   };
