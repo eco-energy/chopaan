@@ -534,6 +534,27 @@ tests:
         build-tools:
           hspec-discover:hspec-discover
 
+benchmarks:
+  solver-bench:
+    main: SolverBench.hs
+    source-dirs: benchmark
+    when:
+      condition: "impl(ghcjs)"
+      then:
+        buildable: false
+      else:
+        dependencies:
+          - chopaan
+          - criterion >= 1.5
+          - sbv >= 9.0
+          - containers
+          - deepseq
+          - base >= 4.14
+        ghc-options:
+          - -O2
+          - -threaded
+          - -rtsopts
+
 flags:
   prod:
     description: Build for production
