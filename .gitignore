@@ -5,3 +5,12 @@ tarballs/
 certs/*
 data
 credentials
+
+# Haskell build artifacts
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+
+# Benchmark binaries
+solver-bench
