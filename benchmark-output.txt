@@ -1,0 +1,15 @@
+benchmarking bipartite/4 nodes
+time                 1.316 s    (1.153 s .. 1.434 s)
+                     0.998 R²   (0.994 R² .. 1.000 R²)
+mean                 1.267 s    (1.221 s .. 1.300 s)
+std dev              46.83 ms   (24.16 ms .. 65.39 ms)
+variance introduced by outliers: 19% (moderately inflated)
+
+benchmarking bipartite/8 nodes
+time                 15.71 s    (15.29 s .. 16.04 s)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 15.86 s    (15.76 s .. 15.93 s)
+std dev              96.64 ms   (43.16 ms .. 130.0 ms)
+variance introduced by outliers: 19% (moderately inflated)
+
+benchmarking bipartite/16 nodes
