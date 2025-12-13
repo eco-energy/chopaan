@@ -1,118 +1,134 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 
+-- | Benchmark for Chopaan's transport problem solver
+-- This is the exact algorithm from Chopaan.Kibbutz.LinOpt.transportProblem
 module Main where
 
 import Criterion.Main
 import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
 import Data.SBV
-import Data.SBV.Control
-import qualified Data.Map.Strict as Map
-import Data.Map.Strict (Map)
-import Control.Monad (forM_)
+import Data.List (transpose)
 
--- | Node identifier
-newtype NodeId = NodeId Int
+--------------------------------------------------------------------------------
+-- Types from Chopaan.Kibbutz.LinOpt (exact copy)
+--------------------------------------------------------------------------------
+
+newtype Sources n = Sources { unSource :: [(n, Double)] }
   deriving (Eq, Ord, Show, Generic, NFData)
 
--- | Transport problem specification
-data TransportProblem = TransportProblem
-  { sources :: [(NodeId, Double)]           -- (node, supply capacity)
-  , sinks   :: [(NodeId, Double)]           -- (node, demand)
-  , costs   :: Map (NodeId, NodeId) Double  -- edge costs
-  } deriving (Show, Generic, NFData)
+newtype Sinks n = Sinks { unSink :: [(n, Double)] }
+  deriving (Eq, Ord, Show, Generic, NFData)
 
--- | Generate a balanced grid topology
--- n sources, n sinks, full bipartite connectivity
-mkProblem :: Int -> TransportProblem
-mkProblem n = TransportProblem
-  { sources = [(NodeId i, 10.0) | i <- [0..n-1]]
-  , sinks   = [(NodeId i, 10.0) | i <- [n..2*n-1]]
-  , costs   = Map.fromList
-      [ ((NodeId i, NodeId j), fromIntegral (abs (i - j) + 1))
-      | i <- [0..n-1]
-      , j <- [n..2*n-1]
-      ]
-  }
+instance Semigroup (Sources n) where
+  (Sources a) <> (Sources b) = Sources (a <> b)
 
--- | Generate a sparse mesh topology (more realistic)
--- Each node connects to at most k neighbors
-mkSparseProblem :: Int -> Int -> TransportProblem
-mkSparseProblem n k = TransportProblem
-  { sources = [(NodeId i, 10.0) | i <- [0..n-1], i `mod` 3 == 0]
-  , sinks   = [(NodeId i, 10.0) | i <- [0..n-1], i `mod` 3 /= 0]
-  , costs   = Map.fromList
-      [ ((NodeId i, NodeId j), fromIntegral (abs (i - j) + 1))
-      | i <- [0..n-1]
-      , j <- [0..n-1]
-      , i /= j
-      , abs (i - j) <= k  -- only connect to k nearest neighbors
-      ]
-  }
+instance Semigroup (Sinks n) where
+  (Sinks a) <> (Sinks b) = Sinks (a <> b)
 
--- | Solve transport problem, return Maybe total cost
-solveTransport :: TransportProblem -> IO (Maybe Double)
-solveTransport problem = runSMT $ do
-  -- Create flow variables for each edge
-  let edges = Map.keys (costs problem)
-  flows <- mapM mkFlow edges
-  let flowMap = Map.fromList (zip edges flows)
+instance Monoid (Sources n) where
+  mempty = Sources []
 
-  -- Non-negativity
-  mapM_ (\f -> constrain $ f .>= 0) flows
+instance Monoid (Sinks n) where
+  mempty = Sinks []
 
-  -- Source conservation: outflow = supply
-  forM_ (sources problem) $ \(node, supply) -> do
-    let outflow = sum [flowMap Map.! (node, j) | (i, j) <- edges, i == node]
-    constrain $ outflow .== literal supply
+class NamedF a n where
+  getVals :: a n -> [Double]
+  getNames :: a n -> [n]
 
-  -- Sink conservation: inflow = demand
-  forM_ (sinks problem) $ \(node, demand) -> do
-    let inflow = sum [flowMap Map.! (i, node) | (i, j) <- edges, j == node]
-    constrain $ inflow .== literal demand
+instance (Show n) => NamedF Sources n where
+  getVals = (snd <$>) . unSource
+  getNames = (fst <$>) . unSource
 
-  -- Minimize cost
-  let totalCost = sum
-        [ literal (costs problem Map.! e) * f
-        | (e, f) <- zip edges flows
-        ]
-  minimize "cost" totalCost
+instance (Show n) => NamedF Sinks n where
+  getVals = (snd <$>) . unSink
+  getNames = (fst <$>) . unSink
 
-  query $ do
-    cs <- checkSat
-    case cs of
-      Sat -> Just <$> getValue totalCost
-      _   -> return Nothing
+mkSources :: Show n => [n] -> [Double] -> Sources n
+mkSources ns vs = Sources $ zip ns vs
+
+mkSinks :: Show n => [n] -> [Double] -> Sinks n
+mkSinks ns vs = Sinks $ zip ns vs
+
+--------------------------------------------------------------------------------
+-- transportProblem from Chopaan.Kibbutz.LinOpt (exact algorithm)
+--------------------------------------------------------------------------------
+
+-- | Variable name generator (exact copy from LinOpt)
+tName :: Show a => a -> a -> String
+tName i j = ("x_" <> (show i) <> "_" <> (show j))
+
+-- | Hadamard product (exact copy from LinOpt)
+hadmard :: (Num a) => [[a]] -> [[a]] -> [[a]]
+hadmard as bs = fmap (\(xs, ys) -> fmap (\(x, y) -> x * y) $ zip xs ys) $ zip as bs
+
+-- | Transport problem optimization (exact algorithm from Chopaan.Kibbutz.LinOpt)
+transportProblem :: Show n => Sources n -> Sinks n -> [[Double]] -> Symbolic ()
+transportProblem ss ds cs = do
+  vars <- txVars
+  mapM_ (\(xs, t) -> constrain $ sum xs .>= t) $ zip vars (fromDouble <$> (getVals ds))
+  mapM_ (\(xs, t) -> constrain $ sum xs .<= t) $ zip (transpose vars) (fromDouble <$> (getVals ss))
+  minimize "goal" $ sum $ (fmap sum) $ hadmard vars (fmap (fmap fromDouble) cs)
   where
-    mkFlow (NodeId i, NodeId j) =
-      sDouble ("f_" ++ show i ++ "_" ++ show j)
+    txVars :: Symbolic [[SReal]]
+    txVars = sequence . (fmap sequence) $ [[sReal $ tName i j
+                                           |i <- getNames ss]
+                                          | j <- getNames ds]
+    fromDouble :: Double -> SReal
+    fromDouble = realToFrac
 
--- | Benchmarks
+--------------------------------------------------------------------------------
+-- Benchmark setup
+--------------------------------------------------------------------------------
+
+data TransportSpec = TransportSpec
+  { specSources :: Sources Int
+  , specSinks   :: Sinks Int
+  , specCosts   :: [[Double]]
+  } deriving (Show)
+
+-- | Generate a balanced bipartite topology
+mkProblem :: Int -> TransportSpec
+mkProblem n = TransportSpec
+  { specSources = mkSources [1..n] (replicate n 10.0)
+  , specSinks   = mkSinks [n+1..2*n] (replicate n 10.0)
+  , specCosts   = [[fromIntegral (abs (i - j) + 1) | i <- [1..n]] | j <- [n+1..2*n]]
+  }
+
+-- | Generate a sparse mesh topology
+mkSparseProblem :: Int -> Int -> TransportSpec
+mkSparseProblem n k = TransportSpec
+  { specSources = mkSources sourceIds (replicate numSources 10.0)
+  , specSinks   = mkSinks sinkIds (replicate numSinks 10.0)
+  , specCosts   = [[if abs (i - j) <= k then fromIntegral (abs (i - j) + 1) else 1e9
+                   | i <- sourceIds] | j <- sinkIds]
+  }
+  where
+    sourceIds = [i | i <- [1..n], i `mod` 3 == 1]
+    sinkIds   = [i | i <- [1..n], i `mod` 3 /= 1]
+    numSources = length sourceIds
+    numSinks   = length sinkIds
+
+-- | Solve using the exact Chopaan algorithm
+solveTransport :: TransportSpec -> IO OptimizeResult
+solveTransport spec = optimize Lexicographic $
+  transportProblem (specSources spec) (specSinks spec) (specCosts spec)
+
+-- | Benchmarks using Chopaan's transport solver algorithm
 main :: IO ()
 main = defaultMain
-  [ bgroup "bipartite"
-    [ bench "4 nodes"   $ nfIO (solveTransport (mkProblem 2))
-    , bench "8 nodes"   $ nfIO (solveTransport (mkProblem 4))
-    , bench "16 nodes"  $ nfIO (solveTransport (mkProblem 8))
-    , bench "32 nodes"  $ nfIO (solveTransport (mkProblem 16))
-    , bench "64 nodes"  $ nfIO (solveTransport (mkProblem 32))
-    , bench "128 nodes" $ nfIO (solveTransport (mkProblem 64))
-    , bench "256 nodes" $ nfIO (solveTransport (mkProblem 128))
+  [ bgroup "chopaan-bipartite"
+    [ bench "4 nodes"   $ whnfIO (solveTransport (mkProblem 2))
+    , bench "8 nodes"   $ whnfIO (solveTransport (mkProblem 4))
+    , bench "16 nodes"  $ whnfIO (solveTransport (mkProblem 8))
+    , bench "32 nodes"  $ whnfIO (solveTransport (mkProblem 16))
     ]
-  , bgroup "sparse-mesh-k4"
-    [ bench "12 nodes"  $ nfIO (solveTransport (mkSparseProblem 12 4))
-    , bench "24 nodes"  $ nfIO (solveTransport (mkSparseProblem 24 4))
-    , bench "48 nodes"  $ nfIO (solveTransport (mkSparseProblem 48 4))
-    , bench "96 nodes"  $ nfIO (solveTransport (mkSparseProblem 96 4))
-    , bench "192 nodes" $ nfIO (solveTransport (mkSparseProblem 192 4))
-    , bench "384 nodes" $ nfIO (solveTransport (mkSparseProblem 384 4))
-    ]
-  , bgroup "sparse-mesh-k8"
-    [ bench "12 nodes"  $ nfIO (solveTransport (mkSparseProblem 12 8))
-    , bench "24 nodes"  $ nfIO (solveTransport (mkSparseProblem 24 8))
-    , bench "48 nodes"  $ nfIO (solveTransport (mkSparseProblem 48 8))
-    , bench "96 nodes"  $ nfIO (solveTransport (mkSparseProblem 96 8))
-    , bench "192 nodes" $ nfIO (solveTransport (mkSparseProblem 192 8))
+  , bgroup "chopaan-sparse-k4"
+    [ bench "12 nodes"  $ whnfIO (solveTransport (mkSparseProblem 12 4))
+    , bench "24 nodes"  $ whnfIO (solveTransport (mkSparseProblem 24 4))
     ]
   ]

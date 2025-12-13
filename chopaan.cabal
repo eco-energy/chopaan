@@ -1214,6 +1214,7 @@ benchmark solver-bench
   hs-source-dirs:   benchmark
   build-depends:
       base >= 4.14
+    , chopaan
     , criterion >= 1.5
     , sbv >= 9.0
     , containers
