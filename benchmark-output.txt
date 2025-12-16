@@ -1,39 +1,74 @@
+Chopaan Transport Problem Solver Benchmark Results
+==================================================
+Using Chopaan.Kibbutz.LinOpt algorithm with Z3 backend
+GHC 9.4.8, SBV 10.10, Criterion benchmarking
+
 benchmarking chopaan-bipartite/4 nodes
-time                 39.60 ms   (38.83 ms .. 40.38 ms)
-                     0.999 R²   (0.998 R² .. 1.000 R²)
-mean                 40.02 ms   (39.72 ms .. 40.42 ms)
-std dev              642.4 μs   (444.2 μs .. 902.3 μs)
-
-benchmarking chopaan-bipartite/8 nodes
-time                 52.29 ms   (49.53 ms .. 54.49 ms)
-                     0.996 R²   (0.991 R² .. 0.999 R²)
-mean                 54.21 ms   (53.10 ms .. 55.04 ms)
-std dev              1.815 ms   (1.373 ms .. 2.380 ms)
-
-benchmarking chopaan-bipartite/16 nodes
-time                 119.4 ms   (110.9 ms .. 125.3 ms)
-                     0.995 R²   (0.983 R² .. 1.000 R²)
-mean                 114.9 ms   (111.6 ms .. 118.0 ms)
-std dev              5.168 ms   (3.868 ms .. 6.424 ms)
-variance introduced by outliers: 11% (moderately inflated)
-
-benchmarking chopaan-bipartite/32 nodes
-time                 324.5 ms   (272.6 ms .. 398.7 ms)
-                     0.987 R²   (0.970 R² .. 1.000 R²)
-mean                 336.7 ms   (314.4 ms .. 353.3 ms)
-std dev              25.09 ms   (14.19 ms .. 34.20 ms)
+time                 32.46 ms   (31.20 ms .. 33.41 ms)
+                     0.992 R²   (0.981 R² .. 0.997 R²)
+mean                 34.18 ms   (33.27 ms .. 35.09 ms)
+std dev              1.923 ms   (1.594 ms .. 2.492 ms)
 variance introduced by outliers: 18% (moderately inflated)
 
-benchmarking chopaan-sparse-k4/12 nodes
-time                 53.47 ms   (51.04 ms .. 55.64 ms)
-                     0.996 R²   (0.989 R² .. 1.000 R²)
-mean                 56.17 ms   (54.72 ms .. 57.33 ms)
-std dev              2.179 ms   (1.517 ms .. 3.321 ms)
+benchmarking chopaan-bipartite/8 nodes
+time                 46.29 ms   (44.70 ms .. 47.91 ms)
+                     0.997 R²   (0.994 R² .. 0.999 R²)
+mean                 46.57 ms   (45.77 ms .. 47.21 ms)
+std dev              1.434 ms   (1.152 ms .. 1.833 ms)
 
-benchmarking chopaan-sparse-k4/24 nodes
-time                 123.4 ms   (119.8 ms .. 131.3 ms)
-                     0.998 R²   (0.995 R² .. 1.000 R²)
-mean                 114.3 ms   (107.3 ms .. 118.1 ms)
-std dev              7.618 ms   (3.959 ms .. 10.17 ms)
-variance introduced by outliers: 12% (moderately inflated)
+benchmarking chopaan-bipartite/16 nodes
+time                 81.25 ms   (75.60 ms .. 88.52 ms)
+                     0.989 R²   (0.975 R² .. 0.999 R²)
+mean                 88.69 ms   (85.60 ms .. 90.66 ms)
+std dev              4.404 ms   (3.001 ms .. 5.708 ms)
 
+benchmarking chopaan-bipartite/32 nodes
+time                 245.5 ms   (202.5 ms .. 296.4 ms)
+                     0.988 R²   (0.970 R² .. 1.000 R²)
+mean                 257.8 ms   (240.3 ms .. 271.3 ms)
+std dev              17.58 ms   (10.96 ms .. 19.76 ms)
+variance introduced by outliers: 17% (moderately inflated)
+
+benchmarking chopaan-bipartite/64 nodes
+time                 1.315 s    (746.1 ms .. 2.059 s)
+                     0.965 R²   (0.901 R² .. 1.000 R²)
+mean                 1.197 s    (1.077 s .. 1.322 s)
+std dev              141.5 ms   (80.40 ms .. 198.1 ms)
+variance introduced by outliers: 23% (moderately inflated)
+
+benchmarking chopaan-bipartite/128 nodes
+time                 4.278 s    (4.036 s .. 4.413 s)
+                     1.000 R²   (0.999 R² .. 1.000 R²)
+mean                 4.268 s    (4.207 s .. 4.311 s)
+std dev              62.53 ms   (33.11 ms .. 87.47 ms)
+variance introduced by outliers: 19% (moderately inflated)
+
+benchmarking chopaan-bipartite/256 nodes
+time                 17.95 s    (15.13 s .. 20.95 s)
+                     0.996 R²   (0.987 R² .. 1.000 R²)
+mean                 18.76 s    (18.30 s .. 19.43 s)
+std dev              711.2 ms   (65.63 ms .. 896.9 ms)
+variance introduced by outliers: 19% (moderately inflated)
+
+benchmarking chopaan-bipartite/512 nodes
+time                 85.03 s    (78.18 s .. 98.07 s)
+                     0.997 R²   (0.995 R² .. 1.000 R²)
+mean                 83.57 s    (77.57 s .. 86.13 s)
+std dev              4.367 s    (1.237 s .. 5.918 s)
+variance introduced by outliers: 19% (moderately inflated)
+
+Summary Table
+-------------
+| Nodes | Variables | Mean Time |
+|-------|-----------|-----------|
+| 4     | 4         | 34.18 ms  |
+| 8     | 16        | 46.57 ms  |
+| 16    | 64        | 88.69 ms  |
+| 32    | 256       | 257.8 ms  |
+| 64    | 1,024     | 1.197 s   |
+| 128   | 4,096     | 4.268 s   |
+| 256   | 16,384    | 18.76 s   |
+| 512   | 65,536    | 83.57 s   |
+
+Scaling: ~O(n²) to O(n³) - polynomial time complexity
+Algorithm: Linear programming via simplex (inequality constraints)

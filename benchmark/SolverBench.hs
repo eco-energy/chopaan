@@ -122,13 +122,14 @@ solveTransport spec = optimize Lexicographic $
 main :: IO ()
 main = defaultMain
   [ bgroup "chopaan-bipartite"
-    [ bench "4 nodes"   $ whnfIO (solveTransport (mkProblem 2))
-    , bench "8 nodes"   $ whnfIO (solveTransport (mkProblem 4))
-    , bench "16 nodes"  $ whnfIO (solveTransport (mkProblem 8))
-    , bench "32 nodes"  $ whnfIO (solveTransport (mkProblem 16))
-    ]
-  , bgroup "chopaan-sparse-k4"
-    [ bench "12 nodes"  $ whnfIO (solveTransport (mkSparseProblem 12 4))
-    , bench "24 nodes"  $ whnfIO (solveTransport (mkSparseProblem 24 4))
+    [ bench "4 nodes"    $ whnfIO (solveTransport (mkProblem 2))
+    , bench "8 nodes"    $ whnfIO (solveTransport (mkProblem 4))
+    , bench "16 nodes"   $ whnfIO (solveTransport (mkProblem 8))
+    , bench "32 nodes"   $ whnfIO (solveTransport (mkProblem 16))
+    , bench "64 nodes"   $ whnfIO (solveTransport (mkProblem 32))
+    , bench "128 nodes"  $ whnfIO (solveTransport (mkProblem 64))
+    , bench "256 nodes"  $ whnfIO (solveTransport (mkProblem 128))
+    , bench "512 nodes"  $ whnfIO (solveTransport (mkProblem 256))
+    , bench "1000 nodes" $ whnfIO (solveTransport (mkProblem 500))
     ]
   ]
