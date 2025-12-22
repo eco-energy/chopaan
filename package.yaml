@@ -123,6 +123,7 @@ dependencies:
 - mwc-random
 - random
 - process
+- temporary
 when:
   condition: "!impl(ghcjs)"
   then:
