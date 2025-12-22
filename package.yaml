@@ -121,6 +121,8 @@ dependencies:
 - barbies
 - higgledy
 - mwc-random
+- random
+- process
 when:
   condition: "!impl(ghcjs)"
   then:
@@ -205,6 +207,9 @@ library:
         - Chopaan.Graph.G
         - Chopaan.Graph.Snapshot
         - Chopaan.CRUD
+        - Chopaan.AC.Solver
+        - Chopaan.AC.NeuralDispatch
+        - Chopaan.AC.Dispatch
         - Chopaan.Ui.Base
         - Chopaan.Ui.Events
         - Chopaan.Ui.AddKbtz
