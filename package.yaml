@@ -213,6 +213,7 @@ library:
         - Chopaan.AC.Dispatch
         - Chopaan.AC.SummingFunctor
         - Chopaan.AC.Properad
+        - Chopaan.AC.ResourceOptimality
         - Chopaan.Ui.Base
         - Chopaan.Ui.Events
         - Chopaan.Ui.AddKbtz
