@@ -211,6 +211,7 @@ library:
         - Chopaan.AC.Solver
         - Chopaan.AC.NeuralDispatch
         - Chopaan.AC.Dispatch
+        - Chopaan.AC.SummingFunctor
         - Chopaan.Ui.Base
         - Chopaan.Ui.Events
         - Chopaan.Ui.AddKbtz
