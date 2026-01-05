@@ -5,3 +5,4 @@ tarballs/
 certs/*
 data
 credentials
+__pycache__/
