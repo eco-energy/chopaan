@@ -115,8 +115,8 @@ data CorollaValue = CorollaValue
 buildCorolla :: DirectedGraph -> Node -> Corolla
 buildCorolla graph node = Corolla
   { corVertex   = node
-  , corInEdges  = filter ((== node) . edgeTarget) (dgEdges graph)
-  , corOutEdges = filter ((== node) . edgeSource) (dgEdges graph)
+  , corInEdges  = filter ((== node) . edgeTgt) (Set.toList $ graphEdges graph)
+  , corOutEdges = filter ((== node) . edgeSrc) (Set.toList $ graphEdges graph)
   }
 
 corollaDegIn :: Corolla -> Int
@@ -229,7 +229,7 @@ evaluateOnPath pf path =
   in mapMaybe (\me -> me >>= flip Map.lookup edgeFlows) edges
   where
     findEdge g src tgt =
-      case filter (\e -> edgeSource e == src && edgeTarget e == tgt) (dgEdges g) of
+      case filter (\e -> edgeSrc e == src && edgeTgt e == tgt) (Set.toList $ graphEdges g) of
         (e:_) -> Just e
         []    -> Nothing
 
@@ -274,10 +274,10 @@ topologicalOrder graph nodes =
 
       -- Compute in-degree within subgraph
       inDegree = Map.fromListWith (+)
-        [ (edgeTarget e, 1 :: Int)
-        | e <- dgEdges graph
-        , Set.member (edgeSource e) nodeSet
-        , Set.member (edgeTarget e) nodeSet
+        [ (edgeTgt e, 1 :: Int)
+        | e <- Set.toList $ graphEdges graph
+        , Set.member (edgeSrc e) nodeSet
+        , Set.member (edgeTgt e) nodeSet
         ]
 
       -- Start with nodes that have no incoming edges from within subgraph
@@ -292,18 +292,18 @@ topologicalOrder graph nodes =
           processed = Set.fromList newAcc
 
           -- Successors of n that might now be ready
-          successors = [ edgeTarget e
-                       | e <- dgEdges g
-                       , edgeSource e == n
-                       , Set.member (edgeTarget e) ns
+          successors = [ edgeTgt e
+                       | e <- Set.toList $ graphEdges g
+                       , edgeSrc e == n
+                       , Set.member (edgeTgt e) ns
                        ]
 
           -- Check if all predecessors are processed
           isReady node = all (`Set.member` processed)
-            [ edgeSource e
-            | e <- dgEdges g
-            , edgeTarget e == node
-            , Set.member (edgeSource e) ns
+            [ edgeSrc e
+            | e <- Set.toList $ graphEdges g
+            , edgeTgt e == node
+            , Set.member (edgeSrc e) ns
             ]
 
           newReady = filter isReady successors
@@ -317,7 +317,7 @@ processInOrder :: DirectedGraph
                -> (Node -> Map Edge PowerFlowState -> Map Edge PowerFlowState)
                -> Map Edge PowerFlowState
 processInOrder graph slackNode processNode =
-  let nodes = dgNodes graph
+  let nodes = Set.toList $ graphNodes graph
       topoNodes = topologicalOrder graph nodes
       nonSlack = filter (/= slackNode) topoNodes
   in foldl (\flows n -> processNode n flows) Map.empty nonSlack

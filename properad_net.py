@@ -243,12 +243,7 @@ class ProperadPowerFlowNet(nn.Module):
             result.append(v)
 
             for e in self.out_edges[v]:
-                t = tgt[src.index(v) if src[e] == v else e]
-                # Find target of this edge
-                for i, (s, tt) in enumerate(zip(src, tgt)):
-                    if i == e:
-                        t = tt
-                        break
+                t = tgt[e]  # Direct lookup - e is the edge index
                 in_degree[t] -= 1
                 if in_degree[t] == 0:
                     queue.append(t)

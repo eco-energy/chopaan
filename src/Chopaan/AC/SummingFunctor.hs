@@ -160,8 +160,8 @@ kirchhoffImbalance SummingFunctor{..} =
   in Map.fromList [(n, nodeImbalance n) | n <- Set.toList (graphNodes g)]
   where
     -- For PowerPair, negate both components
-    negateFlow :: c -> c
-    negateFlow = id  -- Placeholder; real implementation needs Group structure
+    negateFlow :: PowerPair -> PowerPair
+    negateFlow (PowerPair p q) = PowerPair (-p) (-q)
 
 -- | Check if a summing functor is in the Kirchhoff equalizer
 isInEqualizer :: Node -> SummingFunctor PowerPair -> Bool

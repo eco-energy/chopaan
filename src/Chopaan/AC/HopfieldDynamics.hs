@@ -54,6 +54,8 @@ module Chopaan.AC.HopfieldDynamics
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Matrix (Matrix)
@@ -217,13 +219,13 @@ inputFromInjections :: DirectedGraph
 inputFromInjections graph injections =
   ExternalInput $ Map.fromList
     [ (e, distributeInjection e)
-    | e <- dgEdges graph
+    | e <- Set.toList (graphEdges graph)
     ]
   where
     distributeInjection :: Edge -> FlowState
     distributeInjection e =
-      let srcInj = Map.findWithDefault (0, 0) (edgeSource e) injections
-          tgtInj = Map.findWithDefault (0, 0) (edgeTarget e) injections
+      let srcInj = Map.findWithDefault (0, 0) (edgeSrc e) injections
+          tgtInj = Map.findWithDefault (0, 0) (edgeTgt e) injections
           -- Half of each endpoint's injection contributes to this edge
           (pSrc, qSrc) = srcInj
           (pTgt, qTgt) = tgtInj
@@ -376,7 +378,7 @@ powerFlowHopfield :: DirectedGraph
                   -> ThresholdConfig
                   -> (HopfieldConfig, ExternalInput)
 powerFlowHopfield graph injections threshCfg =
-  let edges = dgEdges graph
+  let edges = Set.toList (graphEdges graph)
       numEdges = length edges
       edgeIdx = Map.fromList $ zip edges [0..]
 
@@ -407,10 +409,10 @@ powerFlowHopfield graph injections threshCfg =
   in (config, input)
   where
     sharesNode e1 e2 =
-      edgeSource e1 == edgeSource e2 ||
-      edgeSource e1 == edgeTarget e2 ||
-      edgeTarget e1 == edgeSource e2 ||
-      edgeTarget e1 == edgeTarget e2
+      edgeSrc e1 == edgeSrc e2 ||
+      edgeSrc e1 == edgeTgt e2 ||
+      edgeTgt e1 == edgeSrc e2 ||
+      edgeTgt e1 == edgeTgt e2
 
 -- | Find optimal dispatch as the attractor of Hopfield dynamics
 -- The neural network learns T such that attractors are optimal
@@ -424,7 +426,7 @@ dispatchAsAttractor graph injections threshCfg =
       -- Initialize with zero flows
       initialFlows = Map.fromList
         [ (e, FlowState 0 0 1.0 0)  -- Start at nominal voltage
-        | e <- dgEdges graph
+        | e <- Set.toList (graphEdges graph)
         ]
 
   in findAttractor config input initialFlows

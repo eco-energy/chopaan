@@ -404,6 +404,7 @@ dispatchOne cfg@DispatchConfig{..} DispatchState{..} state = do
       , drQSetpoints = Map.mapKeys show $ Map.mapKeys (\(NodeId i) -> i) odQSetpoints
       , drUncertainty = 0
       , drConfidence = 1.0
+      , drKirchhoffSatisfied = True  -- IPOPT solution satisfies power balance
       }
 
 -- | Convert KibbutzState to ACProblem

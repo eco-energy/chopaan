@@ -181,15 +181,36 @@ class ExternalInput(nn.Module):
 
     Distributes nodal injections (P_gen - P_load, Q_gen - Q_load)
     to edges based on network topology.
+
+    Topology-aware: Only nodes incident to an edge can influence that edge.
     """
 
-    def __init__(self, num_nodes: int, num_edges: int):
+    def __init__(self, num_nodes: int, num_edges: int, edge_index: Optional[torch.Tensor] = None):
         super().__init__()
         self.num_nodes = num_nodes
         self.num_edges = num_edges
 
-        # Learn how to distribute node injections to edges
-        self.distribution = nn.Linear(num_nodes * 2, num_edges * 2, bias=False)
+        # Build and register incidence structure for topology-aware distribution
+        if edge_index is not None:
+            # Build node-edge incidence: I[n,e] = 1 if node n in edge e
+            incidence = torch.zeros(num_nodes, num_edges)
+            incidence[edge_index[0], torch.arange(num_edges)] = 1
+            incidence[edge_index[1], torch.arange(num_edges)] = 1
+            self.register_buffer('incidence_mask', incidence)
+        else:
+            # Fallback: fully connected (will be masked during forward if incidence provided)
+            self.register_buffer('incidence_mask', torch.ones(num_nodes, num_edges))
+
+        # Learn how to distribute node injections to edges (topology-aware)
+        # Separate weights for P and Q
+        self.distribution_p = nn.Linear(num_nodes, num_edges, bias=False)
+        self.distribution_q = nn.Linear(num_nodes, num_edges, bias=False)
+
+        # Initialize weights to respect topology
+        with torch.no_grad():
+            # Only allow connections where node is incident to edge
+            self.distribution_p.weight.data *= self.incidence_mask.T
+            self.distribution_q.weight.data *= self.incidence_mask.T
 
     def forward(
         self,
@@ -197,22 +218,27 @@ class ExternalInput(nn.Module):
         incidence_matrix: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Convert node injections to edge inputs.
+        Convert node injections to edge inputs using topology.
         """
         batch_size = node_injections.shape[0] if node_injections.dim() == 3 else 1
 
-        # Flatten injections
+        # Extract P and Q injections
         if node_injections.dim() == 3:
-            flat = node_injections.reshape(batch_size, -1)
+            p_inject = node_injections[:, :, 0]  # [batch, num_nodes]
+            q_inject = node_injections[:, :, 1]
         else:
-            flat = node_injections.reshape(1, -1)
+            node_injections = node_injections.reshape(self.num_nodes, 2)
+            p_inject = node_injections[:, 0].unsqueeze(0)  # [1, num_nodes]
+            q_inject = node_injections[:, 1].unsqueeze(0)
 
-        # Distribute to edges
-        edge_inputs = self.distribution(flat)
-        edge_inputs = edge_inputs.reshape(batch_size, self.num_edges, 2)
+        # Apply topology-aware distribution
+        # Mask weights to enforce topology during forward pass
+        with torch.no_grad():
+            self.distribution_p.weight.data *= self.incidence_mask.T
+            self.distribution_q.weight.data *= self.incidence_mask.T
 
-        p_input = edge_inputs[:, :, 0]
-        q_input = edge_inputs[:, :, 1]
+        p_input = self.distribution_p(p_inject)  # [batch, num_edges]
+        q_input = self.distribution_q(q_inject)
 
         return p_input.squeeze(0), q_input.squeeze(0)
 
@@ -293,6 +319,7 @@ class HopfieldDynamics(nn.Module):
         q_max: float = 100.0,
         v_min: float = 0.94,
         v_max: float = 1.06,
+        edge_index: Optional[torch.Tensor] = None,
     ):
         super().__init__()
         self.num_nodes = num_nodes
@@ -302,7 +329,7 @@ class HopfieldDynamics(nn.Module):
         # Components
         self.transition = LearnableTransition(num_edges, hidden_dim)
         self.threshold = SoftThreshold(p_max, q_max, v_min, v_max)
-        self.external = ExternalInput(num_nodes, num_edges)
+        self.external = ExternalInput(num_nodes, num_edges, edge_index=edge_index)
 
         # Single step module
         self.step = HopfieldStep(self.transition, self.threshold, self.external)
@@ -414,6 +441,7 @@ class HopfieldPowerFlow(nn.Module):
         num_steps: int = 15,
         p_max: float = 100.0,
         q_max: float = 100.0,
+        edge_index: Optional[torch.Tensor] = None,
     ):
         super().__init__()
         self.num_nodes = num_nodes
@@ -431,7 +459,7 @@ class HopfieldPowerFlow(nn.Module):
         # Compute node injections from features
         self.injection_head = nn.Linear(hidden_dim, 2)  # (P, Q)
 
-        # Hopfield dynamics
+        # Hopfield dynamics (with topology-aware external input)
         self.hopfield = HopfieldDynamics(
             num_nodes=num_nodes,
             num_edges=num_edges,
@@ -439,6 +467,7 @@ class HopfieldPowerFlow(nn.Module):
             hidden_dim=hidden_dim,
             p_max=p_max,
             q_max=q_max,
+            edge_index=edge_index,
         )
 
         # Generator dispatch head
@@ -511,22 +540,17 @@ class HopfieldPowerFlow(nn.Module):
         return result
 
     def _build_edge_adjacency(self, edge_index: torch.Tensor) -> torch.Tensor:
-        """
-        Build edge-to-edge adjacency matrix.
-        Two edges are adjacent if they share a node.
-        """
+        """Build edge-to-edge adjacency using incidence matrix."""
         num_edges = edge_index.shape[1]
-        adj = torch.zeros(num_edges, num_edges, device=edge_index.device)
 
-        for i in range(num_edges):
-            for j in range(num_edges):
-                # Check if edges share a node
-                nodes_i = set(edge_index[:, i].tolist())
-                nodes_j = set(edge_index[:, j].tolist())
-                if nodes_i & nodes_j:  # Intersection non-empty
-                    adj[i, j] = 1.0
+        # Build node-edge incidence: I[n,e] = 1 if node n in edge e
+        incidence = torch.zeros(self.num_nodes, num_edges, device=edge_index.device)
+        incidence[edge_index[0], torch.arange(num_edges)] = 1
+        incidence[edge_index[1], torch.arange(num_edges)] = 1
 
-        return adj
+        # Edge adjacency: E_adj = I^T @ I (edges sharing nodes)
+        adj = incidence.T @ incidence
+        return (adj > 0).float()
 
 
 class HopfieldLoss(nn.Module):
@@ -623,12 +647,13 @@ def build_hopfield_model(
     num_generators: int = 3,
     hidden_dim: int = 64,
     num_steps: int = 15,
+    edge_index: Optional[torch.Tensor] = None,
 ) -> Tuple[HopfieldPowerFlow, HopfieldLoss]:
     """
     Build Hopfield power flow model and loss function.
 
     Example usage:
-        model, loss_fn = build_hopfield_model(10, 15, 3)
+        model, loss_fn = build_hopfield_model(10, 15, 3, edge_index=edge_index)
 
         # Training loop
         for batch in dataloader:
@@ -642,6 +667,7 @@ def build_hopfield_model(
         num_generators=num_generators,
         hidden_dim=hidden_dim,
         num_steps=num_steps,
+        edge_index=edge_index,
     )
 
     loss_fn = HopfieldLoss()
@@ -659,13 +685,20 @@ if __name__ == '__main__':
     num_edges = 6
     num_generators = 2
 
-    # Create model
+    # Define topology
+    edge_index = torch.tensor([
+        [0, 0, 1, 2, 2, 3],  # Source nodes
+        [1, 2, 3, 3, 4, 4],  # Target nodes
+    ])
+
+    # Create model (with topology-aware initialization)
     model, loss_fn = build_hopfield_model(
         num_nodes=num_nodes,
         num_edges=num_edges,
         num_generators=num_generators,
         hidden_dim=32,
         num_steps=10,
+        edge_index=edge_index,
     )
 
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
@@ -673,10 +706,6 @@ if __name__ == '__main__':
     # Test input
     batch_size = 4
     node_features = torch.randn(batch_size, num_nodes, 8)
-    edge_index = torch.tensor([
-        [0, 0, 1, 2, 2, 3],  # Source nodes
-        [1, 2, 3, 3, 4, 4],  # Target nodes
-    ])
 
     # Forward pass
     with torch.no_grad():

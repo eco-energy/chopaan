@@ -408,16 +408,21 @@ class EdgeFlowToNodeSetpoints(nn.Module):
         node_P = torch.zeros(batch_size, self.num_nodes, device=device)
         node_Q = torch.zeros(batch_size, self.num_nodes, device=device)
 
-        P_flows = edge_flows[:, :, 0]
+        P_flows = edge_flows[:, :, 0]  # (batch, num_edges)
         Q_flows = edge_flows[:, :, 1]
 
-        # Add outflows (positive) and subtract inflows (negative)
-        for e in range(self.num_edges):
-            s, t = src[e].item(), tgt[e].item()
-            node_P[:, s] += P_flows[:, e]  # Outflow from source
-            node_P[:, t] -= P_flows[:, e]  # Inflow to target (negative injection)
-            node_Q[:, s] += Q_flows[:, e]
-            node_Q[:, t] -= Q_flows[:, e]
+        # Vectorized: use scatter_add
+        # Expand indices for batched scatter
+        src_exp = src.unsqueeze(0).expand(batch_size, -1)
+        tgt_exp = tgt.unsqueeze(0).expand(batch_size, -1)
+
+        # Outflows: add at source
+        node_P.scatter_add_(1, src_exp, P_flows)
+        node_Q.scatter_add_(1, src_exp, Q_flows)
+
+        # Inflows: subtract at target
+        node_P.scatter_add_(1, tgt_exp, -P_flows)
+        node_Q.scatter_add_(1, tgt_exp, -Q_flows)
 
         return torch.stack([node_P, node_Q], dim=-1)
 

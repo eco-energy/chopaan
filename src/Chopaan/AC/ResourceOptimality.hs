@@ -36,6 +36,7 @@ module Chopaan.AC.ResourceOptimality
     -- * The Adjunction
   , ResourceFunctor(..)      -- ρ : C → R
   , OptimalityFunctor(..)    -- β : R → C (left adjoint)
+  , defaultOptimalityFunctor
   , AdjunctionWitness(..)
     -- * Optimization as Universal Property
   , isOptimal
@@ -57,6 +58,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Vector (Vector)
 import qualified Data.Vector as V
+import Data.List (sortBy)
+import Data.Ord (comparing)
 import GHC.Generics
 import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON, FromJSON)
@@ -136,9 +139,68 @@ defaultResourceFunctor = ResourceFunctor $ \config ->
 
 -- | β : R → C  (optimal config given resources) -- LEFT ADJOINT
 -- This is what the neural network learns!
+--
+-- In practice, applyBeta should call a trained neural network that has learned
+-- the optimal dispatch policy including transmission constraints, voltage limits,
+-- and N-1 security criteria. The network approximates the solution to the
+-- full AC optimal power flow (OPF) problem.
+--
+-- For a fallback implementation without a trained network, use defaultOptimalityFunctor
+-- which performs economic dispatch based on generator cost coefficients.
 newtype OptimalityFunctor = OptimalityFunctor
   { applyBeta :: PowerResource -> IO PowerFlowConfig
   }
+
+-- | Default optimality functor: economic dispatch without neural network
+--
+-- This is a fallback implementation that performs merit-order economic dispatch
+-- based on generator cost coefficients. It does NOT account for:
+--   - Transmission constraints (line flow limits)
+--   - Voltage constraints
+--   - AC power flow equations
+--   - N-1 security criteria
+--
+-- In practice, you should use a trained neural network via applyBeta to get
+-- a dispatch that respects all physical and operational constraints.
+defaultOptimalityFunctor :: DirectedGraph -> Map Node Double -> OptimalityFunctor
+defaultOptimalityFunctor graph loads = OptimalityFunctor $ \resources -> do
+  -- Perform economic dispatch using merit order
+  let dispatch = dispatchFromResources resources loads
+
+      -- Compute total generation and losses (simplified)
+      totalGen = sum [pfsP pf | pf <- Map.elems dispatch]
+      totalLoad = sum (Map.elems loads)
+      losses = max 0 (totalGen - totalLoad)
+
+      -- Create voltage profile (flat start at 1.0 pu)
+      nodeVoltages = Map.fromList
+        [(node, (1.0, 0.0)) | node <- dgNodes graph]
+
+      -- Compute edge flows (simplified DC approximation)
+      edgeFlows = Map.fromList
+        [(edge, estimateFlow edge) | edge <- dgEdges graph]
+
+      estimateFlow edge =
+        let src = edgeSource edge
+            tgt = edgeTarget edge
+            srcP = maybe 0 pfsP (Map.lookup src dispatch)
+            tgtP = maybe 0 pfsP (Map.lookup tgt dispatch)
+            flowP = (srcP - tgtP) / 2
+            flowQ = 0  -- Simplified: ignore reactive power
+        in PowerFlowState flowP flowQ
+
+      -- No curtailment in this simple model
+      curtailment = Map.empty
+
+      config = PowerFlowConfig
+        { pfcEdgeFlows = edgeFlows
+        , pfcNodeVoltage = nodeVoltages
+        , pfcGeneration = dispatch
+        , pfcCurtailment = curtailment
+        , pfcLosses = losses
+        }
+
+  return config
 
 --------------------------------------------------------------------------------
 -- Adjunction Witness
@@ -282,24 +344,84 @@ iterateToConvergence updateNode graph maxIter tol initialFlows =
 --------------------------------------------------------------------------------
 
 -- | Dispatch P, Q at each generator given available resources
+--
+-- Implements economic dispatch using merit order based on generator cost coefficients.
+-- Cost function: C(P) = a*P² + b*P + c
+-- Marginal cost: dC/dP = 2*a*P + b
+--
+-- Algorithm: Sort generators by marginal cost at zero output (coefficient 'b'),
+-- then dispatch cheapest generators first up to their capacity (merit order).
 dispatchFromResources :: PowerResource -> Map Node Double -> Map Node PowerFlowState
 dispatchFromResources resources loads =
   let totalLoad = sum (Map.elems loads)
       totalCapacity = sum (Map.elems $ prGenCapacity resources)
 
-      -- Simple proportional dispatch (real implementation would use OPF)
-      dispatchFraction = min 1.0 (totalLoad / totalCapacity)
+      -- If insufficient capacity, scale down load
+      actualLoad = min totalLoad totalCapacity
 
-  in Map.mapWithKey (\node cap ->
-       PowerFlowState (cap * dispatchFraction) 0  -- P only, Q=0 for simplicity
-     ) (prGenCapacity resources)
+      -- Merit order dispatch: sort generators by marginal cost at zero output
+      genList = Map.toList (prGenCapacity resources)
+
+      -- Sort by 'b' coefficient (marginal cost at P=0) from cost function a*P² + b*P + c
+      -- Generators without cost coefficients are assigned high cost (dispatched last)
+      sortedGens = sortBy (\(n1, _) (n2, _) ->
+        let (_, b1, _) = Map.findWithDefault (0, 1000, 0) n1 (prCostCoeffs resources)
+            (_, b2, _) = Map.findWithDefault (0, 1000, 0) n2 (prCostCoeffs resources)
+        in compare b1 b2
+        ) genList
+
+      -- Dispatch generators in merit order: fill cheapest first
+      (dispatchMap, _remaining) = foldl
+        (\(accMap, remainingLoad) (node, capacity) ->
+          let dispatchHere = min capacity remainingLoad
+              newRemaining = remainingLoad - dispatchHere
+          in (Map.insert node (PowerFlowState dispatchHere 0) accMap, newRemaining)
+        )
+        (Map.empty, actualLoad)
+        sortedGens
+
+      -- Add zero dispatch for any generators not needed
+      fullDispatch = foldr
+        (\(node, _) accMap ->
+          if Map.member node accMap
+            then accMap
+            else Map.insert node (PowerFlowState 0 0) accMap
+        )
+        dispatchMap
+        genList
+
+  in fullDispatch
 
 -- | Extract resource usage from a dispatch
-resourcesFromDispatch :: Map Node PowerFlowState -> PowerResource
-resourcesFromDispatch dispatch = PowerResource
+--
+-- Takes the network graph to compute approximate line flows from nodal injections.
+-- Line flow approximation: for each edge (i→j), estimate flow based on the
+-- difference in injections at nodes i and j.
+resourcesFromDispatch :: DirectedGraph -> Map Node PowerFlowState -> PowerResource
+resourcesFromDispatch graph dispatch = PowerResource
   { prGenCapacity = Map.map pfsP dispatch
-  , prLineRating = Map.empty  -- Would need edge info
-  , prVoltageRange = (0.95, 1.05)  -- Default
+  , prLineRating = computeLineRatings graph dispatch
+  , prVoltageRange = (0.95, 1.05)  -- Default range
   , prCostCoeffs = Map.empty
   , prReserveMargin = 0
   }
+  where
+    -- Compute approximate line ratings from nodal dispatch
+    computeLineRatings :: DirectedGraph -> Map Node PowerFlowState -> Map Edge Double
+    computeLineRatings graph dispatch =
+      Map.fromList
+        [ (edge, estimateEdgeFlow edge)
+        | edge <- dgEdges graph
+        ]
+
+    -- Estimate flow on edge based on source and target node injections
+    estimateEdgeFlow :: Edge -> Double
+    estimateEdgeFlow edge =
+      let src = edgeSource edge
+          tgt = edgeTarget edge
+          srcP = maybe 0 pfsP (Map.lookup src dispatch)
+          tgtP = maybe 0 pfsP (Map.lookup tgt dispatch)
+          -- Approximate flow as proportional to injection difference
+          -- In a real network, would solve power flow equations
+          flowP = abs (srcP - tgtP) / 2
+      in flowP

@@ -190,8 +190,17 @@ class ResourceFunctor(nn.Module):
     """
 
     def forward(self, config: PowerFlowConfig) -> PowerResource:
+        # Extract generation capacities
+        gen_p = config.generation[:, 0]  # P generation
+
+        # Calculate reserve margin: 1.0 - (total_gen / max_capacity)
+        total_gen = gen_p.sum()
+        max_capacity = gen_p.max() * gen_p.shape[0]  # Assume max per node * num nodes
+        reserve_margin = 1.0 - (total_gen / max_capacity).item() if max_capacity > 0 else 0.0
+        reserve_margin = max(0.0, min(1.0, reserve_margin))  # Clamp to [0, 1]
+
         return PowerResource(
-            gen_capacity=config.generation[:, 0],  # P generation
+            gen_capacity=gen_p,
             line_rating=torch.sqrt(
                 config.edge_flows[:, 0]**2 + config.edge_flows[:, 1]**2
             ),
@@ -199,8 +208,8 @@ class ResourceFunctor(nn.Module):
                 config.node_voltage[:, 0].min().item(),
                 config.node_voltage[:, 0].max().item()
             ),
-            cost_coeffs=torch.zeros(config.generation.shape[0], 3),
-            reserve_margin=0.0
+            cost_coeffs=torch.zeros(config.generation.shape[0], 3),  # No cost data
+            reserve_margin=reserve_margin
         )
 
 
@@ -454,9 +463,21 @@ class OptimalityFunctor(nn.Module):
         return generation
 
     def _compute_losses(self, edge_flows: torch.Tensor) -> float:
-        """Estimate losses (simplified: sum of |S|²)."""
+        """
+        Estimate losses using approximation: Loss ≈ R * I² ≈ R * S²/V²
+
+        Where:
+        - R_e ≈ 0.001 pu is typical distribution line resistance
+        - S_e² = P_e² + Q_e² is apparent power squared
+        - V_nom² ≈ 1.0 pu (nominal voltage)
+
+        Formula: losses = sum(R_e * S_e² / V_nom²)
+        """
+        R_line = 0.001  # Typical distribution line resistance in per-unit
+        V_nom_sq = 1.0  # Nominal voltage squared (1.0 pu)
+
         S_squared = edge_flows[:, :, 0]**2 + edge_flows[:, :, 1]**2
-        return S_squared.sum().item() * 0.01  # Rough estimate
+        return (R_line * S_squared.sum() / V_nom_sq).item()
 
 
 class ResourceOptimalDispatcher(nn.Module):
