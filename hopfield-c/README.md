@@ -51,6 +51,37 @@ least-friction route is to build inside that tree:
 
 This writes `hopfield_step.c` and `hopfield_step.h` in the working directory.
 
+### Two cabal.project fixes required (see `categorifier-c.cabal.project.patch`)
+
+`categorifier-c`'s `cabal.project` does not build as-is in 2026; two edits make
+`cabal run hopfield` succeed under GHC 9.0.1 (both captured in the patch):
+
+1. **Drop the orphaned `cmk/connections` git pin.** It is pinned at a
+   force-pushed-away commit (`e8f83fb8…`) that is ungettable via any tarball or
+   git route. `connections` is a declared dep of `categorifier-c` but is never
+   imported in its source, so removing the `source-repository-package` block
+   lets the solver take `connections` from Hackage.
+2. **Pin `index-state: 2022-03-01T00:00:00Z`.** Without it cabal solves a
+   2024-era closure against this 2022 codebase — `finite-typelits 0.2.x` drops
+   the `Data.Finite.Internal (Finite(..))` export that `concat-classes` needs.
+   The pin aligns the whole closure (`finite-typelits-0.1.4.2`, etc.) with what
+   the upstream flake built against.
+
+### Verified output
+
+`generated/hopfield_step.{c,h}` is the committed result. The entry point is
+
+    void hopfield_step(... const double input_double[13], ... double output_double[7]);
+
+`input_double` = `[x0p x0q x1p x1q x2p x2q  t0p t0q t1p t1q t2p t2q  alpha]`,
+`output_double` = `[y0p y0q y1p y1q y2p y2q  gridImport]`; all other typed
+array params are zero-length (unused). The body is branch-free SSA — the 8×
+unrolled Hopfield iteration. `generated/driver_demo.c` exercises it:
+
+    gcc -O2 -I. generated/driver_demo.c generated/hopfield_step.c -lm -o drv && ./drv
+    # settled flows: e0=(16.2555,3.8453) e1=(-6.8162,-2.3072) e2=(-5.2781,-1.5381)
+    # gridImport (slack edge P) = 16.2555
+
 To skip the from-source compile of the plugin closure, authorize the garnix
 binary cache the flake is built with:
 
