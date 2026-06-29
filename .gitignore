@@ -6,3 +6,8 @@ certs/*
 data
 credentials
 __pycache__/
+
+# pufferlib env build artifacts
+pufferlib-env/**/binding.so
+pufferlib-env/**/chopaan_demo
+pufferlib-env/**/*.o
