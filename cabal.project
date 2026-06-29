@@ -10,6 +10,11 @@ package chopaan
 
 source-repository-package
     type: git
+    location: https://github.com/eco-energy/mgenv
+    tag: master
+
+source-repository-package
+    type: git
     location: https://github.com/faezs/concat
     tag: 58dd9e82914bd1eaa2ff048f5477510892598a00
     subdir: inline
