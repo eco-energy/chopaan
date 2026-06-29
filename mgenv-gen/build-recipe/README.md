@@ -1,44 +1,62 @@
-# mgenv-json build recipe (cabal, GHC 8.6.5) — progress + remaining blocker
+# mgenv-json build recipe (cabal, GHC 8.6.5) — COMPLETE
 
-Reproducible state for building mgenv's `Grid.Sample` graph generator with
-cabal (no nix-build, no private deps). Drop these into an mgenv checkout.
+`mgenv-json` builds and runs with cabal, generating real mgenv distribution
+feeders (`../sample-output/grids.json`). No nix-build, no private deps.
+Everything here reproduces it; `mgenv-src.patch` is the full diff vs the
+pristine mgenv tarball.
 
-## Applied (all non-destructive — no source modules deleted)
+## Result
 
-1. **Inlined opt-expect** — `RL_MDP.hs` → `src/RL/MDP.hs`,
-   `Env_MonadEnv.hs` → `src/Env/MonadEnv.hs` (they only need `Streamly`),
-   and removed `opt-expect` from `package.yaml` deps.
-2. **Inlined lcirc** (private `git@bitbucket.org:ecoenergy/lcirc`, and the
-   github mirror `eco-energy/lcirc` had drifted: `ConCat.LCirc`, no `Spider`).
-   `LCirc/{LCirc,Cospan,Spider}.hs` → `src/LCirc/` as faithful self-contained
-   modules (`VI` matching the original `(NodeId, Pair R)`; a real `Spider`
-   Frobenius-fusion definition). `Grid/Grid.hs` uses nothing from them in live
-   code, so they only need to compile. Removed `lCirc` from `package.yaml`.
-3. **cabal.project** — removed the `concat-hardware` subdir (it pulls
-   unresolvable `netlist-to-verilog`; mgenv only uses
-   classes/examples/plugin/inline/known/satisfy).
-4. **build-mgenv.sh** — provides the foreign libs `nix shell` doesn't inject:
-   `libnuma` (GHC 8.6.5's RTS links `-lnuma`) and `zlib`
-   (include/lib/pkgconfig), via `LIBRARY_PATH`/`C_INCLUDE_PATH`/
-   `PKG_CONFIG_PATH` + cabal `--extra-{include,lib}-dirs`. Uses the
-   haskell.nix `ghc-8.6.5` from the store + the committed `cabal.project.freeze`.
+`cabal run mgenv-json -- 4 grids.json` produced 4 radial feeders (9–15 nodes),
+each a connected Euclidean-MST tree with real copper-wire resistances, PV
+ratings (50–500 W), and household loads — mgenv's actual `Grid.Sample`
+(`sampleGridSpec`→`generateGrid`, Delaunay→MST via hgeometry).
 
-## Remaining blocker
+## 14 blockers cleared (all non-destructive — no source modules deleted)
 
-`singletons-2.5.1` (pulled by `hgeometry`, which `Geometry.EMST` needs for the
-Delaunay→MST graph generation) fails to compile on this GHC 8.6.5:
+1. **opt-expect inlined** — `RL_MDP.hs`→`src/RL/MDP.hs`,
+   `Env_MonadEnv.hs`→`src/Env/MonadEnv.hs`; dep dropped from package.yaml.
+2. **lcirc inlined** (private bitbucket; github mirror had drifted to
+   `ConCat.LCirc` with no `Spider`) — `LCirc/{LCirc,Cospan,Spider}.hs`→
+   `src/LCirc/` (faithful `VI`, real `Spider` Frobenius def). dep dropped.
+3. **concat-hardware** subdir removed from cabal.project (unresolvable
+   `netlist-to-verilog`).
+4. **libnuma** on the link path (GHC 8.6.5 RTS links `-lnuma`).
+5. **zlib** include/lib/pkgconfig (`nix shell` doesn't inject C-lib paths).
+6. **singletons-2.5.1** patched (`singletons-2.5.1-Util.patch`): this GHC's
+   `template-haskell` has `Uniq = Integer`, so `qNewUnique`'s `return n`
+   needed `fromIntegral`. Vendored as a local package.
+7. **transformers-base / monad-control / exceptions** added (the inlined
+   `MonadEnv` instances need them); dropped its unused, streamly-git-only
+   `sampleStream`.
+8. **streamly 0.6.1 → 0.8.0** in the freeze — `stackage-to-hackage` missed
+   stack.yaml's git override; mgenv's code uses 0.8.0 internals.
+9. **Grid.HH** `hhS`/`mkHH` stubbed — household *dynamics* (unused by
+   generation) whose streamly Pipe applicative targets a streamly-git API.
+10. **Grid.HH** `runHH` defined — exported but never defined upstream.
+11. **Grid.Sample** `absToUTC` import fixed — it lives in `Physics.Time`,
+    not `Physics.Units` (mgenv import bug).
+12. **Grid.Sample** dynamics scaffolding (`GridState` free `t`,
+    `evolveGridState`, `f`, `actor`, `initGridState`) reduced to compiling
+    stubs — all unused by generation.
+13. **Grid.Sample** `tedges`→`edges` typo fixed — the MST-edge return value.
+14. **Grid.Viz / World.Server** excluded from `mgenv.cabal`'s module list
+    (files kept on disk) — diagrams/servant rendering, orthogonal to
+    generation and bit-rotted; plus a `TransmissionState{..}` record-wildcard
+    fix in Viz.
 
-    src/Data/Singletons/Util.hs:99:16: error:
-        Couldn't match type `Integer' with `Int'   (the NameU/Uniq pattern)
+## GenJson.hs
 
-despite the freeze pinning the canonical 8.6.5 trio
-(`singletons-2.5.1` / `th-desugar-1.9` / `th-abstraction-0.3.1.0`). This is
-third-party bit-rot; `diagrams`/`servant`/`concat`'s `ConCat.Circuit` are
-likely further walls in the full-library build.
+Builds the `GridSpec'` directly rather than via `Randomizable`'s `sampleThis`
+(mgenv's `Randomizable GeoC`/`LifeTime` instances are unimplemented and crash
+at runtime). `generateGrid` only forces `nNodes`/`geometricOrigin`/`nodeDist`,
+so `startDate`/`rate` are left `undefined`. `nNodes` capped to `[6..16]` (set
+`[4..4]` for env-sized feeders).
 
-## Note
+## Reproduce
 
-The graph *schema* this would emit (`grids.json`: incidence `B`,
-conductances `g`, node injections, per `GenJson.hs`) is already consumed by
-`../../pufferlib-env/chopaan` and the categorified Hopfield kernel — so the
-RL integration does not block on this build finishing.
+    # in a fresh mgenv checkout, apply mgenv-src.patch, drop in these
+    # cabal.project / cabal.project.freeze / mgenv.cabal / package.yaml /
+    # app/GenJson.hs / vendor/singletons-2.5.1 (patched), then:
+    ./build-mgenv.sh     # builds exe:mgenv-json (GHC 8.6.5 + freeze + foreign libs)
+    ./run-mgenv.sh       # cabal run mgenv-json -- N grids.json
