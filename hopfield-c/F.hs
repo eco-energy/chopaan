@@ -5,29 +5,34 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | Categorical Hopfield power-flow settling, compiled to C.
+-- | Graph-parameterized categorical Hopfield power-flow settling, compiled to C.
 --
--- This is a fixed-size instantiation of chopaan's
--- @Chopaan.AC.HopfieldDynamics.hopfieldStep@ (Manin-Marcolli Eq. 6.2):
+-- The graph mgenv generates flows in as DATA: a 4x3 directed incidence matrix
+-- B (B[n][e] = +1 if edge e leaves node n, -1 if it enters, 0 otherwise), the
+-- per-edge conductance g_e = 1/R_e, and the per-node P/Q injections. The kernel
+-- builds the coupling operator from the graph and runs chopaan's
+-- @HopfieldDynamics.hopfieldStep@ (Manin-Marcolli Eq. 6.2):
 --
 --   X_e(n+1) = a * X_e(n) + (1 - a) * threshold( SUM_e' T_ee' X_e'(n) + Th_e )
 --
--- specialised to the 4-node radial test feeder with 3 undirected edges:
+-- where, derived from the incidence matrix,
+--   adjacency   A_ee'  = SUM_n B[n][e] B[n][e']        (edges sharing a node)
+--   coupling    T_ee'  = COUP * A_ee' * g_e'           (e' /= e)
+--   ext. input  Th_e   = SUM_n B[n][e] inj[n]          (= inj[src] - inj[tgt])
+--   grid import        = SUM_e B[0][e] X_e^P           (net P leaving slack node 0)
 --
---     0 ──e0── 1 ──e1── 2
---              │
---              e2
---              │
---              3
+-- So the SAME categorified C function works over any 4-node / 3-edge topology
+-- mgenv produces (larger grids reduce onto a fixed (N,E) frame). Everything is
+-- fixed-size dense arithmetic, which Categorifier lowers to a branch-free C
+-- function. K = 8 settling iterations are unrolled.
 --
--- All three edges meet at node 1, so each edge couples to the other two
--- (T_ee' = tCoup for e' /= e, sharing node 1). We track real and reactive
--- power (P, Q) on each edge; the threshold is the categorical feasibility
--- gate (.)+ realised as a box clamp to [-pmax, pmax].
---
--- @settle@ unrolls K = 8 Hopfield iterations into straight-line arithmetic,
--- which Categorifier lowers to a branch-free C function — the fast per-step
--- kernel for the dispatch env.
+-- input_double layout (record field order, 30 doubles):
+--   b00 b01 b02  b10 b11 b12  b20 b21 b22  b30 b31 b32     -- incidence B (row-major, node-major)
+--   ip0 ip1 ip2 ip3   iq0 iq1 iq2 iq3                      -- node P and Q injections
+--   g0 g1 g2                                               -- edge conductances
+--   x0p x0q x1p x1q x2p x2q                                -- initial edge flows
+--   alpha                                                  -- damping
+-- output_double layout (7 doubles): y0p y0q y1p y1q y2p y2q  gridImport
 
 module F (hopfieldCategorified) where
 
@@ -41,17 +46,22 @@ import qualified Categorifier.Categorify as Categorify
 import Categorifier.Client (deriveHasRep)
 import GHC.Generics (Generic)
 
--- | Edge flows X plus per-edge external input Theta and the damping a.
 data Input = Input
-  { -- current edge flows (P, Q) for e0, e1, e2
+  { -- incidence matrix B, node-major: b<n><e>
+    b00 :: C Double, b01 :: C Double, b02 :: C Double,
+    b10 :: C Double, b11 :: C Double, b12 :: C Double,
+    b20 :: C Double, b21 :: C Double, b22 :: C Double,
+    b30 :: C Double, b31 :: C Double, b32 :: C Double,
+    -- node injections (real / reactive)
+    ip0 :: C Double, ip1 :: C Double, ip2 :: C Double, ip3 :: C Double,
+    iq0 :: C Double, iq1 :: C Double, iq2 :: C Double, iq3 :: C Double,
+    -- edge conductances g_e = 1/R_e
+    g0 :: C Double, g1 :: C Double, g2 :: C Double,
+    -- initial edge flows (P, Q)
     x0p :: C Double, x0q :: C Double,
     x1p :: C Double, x1q :: C Double,
     x2p :: C Double, x2q :: C Double,
-    -- external input Theta per edge (from node injections / action / loads)
-    t0p :: C Double, t0q :: C Double,
-    t1p :: C Double, t1q :: C Double,
-    t2p :: C Double, t2q :: C Double,
-    -- damping factor a in (0, 1)
+    -- damping
     alpha :: C Double
   }
   deriving (Generic)
@@ -64,7 +74,6 @@ instance GArrays C Input
 
 type instance TargetOb Input = TargetOb (CG.Rep Input ())
 
--- | Settled edge flows and a reward proxy (slack-edge real power = grid import).
 data Output = Output
   { y0p :: C Double, y0q :: C Double,
     y1p :: C Double, y1q :: C Double,
@@ -81,11 +90,10 @@ instance GArrays C Output
 
 type instance TargetOb Output = TargetOb (CG.Rep Output ())
 
--- Coupling weight between adjacent edges (all share node 1).
-tCoup :: C Double
-tCoup = 0.3
+-- Global coupling scale; the categorical (.)+ feasibility cap.
+coup :: C Double
+coup = 0.1
 
--- Per-edge flow magnitude cap; the categorical (.)+ feasibility gate.
 pmax :: C Double
 pmax = 100
 
@@ -97,31 +105,56 @@ type Flows = (C Double, C Double, C Double, C Double, C Double, C Double)
 f :: Input -> Output
 f inp =
   let a = alpha inp
-      -- one Hopfield iteration over the three edges
+      -- incidence columns (one per edge)
+      (c00, c10, c20, c30) = (b00 inp, b10 inp, b20 inp, b30 inp)  -- edge 0
+      (c01, c11, c21, c31) = (b01 inp, b11 inp, b21 inp, b31 inp)  -- edge 1
+      (c02, c12, c22, c32) = (b02 inp, b12 inp, b22 inp, b32 inp)  -- edge 2
+
+      -- adjacency A_ee' = dot of incidence columns (shared nodes)
+      a01 = c00*c01 + c10*c11 + c20*c21 + c30*c31
+      a02 = c00*c02 + c10*c12 + c20*c22 + c30*c32
+      a12 = c01*c02 + c11*c12 + c21*c22 + c31*c32
+
+      -- conductance-weighted coupling T_ee' = coup * A_ee' * g_e'
+      (gg0, gg1, gg2) = (g0 inp, g1 inp, g2 inp)
+      t01 = coup * a01 * gg1;  t02 = coup * a02 * gg2   -- into edge 0 from 1,2
+      t10 = coup * a01 * gg0;  t12 = coup * a12 * gg2   -- into edge 1 from 0,2
+      t20 = coup * a02 * gg0;  t21 = coup * a12 * gg1   -- into edge 2 from 0,1
+
+      -- external input Th_e = SUM_n B[n][e] * inj[n]
+      (jp0, jp1, jp2, jp3) = (ip0 inp, ip1 inp, ip2 inp, ip3 inp)
+      (jq0, jq1, jq2, jq3) = (iq0 inp, iq1 inp, iq2 inp, iq3 inp)
+      th0p = c00*jp0 + c10*jp1 + c20*jp2 + c30*jp3
+      th1p = c01*jp0 + c11*jp1 + c21*jp2 + c31*jp3
+      th2p = c02*jp0 + c12*jp1 + c22*jp2 + c32*jp3
+      th0q = c00*jq0 + c10*jq1 + c20*jq2 + c30*jq3
+      th1q = c01*jq0 + c11*jq1 + c21*jq2 + c31*jq3
+      th2q = c02*jq0 + c12*jq1 + c22*jq2 + c32*jq3
+
+      upd old net = a * old + (1 - a) * clamp net
+
       oneStep :: Flows -> Flows
       oneStep (p0, q0, p1, q1, p2, q2) =
-        let upd old net = a * old + (1 - a) * clamp net
-            -- e0 couples to e1, e2; external input Theta_e0
-            n0p = upd p0 (tCoup * (p1 + p2) + t0p inp)
-            n0q = upd q0 (tCoup * (q1 + q2) + t0q inp)
-            n1p = upd p1 (tCoup * (p0 + p2) + t1p inp)
-            n1q = upd q1 (tCoup * (q0 + q2) + t1q inp)
-            n2p = upd p2 (tCoup * (p0 + p1) + t2p inp)
-            n2q = upd q2 (tCoup * (q0 + q1) + t2q inp)
-         in (n0p, n0q, n1p, n1q, n2p, n2q)
+        ( upd p0 (t01*p1 + t02*p2 + th0p)
+        , upd q0 (t01*q1 + t02*q2 + th0q)
+        , upd p1 (t10*p0 + t12*p2 + th1p)
+        , upd q1 (t10*q0 + t12*q2 + th1q)
+        , upd p2 (t20*p0 + t21*p1 + th2p)
+        , upd q2 (t20*q0 + t21*q1 + th2q)
+        )
 
-      -- unroll K = 8 iterations toward the Hopfield attractor
       settle = oneStep . oneStep . oneStep . oneStep
              . oneStep . oneStep . oneStep . oneStep
 
       (f0p, f0q, f1p, f1q, f2p, f2q) =
         settle (x0p inp, x0q inp, x1p inp, x1q inp, x2p inp, x2q inp)
+
+      gridP = c00*f0p + c01*f1p + c02*f2p   -- net P leaving slack node 0
    in Output
         { y0p = f0p, y0q = f0q,
           y1p = f1p, y1q = f1q,
           y2p = f2p, y2q = f2q,
-          -- slack edge e0 real-power flow ~ net grid import at the tie point
-          gridImport = f0p
+          gridImport = gridP
         }
 
 hopfieldCategorified :: Input `C.Cat` Output
