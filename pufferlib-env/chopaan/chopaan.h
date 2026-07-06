@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "hopfield_step.h"   // categorified kernel: void hopfield_step(...double in[30]...double out[7])
+#include "mgenv_grids.h"     // real mgenv 4-node feeders (MGENV_GRIDS[MGENV_NUM_GRIDS])
 
 #define CH_HOURS 24
 #define CH_NODES 4
@@ -46,6 +47,7 @@ typedef struct {
 
     // running state
     int hour;
+    int grid_id;                   // which mgenv feeder (index into MGENV_GRIDS)
     unsigned int rng;
     double xflow[2*CH_EDGES];      // persisted edge flows (P,Q) across the settle
     double p_load[CH_NODES];
@@ -80,7 +82,16 @@ static void free_allocated(Chopaan* env){
     free(env->terminals); free(env->truncations);
 }
 
-// Default 4-node radial test feeder (overwritten when a grid is loaded).
+// Load one of mgenv's sampled 4-node feeders into this env.
+static void ch_load_grid(Chopaan* env, int gid){
+    const MgenvGrid* G = &MGENV_GRIDS[((gid % MGENV_NUM_GRIDS) + MGENV_NUM_GRIDS) % MGENV_NUM_GRIDS];
+    memcpy(env->B, G->B, sizeof(env->B));
+    memcpy(env->g, G->g, sizeof(env->g));
+    memcpy(env->p_load_base, G->p_load_base, sizeof(env->p_load_base));
+    env->p_rated = G->p_rated;
+}
+
+// Fallback synthetic feeder (unused once mgenv grids are loaded).
 static void ch_default_grid(Chopaan* env){
     // e0:0->1, e1:1->2, e2:1->3
     double B[CH_NODES][CH_EDGES] = {{1,0,0},{-1,1,1},{0,-1,0},{0,0,-1}};
@@ -110,7 +121,7 @@ static void ch_write_obs(Chopaan* env){
 }
 
 static void c_reset(Chopaan* env){
-    if (env->B[0][0]==0 && env->B[1][0]==0) ch_default_grid(env);
+    ch_load_grid(env, env->grid_id);   // this env trains on mgenv feeder grid_id
     env->hour = 0;
     env->grid_import = 0.0;
     memset(env->xflow, 0, sizeof(env->xflow));

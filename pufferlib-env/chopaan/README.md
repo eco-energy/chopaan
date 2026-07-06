@@ -63,8 +63,24 @@ vector trainer. Verified end-to-end (4 vec envs, 24-step episodes, returns ≈ �
   peak/off-peak tariff; grid import comes from the settled slack-edge flow.
 - **Episode:** 24 hourly steps, auto-reset on terminal.
 
-## Wiring mgenv grids (next)
+## mgenv feeders per env (wired)
 
-`ch_default_grid` hardcodes the 4-node test feeder. A `my_put` in `binding.c`
-can stream an mgenv grid (`grids.json` → incidence `B` + conductances `g` +
-base loads) per env so each parallel env trains on a different sampled feeder.
+`mgenv_grids.h` is codegen'd from the real mgenv output
+(`../../mgenv-gen/sample-output/grids_4node.json`) — 32 distinct 4-node
+Euclidean-MST feeders, each with directed incidence `B`, per-edge conductance
+`g` (relative `1/R`, normalized), PV rating, and base loads. `binding.c`'s
+`my_init` reads the per-env `seed` PufferLib injects and sets
+`grid_id = seed`, so **each parallel env trains on a distinct mgenv feeder**
+(`c_reset` → `ch_load_grid(env, grid_id)`). Verified: 8 vec envs → 8 distinct
+24h returns; ~2.5 M steps/sec rotating across all grids.
+
+Regenerate the header after producing more grids:
+
+    python3 - <<'EOF'  # grids_4node.json -> mgenv_grids.h  (see mgenv-gen/build-recipe)
+    ...builds MGENV_GRIDS[] with normalized conductances...
+    EOF
+
+So the full path is now closed end to end: **mgenv (Haskell/cabal) samples the
+feeder topology → categorifier lowers chopaan's Hopfield step to C → the
+PufferLib env settles that kernel over each mgenv graph at millions of
+steps/sec.**

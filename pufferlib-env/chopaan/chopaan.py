@@ -1,5 +1,5 @@
 '''Chopaan grid-dispatch env: categorical Hopfield physics (categorified to C)
-over an mgenv-generated feeder topology.'''
+over a distinct mgenv-generated feeder per env (grid = seed % MGENV_NUM_GRIDS).'''
 import gymnasium
 import numpy as np
 
