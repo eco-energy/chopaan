@@ -37,12 +37,15 @@ import           DearImGui
 import           DearImGui.OpenGL3
 import           DearImGui.SDL
 import           DearImGui.SDL.OpenGL
-import           DearImGui.Raw (ImVec2(..), ImU32)
+import           DearImGui.Raw (ImVec2(..), ImU32, getForegroundDrawList, imCol32)
 import qualified DearImGui.Raw.DrawList as DL
 import           Foreign.C.Types (CFloat, CInt)
+import           Foreign.Marshal.Utils (with)
+import           Foreign.Ptr (nullPtr)
+import           Foreign.C.String (withCString)
 
 import           Kernel (Flows(..), settle)
-import           Feeder (Feeder(..), loadFeeders, demoFeeder)
+import           Feeder (Feeder(..), sampleFeeders, demoFeeder)
 
 --------------------------------------------------------------------------------
 -- App state (individual IORefs so the ImGui widgets bind directly)
@@ -123,9 +126,7 @@ packInput app fd = do
 -- NB: dear-imgui's ImU32 is a Word32 (0xAABBGGRR). If your version wraps it in
 -- a newtype, replace `fromIntegral w` with its constructor.
 col :: Int -> Int -> Int -> Int -> ImU32
-col r g b a =
-  let w = (a `shiftL` 24) .|. (b `shiftL` 16) .|. (g `shiftL` 8) .|. r :: Int
-  in fromIntegral (fromIntegral w :: Word32)
+col r g b a = imCol32 (fromIntegral r) (fromIntegral g) (fromIntegral b) (fromIntegral a)
 
 roleColour :: Role -> ImU32
 roleColour Slack   = col 90 160 250 255   -- blue  grid-tie
@@ -147,7 +148,7 @@ v2 = ImVec2
 
 drawGraph :: App -> IO ()
 drawGraph app = do
-  dl    <- DL.getForegroundDrawList
+  dl    <- getForegroundDrawList
   g     <- readIORef (appGraph app)
   pos   <- readIORef (appPos app)
   fl    <- readIORef (appFlows app)
@@ -158,14 +159,16 @@ drawGraph app = do
     let (ux,uy) = p u; (vx,vy) = p v
         pw      = maybe 0 fst (lookup i (zip [0..] (fEdge fl)))
         thick   = realToFrac (2 + min 8 (abs pw/6)) :: CFloat
-    DL.addLine dl (v2 ux uy) (v2 vx vy) (edgeColour pw) thick
+    with (v2 ux uy) $ \p1 -> with (v2 vx vy) $ \p2 ->
+      DL.addLine dl p1 p2 (edgeColour pw) thick
   -- nodes
   forM_ (G.vertexList g) $ \n -> do
     let (x,y) = p n
-    DL.addCircleFilled dl (v2 x y) (18::CFloat) (roleColour (roleOf n)) (24::CInt)
-    DL.addCircle       dl (v2 x y) (18::CFloat) (col 20 20 25 255) (24::CInt) (2::CFloat)
-    -- label (node id); if your dear-imgui lacks DrawList.addText, drop this line
-    DL.addText dl (v2 (x-4) (y-7)) (col 20 20 25 255) (T.pack (show n))
+    with (v2 x y) $ \c -> do
+      DL.addCircleFilled dl c (18::CFloat) (roleColour (roleOf n)) (24::CInt)
+      DL.addCircle       dl c (18::CFloat) (col 20 20 25 255) (24::CInt) (2::CFloat)
+    with (v2 (x-4) (y-7)) $ \tp -> withCString (show n) $ \cs ->
+      DL.addText_ dl tp (col 20 20 25 255) cs nullPtr
 
 --------------------------------------------------------------------------------
 -- Interaction: drag nodes with the mouse when ImGui isn't using it
@@ -253,7 +256,7 @@ cycleFeeder app = do
 
 main :: IO ()
 main = do
-  feeders0 <- loadFeeders "grids_4node.json"
+  feeders0 <- sampleFeeders 32          -- live, in-process, via mgenv's generateGrid
   let feeders = if null feeders0 then [demoFeeder] else feeders0
   SDL.initializeAll
   runManaged $ do

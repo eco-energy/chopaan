@@ -23,9 +23,9 @@ executable chopaan-viz
                       , managed
                       , containers
                       , algebraic-graphs  >=0.5
-                      , aeson
-                      , bytestring
                       , text
+                      , mgenv-gen9
+                      , monad-bayes
 
     default-language:   Haskell2010
     ghc-options:        -O2 -threaded -Wall -Wno-unused-imports

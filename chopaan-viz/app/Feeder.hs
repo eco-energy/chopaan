@@ -1,28 +1,31 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
--- | Feeders come from mgenv's *real* @Grid.Sample.generateGrid@.
+-- | Feeders come from mgenv's real @generateGrid@, called DIRECTLY in-process.
 --
--- Why a subprocess and not a direct import: mgenv is pinned to GHC 8.6.5
--- (ConCat / hgeometry / streamly / monad-bayes), while dear-imgui needs GHC
--- ≥8.10 (we build on 9.0.1). One program cannot link both GHCs, so the renderer
--- crosses the boundary by *running mgenv's own binary* (`mgenv-json`) and
--- decoding its output — i.e. it invokes the actual mgenv sampler live, rather
--- than baking a static file. Set @MGENV_JSON@ to the binary, or drop it on PATH.
--- Falls back to a bundled JSON, then a built-in demo, if mgenv isn't reachable.
+-- This is possible because mgenv's generation core was migrated to GHC 9.0.1
+-- (see mgenv-gen/migrate-9.0.1): EMST reimplemented with Prim's (no hgeometry),
+-- dynamics/ConCat/streamly/astro stripped, monad-bayes ported. So the renderer
+-- links the mgenv library and samples feeders live — no subprocess, no JSON.
 module Feeder
   ( Feeder(..)
-  , sampleFeeders     -- live: run mgenv's generateGrid via its binary
-  , loadFeedersFile   -- fallback: decode a committed grids.json
+  , sampleFeeders
   , demoFeeder
   ) where
 
-import           Control.Exception (try, SomeException)
-import           Data.Aeson (FromJSON(..), withObject, eitherDecode, (.:))
-import qualified Data.ByteString.Lazy as BSL
-import qualified Data.ByteString.Lazy.Char8 as BSLC
-import           System.Directory (findExecutable)
-import           System.Environment (lookupEnv)
-import           System.Process (readProcess)
+import           Control.Monad (replicateM)
+import           Data.List (sortOn)
+import qualified Data.Map.Strict as Map
+
+import qualified Algebra.Graph.Labelled as LG
+import           Control.Monad.Bayes.Class (normal, uniform)
+import           Control.Monad.Bayes.Sampler.Strict (sampleIO)
+
+import           Grid.Sample (GridSpec'(..), SampledGrid(..), generateGrid)
+import           Grid.HH (HHSpec(..))
+import qualified Physics.Consumption as Cn
+import qualified Physics.PV as PV
+import           Physics.Transmission (resistance)
+import           Physics.Units (location)
 
 data Feeder = Feeder
   { fdEdges :: [(Int,Int)]
@@ -31,43 +34,34 @@ data Feeder = Feeder
   , fdLoad  :: [Double]
   } deriving Show
 
-instance FromJSON Feeder where
-  parseJSON = withObject "grid" $ \o -> do
-    src   <- o .: "edge_src"
-    tgt   <- o .: "edge_tgt"
-    rohm  <- o .: "edge_r_ohm"
-    rated <- o .: "node_p_rated_kw"
-    load  <- o .: "node_p_load_kw"
-    let c0 = map (\x -> 1 / max 1e-9 x) (rohm :: [Double])
-        m  = if null c0 then 1 else maximum c0
-    pure Feeder { fdEdges = zip src tgt, fdCond = map (/ m) c0
-                , fdRated = rated, fdLoad = load }
-
-newtype Grids = Grids [Feeder]
-instance FromJSON Grids where
-  parseJSON = withObject "grids" $ \o -> Grids <$> o .: "grids"
-
-decodeGrids :: BSL.ByteString -> [Feeder]
-decodeGrids b = case eitherDecode b of Right (Grids gs) -> gs; Left _ -> []
-
--- | Sample @n@ fresh feeders by invoking mgenv's real generateGrid (its binary
--- writes the grids JSON to stdout when given no output path). Locates the binary
--- via $MGENV_JSON or PATH; on any failure returns [] so the caller can fall back.
+-- | Sample @n@ feeders by running mgenv's real generateGrid in-process. The
+-- feeder-size law lives here (Gaussian ~6, clamped to the kernel's [4..8]).
 sampleFeeders :: Int -> IO [Feeder]
-sampleFeeders n = do
-  mbin <- lookupEnv "MGENV_JSON"
-  bin  <- maybe (findExecutable "mgenv-json") (pure . Just) mbin
-  case bin of
-    Nothing -> pure []
-    Just b  -> do
-      r <- try (readProcess b [show n] "") :: IO (Either SomeException String)
-      pure $ either (const []) (decodeGrids . BSLC.pack) r
+sampleFeeders n = sampleIO $ replicateM n (fmap toFeeder (generateGrid spec))
+  where
+    spec = GridSpec
+      { geometricOrigin = pure (location 24.86 67.0)             -- Karachi
+      , nNodes          = do x <- normal 6 2; pure (max 4 (min 8 (round x)))
+      , nodeDist        = do m <- normal 20 60; s <- normal 10 20; normal m (abs s)
+      }
 
--- | Fallback: decode a committed grids.json.
-loadFeedersFile :: FilePath -> IO [Feeder]
-loadFeedersFile fp = do
-  e <- try (BSL.readFile fp) :: IO (Either SomeException BSL.ByteString)
-  pure $ either (const []) decodeGrids e
+-- | Flatten mgenv's labelled graph (TransmissionSpec edges, HHSpec nodes) to the
+-- renderer's compact record — same reduction the JSON path used, done directly.
+toFeeder :: SampledGrid -> Feeder
+toFeeder (SampledGrid g) = Feeder edges cond rated load
+  where
+    verts   = LG.vertexList g
+    nodeMap = Map.fromListWith (\_ old -> old) [ (nId hh, hh) | hh <- verts ]
+    nodes   = sortOn fst (Map.toList nodeMap)
+    idx     = Map.fromList (zip (map fst nodes) [0 :: Int ..])
+    es      = [ (tx, s, t) | (tx, s, t) <- LG.edgeList g, nId s /= nId t ]
+    edges   = [ (idx Map.! nId s, idx Map.! nId t) | (_, s, t) <- es ]
+    cond0   = [ 1 / max 1e-9 (resistance tx) | (tx, _, _) <- es ]
+    mx      = if null cond0 then 1 else maximum cond0
+    cond    = map (/ mx) cond0
+    rated   = [ PV.power (generation hh) / 1000 | (_, hh) <- nodes ]
+    load    = [ let Cn.ConsumptionSpec ls = consumption hh
+                in sum (map Cn.power ls) / 1000 | (_, hh) <- nodes ]
 
 demoFeeder :: Feeder
 demoFeeder = Feeder
