@@ -35,8 +35,8 @@ Prob.Randomizable (monad-bayes-ported).
 
 ## Status
 - [x] EMST reimplemented (hgeometry dropped)
-- [ ] Physics.Units pure reimpl (drop astro)
-- [ ] strip dynamics/ConCat/streamly from samplers + Grid.HH + Grid.Sample
-- [ ] monad-bayes 1.3.x port
-- [ ] cabal.project for 9.0.1, build + iterate
-- [ ] wire into chopaan-viz (Feeder imports Grid.Sample directly)
+- [x] Physics.Units pure reimpl (drop astro)
+- [x] strip dynamics/ConCat/streamly from samplers + Grid.HH + Grid.Sample
+- [x] monad-bayes 1.1 port (MonadSample -> MonadDistribution)
+- [x] builds clean on GHC 9.0.1 (all 9 modules, BUILD_EXIT=0)
+- [x] wired into chopaan-viz: Feeder imports Grid.Sample; renderer links + BUILD_EXIT=0
