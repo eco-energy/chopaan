@@ -11,3 +11,7 @@ __pycache__/
 pufferlib-env/**/binding.so
 pufferlib-env/**/chopaan_demo
 pufferlib-env/**/*.o
+
+# cabal build artifacts
+dist-newstyle/
+**/dist-newstyle/

@@ -91,6 +91,10 @@ gridToValue (SampledGrid g) =
        , "s_base_kw"        .= sBaseKW
        ]
 
+nMin, nMax :: Int
+nMin = 4
+nMax = 8   -- kernel's fixed max feeder size
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -105,7 +109,13 @@ main = do
           { startDate       = undefined
           , rate            = undefined
           , geometricOrigin = pure (location 24.86 67.0)   -- Karachi
-          , nNodes          = uniformD [6 .. 16]
+            -- feeder size ~ a plausible LV-segment distribution rather than a
+            -- fixed count: Gaussian around ~6 service points, clamped to the
+            -- kernel's [nMin .. nMax]. (edges follow: a radial feeder is a
+            -- tree, so |E| = |V| - 1 out of the EMST.)
+          , nNodes          = do
+              x <- normal 6 2.0
+              pure (max nMin (min nMax (round x)))
           , nodeDist        = do { m <- normal 20 60; sd <- normal 10 20; normal m (abs sd) }
           }
     generateGrid spec
