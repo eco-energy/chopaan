@@ -1,0 +1,371 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.5.
+--
+-- see: https://github.com/sol/hpack
+
+name:           mgenv
+version:        0.1.0.0
+description:    Please see the README on Github at <https://github.com/faezs/mgenv#readme>
+homepage:       https://github.com/faezs/mgenv#readme
+bug-reports:    https://github.com/faezs/mgenv/issues
+author:         Faez Shakil
+maintainer:     faez.shakil@gmail.com
+copyright:      2019 Faez Shakil
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/faezs/mgenv
+
+library
+  exposed-modules:
+      Env.MonadEnv
+      Geometry.EMST
+      Grid
+      Grid.Grid
+      Grid.HH
+      Grid.MDP
+      Grid.Sample
+      LCirc.Cospan
+      LCirc.LCirc
+      LCirc.Spider
+      Physics
+      Physics.Consumption
+      Physics.Converters
+      Physics.Field
+      Physics.PV
+      Physics.Storage
+      Physics.Symplectic
+      Physics.Time
+      Physics.Transmission
+      Physics.Units
+      Physics.VectorSpaces
+      Prob.GenerativeModel
+      Prob.Randomizable
+      RL.MDP
+  other-modules:
+      Paths_mgenv
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2
+  build-depends:
+      MemoTrie
+    , QuickCheck
+    , adjunctions
+    , aeson
+    , algebraic-graphs
+    , astro
+    , base >=4.11 && <10
+    , bytestring
+    , checkers
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , containers
+    , diagrams
+    , diagrams-contrib
+    , diagrams-core
+    , diagrams-lib
+    , diagrams-svg
+    , dimensional
+    , distributive
+    , exceptions
+    , extra
+    , fast-logger
+    , fused-effects
+    , generic-lens
+    , geodetics
+    , ghc-prim
+    , hgeometry
+    , hgeometry-combinatorial
+    , hspec
+    , keys
+    , lens
+    , monad-bayes
+    , monad-control
+    , mtl
+    , newtype-generics
+    , non-empty
+    , parallel
+    , pointed
+    , pretty-simple
+    , sbv
+    , servant
+    , servant-server
+    , streamly
+    , text
+    , time
+    , time-compat
+    , transformers
+    , transformers-base
+    , vector-space
+    , wai-middleware-static
+    , warp
+  default-language: Haskell2010
+
+executable design-exe
+  main-is: DesignApp.hs
+  other-modules:
+      Paths_mgenv
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
+  build-depends:
+      MemoTrie
+    , QuickCheck
+    , adjunctions
+    , aeson
+    , algebraic-graphs
+    , astro
+    , base
+    , bytestring
+    , checkers
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , containers
+    , diagrams
+    , diagrams-contrib
+    , diagrams-core
+    , diagrams-lib
+    , diagrams-svg
+    , dimensional
+    , distributive
+    , exceptions
+    , extra
+    , fast-logger
+    , fused-effects
+    , generic-lens
+    , geodetics
+    , ghc-prim
+    , hgeometry
+    , hgeometry-combinatorial
+    , hspec
+    , keys
+    , lens
+    , mgenv
+    , monad-bayes
+    , monad-control
+    , mtl
+    , newtype-generics
+    , non-empty
+    , optparse-simple
+    , parallel
+    , pointed
+    , pretty-simple
+    , sbv
+    , servant
+    , servant-server
+    , streamly
+    , text
+    , time
+    , time-compat
+    , transformers
+    , transformers-base
+    , vector-space
+    , wai-middleware-static
+    , warp
+  default-language: Haskell2010
+
+executable mgenv-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_mgenv
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
+  build-depends:
+      MemoTrie
+    , QuickCheck
+    , adjunctions
+    , aeson
+    , algebraic-graphs
+    , astro
+    , base
+    , bytestring
+    , checkers
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , containers
+    , diagrams
+    , diagrams-contrib
+    , diagrams-core
+    , diagrams-lib
+    , diagrams-svg
+    , dimensional
+    , distributive
+    , exceptions
+    , extra
+    , fast-logger
+    , fused-effects
+    , generic-lens
+    , geodetics
+    , ghc-prim
+    , hgeometry
+    , hgeometry-combinatorial
+    , hspec
+    , keys
+    , lens
+    , mgenv
+    , monad-bayes
+    , monad-control
+    , mtl
+    , newtype-generics
+    , non-empty
+    , optparse-simple
+    , parallel
+    , pointed
+    , pretty-simple
+    , sbv
+    , servant
+    , servant-server
+    , streamly
+    , text
+    , time
+    , time-compat
+    , transformers
+    , transformers-base
+    , vector-space
+    , wai-middleware-static
+    , warp
+  default-language: Haskell2010
+
+executable mgenv-json
+  main-is: GenJson.hs
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -O2
+  build-depends:
+      MemoTrie
+    , QuickCheck
+    , adjunctions
+    , aeson
+    , algebraic-graphs
+    , astro
+    , base
+    , bytestring
+    , checkers
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , containers
+    , diagrams
+    , diagrams-contrib
+    , diagrams-core
+    , diagrams-lib
+    , diagrams-svg
+    , dimensional
+    , distributive
+    , exceptions
+    , extra
+    , fast-logger
+    , fused-effects
+    , generic-lens
+    , geodetics
+    , ghc-prim
+    , hgeometry
+    , hgeometry-combinatorial
+    , hspec
+    , keys
+    , lens
+    , mgenv
+    , monad-bayes
+    , monad-control
+    , mtl
+    , newtype-generics
+    , non-empty
+    , parallel
+    , pointed
+    , pretty-simple
+    , sbv
+    , servant
+    , servant-server
+    , streamly
+    , text
+    , time
+    , time-compat
+    , transformers
+    , transformers-base
+    , vector-space
+    , wai-middleware-static
+    , warp
+  default-language: Haskell2010
+
+test-suite mgenv-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      CircAffSpec
+      Common
+      GeometrySpec
+      GridSpec
+      HHSpec
+      PVSpec
+      SolarSpec
+      StorageSpec
+      Paths_mgenv
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fplugin=ConCat.Plugin -O2 -threaded -rtsopts -with-rtsopts=-N -fplugin=ConCat.Plugin -O2
+  build-depends:
+      MemoTrie
+    , QuickCheck
+    , adjunctions
+    , aeson
+    , algebraic-graphs
+    , astro
+    , base >=4.11 && <10
+    , bytestring
+    , checkers
+    , concat-classes
+    , concat-examples
+    , concat-plugin
+    , containers
+    , diagrams
+    , diagrams-contrib
+    , diagrams-core
+    , diagrams-lib
+    , diagrams-svg
+    , dimensional
+    , distributive
+    , exceptions
+    , extra
+    , fast-logger
+    , fused-effects
+    , generic-lens
+    , geodetics
+    , ghc-prim
+    , hgeometry
+    , hgeometry-combinatorial
+    , hspec
+    , keys
+    , lens
+    , mgenv
+    , monad-bayes
+    , monad-control
+    , mtl
+    , newtype-generics
+    , non-empty
+    , parallel
+    , pointed
+    , pretty-simple
+    , sbv
+    , servant
+    , servant-server
+    , streamly
+    , text
+    , time
+    , time-compat
+    , transformers
+    , transformers-base
+    , vector-space
+    , wai-middleware-static
+    , warp
+  default-language: Haskell2010

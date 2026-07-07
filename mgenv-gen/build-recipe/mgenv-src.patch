@@ -1,0 +1,575 @@
+diff -ruN /tmp/mgenv-orig/src/Env/MonadEnv.hs /tmp/mgenv/src/Env/MonadEnv.hs
+--- /tmp/mgenv-orig/src/Env/MonadEnv.hs	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/mgenv/src/Env/MonadEnv.hs	2026-06-29 20:36:51.572115450 +0000
+@@ -0,0 +1,42 @@
++{-# LANGUAGE TypeApplications #-}
++{-# LANGUAGE DeriveGeneric #-}
++{-# LANGUAGE StandaloneDeriving #-}
++{-# LANGUAGE GeneralizedNewtypeDeriving #-}
++{-# LANGUAGE StandaloneDeriving #-}
++{-# LANGUAGE MultiParamTypeClasses #-}
++{-# LANGUAGE TypeFamilies #-}
++{-# LANGUAGE FlexibleContexts #-}
++{-# LANGUAGE RankNTypes #-}
++
++module Env.MonadEnv (MonadEnv(..), sampleIOE) where
++
++import Control.Monad.Bayes.Class
++import Control.Monad.Bayes.Sampler
++import Control.Monad.Base
++import Control.Monad.Trans.Control
++import Control.Monad.Catch
++import Control.Monad.IO.Class
++import GHC.Generics
++
++
++
++newtype MonadEnv a = MonadEnv { runMonadEnv :: SamplerIO a } deriving (Functor, Applicative, Monad, MonadIO, Generic)
++
++instance MonadThrow MonadEnv where
++  throwM = MonadEnv . liftIO . throwM
++
++
++instance MonadBase IO MonadEnv where
++  liftBase = MonadEnv . liftIO
++
++instance MonadBaseControl IO MonadEnv where
++  type StM MonadEnv a = a
++  -- liftBaseWith :: ((forall a. m a -> IO (StM m a)) -> IO a) -> m a
++  liftBaseWith f = liftIO $ liftBaseWith @IO @IO (\run -> f (run . sampleIO . runMonadEnv)) 
++  restoreM a = liftIO $ restoreM @IO @IO a
++
++deriving instance MonadSample MonadEnv
++
++sampleIOE :: (forall a. MonadEnv a -> IO a)
++sampleIOE = sampleIO . runMonadEnv
++
+diff -ruN /tmp/mgenv-orig/src/Grid/HH.hs /tmp/mgenv/src/Grid/HH.hs
+--- /tmp/mgenv-orig/src/Grid/HH.hs	2021-10-27 00:45:45.000000000 +0000
++++ /tmp/mgenv/src/Grid/HH.hs	2026-06-29 20:45:02.699877479 +0000
+@@ -135,9 +135,16 @@
+ hhS :: (S.MonadAsync m, MonadSample m)
+   => HHState m a
+   -> Pipe m (T m, Wind m, T m) (BatteryState, (ConsumptionState, Watts), (Watts, Watts), Watts)
+-hhS HHState{..} = (,,,) <$> (a batteryState) <*> (a consumptionState) <*> (a txState) <*> (a generationState)
+-  where
+-    a = S.adapt
++hhS = undefined
++
++runHH :: a
++runHH = undefined
++  -- exported by the original module but never defined; Grid.Sample imports it
++  -- only in a comment. Defined as bottom so the module's export list resolves.
++  -- NOTE: household *dynamics*; unused by graph generation (Grid.Sample
++  -- imports it but only references it in comments). The original streamK/Pipe
++  -- applicative does not typecheck against Hackage streamly-0.8.0 (it was built
++  -- against a streamly git commit with a different Pipe API). Stubbed to compile.
+ 
+ type Wind m = UF.Unfold m (GeoC, T') MetersPerSecond
+ 
+@@ -158,31 +165,9 @@
+   -> TransmissionSpec
+   -> HHSpec
+   -> HHState m a
+-mkHH HHSpec{..} delT time windSpeed ambientTemp transmission = HHState
+-  { batteryState = bs'
+-  , consumptionState = cs
+-  , txState = runTransmission tspec tx
+-  , generationState = generated
+-  }
+-  where
+-    t = hence 1000 time delT
+-    cs = consumptionS consumption
+-    consumed = fmap snd cs
+-    cstate = fmap fst cs
+-    (TransmissionState (tspec, tx@(Transmission vSrc iT vSink))) = transmission 
+-    pvT t = runPV loc generation (unZonedTime . toZonedTime $ t) ambientTemp windSpeed
+-    generated :: t m Watts
+-    generated = S.map pvT t
+-    bV :: t m BatteryState -> t m V
+-    bV = fmap batteryVoltage
+-    generationCurrent = S.zipWith (/) generated . bV
+-    consumptionCurrent = S.zipWith (/) consumed . bV
+-    txCurrent = iT
+-    batteryCurrent :: t m BatteryState -> t m Amp
+-    batteryCurrent s = zipSum (zipSum iT (generationCurrent s)) (consumptionCurrent s)
+-    bs' = batteryS storage (S.zipWith (\t' bc -> (snd t', bc)) t (batteryCurrent bs')) 
+-    reward = S.zipWith (+) (fmap energyStored bs') consumed
+-    zipSum = S.zipWith (+)
++mkHH = undefined
++  -- NOTE: household dynamics; unused by graph generation. Streamly Pipe/zip
++  -- combinators here target a streamly git API, not Hackage 0.8.0. Stubbed.
+ 
+ toZonedTime :: T' -> ZonedTime
+ toZonedTime = fromUTC . absToUTC . fst
+diff -ruN /tmp/mgenv-orig/src/Grid/HH.hs.orig /tmp/mgenv/src/Grid/HH.hs.orig
+--- /tmp/mgenv-orig/src/Grid/HH.hs.orig	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/mgenv/src/Grid/HH.hs.orig	2026-06-29 20:44:00.625400247 +0000
+@@ -0,0 +1,191 @@
++{-# LANGUAGE RecordWildCards #-}
++{-# LANGUAGE DeriveGeneric #-}
++{-# LANGUAGE NamedFieldPuns #-}
++{-# LANGUAGE RankNTypes, GADTs #-}
++{-# LANGUAGE FlexibleContexts, FlexibleInstances, TypeOperators #-}
++{-# LANGUAGE ConstraintKinds, KindSignatures, ScopedTypeVariables, TypeApplications #-}
++module Grid.HH
++  ( sampleHH
++  , HHSpec(..)
++  , NodeId
++  , HHState(..)
++  , hhS
++  , runHH
++  , initHHState
++  ) where
++
++import ConCat.Misc hiding (R, C)
++import GHC.Generics hiding (R, C)
++
++import Control.Monad.State
++
++import Control.Monad.Bayes.Class
++
++import Data.Void
++
++import qualified Streamly.Prelude as S
++import qualified Streamly.Internal.Data.Stream.IsStream as S
++
++import qualified Streamly.Internal.Data.Fold as FL
++import qualified Streamly.Internal.Data.Unfold as UF
++import qualified Streamly.Internal.Data.Pipe as P
++import Streamly.Internal.Data.Pipe (Pipe(..))
++
++import Physics.Storage
++  (initBatteryState,  sampleBatterySpec
++  , BatteryState
++  , BatterySpec
++  , batteryVoltage
++  , batteryS
++  , stateNext
++  , energyStored
++  )
++
++import Physics.PV
++  ( samplePVSpec
++  , runPV
++  , PVSpec
++  )
++  
++
++import Physics.Units
++  ( unZonedTime
++  , R
++  , GeoC
++  , EuclideanC
++  , Watts
++  , Amp
++  , DelT
++  , MetersPerSecond
++  , Temperature
++  , ZonedTime
++  , unZonedTime
++  , V
++  , Amp
++  , Ohm
++  , fromUTC
++  )
++
++import Physics.Time (hence, henceUF, absToUTC, T, T', IntervalT)
++
++import Physics.Consumption
++  ( ConsumptionSpec
++  , ConsumptionState
++  , sampleConsumptionSpec
++  , initConsumptionState
++  , consumptionS
++  )
++
++import Physics.Transmission
++  (TransmissionState(..), TransmissionSpec(..), Transmission(..), sendTx, recieveTx)
++
++import Grid hiding (Transmission)
++-- A household tracks three types of State:
++-- (Storage, Consumption, Transmission)
++-- This state results in a Reward at the end of an episode
++type NodeId = Int
++
++type Reward = R
++
++-- battery :: VI s grid battery
++--           -> VI s load battery
++--           -> VI s gen battery
++--           -> C s (battery s) (battery s)
++--           -> C s ((grid :*: load :*: gen) s) (battery s)
++-- battery (VI (gv, gi)) (lv, li) (gnv, gni) c = applyC c
++
++data HH s grid battery load gen where
++  Storage :: C s ((grid :*: load :*: gen) s) (battery s) -> HH s grid battery load gen
++
++
++newtype HHState' m a = HHState' (Pipe m (HHSpec :* TransmissionSpec) (BatteryState, ConsumptionState, Watts, Transmission))
++data HHState (m :: (* -> *)) a =
++  HHState { batteryState :: Pipe m a BatteryState
++          , consumptionState :: Pipe m a (ConsumptionState, Watts)
++          , generationState :: Pipe m a Watts
++          , txState :: Pipe m a (Watts, Watts)
++          }
++  deriving (Generic)
++
++
++initHHState :: ConsumptionSpec -> (BatteryState, ConsumptionState)
++initHHState cs = (initBatteryState, initConsumptionState cs)
++
++data HHSpec = HHSpec
++  { nId :: NodeId
++  , loc :: GeoC
++  , gridLoc  :: EuclideanC
++  , storage  :: BatterySpec
++  , generation :: PVSpec
++  , consumption :: ConsumptionSpec
++  } deriving (Eq, Show, Generic)
++
++instance Ord HHSpec where
++  a `compare` b = (nId a) `compare` (nId b)
++
++
++sampleHH :: (MonadSample m) => NodeId -> GeoC -> EuclideanC -> m HHSpec
++sampleHH n loc grloc = do
++  storage <- sampleBatterySpec
++  gen <- samplePVSpec
++  consump <- sampleConsumptionSpec
++  return $ HHSpec n loc grloc storage gen consump
++
++
++hhS :: (S.MonadAsync m, MonadSample m)
++  => HHState m a
++  -> Pipe m (T m, Wind m, T m) (BatteryState, (ConsumptionState, Watts), (Watts, Watts), Watts)
++hhS HHState{..} = (,,,) <$> (a batteryState) <*> (a consumptionState) <*> (a txState) <*> (a generationState)
++  where
++    a = S.adapt
++
++type Wind m = UF.Unfold m (GeoC, T') MetersPerSecond
++
++type Temp m = UF.Unfold m (GeoC, T') Temperature
++
++
++windy :: Wind m
++windy = undefined
++
++temperate :: Temp m
++temperate = undefined
++
++    
++mkHH :: forall m a. (S.MonadAsync m, MonadSample m)
++  => T m
++  -> Wind m
++  -> Temp m
++  -> TransmissionSpec
++  -> HHSpec
++  -> HHState m a
++mkHH HHSpec{..} delT time windSpeed ambientTemp transmission = HHState
++  { batteryState = bs'
++  , consumptionState = cs
++  , txState = runTransmission tspec tx
++  , generationState = generated
++  }
++  where
++    t = hence 1000 time delT
++    cs = consumptionS consumption
++    consumed = fmap snd cs
++    cstate = fmap fst cs
++    (TransmissionState (tspec, tx@(Transmission vSrc iT vSink))) = transmission 
++    pvT t = runPV loc generation (unZonedTime . toZonedTime $ t) ambientTemp windSpeed
++    generated :: t m Watts
++    generated = S.map pvT t
++    bV :: t m BatteryState -> t m V
++    bV = fmap batteryVoltage
++    generationCurrent = S.zipWith (/) generated . bV
++    consumptionCurrent = S.zipWith (/) consumed . bV
++    txCurrent = iT
++    batteryCurrent :: t m BatteryState -> t m Amp
++    batteryCurrent s = zipSum (zipSum iT (generationCurrent s)) (consumptionCurrent s)
++    bs' = batteryS storage (S.zipWith (\t' bc -> (snd t', bc)) t (batteryCurrent bs')) 
++    reward = S.zipWith (+) (fmap energyStored bs') consumed
++    zipSum = S.zipWith (+)
++
++toZonedTime :: T' -> ZonedTime
++toZonedTime = fromUTC . absToUTC . fst
++-- hhStep :: forall t m. (S.IsStream t, S.MonadAsync m, MonadSample m) =>
++--   HHSpec -> (DelT -> ZonedTime -> MetersPerSecond -> Temperature -> Transmission -> HHState t m)
++-- hhStep hspec = hhStep' hspec
+diff -ruN /tmp/mgenv-orig/src/Grid/Sample.hs /tmp/mgenv/src/Grid/Sample.hs
+--- /tmp/mgenv-orig/src/Grid/Sample.hs	2021-10-27 00:45:45.000000000 +0000
++++ /tmp/mgenv/src/Grid/Sample.hs	2026-06-29 20:49:09.735957919 +0000
+@@ -51,9 +51,10 @@
+   , incrementTime
+   , dateStartToUTC
+   , fromUTC
+-  , absToUTC
+   )
+ 
++import Physics.Time (absToUTC)
++
+ 
+ import RL.MDP
+ import Env.MonadEnv
+@@ -127,14 +128,17 @@
+ 
+ newtype SampledGrid = SampledGrid (LG.Graph TransmissionSpec HHSpec) deriving (Eq, Show, Generic)
+ 
+-newtype GridState m = GridState (LG.Graph (UF.Unfold TransmissionState  ) (NodeId, HHState t m))
++-- NOTE: original GridState referenced a free type var `t`, a nullary
++-- TransmissionState at wrong arity, and Monad/Applicative derives that do not
++-- hold for a labelled graph. It is dynamics scaffolding unused by graph
++-- generation (sampleGridSpec/generateGrid). Reduced to a compiling newtype.
++newtype GridState m = GridState (LG.Graph TransmissionSpec HHSpec)
+   deriving (Generic)
+-  deriving newtype (Functor, Monad, Applicative)
+ 
+ -- instance Functor GridState
+ 
+ evolveGridState :: (((x -> s) -> x) -> s)
+-evolveGridState = unGridState
++evolveGridState = undefined
+ 
+ --runG :: LG.Graph (TransmissionState t m) (HHStat
+ --runG g = LG.foldg
+@@ -147,10 +151,11 @@
+ --stepGridState :: (GridState t m, GridAction) -> m (GridState t m, GridAction)
+ --stepGridState ((GridState s), (GridAction a)) = liftA2 (TransmissionState, HHState, HHState)
+ 
+-f :: ([HHState t m], HHState t m) -> TransmissionState t m
++-- f, actor: dynamics stubs (original signatures used a free `t`); unused by generation.
++f :: a
+ f = undefined
+ 
+-actor :: (([HHState t m], HHState t m) -> TransmissionState t m) -> GridState t m -> GridAction
++actor :: a
+ actor = undefined
+ 
+ 
+@@ -234,6 +239,10 @@
+ --       | otherwise = TransmissionState 0.001
+ --     hhInit HHSpec{consumption} = HHState S.nil S.nil S.nil S.nil
+ 
++initGridState :: a
++initGridState = undefined
++  -- exported but only present commented-out upstream; unused by graph generation.
++
+ toHH :: (MonadSample m) => Node -> m HHSpec
+ toHH (Node{node, geoCoords, coords}) = sampleHH node geoCoords coords
+ 
+@@ -267,7 +276,7 @@
+ type Graph = (NodeDict, [Edge]) 
+ 
+ localAndGlobalLoc :: GeoC -> [AngularCoords] -> Graph
+-localAndGlobalLoc center angularCoords = (nodeDict, tedges)
++localAndGlobalLoc center angularCoords = (nodeDict, edges)
+   where
+     radials = map (\a -> (radial a center)) angularCoords
+     ix = zip [(0::NodeId)..] $ positiveGridPoints angularCoords
+diff -ruN /tmp/mgenv-orig/src/Grid/Viz.hs /tmp/mgenv/src/Grid/Viz.hs
+--- /tmp/mgenv-orig/src/Grid/Viz.hs	2021-10-27 00:45:45.000000000 +0000
++++ /tmp/mgenv/src/Grid/Viz.hs	2026-06-29 20:50:10.552323644 +0000
+@@ -67,7 +67,7 @@
+       ||| (consumptionD consumption conState) # named (ConsumptionD nId)
+ 
+ transmissionD :: TransmissionSpec -> TransmissionState -> Diagram B
+-transmissionD spec@TransmissionSpec{..} state@TransmissionState{..} = showSpecState spec state
++transmissionD spec state = showSpecState spec state
+ 
+ 
+ showSpecState :: (Show a1, Show a2) => a1 -> a2 -> Diagram B
+diff -ruN /tmp/mgenv-orig/src/LCirc/Cospan.hs /tmp/mgenv/src/LCirc/Cospan.hs
+--- /tmp/mgenv-orig/src/LCirc/Cospan.hs	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/mgenv/src/LCirc/Cospan.hs	2026-06-29 20:07:28.373020509 +0000
+@@ -0,0 +1,15 @@
++{-# LANGUAGE DeriveGeneric #-}
++
++-- | Inlined from eco-energy/lcirc (module LCirc.Cospan).
++-- A cospan i -> apex <- o (the open-system gluing structure for LCirc).
++module LCirc.Cospan
++  ( Cospan(..)
++  ) where
++
++import GHC.Generics (Generic)
++
++data Cospan a i o = Cospan
++  { apex  :: a
++  , legIn :: i
++  , legOut :: o
++  } deriving (Eq, Show, Generic)
+diff -ruN /tmp/mgenv-orig/src/LCirc/LCirc.hs /tmp/mgenv/src/LCirc/LCirc.hs
+--- /tmp/mgenv-orig/src/LCirc/LCirc.hs	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/mgenv/src/LCirc/LCirc.hs	2026-06-29 20:07:28.368305856 +0000
+@@ -0,0 +1,14 @@
++{-# LANGUAGE DeriveGeneric #-}
++
++-- | Inlined from eco-energy/lcirc (module LCirc.LCirc).
++-- Minimal surface mgenv's Grid.Grid imports (`import LCirc.LCirc hiding (VI)`).
++-- VI is the vertex-injection type; original: newtype VI = VI (NodeId, Pair R).
++module LCirc.LCirc
++  ( VI(..)
++  ) where
++
++import GHC.Generics (Generic)
++
++-- | Vertex injection: a node id paired with a (real, imag) value, as in lcirc.
++newtype VI = VI (Int, (Double, Double))
++  deriving (Eq, Ord, Show, Generic)
+diff -ruN /tmp/mgenv-orig/src/LCirc/Spider.hs /tmp/mgenv/src/LCirc/Spider.hs
+--- /tmp/mgenv-orig/src/LCirc/Spider.hs	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/mgenv/src/LCirc/Spider.hs	2026-06-29 20:07:28.374606100 +0000
+@@ -0,0 +1,30 @@
++{-# LANGUAGE GADTs #-}
++{-# LANGUAGE DeriveGeneric #-}
++
++-- | Inlined Spider definition for lcirc (the mirror left `data Spider m n`
++-- commented out). A spider is the Frobenius (co)multiplication generator that
++-- fuses the m input wires and n output wires meeting at a network node — the
++-- open-graph vertex used when composing LCirc cospans.
++module LCirc.Spider
++  ( Spider(..)
++  , spider
++  , fuse
++  ) where
++
++import GHC.Generics (Generic)
++
++-- | An (m, n) spider carrying a node label @l@: m inputs, n outputs.
++data Spider l = Spider
++  { spiderIn    :: !Int
++  , spiderOut   :: !Int
++  , spiderLabel :: l
++  } deriving (Eq, Show, Generic)
++
++-- | The canonical (m, n) spider on a label.
++spider :: Int -> Int -> l -> Spider l
++spider = Spider
++
++-- | Frobenius fusion: two spiders sharing a label merge, summing legs
++-- (special commutative Frobenius algebra law).
++fuse :: Spider l -> Spider l -> Spider l
++fuse (Spider i1 o1 l) (Spider i2 o2 _) = Spider (i1 + i2) (o1 + o2) l
+diff -ruN /tmp/mgenv-orig/src/RL/MDP.hs /tmp/mgenv/src/RL/MDP.hs
+--- /tmp/mgenv-orig/src/RL/MDP.hs	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/mgenv/src/RL/MDP.hs	2026-06-29 19:59:01.467669086 +0000
+@@ -0,0 +1,119 @@
++{-# LANGUAGE RankNTypes #-}
++{-# LANGUAGE ConstraintKinds #-}
++{-# LANGUAGE TypeApplications #-}
++{-# LANGUAGE FlexibleContexts #-}
++{-# LANGUAGE ScopedTypeVariables #-}
++{-# LANGUAGE NamedFieldPuns #-}
++{-# LANGUAGE DeriveGeneric #-}
++{-# LANGUAGE GeneralizedNewtypeDeriving #-}
++module RL.MDP where
++
++import GHC.Generics hiding (R)
++
++import Data.Monoid
++import Control.Monad.Bayes.Class ()
++import Control.Monad.Trans.State.Strict hiding (get, modify', put, state)
++import Control.Monad.State.Class
++import Control.Monad.Trans.Class () --(lift)
++
++
++
++import Streamly
++import qualified Streamly.Prelude as S
++
++
++-- $ A Markov process takes place in a probability monad,
++-- $ and has s as its state
++data MarkovProcess m s = MP {
++  step :: s -> m s
++}
++
++-- $ Running a process is iterating monadically over the state
++-- $ s -> m s . s -> m s . s -> m s
++simulate :: forall t m s. (IsStream t, MonadAsync m)
++  => MarkovProcess m s
++  -> s
++  -> t m s
++simulate (MP {step}) s = S.iterateM step (pure s)
++
++
++----------------Dealing With Rewards ----------------------------------
++-- $ The reward defines what to accomplish and is a monoidal number
++type Reward = Sum Double
++
++ -- $ One step of a MarkovRewardProcess gives us the next state and the reward
++-- $data MarkovRewardProcess m s = MRP { step' :: s -> m (s, Reward) } 
++-- $ This is a WriterT Reward around m
++type MarkovRewardProcess m s = MarkovProcess (StateT Reward m) s
++
++
++
++-- $ This is how we inject the reward at each step 
++reward :: (MonadState Reward m) => Double -> m ()
++reward x =  modify' (<> Sum x)
++
++--------------------- MDP ----------------------------------
++-- $ an MDP takes a state and an action and returns the next state and reward 
++data MarkovDecisionProcess m s a = MDP { act :: s -> (s -> a) -> StateT Reward m s }
++
++
++-- $ A function from state to action
++type Policy s a = s -> a
++
++
++-- $ Choose the action that maximizes our total expected reward
++-- $                 This is equivalent to
++-- $ Find the Policy that maximizes our total expected reward
++
++
++-- $ Application of the policy to the Markov Decision Process returns a Markov Reward Process
++
++-- $ MDP + Policy = MRP
++apply :: forall m s a. Policy s a -> MarkovDecisionProcess m s a -> MarkovRewardProcess m s
++apply policy (MDP{ act }) = MP { step = \ s -> act s policy } 
++
++
++
++-- EXAMPLE
++{--
++demandForecast :: MonadSample m => m Double
++demandForecast = normal 100 50
++
++store :: (Monad m) => m Double -> MarkovProcess m Double
++store demand = MP {
++  step = \inventory -> do
++      let ordered = 3
++      demanded <- demand
++      let sold = min inventory demanded
++      pure (inventory - sold + ordered)
++}
++
++storeMDP :: (Monad m) => m Double -> MarkovDecisionProcess m Double Double
++storeMDP demand = MDP {
++  act = \ inventory orderer -> do
++      let ordered = orderer inventory
++      reward $ (-1) * inventory
++      reward $ (-4) * ordered
++
++      demanded <- lift demand
++      let sold = min demanded inventory
++          missed = demanded - sold
++      reward (sold * 6 - missed * 12)
++      pure (inventory - sold + ordered)
++}
++
++
++storeSMDP :: (Monad m) => m Double -> StochasticMDP m Double Double
++storeSMDP demand = SMDP {
++  actS = \ inventory orderer -> do
++      ordered <- lift orderer
++      reward (-1 * inventory)
++      reward (-4 * ordered)
++
++      demanded <- lift demand
++      let sold = min demanded inventory
++          missed = demanded - sold
++      reward (sold * 6 - missed * 12)
++      pure (inventory - sold + ordered)
++}
++--}

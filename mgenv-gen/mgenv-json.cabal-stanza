@@ -1,0 +1,18 @@
+
+  # hpack stanza: append to mgenv's package.yaml under `executables:`
+  mgenv-json:
+    main:                GenJson.hs
+    source-dirs:         app
+    dependencies:
+    - mgenv
+    - base
+    - aeson
+    - bytestring
+    - containers
+    - algebraic-graphs
+    - monad-bayes
+    other-modules: []
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -O2

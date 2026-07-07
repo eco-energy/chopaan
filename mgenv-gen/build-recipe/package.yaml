@@ -1,0 +1,153 @@
+name:                mgenv
+version:             0.1.0.0
+github:              faezs/mgenv
+license:             BSD3
+author:              Faez Shakil
+maintainer:          faez.shakil@gmail.com
+copyright:           2019 Faez Shakil
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on Github at <https://github.com/faezs/mgenv#readme>
+
+dependencies:
+- base >= 4.11 && < 10
+- streamly
+- generic-lens
+- algebraic-graphs
+- time
+- dimensional
+- astro
+- extra
+- aeson
+- MemoTrie
+- parallel
+- fused-effects
+- monad-bayes
+- transformers-base
+- monad-control
+- exceptions
+- non-empty
+- geodetics
+- mtl
+- containers
+- lens
+- concat-classes
+- concat-examples
+- concat-plugin
+- text
+- adjunctions
+- distributive
+- warp
+- fast-logger
+- servant
+- servant-server
+- wai-middleware-static
+- bytestring
+- QuickCheck
+- vector-space
+- checkers
+- pointed
+- hspec
+- diagrams
+- diagrams-core
+- diagrams-lib
+- diagrams-contrib
+- diagrams-svg
+- keys
+- pretty-simple
+- hgeometry
+- hgeometry-combinatorial
+- transformers
+- newtype-generics
+- ghc-prim
+- sbv
+- time-compat
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wpartial-fields
+- -Wredundant-constraints
+- -fplugin=ConCat.Plugin
+- -O2
+
+library:
+  source-dirs: src
+
+executables:
+  mgenv-exe:
+    main:                Main.hs
+    source-dirs:         app
+    dependencies:
+    - mgenv
+    - optparse-simple
+    - base
+    other-modules:
+      - Paths_mgenv    
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -fplugin=ConCat.Plugin
+    - -O2
+
+  mgenv-json:
+    main:                GenJson.hs
+    source-dirs:         app
+    dependencies:
+    - mgenv
+    - base
+    - aeson
+    - bytestring
+    - containers
+    - algebraic-graphs
+    - monad-bayes
+    other-modules: []
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -O2
+
+  design-exe:
+    main:                DesignApp.hs
+    source-dirs:         app
+    dependencies:
+    - mgenv
+    - optparse-simple
+    - base
+    other-modules:
+      - Paths_mgenv
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -fplugin=ConCat.Plugin
+    - -O2
+tests:
+  mgenv-test:
+    main:                Spec.hs
+    source-dirs:         test
+    dependencies:
+    - mgenv
+    - hspec
+    - QuickCheck
+    - checkers
+
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -fplugin=ConCat.Plugin
+    - -O2

@@ -73,6 +73,7 @@ dependencies:
 - keys
 - vector
 - vector-sized
+- matrix
 - dimensional
 - retry
 - algebraic-graphs >= 0.5
@@ -121,6 +122,9 @@ dependencies:
 - barbies
 - higgledy
 - mwc-random
+- random
+- process
+- temporary
 when:
   condition: "!impl(ghcjs)"
   then:
@@ -205,6 +209,13 @@ library:
         - Chopaan.Graph.G
         - Chopaan.Graph.Snapshot
         - Chopaan.CRUD
+        - Chopaan.AC.Solver
+        - Chopaan.AC.NeuralDispatch
+        - Chopaan.AC.Dispatch
+        - Chopaan.AC.SummingFunctor
+        - Chopaan.AC.Properad
+        - Chopaan.AC.ResourceOptimality
+        - Chopaan.AC.HopfieldDynamics
         - Chopaan.Ui.Base
         - Chopaan.Ui.Events
         - Chopaan.Ui.AddKbtz
